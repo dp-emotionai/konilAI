@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/* =========================
+   ELAS Design Tokens
+   Clean SaaS (Light-first)
+   ========================= */
+:root {
+  /* Backgrounds */
+  --bg: #f6f7fb;            /* page background */
+  --surface: #ffffff;       /* cards / panels */
+  --surface-subtle: #f2f4f8;/* inputs / subtle fills */
+  --border: rgba(15, 18, 34, 0.10);
+
+  /* Text */
+  --text: #0f1222;
+  --muted: rgba(15, 18, 34, 0.62);
+
+  /* Primary (purple) */
+  --primary: 142 91 255;
+  --primary-hover: 164 123 255;
+  --primary-muted: rgba(142, 91, 255, 0.12);
+
+  /* Radii */
+  --radius: 14px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+
+  /* States */
+  --success: 61 220 151;
+  --warning: 245 165 36;
+  --error: 255 77 109;
+
+  /* Shadows (light) */
+  --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 14px 40px rgba(15, 23, 42, 0.10);
+}
+
+/* Optional dark theme (NO gradients) */
+:root.dark {
+  --bg: #0f1117;
+  --surface: #151826;
+  --surface-subtle: #1b2032;
+  --border: rgba(255, 255, 255, 0.10);
+
+  --text: rgba(255, 255, 255, 0.92);
+  --muted: rgba(255, 255, 255, 0.62);
+
+  --primary-muted: rgba(142, 91, 255, 0.22);
+
+  /* Shadows (dark) */
+  --shadow-soft: 0 16px 45px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 18px 60px rgba(0, 0, 0, 0.45);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-sans);
+  background: var(--bg);
+  text-rendering: geometricPrecision;
+}
+
+/* ✅ Убираем тёмный градиент полностью */
+.dark body {
+  background: var(--bg);
+}
+
+/* Typography polish */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+/* Selection */
+::selection {
+  background: rgba(142, 91, 255, 0.22);
+}
+
+/* Better focus defaults */
+:focus-visible {
+  outline: none;
+}
+
+/* Smooth UI feel */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Inputs/buttons feel more premium */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* Subtle scrollbar */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(15, 18, 34, 0.16);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border: 3px solid transparent;
+  background-clip: content-box;
+}

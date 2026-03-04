@@ -1,0 +1,42 @@
+{
+  "session_id": "83e90f89-2e11-4ee6-8533-c31c2c3cb112",
+  "session_name": "Realtime Analysis - SCHOOL",
+  "start_time": "2026-02-27T06:57:37.067266",
+  "end_time": "2026-02-27T06:57:39.881769",
+  "duration_seconds": 0.0,
+  "averages": {
+    "engagement": 0.0,
+    "stress": 0.0,
+    "fatigue": 0.0,
+    "risk": 0.0,
+    "stability": 0.0
+  },
+  "initial": {
+    "engagement": 0.0,
+    "stress": 0.0,
+    "fatigue": 0.0
+  },
+  "final": {
+    "engagement": 0.0,
+    "stress": 0.0,
+    "fatigue": 0.0
+  },
+  "changes": {
+    "engagement": 0.0,
+    "stress": 0.0,
+    "fatigue": 0.0
+  },
+  "patterns": {
+    "engagement_trend": "STABLE",
+    "stress_peaks": 0,
+    "disengagement_periods": 0
+  },
+  "total_students": 0,
+  "student_metrics": {},
+  "attention_drops": [],
+  "confidence_segments": {
+    "start": 0.0,
+    "middle": 0.0,
+    "end": 0.0
+  }
+}

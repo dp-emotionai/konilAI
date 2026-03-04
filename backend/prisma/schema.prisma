@@ -1,0 +1,250 @@
+// ELAS Backend — SQLite for dev (switch to PostgreSQL for production via DATABASE_URL)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         String   // "student" | "teacher" | "admin"
+  name         String?
+  status       String   @default("active") // "active" | "blocked"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  groupsAsTeacher     Group[]
+  groupMemberships    GroupMember[]
+  invitationsReceived Invitation[]  @relation("InvitationInvitee")
+  sessionsAsTeacher   Session[]
+  consentRecords      ConsentRecord[]
+
+  // Chat relations
+  groupMessages    GroupMessage[]      @relation("GroupMessageSender")
+  sessionMessages  SessionMessage[]    @relation("SessionMessageSender")
+  messageReads     MessageRead[]
+  chatMutesCreated ChatMute[]          @relation("ChatMuteCreator")
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  teacherId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher     User             @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  sessions    Session[]
+  members     GroupMember[]
+  invitations Invitation[]
+
+  // Chat
+  messages       GroupMessage[]
+  chatSettings   GroupChatSettings?
+
+  @@index([teacherId])
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+  role      String   @default("student") // "student" | "assistant"
+  status    String   @default("active")   // "active" | "removed" | "blocked"
+  addedAt   DateTime @default(now())
+  removedAt DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+  @@index([status])
+}
+
+model Invitation {
+  id           String   @id @default(uuid())
+  groupId      String
+  inviteeEmail String   // email to invite (or found user's email)
+  inviteeUserId String? // set when user found; student who accepts
+  status       String   @default("pending") // "pending" | "accepted" | "declined" | "expired" | "revoked"
+  token        String?  // for email link (optional)
+  createdAt    DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User? @relation("InvitationInvitee", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([inviteeUserId])
+  @@index([status])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  title       String
+  type        String   // "lecture" | "exam"
+  status      String   @default("draft") // "draft" | "active" | "finished"
+  code        String   @unique // e.g. ELAS-9K2A for join
+  groupId     String
+  createdById String
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  teacher User    @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  consents ConsentRecord[]
+
+  // Chat
+  messages   SessionMessage[]
+  chatPolicy SessionChatPolicy?
+
+  @@index([groupId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model ConsentRecord {
+  id         String   @id @default(uuid())
+  userId     String
+  sessionId  String
+  consentedAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId])
+  @@index([sessionId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String   // userId who did the action
+  action     String   // e.g. "session_created", "session_started", "session_ended", "group_created"
+  entityType String   // "session" | "group" | "user" | "model" | "storage"
+  entityId   String?
+  meta       String?  // JSON string for extra data
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+/// Group-level chat messages (Announcements / Q&A / Chat / system)
+model GroupMessage {
+  id        String   @id @default(uuid())
+  groupId   String
+  senderId  String
+  type      String   // "message" | "announcement" | "question" | "answer" | "system"
+  text      String
+  replyToId String?  // thread parent
+  qaStatus  String?  // for questions: "open" | "answered" | "resolved"
+  pinnedAt  DateTime?
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender User @relation("GroupMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  reads MessageRead[]
+
+  @@index([groupId])
+  @@index([senderId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+/// Session-level chat messages (Lecture/Exam modes, public + help channel)
+model SessionMessage {
+  id           String   @id @default(uuid())
+  sessionId    String
+  senderId     String
+  type         String   // "message" | "question" | "system" | "moderation" | "reaction"
+  text         String
+  channel      String   @default("public") // "public" | "help"
+  helpStudentId String? // for private help channel threads
+  createdAt    DateTime @default(now())
+  editedAt     DateTime?
+  deletedAt    DateTime?
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender  User    @relation("SessionMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([senderId])
+  @@index([channel])
+  @@index([createdAt])
+}
+
+/// Reactions (👍 ❓ 🐢 🔁 …) for both group and session messages
+model MessageReaction {
+  id        String   @id @default(uuid())
+  scope     String   // "group" | "session"
+  messageId String   // FK to GroupMessage.id or SessionMessage.id (scope decides)
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@index([scope, messageId])
+  @@index([userId])
+  @@unique([scope, messageId, userId, emoji])
+}
+
+/// Read receipts for announcements in groups
+model MessageRead {
+  id              String   @id @default(uuid())
+  groupMessageId  String
+  userId          String
+  readAt          DateTime @default(now())
+
+  announcement GroupMessage @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupMessageId])
+  @@index([userId])
+  @@unique([groupMessageId, userId])
+}
+
+/// Mutes for group or session chat
+model ChatMute {
+  id           String   @id @default(uuid())
+  scope        String   // "group" | "session"
+  scopeId      String   // groupId or sessionId
+  targetUserId String
+  mutedUntil   DateTime
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  creator User @relation("ChatMuteCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([scope, scopeId])
+  @@index([targetUserId])
+}
+
+/// Per-group chat settings (optional group chat + slowmode)
+model GroupChatSettings {
+  groupId      String   @id
+  chatEnabled  Boolean  @default(true)
+  slowmodeSec  Int      @default(0) // 0 = no slowmode
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+/// Per-session chat policy (Lecture/Exam modes etc.)
+model SessionChatPolicy {
+  sessionId    String   @id
+  mode         String   @default("lecture_open") // "lecture_open" | "questions_only" | "locked" | "exam_help_only"
+  slowmodeSec  Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
