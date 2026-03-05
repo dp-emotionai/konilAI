@@ -15,9 +15,9 @@ export default function PageHero({
 }) {
   return (
     <div className={cn("mx-auto w-full max-w-elas-page px-4", className)}>
-      <div className="rounded-elas-lg bg-surface/70 shadow-soft px-5 sm:px-6 py-5 sm:py-6">
+      <div className="pt-6 sm:pt-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="max-w-2xl space-y-2.5">
+          <div className="max-w-2xl space-y-2">
             {overline ? (
               <div className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
                 {overline}
@@ -37,6 +37,9 @@ export default function PageHero({
 
           {right ? <div className="shrink-0">{right}</div> : null}
         </div>
+
+        {/* softer divider (avoid harsh 1px lines in dark) */}
+        <div className="mt-6 h-px w-full bg-[color:var(--border)] opacity-70 dark:opacity-50" />
       </div>
     </div>
   );

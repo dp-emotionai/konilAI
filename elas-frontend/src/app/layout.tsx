@@ -12,11 +12,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-bg text-fg antialiased">
         <ThemeProvider>
           <UIProvider>
-            <TopNav />
-            <Shell>
-              <RoleGuard>{children}</RoleGuard>
-            </Shell>
-            <Footer />
+            {/* Ensure UI always renders above the noise overlay */}
+            <div className="relative z-10">
+              <TopNav />
+              <Shell>
+                <RoleGuard>{children}</RoleGuard>
+              </Shell>
+              <Footer />
+            </div>
           </UIProvider>
         </ThemeProvider>
       </body>

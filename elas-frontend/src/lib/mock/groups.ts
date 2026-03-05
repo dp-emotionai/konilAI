@@ -11,6 +11,10 @@ export type Group = {
   name: string;          // e.g. "AI-21"
   program: string;       // e.g. "Artificial Intelligence"
   status: GroupStatus;
+  /** Описание группы (курс, цели). */
+  description?: string;
+  /** URL обложки/аватарки группы. */
+  imageUrl?: string;
 
   teacher: {
     id: string;
@@ -29,6 +33,7 @@ export const groups: Group[] = [
     name: "AI-21",
     program: "Artificial Intelligence",
     status: "active",
+    description: "Группа по машинному обучению и нейросетям. Осенний семестр 2025/26.",
     teacher: { id: "T-01", name: "Dr. Serik", email: "teacher@demo" },
     students: [
       { id: "S-01", name: "Aruzhan K." },
@@ -44,6 +49,7 @@ export const groups: Group[] = [
     name: "CS-22",
     program: "Computer Science",
     status: "active",
+    description: "Базовая программа по компьютерным наукам. Веб, алгоритмы, БД.",
     teacher: { id: "T-02", name: "Prof. Aiman", email: "teacher2@demo" },
     students: [
       { id: "S-11", name: "Eldar N." },

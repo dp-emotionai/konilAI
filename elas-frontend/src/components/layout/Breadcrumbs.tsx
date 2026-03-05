@@ -20,9 +20,7 @@ export default function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
                 {item.label}
               </Link>
             ) : (
-              <span className={isLast ? "text-fg font-medium" : undefined}>
-                {item.label}
-              </span>
+              <span className={isLast ? "text-fg font-medium" : undefined}>{item.label}</span>
             )}
           </span>
         );

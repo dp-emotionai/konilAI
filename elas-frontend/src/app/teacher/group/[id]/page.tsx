@@ -7,7 +7,6 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Section from "@/components/common/Section";
 import Reveal from "@/components/common/Reveal";
-import GlassCard from "@/components/ui/GlassCard";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -32,22 +31,25 @@ import { getGroupById } from "@/lib/mock/groups";
 import { getSessionsByGroup, type GroupSession } from "@/lib/mock/groupSessions";
 import type { Group } from "@/lib/mock/groups";
 import { nextTeacherAction, setSessionStatusOverride } from "@/lib/mock/sessionLifecycle";
-import Glow from "@/components/common/Glow"
+import Glow from "@/components/common/Glow";
+import { Card, CardContent } from "@/components/ui/Card";
+import Input from "@/components/ui/Input";
+import { Edit3, Mail, ImagePlus } from "lucide-react";
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 function ToneBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: Tone }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-success/15 text-success ring-1 ring-success/30"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/25"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-warning/15 text-warning ring-1 ring-warning/30"
       : tone === "purple"
-      ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      ? "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/25"
+      : "bg-surface-subtle text-muted ring-1 ring-[color:var(--border)]/30";
   return (
-    <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur", toneClass)}>
+    <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium", toneClass)}>
       {children}
     </Badge>
   );
@@ -94,17 +96,17 @@ function MemberActionsDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-45 rounded-2xl border border-white/10 bg-[#0b0b12] py-1 shadow-xl">
+          <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-1">
             <button
               type="button"
-              className="w-full px-4 py-2 text-left text-sm text-zinc-200 hover:bg-white/10"
+              className="w-full px-4 py-2 text-left text-sm text-fg hover:bg-surface-subtle"
               onClick={() => { setOpen(false); onRemove(); }}
             >
               Удалить из группы
             </button>
             <button
               type="button"
-              className="w-full px-4 py-2 text-left text-sm text-amber-400 hover:bg-white/10"
+              className="w-full px-4 py-2 text-left text-sm text-warning hover:bg-surface-subtle"
               onClick={() => { setOpen(false); onBlock(); }}
             >
               Заблокировать
@@ -147,6 +149,10 @@ export default function TeacherGroupDetailPage() {
 
   type TabId = "sessions" | "announcements" | "members" | "invitations";
   const [activeTab, setActiveTab] = useState<TabId>("sessions");
+  const [editingName, setEditingName] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [localName, setLocalName] = useState("");
+  const [localDescription, setLocalDescription] = useState("");
 
   const [groupInvitations, setGroupInvitations] = useState<GroupInvitationRow[]>([]);
   const [groupMembers, setGroupMembers] = useState<GroupMemberRow[]>([]);
@@ -193,6 +199,13 @@ export default function TeacherGroupDetailPage() {
 
   const pendingCount = groupInvitations.filter((i) => i.status === "pending").length;
 
+  useEffect(() => {
+    if (group) {
+      setLocalName(group.name);
+      setLocalDescription((group as { description?: string }).description ?? "");
+    }
+  }, [group?.id, group?.name, (group as { description?: string })?.description]);
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmails, setInviteEmails] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -230,9 +243,11 @@ export default function TeacherGroupDetailPage() {
         <Glow />
         <PageHero title="Загрузка…" subtitle="Группа и сессии загружаются." />
         <Section>
-          <GlassCard className="p-7">
-            <div className="h-24 rounded-2xl bg-white/5 animate-pulse" />
-          </GlassCard>
+          <Card variant="elevated">
+            <CardContent className="p-7">
+              <div className="h-24 rounded-2xl bg-surface-subtle animate-pulse" />
+            </CardContent>
+          </Card>
         </Section>
       </div>
     );
@@ -244,21 +259,26 @@ export default function TeacherGroupDetailPage() {
         <Glow />
         <PageHero title="Группа не найдена" subtitle="Такой группы нет в системе." />
         <Section>
-          <GlassCard className="p-7">
-            <Link
-              href="/teacher/groups"
-              className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100 transition"
-            >
-              ← К списку групп
-            </Link>
-          </GlassCard>
+          <Card variant="elevated">
+            <CardContent className="p-7">
+              <Link
+                href="/teacher/groups"
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg transition"
+              >
+                ← К списку групп
+              </Link>
+            </CardContent>
+          </Card>
         </Section>
       </div>
     );
   }
 
+  const groupImageUrl = (group as { imageUrl?: string }).imageUrl;
+  const groupDescription = (group as { description?: string }).description ?? "";
+
   return (
-    <div className="relative space-y-14 pb-20">
+    <div className="relative space-y-10 pb-20">
       <Glow />
       <Breadcrumbs
         items={[
@@ -267,58 +287,155 @@ export default function TeacherGroupDetailPage() {
           { label: group.name },
         ]}
       />
-      <div className="flex items-center gap-2 mb-2">
+      <Section spacing="none">
         <Link
           href="/teacher/groups"
-          className="text-sm text-(--muted) hover:text-(--text)] transition"
+          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg transition-colors"
         >
           ← К списку групп
         </Link>
-      </div>
-      <PageHero
-        title={`${group.name} · Рабочее пространство`}
-        subtitle={
-          apiAvailable && pendingCount > 0
-            ? `${group.program} · ${group.students.length} студентов · ${pendingCount} приглашений в ожидании`
-            : `${group.program} · ${group.students.length} студентов`
-        }
-      />
+      </Section>
 
-      <Section>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/teacher/groups"
-            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100 transition"
-          >
-            Назад
-          </Link>
-          {apiAvailable && (
-            <Button variant="outline" size="sm" onClick={() => { setInviteOpen(true); setInviteError(null); setInviteSuccess(null); }}>
-              Пригласить студентов
-            </Button>
-          )}
-          {apiAvailable && pendingCount > 0 && (
-            <ToneBadge tone="warning">Приглашений: {pendingCount}</ToneBadge>
-          )}
-          <ToneBadge tone={group.status === "active" ? "success" : "neutral"}>
-            {group.status === "active" ? "Активна" : "В архиве"}
-          </ToneBadge>
-          <ToneBadge tone="info">{group.id}</ToneBadge>
-        </div>
+      {/* Hero: аватар, имя, описание */}
+      <Section spacing="none">
+        <Card variant="elevated" className="overflow-hidden">
+          <div
+            className="h-32 md:h-40 w-full bg-gradient-to-br from-primary-muted/30 to-primary-muted/10"
+            style={groupImageUrl ? { backgroundImage: `url(${groupImageUrl})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+          />
+          <CardContent className="relative -mt-16 md:-mt-20 px-6 pb-6 md:px-8 md:pb-8">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+              <div className="flex items-end gap-4">
+                {groupImageUrl ? (
+                  <div className="relative group/avatar">
+                    <div
+                      className="h-24 w-24 md:h-28 md:w-28 rounded-2xl ring-4 ring-[var(--surface)] bg-surface-subtle bg-cover bg-center shrink-0"
+                      style={{ backgroundImage: `url(${groupImageUrl})` }}
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white text-xs gap-1"
+                      title="Сменить фото (скоро)"
+                    >
+                      <ImagePlus size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative group/avatar">
+                    <div className="h-24 w-24 md:h-28 md:w-28 rounded-2xl ring-4 ring-[var(--surface)] bg-gradient-to-br from-primary-muted to-primary-muted/50 flex items-center justify-center text-3xl md:text-4xl font-bold text-[rgb(var(--primary))] shrink-0">
+                      {group.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <button
+                      type="button"
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-2xl bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white text-xs"
+                      title="Добавить фото группы (скоро)"
+                    >
+                      <ImagePlus size={20} />
+                      <span>Добавить фото</span>
+                    </button>
+                  </div>
+                )}
+                <div className="pb-1">
+                  {editingName ? (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={localName}
+                        onChange={(e) => setLocalName(e.target.value)}
+                        className="max-w-xs rounded-xl font-semibold text-lg"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={() => setEditingName(false)}>Сохранить</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setLocalName(group.name); setEditingName(false); }}>Отмена</Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-2xl md:text-3xl font-bold text-fg">{localName || group.name}</h1>
+                      <button
+                        type="button"
+                        onClick={() => setEditingName(true)}
+                        className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-subtle transition-colors"
+                        aria-label="Редактировать название"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-1 text-sm text-muted">
+                    {group.program} · {group.students.length} студентов
+                    {apiAvailable && pendingCount > 0 && ` · ${pendingCount} приглашений`}
+                  </p>
+                </div>
+              </div>
+              <div className="sm:ml-auto flex flex-wrap items-center gap-2">
+                {apiAvailable && (
+                  <Button size="sm" variant="outline" className="gap-2 rounded-xl" onClick={() => { setInviteOpen(true); setInviteError(null); setInviteSuccess(null); }}>
+                    <Mail size={16} />
+                    Пригласить
+                  </Button>
+                )}
+                <ToneBadge tone={group.status === "active" ? "success" : "neutral"}>
+                  {group.status === "active" ? "Активна" : "В архиве"}
+                </ToneBadge>
+                <Badge className="bg-surface-subtle text-muted">{group.id}</Badge>
+              </div>
+            </div>
+            {(groupDescription || editingDesc) && (
+              <div className="mt-4 pt-4 border-t border-[color:var(--border)]/20">
+                {editingDesc ? (
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-muted">Описание группы</label>
+                    <Input
+                      value={localDescription}
+                      onChange={(e) => setLocalDescription(e.target.value)}
+                      placeholder="Краткое описание курса или группы…"
+                      className="rounded-xl"
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setEditingDesc(false)}>Сохранить</Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setLocalDescription(groupDescription); setEditingDesc(false); }}>Отмена</Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <p className="text-sm text-muted leading-relaxed flex-1">{localDescription || groupDescription || "Нет описания."}</p>
+                    <button
+                      type="button"
+                      onClick={() => setEditingDesc(true)}
+                      className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-subtle transition-colors shrink-0"
+                      aria-label="Редактировать описание"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {!groupDescription && !editingDesc && (
+              <button
+                type="button"
+                onClick={() => setEditingDesc(true)}
+                className="mt-4 flex items-center gap-2 text-sm text-muted hover:text-fg transition-colors"
+              >
+                <Edit3 size={14} />
+                Добавить описание группы
+              </button>
+            )}
+          </CardContent>
+        </Card>
       </Section>
 
       <Section>
-        <div className="flex flex-wrap gap-2 border-b border-white/10 pb-3 mb-4">
+        <div className="flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3 mb-4">
           {(["sessions", "announcements", "members", "invitations"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "rounded-2xl px-4 py-2 text-sm font-medium transition",
+                "rounded-xl px-4 py-2 text-sm font-medium transition",
                 activeTab === tab
-                  ? "bg-purple-500/20 ring-1 ring-purple-400/25 text-purple-100"
-                  : "ring-1 ring-white/10 bg-white/5 hover:bg-white/10 text-zinc-300"
+                  ? "bg-primary-muted ring-1 ring-[rgb(var(--primary))]/25 text-[rgb(var(--primary))]"
+                  : "ring-1 ring-[color:var(--border)]/30 bg-surface-subtle/50 hover:bg-surface-subtle text-muted hover:text-fg"
               )}
             >
               {tab === "sessions"
@@ -334,7 +451,8 @@ export default function TeacherGroupDetailPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Reveal className="lg:col-span-2">
-            <GlassCard className="p-7">
+            <Card variant="elevated">
+              <CardContent className="p-6 md:p-8">
               {activeTab === "sessions" && (
                 <>
                   <h2 className="text-xl font-semibold">Сессии</h2>
@@ -633,33 +751,36 @@ export default function TeacherGroupDetailPage() {
                   )}
                 </>
               )}
-            </GlassCard>
+              </CardContent>
+            </Card>
           </Reveal>
 
           <Reveal>
-            <GlassCard className="p-7">
-              <h2 className="text-xl font-semibold">Информация о группе</h2>
-              <p className="mt-1 text-sm text-zinc-400">Краткий контекст для работы.</p>
+            <Card variant="elevated">
+              <CardContent className="p-6 md:p-8">
+                <h2 className="text-xl font-semibold text-fg">Информация о группе</h2>
+                <p className="mt-1 text-sm text-muted">Краткий контекст для работы.</p>
 
-              <div className="mt-6 space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Преподаватель</span>
-                  <span className="text-zinc-200">{group.teacher.name}</span>
+                <div className="mt-6 space-y-3 rounded-2xl bg-surface-subtle/60 ring-1 ring-[color:var(--border)]/20 p-5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted">Преподаватель</span>
+                    <span className="text-fg font-medium">{group.teacher.name}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted">Студентов</span>
+                    <span className="text-fg font-medium">{group.students.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted">Программа</span>
+                    <span className="text-fg font-medium">{group.program}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Студентов</span>
-                  <span className="text-zinc-200">{group.students.length}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-zinc-400">Программа</span>
-                  <span className="text-zinc-200">{group.program}</span>
-                </div>
-              </div>
 
-              <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-zinc-500">
-                Подключение к сессии доступно студентам после дачи согласия на анализ эмоций.
-              </div>
-            </GlassCard>
+                <div className="mt-5 rounded-2xl bg-surface-subtle/40 ring-1 ring-[color:var(--border)]/20 p-4 text-xs text-muted">
+                  Подключение к сессии доступно студентам после дачи согласия на анализ эмоций.
+                </div>
+              </CardContent>
+            </Card>
           </Reveal>
         </div>
       </Section>

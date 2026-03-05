@@ -7,7 +7,7 @@ import {Card} from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useUI } from "@/components/layout/Providers";
-import { ROLE_HOME } from "@/lib/routes";
+import { ROLE_HOME } from "@/lib/nav";
 import { api, setAuth, clearAuth, isApiAvailable } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
 

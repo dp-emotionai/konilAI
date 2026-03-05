@@ -21,7 +21,7 @@ function readStoredTheme(): Theme | null {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // ✅ default — LIGHT (как ты хочешь)
+  // default — LIGHT
   const [theme, setTheme] = useState<Theme>("light");
 
   useEffect(() => {

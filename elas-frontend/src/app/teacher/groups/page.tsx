@@ -2,64 +2,88 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Section from "@/components/common/Section";
 import Reveal from "@/components/common/Reveal";
-import GlassCard from "@/components/ui/GlassCard";
+
+import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
-import { cn } from "@/lib/cn";
+
 import { groups as mockGroups } from "@/lib/mock/groups";
 import { getSessionsByGroup } from "@/lib/mock/groupSessions";
 import { getTeacherGroups, createGroup, type TeacherGroup } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
 
-type Tone = "neutral" | "success" | "info" | "warning" | "purple";
+import { Users, Plus, ArrowRight, Search, LayoutGrid, PlayCircle, Edit3 } from "lucide-react";
+import { cn } from "@/lib/cn";
 
-function ToneBadge({ children, tone = "neutral", className }: { children: React.ReactNode; tone?: Tone; className?: string }) {
-  const toneClass =
-    tone === "success" ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
-    : tone === "info" ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
-    : tone === "purple" ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-    : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+type GroupRow = {
+  id: string;
+  name: string;
+  program?: string;
+  description?: string;
+  imageUrl?: string;
+  sessionCount: number;
+  studentsCount: number;
+};
+
+function GroupAvatar({ name, imageUrl, className }: { name: string; imageUrl?: string; className?: string }) {
+  const initial = name.slice(0, 2).toUpperCase();
+  if (imageUrl) {
+    return (
+      <div
+        className={cn("relative overflow-hidden rounded-2xl bg-surface-subtle bg-cover bg-center", className)}
+        style={{ backgroundImage: `url(${imageUrl})` }}
+        role="img"
+        aria-label={name}
+      />
+    );
+  }
   return (
-    <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur", toneClass, className)}>
-      {children}
-    </Badge>
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-2xl bg-gradient-to-br from-primary-muted/60 to-primary-muted/20 text-[rgb(var(--primary))] font-bold text-lg",
+        className
+      )}
+    >
+      {initial}
+    </div>
   );
-}
-
-function fetchGroups(setApiGroups: (g: TeacherGroup[]) => void, setLoading: (v: boolean) => void) {
-  setLoading(true);
-  getTeacherGroups()
-    .then(setApiGroups)
-    .finally(() => setLoading(false));
 }
 
 export default function TeacherGroupsPage() {
   const [q, setQ] = useState("");
   const [apiGroups, setApiGroups] = useState<TeacherGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
+
+  const [showCreate, setShowCreate] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupProgram, setNewGroupProgram] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+
   const apiAvailable = getApiBaseUrl() && hasAuth();
 
-  useEffect(() => {
+  async function refresh() {
     if (!apiAvailable) {
       setLoading(false);
       return;
     }
-    let mounted = true;
-    getTeacherGroups().then((list) => {
-      if (mounted) setApiGroups(list);
-    }).finally(() => {
-      if (mounted) setLoading(false);
-    });
-    return () => { mounted = false; };
+    setLoading(true);
+    try {
+      const list = await getTeacherGroups();
+      setApiGroups(list);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
   }, [apiAvailable]);
 
   const handleCreateGroup = async () => {
@@ -73,8 +97,9 @@ export default function TeacherGroupsPage() {
     try {
       await createGroup(name);
       setNewGroupName("");
-      setShowCreateGroup(false);
-      fetchGroups(setApiGroups, setLoading);
+      setNewGroupProgram("");
+      setShowCreate(false);
+      await refresh();
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : "Ошибка создания группы.");
     } finally {
@@ -82,137 +107,252 @@ export default function TeacherGroupsPage() {
     }
   };
 
-  const list = apiAvailable ? apiGroups : mockGroups.map((g) => ({
-    id: g.id,
-    name: g.name,
-    sessionCount: getSessionsByGroup(g.id).length,
-    program: g.program,
-    students: g.students,
-  }));
+  const list: GroupRow[] = useMemo(() => {
+    if (apiAvailable) {
+      return apiGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        program: undefined,
+        description: undefined,
+        imageUrl: undefined,
+        sessionCount: g.sessionCount ?? 0,
+        studentsCount: 0,
+      }));
+    }
+    return mockGroups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      program: g.program,
+      description: (g as { description?: string }).description,
+      imageUrl: (g as { imageUrl?: string }).imageUrl,
+      sessionCount: getSessionsByGroup(g.id).length,
+      studentsCount: g.students.length,
+    }));
+  }, [apiAvailable, apiGroups]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return list.filter((g: { id: string; name: string; program?: string }) => {
+    return list.filter((g) => {
       if (!s) return true;
-      return g.name.toLowerCase().includes(s) || (g.program && g.program.toLowerCase().includes(s));
+      return (
+        g.name.toLowerCase().includes(s) ||
+        (g.program && g.program.toLowerCase().includes(s)) ||
+        (g.description && g.description.toLowerCase().includes(s)) ||
+        g.id.toLowerCase().includes(s)
+      );
     });
   }, [list, q]);
 
+  const totalStudents = useMemo(() => list.reduce((acc, g) => acc + g.studentsCount, 0), [list]);
+  const totalSessions = useMemo(() => list.reduce((acc, g) => acc + g.sessionCount, 0), [list]);
+
   return (
-    <div className="space-y-10 pb-16">
+    <div className="pb-16">
       <Breadcrumbs items={[{ label: "Преподаватель", href: "/teacher/dashboard" }, { label: "Группы" }]} />
+
       <PageHero
         title="Мои группы"
-        subtitle="Работа с учебными группами: сессии, приглашения и аналитика."
+        subtitle="Управляйте группами, участниками и сессиями. Добавляйте описание и обложки."
         right={
-          <Link href="/teacher/sessions/new">
-            <Button>Создать сессию</Button>
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/teacher/sessions/new">
+              <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+                <PlayCircle size={16} />
+                Создать сессию
+              </Button>
+            </Link>
+            {apiAvailable && (
+              <Button
+                size="sm"
+                className="gap-2 rounded-xl shadow-soft"
+                onClick={() => {
+                  setShowCreate((v) => !v);
+                  setCreateError("");
+                  setNewGroupName("");
+                  setNewGroupProgram("");
+                }}
+              >
+                <Plus size={16} />
+                {showCreate ? "Закрыть" : "Создать группу"}
+              </Button>
+            )}
+          </div>
         }
       />
 
-      <Section>
+      {/* Сводка */}
+      <Section spacing="none" className="mt-6">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-muted/50 text-[rgb(var(--primary))]">
+                <LayoutGrid size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-fg">{filtered.length}</div>
+                <div className="text-xs text-muted">Групп</div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-muted/50 text-[rgb(var(--primary))]">
+                <Users size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-fg">{totalStudents}</div>
+                <div className="text-xs text-muted">Студентов</div>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-muted/50 text-[rgb(var(--primary))]">
+                <PlayCircle size={24} />
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-fg">{totalSessions}</div>
+                <div className="text-xs text-muted">Сессий</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section spacing="none" className="mt-8 space-y-6">
         <Reveal>
-          <GlassCard className="p-7">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="space-y-1">
-                <h2 className="text-xl font-semibold text-(--text)">Группы</h2>
-                <p className="text-sm text-(--muted)">
-                  Откройте группу, чтобы создать сессию, увидеть участников и аналитику.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <ToneBadge tone="info">{filtered.length} групп</ToneBadge>
-                {apiAvailable && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="rounded-2xl"
-                    onClick={() => {
-                      setShowCreateGroup((s) => !s);
-                      setCreateError("");
-                      setNewGroupName("");
-                    }}
-                  >
-                    {showCreateGroup ? "Отмена" : "Создать группу"}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {apiAvailable && showCreateGroup && (
-              <div className="mt-6 rounded-2xl border border-purple-500/20 bg-purple-500/10 p-5">
-                <p className="text-sm font-medium text-slate-900 dark:text-zinc-200 mb-3">Новая группа</p>
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div className="min-w-[200px] flex-1">
-                    <Input
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="Название группы, например: AI-21"
-                      onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
-                    />
-                  </div>
-                  <Button onClick={handleCreateGroup} disabled={creating}>
-                    {creating ? "Создание…" : "Создать"}
-                  </Button>
+          <Card variant="elevated">
+            <CardContent className="p-6 md:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wider text-muted">Каталог</div>
+                  <h2 className="mt-2 text-xl font-bold text-fg">Все группы</h2>
+                  <p className="mt-1 text-sm text-muted">
+                    Откройте группу, чтобы управлять участниками, приглашениями и сессиями.
+                  </p>
                 </div>
-                {createError && <p className="mt-2 text-sm text-red-500">{createError}</p>}
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary/10 text-[rgb(var(--primary))]">{filtered.length} групп</Badge>
+                  {!apiAvailable && <Badge className="bg-surface-subtle">Demo</Badge>}
+                </div>
               </div>
-            )}
 
-            <div className="mt-6">
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Поиск по названию группы…"
-              />
-            </div>
+              {apiAvailable && showCreate && (
+                <div className="mt-6 rounded-2xl bg-surface-subtle/60 ring-1 ring-[color:var(--border)]/20 p-6">
+                  <div className="text-sm font-semibold text-fg mb-3">Новая группа</div>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="min-w-[200px] flex-1 space-y-1">
+                      <label className="text-xs text-muted">Название</label>
+                      <Input
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        placeholder="Например: AI-21"
+                        onKeyDown={(e) => e.key === "Enter" && handleCreateGroup()}
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <div className="min-w-[200px] flex-1 space-y-1">
+                      <label className="text-xs text-muted">Программа (необязательно)</label>
+                      <Input
+                        value={newGroupProgram}
+                        onChange={(e) => setNewGroupProgram(e.target.value)}
+                        placeholder="Artificial Intelligence"
+                        className="rounded-xl"
+                      />
+                    </div>
+                    <div className="flex items-end gap-2">
+                      <Button onClick={handleCreateGroup} disabled={creating} className="rounded-xl">
+                        {creating ? "Создание…" : "Создать"}
+                      </Button>
+                      <Button variant="ghost" onClick={() => setShowCreate(false)} className="rounded-xl">
+                        Отмена
+                      </Button>
+                    </div>
+                  </div>
+                  {createError && <div className="mt-2 text-sm text-error">{createError}</div>}
+                </div>
+              )}
 
-            {loading ? (
-              <div className="mt-6 h-32 rounded-2xl bg-white/60 dark:bg-white/5 animate-pulse" />
-            ) : filtered.length === 0 ? (
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
-                <p className="text-sm text-zinc-200">Групп не найдено.</p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {apiAvailable ? "Нажмите «Создать группу» выше или измените поиск." : "Измените запрос поиска."}
-                </p>
+              <div className="mt-6 relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Поиск по названию, программе или описанию…"
+                  className="pl-11 rounded-xl"
+                />
               </div>
-            ) : (
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {filtered.map(
-                  (g: {
-                    id: string;
-                    name: string;
-                    sessionCount?: number;
-                    program?: string;
-                    students?: unknown[];
-                  }) => (
-                    <Link
-                      key={g.id}
-                      href={`/teacher/group/${g.id}`}
-                      className="rounded-3xl border border-black/5 bg-[color:var(--surface)] p-6 shadow-[0_14px_30px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:shadow-elas-soft-light transition block dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold text-[color:var(--text)]">{g.name}</p>
-                          {g.program && <p className="text-sm text-[color:var(--muted)]">{g.program}</p>}
+
+              {loading ? (
+                <div className="mt-6 space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-28 rounded-2xl bg-surface-subtle/50 animate-pulse" />
+                  ))}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="mt-6 rounded-2xl bg-surface-subtle/50 ring-1 ring-[color:var(--border)]/20 p-12 text-center">
+                  <LayoutGrid size={48} className="mx-auto text-muted opacity-50" />
+                  <p className="mt-4 font-medium text-fg">Группы не найдены</p>
+                  <p className="mt-1 text-sm text-muted">
+                    {apiAvailable ? "Создайте группу или измените запрос поиска." : "Измените запрос."}
+                  </p>
+                  {apiAvailable && !showCreate && (
+                    <Button className="mt-4 gap-2 rounded-xl" onClick={() => setShowCreate(true)}>
+                      <Plus size={16} />
+                      Создать группу
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  {filtered.map((g) => (
+                    <Link key={g.id} href={`/teacher/group/${g.id}`} className="block">
+                      <div
+                        className={cn(
+                          "group rounded-2xl ring-1 transition-all duration-200",
+                          "bg-surface-subtle/40 ring-[color:var(--border)]/20 hover:ring-[color:var(--border)]/40 hover:shadow-soft",
+                          "p-5 md:p-6 flex flex-col sm:flex-row sm:items-center gap-4"
+                        )}
+                      >
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <GroupAvatar name={g.name} imageUrl={g.imageUrl} className="h-16 w-16 shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-semibold text-fg truncate">{g.name}</div>
+                            {g.program && (
+                              <div className="mt-0.5 text-sm text-muted truncate">{g.program}</div>
+                            )}
+                            {g.description && (
+                              <div className="mt-1 text-sm text-muted line-clamp-2">{g.description}</div>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <span className="inline-flex items-center gap-1 text-xs text-muted">
+                                <Users size={12} />
+                                {g.studentsCount} участников
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-xs text-muted">
+                                <PlayCircle size={12} />
+                                {g.sessionCount} сессий
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm ring-1 ring-[color:var(--border)]/30 bg-surface text-fg">
+                            <Edit3 size={14} />
+                            Настроить
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm bg-[rgb(var(--primary))] text-white shadow-soft">
+                            Открыть
+                            <ArrowRight size={14} />
+                          </span>
                         </div>
                       </div>
-                      <div className="mt-4 flex items-center gap-2 flex-wrap">
-                        <ToneBadge tone="info">ID: {g.id}</ToneBadge>
-                        {typeof g.sessionCount === "number" && (
-                          <ToneBadge tone="purple">{g.sessionCount} сессий</ToneBadge>
-                        )}
-                        {Array.isArray(g.students) && (
-                          <ToneBadge tone="purple">{g.students.length} студентов</ToneBadge>
-                        )}
-                      </div>
                     </Link>
-                  ),
-                )}
-              </div>
-            )}
-          </GlassCard>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </Reveal>
       </Section>
     </div>

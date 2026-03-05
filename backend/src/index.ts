@@ -1,27 +1,27 @@
 import "dotenv/config";
 import http from "http";
 import express from "express";
-import cors from "cors";
 import { WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 
 import { CONFIG } from "./config";
 import { registerRoutes } from "./http/routes";
+import { corsMiddleware, helmetMiddleware } from "./http/security";
 import { handleMessage, handleDisconnect, send } from "./signaling/handlers";
 import type { ClientWithSocket } from "./signaling/types";
 import { handleChatMessage, handleChatDisconnect } from "./chat-ws/handlers";
 import type { ChatClient } from "./chat-ws/types";
+import { assertWsOrigin, verifyWsToken } from "./ws/security";
 
 const app = express();
 
-app.use(
-  cors({
-    origin: CONFIG.corsOrigin,
-    credentials: true,
-  })
-);
+app.disable("x-powered-by");
+// IMPORTANT for real client IP behind proxies (rate-limit, logs)
+app.set("trust proxy", 1);
 
-app.use(express.json());
+app.use(helmetMiddleware());
+app.use(corsMiddleware());
+app.use(express.json({ limit: CONFIG.jsonBodyLimit }));
 registerRoutes(app);
 
 const server = http.createServer(app);
@@ -33,6 +33,17 @@ const wssChat = new WebSocketServer({ noServer: true });
 // ✅ Manual upgrade router (fixes /ws-chat not connecting)
 server.on("upgrade", (req, socket, head) => {
   try {
+    // Origin allowlist (prevents other sites from opening WS to you)
+    assertWsOrigin(req);
+
+    // Optional/required WS auth
+    const auth = verifyWsToken(req);
+    if (CONFIG.wsRequireAuth && !auth) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
     const url = req.url ?? "";
     const pathname = new URL(url, "http://localhost").pathname;
 
@@ -41,6 +52,8 @@ server.on("upgrade", (req, socket, head) => {
 
     if (pathname === CONFIG.wsPath) {
       wssSignaling.handleUpgrade(req, socket, head, (ws) => {
+        // attach auth to req for handlers if needed
+        (req as any).wsAuth = auth;
         wssSignaling.emit("connection", ws, req);
       });
       return;
@@ -48,6 +61,7 @@ server.on("upgrade", (req, socket, head) => {
 
     if (pathname === CONFIG.chatWsPath) {
       wssChat.handleUpgrade(req, socket, head, (ws) => {
+        (req as any).wsAuth = auth;
         wssChat.emit("connection", ws, req);
       });
       return;
@@ -55,6 +69,9 @@ server.on("upgrade", (req, socket, head) => {
 
     socket.destroy();
   } catch {
+    try {
+      socket.write("HTTP/1.1 400 Bad Request\r\n\r\n");
+    } catch {}
     socket.destroy();
   }
 });
@@ -63,13 +80,15 @@ server.on("upgrade", (req, socket, head) => {
 wssSignaling.on("connection", (socket, req) => {
   console.log(`[WS] signaling connected url=${req.url}`);
 
+  const wsAuth = (req as any).wsAuth ?? null;
+
   const clientRef: { current: ClientWithSocket | null } = { current: null };
 
   send(socket, { type: "welcome", clientId: uuidv4() });
 
   socket.on("message", (data) => {
     const raw = typeof data === "string" ? data : data.toString("utf-8");
-    handleMessage(socket, clientRef, raw);
+    void handleMessage(socket, clientRef, raw, wsAuth);
   });
 
   socket.on("close", () => handleDisconnect(clientRef));
@@ -84,7 +103,7 @@ wssChat.on("connection", (socket, req) => {
 
   socket.on("message", (data) => {
     const raw = typeof data === "string" ? data : data.toString("utf-8");
-    handleChatMessage(socket, clientRef, raw);
+    void handleChatMessage(socket, clientRef, raw);
   });
 
   socket.on("close", () => handleChatDisconnect(clientRef));

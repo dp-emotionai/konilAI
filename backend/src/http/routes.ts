@@ -5,13 +5,13 @@ import { registerSessionsRoutes } from "./sessions";
 import { registerAuditRoutes } from "./audit";
 import { registerInvitationsRoutes } from "./invitations";
 import { registerChatRoutes } from "./chat";
+import { registerSearchRoutes } from "./search";
 
 export function registerRoutes(app: Express) {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
 
-  // Chrome DevTools запрашивает этот URL — отдаём 204, чтобы не светить 404 в консоли
   app.get("/.well-known/appspecific/com.chrome.devtools.json", (_req, res) => {
     res.status(204).end();
   });
@@ -22,4 +22,5 @@ export function registerRoutes(app: Express) {
   registerAuditRoutes(app);
   registerInvitationsRoutes(app);
   registerChatRoutes(app);
+  registerSearchRoutes(app);
 }

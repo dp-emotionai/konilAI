@@ -1,77 +1,91 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import * as React from "react";
 import { cn } from "@/lib/cn";
 import { CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 
 type ToastType = "success" | "error" | "info";
-type ToastItem = { id: string; type: ToastType; title: string; text?: string };
 
-type ToastAPI = {
+export type ToastItem = {
+  id: string;
+  type: ToastType;
+  title: string;
+  text?: string;
+};
+
+type ToastContextValue = {
   push: (t: Omit<ToastItem, "id">) => void;
 };
 
-const ToastCtx = createContext<ToastAPI | null>(null);
+const ToastContext = React.createContext<ToastContextValue | null>(null);
+
+function iconFor(type: ToastType) {
+  if (type === "success") return <CheckCircle2 size={16} className="text-[rgb(var(--success))]" />;
+  if (type === "error") return <AlertTriangle size={16} className="text-[rgb(var(--error))]" />;
+  return <Info size={16} className="text-[rgb(var(--primary))]" />;
+}
+
+function ringFor(type: ToastType) {
+  if (type === "success") return "ring-[rgb(var(--success))]/20";
+  if (type === "error") return "ring-[rgb(var(--error))]/20";
+  return "ring-[rgb(var(--primary))]/18";
+}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [items, setItems] = React.useState<ToastItem[]>([]);
 
-  const api = useMemo<ToastAPI>(() => ({
-    push: (t) => {
-      const id = crypto.randomUUID();
-      const item: ToastItem = { id, ...t };
-      setToasts((p) => [item, ...p].slice(0, 4));
-      setTimeout(() => {
-        setToasts((p) => p.filter((x) => x.id !== id));
-      }, 2800);
-    },
-  }), []);
+  const push = React.useCallback((t: Omit<ToastItem, "id">) => {
+    const id = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const item: ToastItem = { id, ...t };
+    setItems((prev) => [item, ...prev].slice(0, 3));
+
+    window.setTimeout(() => {
+      setItems((prev) => prev.filter((x) => x.id !== id));
+    }, 3500);
+  }, []);
 
   return (
-    <ToastCtx.Provider value={api}>
+    <ToastContext.Provider value={{ push }}>
       {children}
-      <div className="fixed right-4 top-16 z-[200] flex flex-col gap-2 w-[340px] max-w-[90vw]">
-        {toasts.map((t) => (
-          <ToastCard
+      <div className="fixed right-4 top-4 z-[120] space-y-2">
+        {items.map((t) => (
+          <div
             key={t.id}
-            item={t}
-            onClose={() => setToasts((p) => p.filter((x) => x.id !== t.id))}
-          />
+            className={cn(
+              "w-[320px] rounded-2xl bg-surface text-fg shadow-card",
+              "ring-1 ring-[color:var(--border)]/25",
+              ringFor(t.type),
+              "px-4 py-3"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5">{iconFor(t.type)}</div>
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold">{t.title}</div>
+                {t.text ? <div className="mt-0.5 text-sm text-muted">{t.text}</div> : null}
+              </div>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex h-8 w-8 items-center justify-center rounded-full",
+                  "bg-surface-subtle/80 hover:bg-surface-subtle transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
+                )}
+                onClick={() => setItems((prev) => prev.filter((x) => x.id !== t.id))}
+                aria-label="Dismiss"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
         ))}
       </div>
-    </ToastCtx.Provider>
+    </ToastContext.Provider>
   );
 }
 
 export function useToast() {
-  const ctx = useContext(ToastCtx);
+  const ctx = React.useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used inside ToastProvider");
   return ctx;
-}
-
-function ToastCard({ item, onClose }: { item: ToastItem; onClose: () => void }) {
-  const Icon = item.type === "success" ? CheckCircle2 : item.type === "error" ? AlertTriangle : Info;
-  const border =
-    item.type === "success"
-      ? "border-emerald-400/20"
-      : item.type === "error"
-      ? "border-red-400/20"
-      : "border-white/10";
-
-  return (
-    <div className={cn("rounded-2xl bg-[#0b0b12] border shadow-[0_20px_60px_rgba(0,0,0,0.55)] p-4", border)}>
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 text-white/80">
-          <Icon size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{item.title}</div>
-          {item.text && <div className="text-sm text-white/60 mt-1">{item.text}</div>}
-        </div>
-        <button onClick={onClose} className="text-white/50 hover:text-white/80">
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
 }

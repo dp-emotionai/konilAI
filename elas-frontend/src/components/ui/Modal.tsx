@@ -1,39 +1,82 @@
 "use client";
 
+import * as React from "react";
 import { cn } from "@/lib/cn";
-import Button from "@/components/ui/Button";
 import { X } from "lucide-react";
 
-type Props = {
+type ModalProps = {
   open: boolean;
-  title?: string;
-  description?: string;
   onClose: () => void;
-  children?: React.ReactNode;
+  title?: string;
+  children: React.ReactNode;
   footer?: React.ReactNode;
+  className?: string;
 };
 
-export default function Modal({ open, title, description, onClose, children, footer }: Props) {
+export default function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  className,
+}: ModalProps) {
+  React.useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[100]">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/30 dark:bg-black/55"
+        onMouseDown={onClose}
+        aria-hidden
+      />
       <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl rounded-3xl bg-[#0b0b12] border border-white/10 shadow-[0_40px_120px_rgba(0,0,0,0.7)]">
-          <div className="p-5 border-b border-white/10 flex items-start justify-between gap-4">
+        <div
+          className={cn(
+            "w-full max-w-lg rounded-2xl bg-surface text-fg",
+            "shadow-elevated ring-1 ring-[color:var(--border)]/30",
+            "overflow-hidden",
+            className
+          )}
+          onMouseDown={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50">
             <div className="min-w-0">
-              {title && <div className="text-xl font-semibold">{title}</div>}
-              {description && <div className="text-sm text-white/60 mt-1">{description}</div>}
+              {title ? <div className="text-base font-semibold truncate">{title}</div> : null}
             </div>
-            <Button variant="ghost" size="sm" onClick={onClose} className={cn("shrink-0")}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={cn(
+                "inline-flex h-9 w-9 items-center justify-center rounded-full",
+                "bg-surface-subtle/80 hover:bg-surface-subtle transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
+              )}
+              aria-label="Close"
+            >
               <X size={18} />
-            </Button>
+            </button>
           </div>
 
-          <div className="p-5">{children}</div>
+          <div className="px-5 py-4">{children}</div>
 
-          {footer && <div className="p-5 border-t border-white/10">{footer}</div>}
+          {footer ? (
+            <div className="px-5 py-4 border-t border-border/50 bg-surface/60">
+              {footer}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

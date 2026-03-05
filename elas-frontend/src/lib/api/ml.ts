@@ -4,7 +4,13 @@
 
 export type MlSessionId = string;
 
-export type MlSessionState = "idle" | "starting" | "live" | "stopping" | "stopped" | "error";
+export type MlSessionState =
+  | "idle"
+  | "starting"
+  | "live"
+  | "stopping"
+  | "stopped"
+  | "error";
 
 export type MlEmotionLabel =
   | "angry"
@@ -133,7 +139,9 @@ export async function mlStartSession(
  * Stop ML analytics for given session.
  * Later this will POST /sessions/stop.
  */
-export async function mlStopSession(sessionId: MlSessionId): Promise<MlStopSessionResponse> {
+export async function mlStopSession(
+  sessionId: MlSessionId
+): Promise<MlStopSessionResponse> {
   return {
     sessionId,
     state: "stopping",
@@ -144,7 +152,9 @@ export async function mlStopSession(sessionId: MlSessionId): Promise<MlStopSessi
  * Fetch summary JSON for a finished session.
  * Later: GET /sessions/{id}/summary.
  */
-export async function mlGetSessionSummary(_sessionId: MlSessionId): Promise<MlSessionSummary> {
+export async function mlGetSessionSummary(
+  _sessionId: MlSessionId
+): Promise<MlSessionSummary> {
   // Simple placeholder for wiring UI; numbers are arbitrary mock.
   return {
     sessionId: _sessionId,
@@ -193,8 +203,6 @@ export async function mlGetSessionEvents(
 /**
  * Connect to realtime WebSocket stream with per-frame + group snapshots.
  * Later this will open WS /sessions/{id}/stream.
- *
- * The callback-based shape keeps UI pages decoupled from concrete WS client.
  */
 export type MlStreamCallbacks = {
   onOpen?: () => void;
@@ -220,15 +228,19 @@ export function mlConnectStream(
   };
 }
 
-// --- emotion-ml-service backend/app.py contract ---
+// -------------------------------
+// emotion-ml-service backend/app.py contract
+// -------------------------------
 
-const ML_API_BASE =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_ML_API_URL) ||
-  "http://localhost:8000";
+/**
+ * NOTE:
+ * In Next.js, NEXT_PUBLIC_* variables are inlined into client bundle.
+ * So we can safely read `process.env.NEXT_PUBLIC_ML_API_URL` here.
+ */
+const ML_API_BASE = process.env.NEXT_PUBLIC_ML_API_URL || "http://localhost:8000";
 
 export function getMlApiBaseUrl(): string {
-  if (typeof window === "undefined") return "";
-  return ML_API_BASE.replace(/\/$/, "");
+  return (ML_API_BASE || "").replace(/\/$/, "");
 }
 
 export type MlAnalyzeResponse = {
@@ -239,42 +251,146 @@ export type MlAnalyzeResponse = {
   dominant_emotion: string;
 };
 
+type AnalyzeOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
+
 /**
  * Send a 64×64 grayscale frame to emotion-ml-service POST /analyze.
+ * - supports AbortSignal
+ * - has internal timeout to avoid hung requests
  * Returns null on network error or invalid response.
  */
-export async function mlAnalyzeFrame(image: number[][]): Promise<MlAnalyzeResponse | null> {
+export async function mlAnalyzeFrame(
+  image: number[][],
+  opts: AnalyzeOptions = {}
+): Promise<MlAnalyzeResponse | null> {
   const base = getMlApiBaseUrl();
   if (!base) return null;
+
+  const timeoutMs = opts.timeoutMs ?? 1500;
+
+  // internal controller to enforce timeout + allow chaining abort
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  const onAbort = () => controller.abort();
+
   try {
+    if (opts.signal) {
+      if (opts.signal.aborted) return null;
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
+
     const res = await fetch(`${base}/analyze`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image }),
+      signal: controller.signal,
     });
-    const data = await res.json();
-    if (!res.ok || data.error) return null;
+
+    if (!res.ok) return null;
+
+    const data = await res.json().catch(() => null);
+    if (!data || (data as any).error) return null;
+
     return data as MlAnalyzeResponse;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
+    opts.signal?.removeEventListener("abort", onAbort);
   }
 }
 
 /**
- * Capture one frame from a video element as 64×64 grayscale (0–255).
- * Returns null if video not ready or dimensions invalid.
+ * Safe ML polling loop (no overlap).
+ * Waits for each request to finish before scheduling the next tick.
  */
-export function captureFrame64x64Grayscale(video: HTMLVideoElement): number[][] | null {
+export function startMlLoop(params: {
+  fps?: number; // default ~1.5 fps
+  getFrame: () => number[][] | null;
+  onResult: (r: MlAnalyzeResponse) => void;
+  onTickError?: () => void;
+  shouldSend?: () => boolean;
+}) {
+  const fps = params.fps ?? 1.5;
+  const intervalMs = Math.max(250, Math.round(1000 / fps));
+
+  let stopped = false;
+  let timer: number | null = null;
+  const controller = new AbortController();
+
+  const tick = async () => {
+    if (stopped) return;
+
+    try {
+      if (params.shouldSend && !params.shouldSend()) {
+        timer = window.setTimeout(tick, intervalMs);
+        return;
+      }
+
+      const frame = params.getFrame();
+      if (!frame) {
+        timer = window.setTimeout(tick, intervalMs);
+        return;
+      }
+
+      const result = await mlAnalyzeFrame(frame, {
+        signal: controller.signal,
+        timeoutMs: 1500,
+      });
+
+      if (result) params.onResult(result);
+      else params.onTickError?.();
+    } catch {
+      params.onTickError?.();
+    } finally {
+      if (!stopped) timer = window.setTimeout(tick, intervalMs);
+    }
+  };
+
+  timer = window.setTimeout(tick, intervalMs);
+
+  return {
+    stop() {
+      stopped = true;
+      controller.abort();
+      if (timer) window.clearTimeout(timer);
+    },
+  };
+}
+
+/**
+ * Capture one frame from a video element as 64×64 grayscale (0–255).
+ * Optimized: reuses a single canvas to avoid allocations.
+ */
+let _canvas: HTMLCanvasElement | null = null;
+let _ctx: CanvasRenderingContext2D | null = null;
+
+export function captureFrame64x64Grayscale(
+  video: HTMLVideoElement
+): number[][] | null {
   if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return null;
+
   const size = 64;
-  const canvas = document.createElement("canvas");
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return null;
+
+  if (!_canvas) {
+    _canvas = document.createElement("canvas");
+    _canvas.width = size;
+    _canvas.height = size;
+    _ctx = _canvas.getContext("2d");
+  }
+
+  const ctx = _ctx;
+  if (!ctx || !_canvas) return null;
+
   ctx.drawImage(video, 0, 0, size, size);
+
   const imageData = ctx.getImageData(0, 0, size, size);
   const data = imageData.data;
+
   const out: number[][] = [];
   for (let y = 0; y < size; y++) {
     const row: number[] = [];
@@ -284,10 +400,9 @@ export function captureFrame64x64Grayscale(video: HTMLVideoElement): number[][] 
       const g = data[i + 1];
       const b = data[i + 2];
       const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-      row.push(Math.min(255, Math.max(0, gray)));
+      row.push(gray);
     }
     out.push(row);
   }
   return out;
 }
-

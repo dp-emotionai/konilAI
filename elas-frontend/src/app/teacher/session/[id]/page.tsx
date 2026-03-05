@@ -3,60 +3,92 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
-import {Card} from "@/components/ui/Card";
+import Section from "@/components/common/Section";
+
+import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+
 import { mockSessions } from "@/lib/mock/sessions";
 import { getSessionLiveMetrics, postSessionMessage, type SessionLiveMetrics } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
+
 import { TeacherSessionTabs } from "@/components/session/TeacherSessionTabs";
 import CameraCheck from "@/components/session/CameraCheck";
+import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
+
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
-import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
 
-function ChartMock({ title }: { title: string }) {
+import { getWsBaseUrl } from "@/lib/env";
+import { Activity, Users, Video, AlertTriangle, Send, LogOut, Share2, Flag, Clock } from "lucide-react";
+
+type SessionPhase = "preflight" | "live" | "ended";
+
+function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-white/60">{title}</div>
-        <Badge className="rounded-full bg-white/10 text-xs">Пример</Badge>
-      </div>
-      <div className="mt-4 h-44 rounded-2xl border border-white/10 bg-gradient-to-b from-purple-500/15 to-transparent" />
-      <div className="mt-3 text-xs text-white/45">Графики подключатся к реальным метрикам (ML/WS).</div>
+    <div className="rounded-elas-lg bg-surface-subtle px-3 py-2">
+      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-sm font-semibold text-fg">{value}</div>
     </div>
   );
 }
 
-export default function TeacherLectureAnalyticsPage() {
+function formatPct01(x?: number) {
+  if (typeof x !== "number" || Number.isNaN(x)) return "—";
+  return `${Math.round(x * 100)}%`;
+}
+
+export default function TeacherLiveMonitorPage() {
   const params = useParams<{ id: string }>();
-  const session = useMemo(() => mockSessions.find((s) => s.id === params.id) ?? mockSessions[0], [params.id]);
-  const [live, setLive] = useState(false);
+  const sessionId = params?.id ?? "";
+
+  const session = useMemo(
+    () => mockSessions.find((s) => s.id === sessionId) ?? mockSessions[0],
+    [sessionId]
+  );
+
+  const [phase, setPhase] = useState<SessionPhase>("preflight");
+  const [liveSeconds, setLiveSeconds] = useState(0);
+
+  // WebRTC
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  const apiAvailable = getApiBaseUrl() && hasAuth();
+  // Metrics
+  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
+  const [polling, setPolling] = useState(false);
 
-  // Комната WebRTC = sessionId из URL, чтобы преподаватель и студент попали в одну и ту же комнату
-  const roomId = (params?.id as string) || session.id;
+  // Gates / readiness
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
+  const wsUrl = getWsBaseUrl();
+  const [cameraReady, setCameraReady] = useState(false);
 
+  const roomId = sessionId || session.id;
+  const isLive = phase === "live";
+
+  // Live timer
   useEffect(() => {
-    if (!live || !roomId) return;
-    const signaling = new SignalingClient("ws://localhost:4000/ws");
+    if (!isLive) return;
+    const id = window.setInterval(() => setLiveSeconds((s) => s + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [isLive]);
+
+  // WebRTC connect
+  useEffect(() => {
+    if (!isLive || !roomId) return;
+
+    const signaling = new SignalingClient(`${wsUrl}/ws`);
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
-      onRemoteStream: (_peerId, stream) => {
-        setRemoteStream(stream);
-      },
-      onPeersChange: (peers) => {
-        setParticipants(peers);
-      },
+      onRemoteStream: (_peerId, stream) => setRemoteStream(stream),
+      onPeersChange: (peers) => setParticipants(peers),
     });
 
     signaling.connect();
@@ -73,8 +105,10 @@ export default function TeacherLectureAnalyticsPage() {
 
     return () => {
       manager.leave();
+      setRemoteStream(null);
+      setParticipants([]);
     };
-  }, [live, roomId]);
+  }, [isLive, roomId, wsUrl]);
 
   useEffect(() => {
     if (!remoteVideoRef.current || !remoteStream) return;
@@ -82,23 +116,62 @@ export default function TeacherLectureAnalyticsPage() {
     remoteVideoRef.current.play().catch(() => {});
   }, [remoteStream]);
 
-  // Опрос live-метрик с бэкенда каждые 2 с (только когда в эфире и API доступен)
+  // Safe polling live metrics (no overlap)
   useEffect(() => {
-    if (!live || !roomId || !apiAvailable) {
+    if (!isLive || !roomId || !apiAvailable) {
       setLiveMetrics(null);
+      setPolling(false);
       return;
     }
-    const poll = async () => {
-      const data = await getSessionLiveMetrics(roomId);
-      if (data) setLiveMetrics(data);
+
+    let stopped = false;
+    let timer: number | null = null;
+    let inflight = false;
+
+    const tick = async () => {
+      if (stopped) return;
+      if (inflight) {
+        timer = window.setTimeout(tick, 700);
+        return;
+      }
+      inflight = true;
+      setPolling(true);
+      try {
+        const data = await getSessionLiveMetrics(roomId);
+        if (!stopped && data) setLiveMetrics(data);
+      } finally {
+        inflight = false;
+        if (!stopped) timer = window.setTimeout(tick, 2000);
+      }
     };
-    poll();
-    const interval = setInterval(poll, 2000);
-    return () => clearInterval(interval);
-  }, [live, roomId, apiAvailable]);
+
+    tick();
+
+    return () => {
+      stopped = true;
+      if (timer) window.clearTimeout(timer);
+      setPolling(false);
+    };
+  }, [isLive, roomId, apiAvailable]);
+
+  // Derived
+  const hasMl = Boolean(liveMetrics?.participants?.length);
+  const avgRisk = liveMetrics?.avgRisk ?? 0;
+  const avgConfidence = liveMetrics?.avgConfidence ?? 0;
+
+  const gates = {
+    backend: apiAvailable,
+    ws: Boolean(wsUrl),
+    camera: cameraReady,
+  };
+  const criticalOk = gates.backend && gates.ws && gates.camera;
+
+  const liveLabel = phase === "ended" ? "Ended" : isLive ? "Live" : "Preflight";
+
+  const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
 
   return (
-    <div className="space-y-6">
+    <div className="pb-12 space-y-6">
       <Breadcrumbs
         items={[
           { label: "Преподаватель", href: "/teacher/dashboard" },
@@ -106,225 +179,405 @@ export default function TeacherLectureAnalyticsPage() {
           { label: session.title },
         ]}
       />
-      <div className="flex items-center gap-2 mb-2">
-        <Link
-          href="/teacher/sessions"
-          className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition"
-        >
-          ← К списку сессий
-        </Link>
-      </div>
+
+      <Link href="/teacher/sessions" className="inline-flex text-sm text-muted hover:text-fg transition-colors">
+        ← К списку сессий
+      </Link>
+
       <PageHero
         overline="Преподаватель · Live-монитор"
         title={session.title}
-        subtitle="Таймлайн вовлечённости, провалы внимания, распределение эмоций. Результаты не для оценивания."
+        subtitle="Live-видео + метрики группы. Используется только для улучшения урока, не для оценивания личности."
         right={
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline">Итоговая сводка</Button>
-            <Button>Экспорт отчёта</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-surface-subtle">Type: {session.type === "exam" ? "Exam" : "Lecture"}</Badge>
+            <Badge className={isLive ? "bg-primary/10 text-[rgb(var(--primary))]" : "bg-surface-subtle"}>
+              <span className="inline-flex h-2 w-2 rounded-full mr-1 bg-[rgb(var(--success))] animate-pulse" />
+              {liveLabel}
+            </Badge>
           </div>
         }
       />
 
       <TeacherSessionTabs sessionId={session.id} />
 
-      <Reveal>
-        <CameraCheck onStart={() => setLive(true)} />
-      </Reveal>
+      {/* Sticky command bar */}
+      <Section spacing="none" className="mt-4">
+        <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Badge className={isLive ? "bg-primary/10 text-[rgb(var(--primary))]" : "bg-surface-subtle text-muted"}>
+              {liveLabel}
+            </Badge>
+            <div className="inline-flex items-center gap-1 text-xs text-muted">
+              <Clock size={14} />
+              <span>{timerLabel}</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 text-xs text-muted">
+              <span>Room:</span>
+              <span className="font-mono text-[11px]">{roomId ? `${roomId.slice(0, 8)}…` : "—"}</span>
+            </div>
+          </div>
 
-      {live && (
-        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              className="gap-2"
+              disabled={!criticalOk || isLive}
+              onClick={() => {
+                if (!criticalOk) return;
+                setPhase("live");
+                setLiveSeconds(0);
+              }}
+            >
+              <Video size={14} />
+              Start session
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              disabled={!isLive}
+              onClick={() => {
+                setPhase("ended");
+              }}
+            >
+              <LogOut size={14} />
+              End session
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled>
+              <Share2 size={14} />
+              Share join link
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled>
+              <Flag size={14} />
+              Add marker
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      {/* Preflight: checklist + camera check */}
+      {phase === "preflight" && (
+        <Section spacing="none" className="mt-6">
           <Reveal>
-            <Card className="p-6 md:p-7 space-y-4">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="text-sm text-white/60">Групповой звонок</div>
-                  <div className="mt-2 text-lg font-semibold text-zinc-100">
-                    Подключение по WebRTC. Студенты подключаются к этой сессии.
-                  </div>
-                  <div className="mt-2 text-sm text-white/60">
-                    WebSocket + WebRTC для медиа. Аналитика эмоций — по кадрам 1–2 fps (видео не сохраняется).
-                  </div>
-                </div>
-                <Badge className="bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20">В эфире</Badge>
-              </div>
+            <div className="grid gap-6 lg:grid-cols-12 items-start">
+              <div className="lg:col-span-5 space-y-4">
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-7 space-y-4">
+                    <div>
+                      <div className="text-xs font-medium uppercase tracking-wider text-muted">Preflight checklist</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">Проверьте перед стартом</div>
+                      <div className="mt-1 text-sm text-muted">
+                        Пока критические проверки не зелёные — сессия не запустится.
+                      </div>
+                    </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="text-xs text-white/60">Ваша камера</div>
-                  <div className="relative aspect-video rounded-2xl border border-white/10 bg-black/25 overflow-hidden">
-                    <video ref={localVideoRef} className="h-full w-full object-cover" playsInline muted />
-                    {!participants.length && (
-                      <div className="absolute inset-0 grid place-items-center text-xs text-white/60">
-                        Ожидание подключения студентов…
+                    <div className="space-y-3 text-sm">
+                      <ChecklistItem label="Backend / Auth" ok={gates.backend} hint={apiAvailable ? "API доступен" : "Нет API URL или токена"} />
+                      <ChecklistItem label="WS signaling" ok={gates.ws} hint={wsUrl || "WS URL не настроен"} />
+                      <ChecklistItem
+                        label="Camera ready"
+                        ok={gates.camera}
+                        hint={gates.camera ? "Preview OK" : "Запустите камеру и проверьте лицо/свет"}
+                      />
+                      <ChecklistItem
+                        label="Consent-first"
+                        ok
+                        hint="Студенты дают согласие до аналитики. Напоминание есть в интерфейсе студента."
+                      />
+                    </div>
+
+                    {!criticalOk && (
+                      <div className="rounded-elas-lg bg-surface-subtle/80 px-3 py-2 text-xs text-muted">
+                        Start session станет доступна, когда Backend, WS и Camera будут в статусе OK.
                       </div>
                     )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-white/60">
-                    <span>Видео студентов</span>
-                    <span>{participants.length} подключено</span>
-                  </div>
-                  <div className="relative aspect-video rounded-2xl border border-white/10 bg-black/25 overflow-hidden">
-                    <video ref={remoteVideoRef} className="h-full w-full object-cover" playsInline />
-                    {!remoteStream && (
-                      <div className="absolute inset-0 grid place-items-center text-xs text-white/60">
-                        Откройте эту же сессию как студент для связи.
-                      </div>
-                    )}
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               </div>
-              <p className="text-xs text-white/45 mt-2">
-                WebRTC: комната {roomId.slice(0, 8)}… · участников: {participants.length} · удалённое видео: {remoteStream ? "да" : "нет"}. Запустите бэкенд (порт 4000) для signaling.
-              </p>
-            </Card>
-          </Reveal>
 
-          {/* Участники + состояние группы + провалы внимания (ТЗ: live monitor) */}
-          <div className="grid lg:grid-cols-3 gap-4 mt-6">
-            <Reveal>
-              <Card className="p-6 md:p-7">
-                <div className="text-sm text-white/60 mb-3">Участники</div>
-                <div className="text-lg font-semibold text-zinc-100">Метрики по студентам (ML)</div>
-                <p className="mt-2 text-sm text-white/60">
-                  {liveMetrics?.participants.length
-                    ? `Студенты с согласием на анализ: эмоция, состояние, риск. Обновление каждые 2 с.`
-                    : "Данные появятся, когда студенты начнут отправлять метрики (камера + согласие + ML)."}
-                </p>
-                <ul className="mt-4 space-y-2">
-                  <li className="text-sm text-zinc-300">Вы (преподаватель)</li>
-                  {!liveMetrics?.participants.length ? (
-                    <li className="text-sm text-white/50">Пока нет данных с ML</li>
-                  ) : (
-                    liveMetrics.participants.map((p) => (
-                      <li key={p.userId} className="flex flex-wrap items-center gap-2 text-sm">
-                        <span className="text-zinc-300 font-medium">{p.name || p.email || p.userId}</span>
-                        <Badge className="bg-white/10 text-white/80 text-xs">{p.emotion} ({(p.confidence * 100).toFixed(0)}%)</Badge>
-                        <Badge className={p.state === "NORMAL" ? "bg-emerald-500/15 text-emerald-200 text-xs" : "bg-amber-500/15 text-amber-200 text-xs"}>{p.state}</Badge>
-                        <span className="text-white/50">Risk {(p.risk * 100).toFixed(0)}%</span>
-                        <span className="text-white/40 text-xs">{new Date(p.updatedAt).toLocaleTimeString()}</span>
-                      </li>
-                    ))
-                  )}
-                </ul>
-              </Card>
-            </Reveal>
-            <Reveal>
-              <Card className="p-6 md:p-7 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-white/60 mb-1">Состояние группы</div>
-                    <div className="text-lg font-semibold text-zinc-100">Средний риск / уверенность ML</div>
-                    <p className="mt-1 text-sm text-white/60">Агрегаты по участникам с метриками в реальном времени.</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!liveMetrics || !liveMetrics.participants.length || !apiAvailable}
-                    onClick={() => {
-                      if (!liveMetrics || !apiAvailable) return;
-                      const riskPct = (liveMetrics.avgRisk * 100).toFixed(0);
-                      const text = `⚠ Средний риск сейчас ${riskPct}% (на основе текущих ML-метрик группы).`;
-                      postSessionMessage(roomId, { type: "system", text, channel: "public" }).catch((e) =>
-                        console.error("postSessionMessage(system)", e)
-                      );
-                    }}
-                  >
-                    Отправить в чат
-                  </Button>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-xs text-white/50">Средний риск</div>
-                    <div className="text-2xl font-semibold text-amber-300">
-                      {liveMetrics?.participants.length ? `${(liveMetrics.avgRisk * 100).toFixed(0)}%` : "—"}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                    <div className="text-xs text-white/50">Средняя уверенность</div>
-                    <div className="text-2xl font-semibold text-emerald-300">
-                      {liveMetrics?.participants.length ? `${(liveMetrics.avgConfidence * 100).toFixed(0)}%` : "—"}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Reveal>
-            <Reveal>
-              <Card className="p-6 md:p-7">
-                <div className="text-sm text-white/60 mb-3">Провалы внимания</div>
-                <div className="text-lg font-semibold text-zinc-100">Alert'ы по таймлайну</div>
-                <p className="mt-2 text-sm text-white/60">Например: «23–30 мин — у 68% скука».</p>
-                <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200/90">
-                  Пока нет событий. После подключения ML появятся метки провалов внимания.
-                </div>
-              </Card>
-            </Reveal>
-          </div>
-
-          {/* Чат сессии (Lecture/Exam) */}
-          <div className="mt-6 grid lg:grid-cols-3 gap-4">
-            <Reveal className="lg:col-span-2">
-              <SessionChatPanel sessionId={roomId} role="teacher" type={session.type === "exam" ? "exam" : "lecture"} />
-            </Reveal>
-          </div>
-        </>
-      )}
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Reveal><Kpi title="Средняя вовлечённость" value="68%" hint="За сессию (пример)" /></Reveal>
-        <Reveal><Kpi title="Провалы внимания" value="9" hint="Маркеры (пример)" /></Reveal>
-        <Reveal><Kpi title="Качество данных" value={session.quality} hint="По камере" /></Reveal>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Reveal><ChartMock title="Вовлечённость по времени" /></Reveal>
-        <Reveal><ChartMock title="Фокус (тепловая полоса)" /></Reveal>
-        <Reveal><ChartMock title="Распределение эмоций" /></Reveal>
-        <Reveal><ChartMock title="Стресс (опционально)" /></Reveal>
-      </div>
-
-      <Reveal>
-        <Card className="p-6 md:p-7">
-          <div className="flex items-start justify-between flex-wrap gap-3">
-            <div>
-              <div className="text-sm text-white/60">Рекомендации</div>
-              <div className="mt-2 text-lg font-semibold text-zinc-100">Авто-подсказки (пример)</div>
-              <div className="mt-2 text-sm text-white/60">
-                Позже: на основе ML-пайплайна и логов событий.
+              <div className="lg:col-span-7">
+                <CameraCheck onReadyChange={setCameraReady} />
               </div>
             </div>
-            <Button variant="outline">Обновить</Button>
-          </div>
+          </Reveal>
+        </Section>
+      )}
 
-          <div className="mt-5 grid md:grid-cols-3 gap-3">
-            <Insight title="23–30 мин: спад вовлечённости" text="Переключитесь на интерактив или Q&A." />
-            <Insight title="Низкое качество камер" text="Попросите улучшить освещение и положение камеры." />
-            <Insight title="Разброс по группе" text="Смешанная вовлечённость; можно разбить на подгруппы." />
+      {/* Live command center */}
+      {phase === "live" && (
+        <Section spacing="none" className="mt-6 space-y-6">
+          <div className="grid gap-6 lg:grid-cols-12 items-start">
+            {/* Left: видео + чат */}
+            <Reveal className="lg:col-span-5">
+              <Card variant="elevated">
+                <CardContent className="p-6 md:p-7 space-y-6">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm text-muted">Групповой звонок</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">WebRTC эфир</div>
+                      <div className="mt-2 text-sm text-muted">
+                        Студенты подключаются к этой же комнате. Видео не сохраняется.
+                      </div>
+                    </div>
+                    <Badge variant="success" className="gap-1.5">
+                      <span className="inline-flex h-1.5 w-1.5 rounded-full bg-[rgb(var(--success))] animate-pulse" />
+                      LIVE
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-fg">Ваша камера</div>
+                        <div className="text-xs text-muted">
+                          {participants.length ? "Студенты подключены" : "Ожидание студентов…"}
+                        </div>
+                      </div>
+                      <div className="relative aspect-video rounded-elas-lg overflow-hidden bg-black">
+                        <video ref={localVideoRef} className="h-full w-full object-cover" playsInline muted />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-medium text-fg">Видео студентов</div>
+                        <div className="text-xs text-muted">
+                          {remoteStream ? `${participants.length} peers` : "Нет удалённого видео"}
+                        </div>
+                      </div>
+                      <div className="relative aspect-video rounded-elas-lg overflow-hidden bg-surface-subtle">
+                        <video ref={remoteVideoRef} className="h-full w-full object-cover" playsInline />
+                        {!remoteStream && (
+                          <div className="absolute inset-0 grid place-items-center text-sm text-muted text-center px-6">
+                            Пока нет удалённого видео. Откройте эту же сессию как студент для связи.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <StatusPill label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
+                    <StatusPill label="Peers" value={`${participants.length}`} />
+                    <StatusPill label="Remote video" value={remoteStream ? "Да" : "Нет"} />
+                    <StatusPill label="Polling" value={apiAvailable ? (polling ? "On" : "Idle") : "Off"} />
+                  </div>
+
+                  {/* Chat как часть командного центра */}
+                  <SessionChatPanel
+                    sessionId={roomId}
+                    role="teacher"
+                    type={session.type === "exam" ? "exam" : "lecture"}
+                  />
+
+                  <div className="rounded-elas-lg bg-surface-subtle p-4 flex items-start gap-3">
+                    <Activity className="mt-0.5 text-[rgb(var(--primary))]" size={18} />
+                    <div className="text-sm text-muted leading-relaxed">
+                      Метрики отображаются только для студентов, которые дали согласие. В систему не сохраняется raw-видео.
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            {/* Center: timeline / events */}
+            <Reveal className="lg:col-span-3">
+              <Card variant="elevated">
+                <CardContent className="p-6 md:p-7 space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm text-muted">События</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">Timeline</div>
+                      <div className="mt-2 text-sm text-muted">
+                        Поток join/leave, consent, alerts и маркеров (будет заполнен с WS).
+                      </div>
+                    </div>
+                    <Badge className="bg-surface-subtle text-xs">Stream</Badge>
+                  </div>
+
+                  <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-4 text-sm text-muted">
+                    Пока события приходят только частично. В проде здесь будет общий event stream с отметками времени
+                    и маркерами преподавателя.
+                  </div>
+                </CardContent>
+              </Card>
+            </Reveal>
+
+            {/* Right: participants + агрегаты + alerts + подсказка */}
+            <Reveal className="lg:col-span-4">
+              <div className="space-y-6">
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-7 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm text-muted">Участники</div>
+                        <div className="mt-2 text-lg font-semibold text-fg">Список и ML-метрики</div>
+                        <div className="mt-2 text-sm text-muted">
+                          Кто в онлайне, кто дал consent и когда были последние метрики.
+                        </div>
+                      </div>
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-elas-lg bg-surface-subtle text-[rgb(var(--primary))]">
+                        <Users size={18} />
+                      </div>
+                    </div>
+
+                    {!hasMl ? (
+                      <div className="rounded-elas-lg bg-surface-subtle p-4 text-sm text-muted">
+                        Пока нет ML-данных. Студенты должны: дать consent → включить камеру → открыть урок.
+                      </div>
+                    ) : (
+                      <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {liveMetrics!.participants.map((p) => (
+                          <div key={p.userId} className="rounded-elas-lg bg-surface-subtle p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="font-semibold text-fg truncate">
+                                  {p.name || p.email || p.userId}
+                                </div>
+                                <div className="mt-1 text-xs text-muted">
+                                  last metric {new Date(p.updatedAt).toLocaleTimeString()}
+                                </div>
+                              </div>
+
+                              <Badge className="bg-primary/10">
+                                {p.emotion} • {(p.confidence * 100).toFixed(0)}%
+                              </Badge>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <Badge variant={p.state === "NORMAL" ? "success" : "warning"}>{p.state}</Badge>
+                              <Badge className="bg-surface">Risk {(p.risk * 100).toFixed(0)}%</Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-7 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm text-muted">Состояние группы</div>
+                        <div className="mt-2 text-lg font-semibold text-fg">Средние агрегаты</div>
+                        <div className="mt-2 text-sm text-muted">
+                          На основе текущих участников с ML-метриками.
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        disabled={!hasMl || !apiAvailable}
+                        onClick={() => {
+                          if (!hasMl || !apiAvailable) return;
+                          const riskPct = (avgRisk * 100).toFixed(0);
+                          const text = `⚠ Средний риск сейчас ${riskPct}% (по текущим ML-метрикам группы).`;
+                          postSessionMessage(roomId, { type: "system", text, channel: "public" }).catch(() => {});
+                        }}
+                      >
+                        <Send size={14} />
+                        В чат
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <StatusPill label="Avg risk" value={hasMl ? formatPct01(avgRisk) : "—"} />
+                      <StatusPill label="Avg confidence" value={hasMl ? formatPct01(avgConfidence) : "—"} />
+                    </div>
+
+                    {!apiAvailable && (
+                      <div className="text-xs text-muted">
+                        Сейчас mock-режим: backend/auth недоступен, live metrics не опрашиваются.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-7 space-y-3">
+                    <div>
+                      <div className="text-sm text-muted">Провалы внимания</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">Alerts</div>
+                      <div className="mt-2 text-sm text-muted">
+                        Здесь будут события по таймлайну (через ML/WS stream).
+                      </div>
+                    </div>
+
+                    <div className="rounded-elas-lg bg-surface-subtle p-4 text-sm text-muted flex items-start gap-3">
+                      <AlertTriangle size={18} className="mt-0.5 text-[rgb(var(--warning))]" />
+                      Пока нет событий. После подключения потоковых событий появятся метки провалов.
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-7 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm text-muted">Подсказка</div>
+                        <div className="mt-2 text-lg font-semibold text-fg">Что показать на защите</div>
+                        <div className="mt-2 text-sm text-muted">
+                          Запустите LIVE → подключите студента → покажите participants + avg risk + чат → завершите и
+                          экспортируйте отчёт (после интеграции).
+                        </div>
+                      </div>
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-elas-lg bg-surface-subtle text-[rgb(var(--primary))]">
+                        <Video size={18} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </Reveal>
           </div>
-        </Card>
-      </Reveal>
+        </Section>
+      )}
+
+      {phase === "ended" && (
+        <Section spacing="none" className="mt-6">
+          <Reveal>
+            <Card variant="elevated">
+              <CardContent className="p-6 md:p-8 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm text-muted">Session summary (mock)</div>
+                    <div className="mt-2 text-lg font-semibold text-fg">Сессия завершена</div>
+                    <div className="mt-2 text-sm text-muted">
+                      Здесь позже появится отчёт: длительность, участники, средняя вовлечённость, alerts и markers.
+                    </div>
+                  </div>
+                  <Badge className="bg-surface-subtle">Duration {timerLabel}</Badge>
+                </div>
+                <Button size="sm" variant="outline" className="mt-2" disabled>
+                  Экспорт отчёта (скоро)
+                </Button>
+              </CardContent>
+            </Card>
+          </Reveal>
+        </Section>
+      )}
     </div>
   );
 }
 
-function Kpi({ title, value, hint }: { title: string; value: string; hint: string }) {
+function ChecklistItem({ label, ok, hint }: { label: string; ok: boolean; hint: string }) {
   return (
-    <Card className="p-6 md:p-7">
-      <div className="text-sm text-white/60">{title}</div>
-      <div className="mt-2 text-3xl font-semibold">{value}</div>
-      <div className="mt-2 text-sm text-white/50">{hint}</div>
-    </Card>
-  );
-}
-
-function Insight({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4 hover:bg-white/5 transition">
-      <div className="font-semibold">{title}</div>
-      <div className="mt-2 text-sm text-white/60">{text}</div>
+    <div className="flex items-start gap-2">
+      <span
+        className={
+          "mt-1 inline-flex h-2.5 w-2.5 rounded-full " +
+          (ok ? "bg-[rgb(var(--success))]" : "bg-[rgb(var(--error))]")
+        }
+      />
+      <div className="text-xs">
+        <div className="font-medium text-fg">{label}</div>
+        <div className="text-muted mt-0.5">{hint}</div>
+      </div>
     </div>
   );
 }
+

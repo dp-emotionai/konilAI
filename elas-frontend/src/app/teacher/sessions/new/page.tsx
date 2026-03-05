@@ -31,10 +31,6 @@ export default function TeacherCreateSessionPage() {
   const apiAvailable = getApiBaseUrl() && hasAuth();
 
   useEffect(() => {
-    if (!apiAvailable) {
-      setGroupsLoading(false);
-      return;
-    }
     let mounted = true;
     setGroupsLoading(true);
     getTeacherGroups()
@@ -69,6 +65,10 @@ export default function TeacherCreateSessionPage() {
     }
     if (!apiAvailable) {
       setError("РЎРµСЂРІРµСЂ РЅРµРґРѕСЃС‚СѓРїРµРЅ. РќР°СЃС‚СЂРѕР№С‚Рµ backend РґР»СЏ СЃРѕР·РґР°РЅРёСЏ СЃРµСЃСЃРёР№.");
+      return;
+    }
+    if (apiAvailable && !groups.some((g) => g.id === groupId)) {
+      setError("Selected group is no longer available. Refresh and choose a valid group.");
       return;
     }
     setCreating(true);

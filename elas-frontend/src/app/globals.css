@@ -6,19 +6,27 @@
    ========================= */
 :root {
   /* Backgrounds */
-  --bg: #f6f7fb;            /* page background */
-  --surface: #ffffff;       /* cards / panels */
-  --surface-subtle: #f2f4f8;/* inputs / subtle fills */
+  --bg: #f6f7fb;             /* page background */
+  --surface: #ffffff;        /* cards / panels */
+  --surface-subtle: #f2f4f8; /* subtle fills */
+  --surface-hover: rgba(15, 18, 34, 0.06);
+
+  /* Borders */
   --border: rgba(15, 18, 34, 0.10);
+  --border-strong: rgba(15, 18, 34, 0.16);
 
   /* Text */
   --text: #0f1222;
   --muted: rgba(15, 18, 34, 0.62);
+  --muted-2: rgba(15, 18, 34, 0.42);
 
   /* Primary (purple) */
   --primary: 142 91 255;
   --primary-hover: 164 123 255;
   --primary-muted: rgba(142, 91, 255, 0.12);
+
+  /* ✅ Focus ring MUST be a valid CSS color */
+  --ring: rgb(var(--primary));
 
   /* Radii */
   --radius: 14px;
@@ -36,23 +44,31 @@
   /* Shadows (light) */
   --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.08);
   --shadow-card: 0 14px 40px rgba(15, 23, 42, 0.10);
+  --shadow-elevated: 0 22px 70px rgba(15, 23, 42, 0.14);
 }
 
-/* Optional dark theme (NO gradients) */
 :root.dark {
   --bg: #0f1117;
   --surface: #151826;
   --surface-subtle: #1b2032;
+  --surface-hover: rgba(255, 255, 255, 0.06);
+
   --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
 
   --text: rgba(255, 255, 255, 0.92);
   --muted: rgba(255, 255, 255, 0.62);
+  --muted-2: rgba(255, 255, 255, 0.45);
 
   --primary-muted: rgba(142, 91, 255, 0.22);
+
+  /* ring stays valid */
+  --ring: rgb(var(--primary));
 
   /* Shadows (dark) */
   --shadow-soft: 0 16px 45px rgba(0, 0, 0, 0.35);
   --shadow-card: 0 18px 60px rgba(0, 0, 0, 0.45);
+  --shadow-elevated: 0 26px 90px rgba(0, 0, 0, 0.58);
 }
 
 html,
@@ -66,14 +82,19 @@ body {
   font-family: var(--font-sans);
   background: var(--bg);
   text-rendering: geometricPrecision;
+  position: relative;
 }
 
-/* ✅ Убираем тёмный градиент полностью */
+/* dark has no gradients */
 .dark body {
   background: var(--bg);
 }
 
-/* Typography polish */
+/* ✅ Correct selection alpha */
+::selection {
+  background: rgba(142, 91, 255, 0.22);
+}
+
 h1,
 h2,
 h3,
@@ -81,27 +102,38 @@ h4 {
   letter-spacing: -0.02em;
 }
 
-/* Selection */
-::selection {
-  background: rgba(142, 91, 255, 0.22);
-}
-
-/* Better focus defaults */
 :focus-visible {
   outline: none;
 }
 
-/* Smooth UI feel */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Inputs/buttons feel more premium */
 button,
 input,
 textarea,
 select {
   font: inherit;
+}
+
+/* ===== DITHER / NOISE OVERLAY (anti-banding) ===== */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+
+  opacity: 0.02;
+  mix-blend-mode: soft-light;
+}
+
+:root.dark body::before {
+  opacity: 0.035;
 }
 
 /* Subtle scrollbar */
