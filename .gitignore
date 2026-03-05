@@ -1,53 +1,9 @@
-# =====================
-# Root / common
-# =====================
-.env
-.env.*
-*.local
-*.log
-
-# OS / IDE
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
-
-# =====================
-# Node (frontend/backend)
-# =====================
+*.zip
 **/node_modules/
-**/dist/
-**/build/
-**/.turbo/
-**/.cache/
-
-# Next.js
 **/.next/
-**/out/
-
-# =====================
-# Prisma / DB
-# =====================
-**/prisma/dev.db
-**/*.db
-**/*.sqlite
-
-# =====================
-# Python / ML
-# =====================
+**/dist/
+**/.env
+**/.env.local
 **/__pycache__/
-**/*.pyc
 **/.venv/
-**/venv/
-**/.pytest_cache/
-**/.mypy_cache/
-**/.ruff_cache/
-
-# Jupyter
-**/.ipynb_checkpoints/
-
-# =====================
-# Secrets
-# =====================
-**/*.pem
-**/*.key
+**/*.pyc
