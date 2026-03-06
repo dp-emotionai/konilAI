@@ -75,14 +75,14 @@ function PermissionPill({
   label: string;
   state: PermissionStateLite;
 }) {
-  const variant =
+  const className =
     state === "granted"
-      ? "success"
+      ? "bg-emerald-500/12 text-emerald-300 ring-emerald-500/20"
       : state === "denied"
-      ? "error"
+      ? "bg-red-500/12 text-red-300 ring-red-500/20"
       : state === "prompt"
-      ? "warning"
-      : "default";
+      ? "bg-amber-500/12 text-amber-300 ring-amber-500/20"
+      : "bg-surface-subtle text-muted ring-[color:var(--border)]/25";
 
   const text =
     state === "granted"
@@ -96,7 +96,7 @@ function PermissionPill({
   return (
     <div className="flex items-center justify-between gap-3 rounded-elas-lg bg-surface-subtle px-4 py-3">
       <div className="text-sm text-fg">{label}</div>
-      <Badge variant={variant}>{text}</Badge>
+      <Badge className={className}>{text}</Badge>
     </div>
   );
 }
@@ -368,7 +368,7 @@ export default function ProfilePage() {
             </Card>
           </div>
         ) : err ? (          <EmptyState
-            title="�� ������� ��������� �������"
+            title="�� ������� ��������� �������"
             text={err}
           />
         ) : (
@@ -534,7 +534,7 @@ export default function ProfilePage() {
                         Опасная операция. Будет требовать подтверждения и может быть ограничена администратором.
                       </div>
                       <div className="mt-3">
-                        <Button size="sm" variant="error" disabled>
+                        <Button size="sm" variant="danger" disabled>
                           Coming soon
                         </Button>
                       </div>
@@ -624,7 +624,7 @@ export default function ProfilePage() {
                               {netMs} ms
                             </Badge>
                           ) : netStatus === "fail" ? (
-                            <Badge variant="error" className="gap-1">
+                            <Badge variant="danger" className="gap-1 bg-red-500/12 text-red-300 ring-red-500/20">
                               <AlertTriangle size={14} />
                               Failed
                             </Badge>
