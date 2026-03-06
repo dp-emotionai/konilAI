@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -11,7 +10,14 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import Table, { THead, TBody, TRow, TH, TCell, TMuted } from "@/components/ui/Table";
+import Table, {
+  THead,
+  TBody,
+  TRow,
+  TH,
+  TCell,
+  TMuted,
+} from "@/components/ui/Table";
 import { mockUsers } from "@/lib/mock/users";
 
 type RoleFilter = "all" | "student" | "teacher" | "admin";
@@ -127,7 +133,9 @@ export default function AdminUsersPage() {
                   <TRow key={u.id}>
                     <TCell>
                       <div className="font-medium text-fg">{u.email}</div>
-                      <TMuted>Создан: {new Date(u.createdAt).toLocaleDateString()}</TMuted>
+                      <TMuted>
+                        Создан: {new Date(u.createdAt).toLocaleDateString()}
+                      </TMuted>
                     </TCell>
 
                     <TCell>
@@ -168,7 +176,7 @@ export default function AdminUsersPage() {
             </Table>
 
             {data.length === 0 ? (
-              <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle px-4 py-8 text-center text-sm text-muted">
+              <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface-subtle px-4 py-8 text-center text-sm text-muted">
                 По заданным фильтрам ничего не найдено.
               </div>
             ) : null}
@@ -177,48 +185,54 @@ export default function AdminUsersPage() {
       </Reveal>
 
       <Modal
-  open={editOpen}
-  title="Редактировать пользователя"
-  onClose={() => setEditOpen(false)}
-  footer={
-    <div className="flex justify-end gap-2">
-      <Button variant="outline" onClick={() => setEditOpen(false)}>
-        Отмена
-      </Button>
-      <Button onClick={() => setEditOpen(false)}>Сохранить</Button>
-    </div>
-  }
->
-  <p className="mb-4 text-sm text-muted">
-    Изменить роль и статус (интерфейс в разработке).
-  </p>
+        open={editOpen}
+        title="Редактировать пользователя"
+        onClose={() => setEditOpen(false)}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={() => setEditOpen(false)}>Сохранить</Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-muted">
+            Изменить роль и статус. Интерфейс пока в разработке.
+          </p>
 
-  <div className="space-y-3">
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
-      <div className="text-sm text-muted">Email</div>
-      <div className="mt-1 font-medium text-fg">{selected?.email ?? "-"}</div>
-    </div>
+          <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
+            <div className="text-sm text-muted">Email</div>
+            <div className="mt-1 font-medium text-fg">{selected?.email ?? "-"}</div>
+          </div>
 
-    <div className="grid gap-3 md:grid-cols-2">
-      <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
-        <div className="text-sm text-muted">Роль</div>
-        <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none">
-          <option>student</option>
-          <option>teacher</option>
-          <option>admin</option>
-        </select>
-      </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
+              <div className="text-sm text-muted">Роль</div>
+              <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35">
+                <option>student</option>
+                <option>teacher</option>
+                <option>admin</option>
+              </select>
+            </div>
 
-      <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
-        <div className="text-sm text-muted">Статус</div>
-        <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none">
-          <option>active</option>
-          <option>blocked</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</Modal>
+            <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
+              <div className="text-sm text-muted">Статус</div>
+              <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35">
+                <option>active</option>
+                <option>blocked</option>
+              </select>
+            </div>
+          </div>
+
+          {selected ? (
+            <div className="text-xs text-muted">
+              ID: <span className="text-fg">{selected.id}</span>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }
