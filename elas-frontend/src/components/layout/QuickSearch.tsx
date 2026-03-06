@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Video, Users, User, AlertCircle } from "lucide-react";
@@ -21,30 +21,39 @@ type Props = {
 
 export default function QuickSearch({ open, onClose, role }: Props) {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
   const { query, setQuery, data, loading, error, minLength } = useSearch(role);
   const available = isSearchAvailable();
 
   useEffect(() => {
     if (open) {
       setQuery("");
-      setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, setQuery]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === "Escape") {
         onClose();
         return;
       }
+
       if (e.key === "Enter" && data?.results) {
         const { sessions, groups, users } = data.results;
         const total = sessions.length + groups.length + (users?.length ?? 0);
+
         if (total === 1) {
-          if (sessions.length) router.push(`/teacher/session/${sessions[0].id}`);
-          else if (groups.length) router.push(role === "teacher" ? `/teacher/group/${groups[0].id}` : `/student/group/${groups[0].id}`);
-          else if (users?.length) router.push(`/admin/users?id=${users[0].id}`);
+          if (sessions.length) {
+            router.push(`/teacher/session/${sessions[0].id}`);
+          } else if (groups.length) {
+            router.push(
+              role === "teacher"
+                ? `/teacher/group/${groups[0].id}`
+                : `/student/group/${groups[0].id}`
+            );
+          } else if (users?.length) {
+            router.push(`/admin/users?id=${users[0].id}`);
+          }
+
           onClose();
         }
       }
@@ -55,13 +64,21 @@ export default function QuickSearch({ open, onClose, role }: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100]" aria-modal="true" role="dialog" aria-label="Quick search">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute left-1/2 top-[15%] w-full max-w-xl -translate-x-1/2 rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40">
-          <Search size={20} className="text-muted shrink-0" />
+    <div
+      className="fixed inset-0 z-[100]"
+      aria-modal="true"
+      role="dialog"
+      aria-label="Quick search"
+    >
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      <div className="absolute left-1/2 top-[15%] w-full max-w-xl -translate-x-1/2 overflow-hidden rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25">
+        <div className="flex items-center gap-3 border-b border-border/40 px-4 py-3">
+          <Search size={20} className="shrink-0 text-muted" />
           <Input
-            ref={inputRef}
             type="text"
             placeholder="Search sessions, groups…"
             value={query}
@@ -69,8 +86,11 @@ export default function QuickSearch({ open, onClose, role }: Props) {
             onKeyDown={handleKeyDown}
             className="border-0 ring-0 shadow-none focus:ring-0"
             autoComplete="off"
+            autoFocus
           />
-          <kbd className="hidden sm:inline text-xs text-muted bg-surface-subtle px-2 py-1 rounded">{KBD}</kbd>
+          <kbd className="hidden rounded bg-surface-subtle px-2 py-1 text-xs text-muted sm:inline">
+            {KBD}
+          </kbd>
         </div>
 
         <div className="max-h-[60vh] overflow-y-auto">
@@ -78,27 +98,41 @@ export default function QuickSearch({ open, onClose, role }: Props) {
             <div className="p-6 text-center text-muted">
               <AlertCircle size={24} className="mx-auto mb-2 opacity-70" />
               <p className="font-medium">Search unavailable</p>
-              <p className="text-sm mt-1">Sign in and connect to API to search.</p>
+              <p className="mt-1 text-sm">Sign in and connect to API to search.</p>
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                <Link href="/auth/login" className="text-sm text-[rgb(var(--primary))] hover:underline" onClick={onClose}>Sign in</Link>
-                <Link href="/docs" className="text-sm text-[rgb(var(--primary))] hover:underline" onClick={onClose}>Docs</Link>
+                <Link
+                  href="/auth/login"
+                  className="text-sm text-[rgb(var(--primary))] hover:underline"
+                  onClick={onClose}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/docs"
+                  className="text-sm text-[rgb(var(--primary))] hover:underline"
+                  onClick={onClose}
+                >
+                  Docs
+                </Link>
               </div>
             </div>
           )}
 
           {available && query.length > 0 && query.length < minLength && (
-            <div className="p-4 text-sm text-muted text-center">Type at least {minLength} characters</div>
+            <div className="p-4 text-center text-sm text-muted">
+              Type at least {minLength} characters
+            </div>
           )}
 
           {available && error && (
-            <div className="p-4 flex items-center gap-2 text-error text-sm">
+            <div className="flex items-center gap-2 p-4 text-sm text-error">
               <AlertCircle size={18} />
               {error}
             </div>
           )}
 
           {available && loading && query.length >= minLength && (
-            <div className="p-6 text-center text-muted text-sm">Searching…</div>
+            <div className="p-6 text-center text-sm text-muted">Searching…</div>
           )}
 
           {available && data && query.length >= minLength && !loading && (
@@ -106,7 +140,7 @@ export default function QuickSearch({ open, onClose, role }: Props) {
           )}
 
           {available && !data && !loading && query.length >= minLength && (
-            <div className="p-6 text-center text-muted text-sm">No results</div>
+            <div className="p-6 text-center text-sm text-muted">No results</div>
           )}
         </div>
       </div>
@@ -130,12 +164,15 @@ function Results({
 
   if (!hasSessions && !hasGroups && !hasUsers) {
     return (
-      <div className="p-6 text-center text-muted text-sm">No results for &quot;{data.q}&quot;</div>
+      <div className="p-6 text-center text-sm text-muted">
+        No results for &quot;{data.q}&quot;
+      </div>
     );
   }
 
   const sessionHref = (id: string) =>
     role === "teacher" ? `/teacher/session/${id}` : `/student/session/${id}`;
+
   const groupHref = (id: string) =>
     role === "teacher" ? `/teacher/group/${id}` : `/student/group/${id}`;
 
@@ -149,20 +186,24 @@ function Results({
               href={sessionHref(s.id)}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-elas mx-2",
-                "hover:bg-surface-subtle transition-colors",
-                "text-fg no-underline"
+                "mx-2 flex items-center gap-3 rounded-elas px-4 py-2.5",
+                "text-fg no-underline transition-colors hover:bg-surface-subtle"
               )}
             >
-              <span className="font-medium truncate">{s.title}</span>
-              {s.groupName && <span className="text-muted text-sm truncate">{s.groupName}</span>}
+              <span className="truncate font-medium">{s.title}</span>
+              {s.groupName && (
+                <span className="truncate text-sm text-muted">{s.groupName}</span>
+              )}
               {s.status === "active" && (
-                <span className="text-xs bg-primary/15 text-[rgb(var(--primary))] px-1.5 py-0.5 rounded">LIVE</span>
+                <span className="rounded px-1.5 py-0.5 text-xs text-[rgb(var(--primary))] bg-primary/15">
+                  LIVE
+                </span>
               )}
             </Link>
           ))}
         </Section>
       )}
+
       {hasGroups && (
         <Section title="Groups" icon={<Users size={16} />}>
           {groups.map((g) => (
@@ -171,19 +212,19 @@ function Results({
               href={groupHref(g.id)}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-elas mx-2",
-                "hover:bg-surface-subtle transition-colors",
-                "text-fg no-underline"
+                "mx-2 flex items-center gap-3 rounded-elas px-4 py-2.5",
+                "text-fg no-underline transition-colors hover:bg-surface-subtle"
               )}
             >
-              <span className="font-medium truncate">{g.name}</span>
+              <span className="truncate font-medium">{g.name}</span>
               {g.membersCount != null && (
-                <span className="text-muted text-sm">{g.membersCount} members</span>
+                <span className="text-sm text-muted">{g.membersCount} members</span>
               )}
             </Link>
           ))}
         </Section>
       )}
+
       {hasUsers && (
         <Section title="Users" icon={<User size={16} />}>
           {users!.map((u) => (
@@ -192,13 +233,12 @@ function Results({
               href={`/admin/users?id=${u.id}`}
               onClick={onClose}
               className={cn(
-                "flex items-center gap-3 px-4 py-2.5 rounded-elas mx-2",
-                "hover:bg-surface-subtle transition-colors",
-                "text-fg no-underline"
+                "mx-2 flex items-center gap-3 rounded-elas px-4 py-2.5",
+                "text-fg no-underline transition-colors hover:bg-surface-subtle"
               )}
             >
-              <span className="font-medium truncate">{u.name || u.email}</span>
-              <span className="text-muted text-sm truncate">{u.email}</span>
+              <span className="truncate font-medium">{u.name || u.email}</span>
+              <span className="truncate text-sm text-muted">{u.email}</span>
               {u.role && <span className="text-xs text-muted">{u.role}</span>}
             </Link>
           ))}
@@ -240,16 +280,18 @@ export function QuickSearchTrigger({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 h-9 px-3 rounded-elas text-sm text-muted",
+        "inline-flex h-9 items-center gap-2 rounded-elas px-3 text-sm text-muted",
         "bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/30",
-        "hover:bg-surface-subtle hover:text-fg transition-colors",
+        "transition-colors hover:bg-surface-subtle hover:text-fg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/35",
         className
       )}
     >
       <Search size={16} />
       <span>Search…</span>
-      <kbd className="hidden sm:inline text-[10px] bg-surface px-1.5 py-0.5 rounded">⌘K</kbd>
+      <kbd className="hidden rounded bg-surface px-1.5 py-0.5 text-[10px] sm:inline">
+        ⌘K
+      </kbd>
     </button>
   );
 }
