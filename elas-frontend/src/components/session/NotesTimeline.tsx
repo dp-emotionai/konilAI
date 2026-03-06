@@ -1,6 +1,6 @@
 "use client";
 
-import Card from "@/components/ui/Card";
+import {Card} from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useMemo, useState } from "react";
