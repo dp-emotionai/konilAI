@@ -229,10 +229,10 @@ function AppNavItem({
         label={item.label}
         active={active}
         className={
-          item.badge === "live" && liveSessionId
-            ? "text-[rgb(var(--primary))]"
-            : undefined
-        }
+  "badge" in item && item.badge === "live" && liveSessionId
+    ? "text-[rgb(var(--primary))]"
+    : undefined
+}
       />
     );
   }
