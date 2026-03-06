@@ -11,6 +11,7 @@ type ModalProps = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   className?: string;
+  description?: string;
 };
 
 export default function Modal({
