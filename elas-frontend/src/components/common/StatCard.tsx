@@ -1,4 +1,4 @@
-import Card from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 
 export default function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (

@@ -1,4 +1,4 @@
-import {Card} from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 
 export default function EmptyState({ title, text }: { title: string; text: string }) {
   return (
