@@ -5,8 +5,27 @@ import { CONFIG } from "../config";
 
 function isAllowedOrigin(origin: string | undefined | null): boolean {
   if (!origin) return true; // same-origin / server-to-server
-  if (!CONFIG.corsOrigins.length) return false;
-  return CONFIG.corsOrigins.includes(origin);
+
+  const allowed = CONFIG.corsOrigins;
+
+  if (!allowed.length) return false;
+
+  if (allowed.includes(origin)) return true;
+
+  // Allow Vercel preview deployments if explicitly enabled in env
+  const allowVercelPreview = allowed.includes("https://*.vercel.app");
+  if (allowVercelPreview) {
+    try {
+      const url = new URL(origin);
+      if (url.protocol === "https:" && url.hostname.endsWith(".vercel.app")) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 /**
