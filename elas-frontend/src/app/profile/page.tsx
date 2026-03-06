@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -54,8 +54,8 @@ type MeRes = {
 type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
 
 function safeInitial(email?: string | null, name?: string | null) {
-  const s = (name?.trim() || email?.trim() || "U").trim();
-  return s.slice(0, 1).toUpperCase();
+  const source = (name?.trim() || email?.trim() || "U").trim();
+  return source.slice(0, 1).toUpperCase();
 }
 
 async function copyToClipboard(text: string) {
@@ -75,14 +75,14 @@ function PermissionPill({
   label: string;
   state: PermissionStateLite;
 }) {
-  const className =
+  const variant =
     state === "granted"
-      ? "bg-emerald-500/12 text-emerald-300 ring-emerald-500/20"
+      ? "success"
       : state === "denied"
-      ? "bg-red-500/12 text-red-300 ring-red-500/20"
+      ? "danger"
       : state === "prompt"
-      ? "bg-amber-500/12 text-amber-300 ring-amber-500/20"
-      : "bg-surface-subtle text-muted ring-[color:var(--border)]/25";
+      ? "warning"
+      : "secondary";
 
   const text =
     state === "granted"
@@ -96,7 +96,7 @@ function PermissionPill({
   return (
     <div className="flex items-center justify-between gap-3 rounded-elas-lg bg-surface-subtle px-4 py-3">
       <div className="text-sm text-fg">{label}</div>
-      <Badge className={className}>{text}</Badge>
+      <Badge variant={variant}>{text}</Badge>
     </div>
   );
 }
@@ -110,7 +110,7 @@ function getRoleHome(role: Role): string {
 function getRoleQuickLinks(role: Role): Array<{
   href: string;
   label: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }> {
   if (role === "teacher") {
     return [
@@ -119,6 +119,7 @@ function getRoleQuickLinks(role: Role): Array<{
       { href: "/teacher/reports", label: "Reports", icon: <BarChart3 size={16} /> },
     ];
   }
+
   if (role === "admin") {
     return [
       { href: "/admin/users", label: "Users", icon: <Users size={16} /> },
@@ -126,6 +127,7 @@ function getRoleQuickLinks(role: Role): Array<{
       { href: "/admin/audit", label: "Audit", icon: <Database size={16} /> },
     ];
   }
+
   return [
     { href: "/student/sessions", label: "Sessions", icon: <FileText size={16} /> },
     { href: "/student/groups", label: "Groups", icon: <Users size={16} /> },
@@ -138,7 +140,6 @@ export default function ProfilePage() {
   const toast = useToast();
   const ui = useUI();
 
-  // role from UI store is our primary signal
   const role = (ui.state.role as Role) || "student";
   const home = getRoleHome(role);
   const quickLinks = getRoleQuickLinks(role);
@@ -150,20 +151,22 @@ export default function ProfilePage() {
 
   const consentGranted = ui.state.consent;
 
-  // Permissions / checks
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
   const [netMs, setNetMs] = useState<number | null>(null);
-  const [netStatus, setNetStatus] = useState<"idle" | "checking" | "ok" | "fail">("idle");
+  const [netStatus, setNetStatus] = useState<"idle" | "checking" | "ok" | "fail">(
+    "idle"
+  );
 
-  // Camera preview
   const [previewOn, setPreviewOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const initials = safeInitial(stored?.email ?? me?.email, stored?.name ?? me?.name ?? null);
+  const initials = safeInitial(
+    stored?.email ?? me?.email,
+    stored?.name ?? me?.name ?? null
+  );
 
-  // Load profile
   useEffect(() => {
     let mounted = true;
     const ac = new AbortController();
@@ -172,24 +175,22 @@ export default function ProfilePage() {
       setLoading(true);
       setErr(null);
 
-      // If auth absent -> send to login
       if (!hasAuth()) {
         setLoading(false);
         router.push("/auth/login");
         return;
       }
 
-      // Offline/mock: show stored auth only
       if (!isApiAvailable()) {
         if (mounted) {
           setMe(
             stored
-              ? ({
+              ? {
                   id: "local",
                   email: stored.email,
-                  role: stored.role,
+                  role: stored.role as Role,
                   name: stored.name ?? null,
-                } as MeRes)
+                }
               : null
           );
           setLoading(false);
@@ -216,15 +217,14 @@ export default function ProfilePage() {
       mounted = false;
       ac.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, stored]);
 
-  // Permissions: query if supported
   useEffect(() => {
     let cancelled = false;
 
     async function queryPerms() {
       const perms = (navigator as any)?.permissions;
+
       if (!perms?.query) {
         setCamPerm("unsupported");
         setMicPerm("unsupported");
@@ -233,22 +233,35 @@ export default function ProfilePage() {
 
       try {
         const cam = await perms.query({ name: "camera" });
-        if (!cancelled) setCamPerm((cam.state as PermissionStateLite) || "prompt");
-        cam.onchange = () => !cancelled && setCamPerm((cam.state as PermissionStateLite) || "prompt");
+        if (!cancelled) {
+          setCamPerm((cam.state as PermissionStateLite) || "prompt");
+        }
+        cam.onchange = () => {
+          if (!cancelled) {
+            setCamPerm((cam.state as PermissionStateLite) || "prompt");
+          }
+        };
       } catch {
         setCamPerm("unsupported");
       }
 
       try {
         const mic = await perms.query({ name: "microphone" });
-        if (!cancelled) setMicPerm((mic.state as PermissionStateLite) || "prompt");
-        mic.onchange = () => !cancelled && setMicPerm((mic.state as PermissionStateLite) || "prompt");
+        if (!cancelled) {
+          setMicPerm((mic.state as PermissionStateLite) || "prompt");
+        }
+        mic.onchange = () => {
+          if (!cancelled) {
+            setMicPerm((mic.state as PermissionStateLite) || "prompt");
+          }
+        };
       } catch {
         setMicPerm("unsupported");
       }
     }
 
     queryPerms();
+
     return () => {
       cancelled = true;
     };
@@ -266,9 +279,11 @@ export default function ProfilePage() {
 
     setNetStatus("checking");
     setNetMs(null);
+
     const t0 = performance.now();
+
     try {
-      await api.get("health"); // public
+      await api.get("health");
       const dt = Math.round(performance.now() - t0);
       setNetMs(dt);
       setNetStatus("ok");
@@ -288,26 +303,44 @@ export default function ProfilePage() {
         });
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+
       streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
       }
+
       setPreviewOn(true);
-      toast.push({ type: "success", title: "Camera check", text: "Camera stream started (not recorded)." });
+      toast.push({
+        type: "success",
+        title: "Camera check",
+        text: "Camera stream started (not recorded).",
+      });
     } catch (e: any) {
-      toast.push({ type: "error", title: "Camera blocked", text: e?.message || "Permission denied." });
+      toast.push({
+        type: "error",
+        title: "Camera blocked",
+        text: e?.message || "Permission denied.",
+      });
       setPreviewOn(false);
     }
   }
 
   function stopPreview() {
     try {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
-      if (videoRef.current) videoRef.current.srcObject = null;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     } catch {}
+
     setPreviewOn(false);
   }
 
@@ -323,7 +356,9 @@ export default function ProfilePage() {
 
   return (
     <div className="pb-12">
-      <Breadcrumbs items={[{ label: roleLabel(role), href: home }, { label: "Профиль" }]} />
+      <Breadcrumbs
+        items={[{ label: roleLabel(role), href: home }, { label: "Профиль" }]}
+      />
 
       <PageHero
         title="Профиль"
@@ -335,7 +370,12 @@ export default function ProfilePage() {
                 Назад
               </Button>
             </Link>
-            <Button variant="outline" size="sm" onClick={signOut} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              className="gap-2"
+            >
               <LogOut size={16} />
               Выйти
             </Button>
@@ -356,6 +396,7 @@ export default function ProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
             <Card className="lg:col-span-5">
               <CardContent className="p-6 md:p-7">
                 <Skeleton className="h-6 w-40" />
@@ -367,20 +408,16 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
           </div>
-        ) : err ? (          <EmptyState
-            title="�� ������� ��������� �������"
-            text={err}
-          />
+        ) : err ? (
+          <EmptyState title="Не удалось загрузить профиль" text={err} />
         ) : (
           <div className="grid gap-6 lg:grid-cols-12">
-            {/* LEFT */}
-            <div className="lg:col-span-7 space-y-6">
-              {/* Identity */}
+            <div className="space-y-6 lg:col-span-7">
               <Card>
                 <CardContent className="p-6 md:p-7">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-start gap-4">
-                      <div className="relative h-12 w-12 rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25 overflow-hidden grid place-items-center">
+                      <div className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25">
                         <div
                           className="absolute inset-0"
                           style={{
@@ -388,12 +425,17 @@ export default function ProfilePage() {
                               "radial-gradient(circle at 30% 20%, rgba(142,91,255,.30) 0%, rgba(142,91,255,.14) 40%, rgba(142,91,255,0) 70%)",
                           }}
                         />
-                        <div className="relative z-10 text-fg font-semibold">{initials}</div>
+                        <div className="relative z-10 font-semibold text-fg">
+                          {initials}
+                        </div>
                       </div>
 
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="text-lg font-semibold text-fg truncate">{titleName}</div>
+                          <div className="truncate text-lg font-semibold text-fg">
+                            {titleName}
+                          </div>
+
                           <Badge className="bg-surface-subtle ring-1 ring-[color:var(--border)]/30 shadow-none">
                             {roleLabel(showRole)}
                           </Badge>
@@ -411,11 +453,13 @@ export default function ProfilePage() {
                           )}
                         </div>
 
-                        <div className="mt-1 text-sm text-muted truncate">
+                        <div className="mt-1 truncate text-sm text-muted">
                           {me?.email ?? stored?.email ?? "—"}
                         </div>
+
                         <div className="mt-1 text-xs text-muted">
-                          Consent-first: мы не храним raw-видео. Используются только агрегированные метрики.
+                          Consent-first: мы не храним raw-видео. Используются только
+                          агрегированные метрики.
                         </div>
                       </div>
                     </div>
@@ -427,6 +471,7 @@ export default function ProfilePage() {
                           Центр согласия
                         </Button>
                       </Link>
+
                       <Link href="/settings">
                         <Button variant="outline" size="sm" className="gap-2">
                           <Settings size={16} />
@@ -440,16 +485,22 @@ export default function ProfilePage() {
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
                       <div className="text-xs text-muted">User ID</div>
                       <div className="mt-1 flex items-center justify-between gap-2">
-                        <div className="text-sm text-fg font-medium truncate">{me?.id ?? "—"}</div>
+                        <div className="truncate text-sm font-medium text-fg">
+                          {me?.id ?? "—"}
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="shrink-0"
                           onClick={async () => {
                             if (!me?.id) return;
                             await copyToClipboard(me.id);
-                            toast.push({ type: "success", title: "Copied", text: "User ID copied to clipboard." });
+                            toast.push({
+                              type: "success",
+                              title: "Copied",
+                              text: "User ID copied to clipboard.",
+                            });
                           }}
-                          className="shrink-0"
                         >
                           <Copy size={16} />
                         </Button>
@@ -459,16 +510,22 @@ export default function ProfilePage() {
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
                       <div className="text-xs text-muted">Email</div>
                       <div className="mt-1 flex items-center justify-between gap-2">
-                        <div className="text-sm text-fg font-medium truncate">{me?.email ?? "—"}</div>
+                        <div className="truncate text-sm font-medium text-fg">
+                          {me?.email ?? "—"}
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="shrink-0"
                           onClick={async () => {
                             if (!me?.email) return;
                             await copyToClipboard(me.email);
-                            toast.push({ type: "success", title: "Copied", text: "Email copied to clipboard." });
+                            toast.push({
+                              type: "success",
+                              title: "Copied",
+                              text: "Email copied to clipboard.",
+                            });
                           }}
-                          className="shrink-0"
                         >
                           <Copy size={16} />
                         </Button>
@@ -487,17 +544,19 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Privacy & Consent */}
               <Card>
                 <CardContent className="p-6 md:p-7">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-sm text-muted">Privacy</div>
-                      <div className="mt-2 text-lg font-semibold text-fg">Контроль данных</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">
+                        Контроль данных
+                      </div>
                       <div className="mt-2 text-sm text-muted">
                         Прозрачные настройки для consent-first аналитики.
                       </div>
                     </div>
+
                     <div className="inline-flex items-center gap-2 rounded-full bg-surface-subtle px-3 py-1 text-xs text-muted">
                       <Info size={14} className="text-[rgb(var(--primary))]" />
                       privacy
@@ -506,12 +565,19 @@ export default function ProfilePage() {
 
                   <div className="mt-5 grid gap-3">
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">Consent status</div>
+                      <div className="text-sm font-semibold text-fg">
+                        Consent status
+                      </div>
                       <div className="mt-1 text-sm text-muted">
-                        Согласие требуется перед началом видео-аналитики. Может быть запрошено для каждой сессии отдельно.
+                        Согласие требуется перед началом видео-аналитики. Может быть
+                        запрошено для каждой сессии отдельно.
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {consentGranted ? <Badge variant="success">Granted</Badge> : <Badge variant="warning">Not granted</Badge>}
+                        {consentGranted ? (
+                          <Badge variant="success">Granted</Badge>
+                        ) : (
+                          <Badge variant="warning">Not granted</Badge>
+                        )}
                         <Link href="/consent">
                           <Button size="sm">Review consent</Button>
                         </Link>
@@ -519,8 +585,13 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">Download my data</div>
-                      <div className="mt-1 text-sm text-muted">Экспорт данных появится позже (после финализации политики хранения).</div>
+                      <div className="text-sm font-semibold text-fg">
+                        Download my data
+                      </div>
+                      <div className="mt-1 text-sm text-muted">
+                        Экспорт данных появится позже, после финализации политики
+                        хранения.
+                      </div>
                       <div className="mt-3">
                         <Button size="sm" variant="outline" disabled>
                           Coming soon
@@ -529,9 +600,12 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">Delete account</div>
+                      <div className="text-sm font-semibold text-fg">
+                        Delete account
+                      </div>
                       <div className="mt-1 text-sm text-muted">
-                        Опасная операция. Будет требовать подтверждения и может быть ограничена администратором.
+                        Опасная операция. Будет требовать подтверждения и может быть
+                        ограничена администратором.
                       </div>
                       <div className="mt-3">
                         <Button size="sm" variant="danger" disabled>
@@ -543,14 +617,16 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Role-specific (no mocks) */}
               {role === "teacher" ? (
                 <Card>
                   <CardContent className="p-6 md:p-7">
                     <div className="text-sm text-muted">Teacher</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">Настройки преподавателя</div>
+                    <div className="mt-2 text-lg font-semibold text-fg">
+                      Настройки преподавателя
+                    </div>
                     <div className="mt-2 text-sm text-muted">
-                      Появятся позже: шаблоны уроков, дефолтные политики сессии, экспорты и интеграции.
+                      Появятся позже: шаблоны уроков, дефолтные политики сессии,
+                      экспорты и интеграции.
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button variant="outline" size="sm" disabled>
@@ -568,7 +644,9 @@ export default function ProfilePage() {
                 <Card>
                   <CardContent className="p-6 md:p-7">
                     <div className="text-sm text-muted">Admin</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">Администрирование</div>
+                    <div className="mt-2 text-lg font-semibold text-fg">
+                      Администрирование
+                    </div>
                     <div className="mt-2 text-sm text-muted">
                       Быстрые ссылки на аудит и управление пользователями.
                     </div>
@@ -589,19 +667,21 @@ export default function ProfilePage() {
               ) : null}
             </div>
 
-            {/* RIGHT */}
-            <div className="lg:col-span-5 space-y-6">
-              {/* Device readiness */}
+            <div className="space-y-6 lg:col-span-5">
               <Card>
                 <CardContent className="p-6 md:p-7">
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <div className="text-sm text-muted">Device readiness</div>
-                      <div className="mt-2 text-lg font-semibold text-fg">Проверка устройства</div>
+                      <div className="mt-2 text-lg font-semibold text-fg">
+                        Проверка устройства
+                      </div>
                       <div className="mt-2 text-sm text-muted">
-                        Перед LIVE убедитесь, что камера доступна. Видео не записывается.
+                        Перед LIVE убедитесь, что камера доступна. Видео не
+                        записывается.
                       </div>
                     </div>
+
                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-elas-lg bg-surface-subtle text-[rgb(var(--primary))] ring-1 ring-[color:var(--border)]/25">
                       <Camera size={18} />
                     </div>
@@ -614,9 +694,14 @@ export default function ProfilePage() {
                     <div className="rounded-elas-lg bg-surface-subtle p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-fg">Network check</div>
-                          <div className="text-sm text-muted">Ping backend /health и оценка задержки.</div>
+                          <div className="text-sm font-semibold text-fg">
+                            Network check
+                          </div>
+                          <div className="text-sm text-muted">
+                            Ping backend /health и оценка задержки.
+                          </div>
                         </div>
+
                         <div className="inline-flex items-center gap-2">
                           {netStatus === "ok" ? (
                             <Badge variant="success" className="gap-1">
@@ -624,7 +709,7 @@ export default function ProfilePage() {
                               {netMs} ms
                             </Badge>
                           ) : netStatus === "fail" ? (
-                            <Badge variant="danger" className="gap-1 bg-red-500/12 text-red-300 ring-red-500/20">
+                            <Badge variant="danger" className="gap-1">
                               <AlertTriangle size={14} />
                               Failed
                             </Badge>
@@ -638,7 +723,12 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="mt-3">
-                        <Button variant="outline" size="sm" onClick={runNetworkCheck} disabled={netStatus === "checking"}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={runNetworkCheck}
+                          disabled={netStatus === "checking"}
+                        >
                           Run check
                         </Button>
                       </div>
@@ -648,9 +738,11 @@ export default function ProfilePage() {
                   <div className="mt-5 rounded-elas-lg bg-surface-subtle p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-fg">Camera preview</div>
+                        <div className="text-sm font-semibold text-fg">
+                          Camera preview
+                        </div>
                         <div className="text-sm text-muted">
-                          Локальный preview (не отправляется на сервер).
+                          Локальный preview, не отправляется на сервер.
                         </div>
                       </div>
 
@@ -669,35 +761,42 @@ export default function ProfilePage() {
 
                     <div
                       className={cn(
-                        "mt-4 overflow-hidden rounded-elas-lg ring-1 ring-[color:var(--border)]/30 bg-bg",
+                        "mt-4 overflow-hidden rounded-elas-lg bg-bg ring-1 ring-[color:var(--border)]/30",
                         previewOn ? "block" : "hidden"
                       )}
                     >
-                      <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover" />
+                      <video
+                        ref={videoRef}
+                        muted
+                        playsInline
+                        className="aspect-video w-full object-cover"
+                      />
                     </div>
 
                     {!previewOn ? (
                       <div className="mt-4 text-xs text-muted">
-                        Если камера “Denied”, откройте настройки браузера и разрешите доступ для сайта.
+                        Если камера заблокирована, откройте настройки браузера и
+                        разрешите доступ для сайта.
                       </div>
                     ) : null}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Quick links */}
               <Card>
                 <CardContent className="p-6 md:p-7">
                   <div className="text-sm text-muted">Navigation</div>
-                  <div className="mt-2 text-lg font-semibold text-fg">Быстрые ссылки</div>
+                  <div className="mt-2 text-lg font-semibold text-fg">
+                    Быстрые ссылки
+                  </div>
 
                   <div className="mt-4 grid gap-2">
-                    {quickLinks.map((x) => (
-                      <Link key={x.href} href={x.href} className="block">
+                    {quickLinks.map((item) => (
+                      <Link key={item.href} href={item.href} className="block">
                         <Button variant="outline" className="w-full justify-between">
                           <span className="inline-flex items-center gap-2">
-                            {x.icon}
-                            {x.label}
+                            {item.icon}
+                            {item.label}
                           </span>
                           <span className="text-muted">→</span>
                         </Button>
@@ -713,7 +812,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-
-
-
