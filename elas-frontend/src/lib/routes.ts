@@ -36,10 +36,31 @@ export const ROLE_HOME = {
   admin: ROUTES.adminDashboard,
 } as const;
 
-export type AppRole = keyof typeof ROLE_HOME;
+export const NAV_BY_ROLE = {
+  student: [
+    { label: "Dashboard", href: ROUTES.studentDashboard },
+    { label: "Sessions", href: ROUTES.studentSessions },
+    { label: "Groups", href: ROUTES.studentGroups },
+    { label: "Summary", href: ROUTES.studentSummary },
+  ],
+  teacher: [
+    { label: "Dashboard", href: ROUTES.teacherDashboard },
+    { label: "Groups", href: ROUTES.teacherGroups },
+    { label: "Sessions", href: ROUTES.teacherSessions },
+    { label: "Reports", href: ROUTES.teacherReports },
+    { label: "Compare", href: ROUTES.teacherCompare },
+  ],
+  admin: [
+    { label: "Dashboard", href: ROUTES.adminDashboard },
+    { label: "Users", href: ROUTES.adminUsers },
+    { label: "Groups", href: ROUTES.adminGroups },
+    { label: "Audit", href: ROUTES.adminAudit },
+    { label: "Model", href: ROUTES.adminModel },
+    { label: "Storage", href: ROUTES.adminStorage },
+  ],
+} as const;
 
 export function getRoleHome(role?: string | null) {
-  if (!role) return ROUTES.home;
   if (role === "student") return ROLE_HOME.student;
   if (role === "teacher") return ROLE_HOME.teacher;
   if (role === "admin") return ROLE_HOME.admin;
