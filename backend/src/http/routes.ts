@@ -8,8 +8,17 @@ import { registerChatRoutes } from "./chat";
 import { registerSearchRoutes } from "./search";
 
 export function registerRoutes(app: Express) {
+  app.get("/", (_req, res) => {
+    res.status(200).json({
+      service: "ELAS backend",
+      status: "ok",
+    });
+  });
+
   app.get("/health", (_req, res) => {
-    res.json({ status: "ok" });
+    res.status(200).json({
+      status: "ok",
+    });
   });
 
   app.get("/.well-known/appspecific/com.chrome.devtools.json", (_req, res) => {
