@@ -1,5 +1,3 @@
-"use client";
-
 import type { ClientId, Participant, Role } from "./types";
 import { SignalingClient } from "./signalingClient";
 
@@ -14,11 +12,11 @@ export class PeerConnectionManager {
   private signaling: SignalingClient;
   private localStream: MediaStream | null = null;
   private peers = new Map<ClientId, RTCPeerConnection>();
-  private peerMeta = new Map<ClientId, Participant>();
   private selfId: ClientId | null = null;
   private sessionId: string;
   private role: Role;
   private callbacks: PeerCallbacks;
+  private participants: Participant[] = [];
 
   constructor(
     signaling: SignalingClient,
@@ -33,39 +31,31 @@ export class PeerConnectionManager {
 
     this.signaling.on("joined", (self, participants) => {
       this.selfId = self.id;
-      this.peerMeta.clear();
-
-      participants
-        .filter((p) => p.id !== self.id)
-        .forEach((p) => this.peerMeta.set(p.id, p));
-
-      this.emitPeers();
+      this.participants = participants.filter((p) => p.id !== self.id);
+      this.callbacks.onPeersChange?.(this.participants);
 
       if (this.role === "teacher") {
-        participants
-          .filter((p) => p.id !== self.id)
-          .forEach((p) => {
-            if (this.localStream) {
-              void this.createPeerAndOffer(p.id);
-            }
-          });
+        this.participants.forEach((p) => {
+          if (this.localStream) this.createPeerAndOffer(p.id);
+        });
       }
     });
 
     this.signaling.on("user-joined", (p) => {
-      this.peerMeta.set(p.id, p);
-      this.emitPeers();
+      if (this.selfId && p.id === this.selfId) return;
+      this.participants = [...this.participants.filter((x) => x.id !== p.id), p];
+      this.callbacks.onPeersChange?.(this.participants);
 
       if (this.role === "teacher" && this.localStream) {
-        void this.createPeerAndOffer(p.id);
+        this.createPeerAndOffer(p.id);
       }
     });
 
     this.signaling.on("user-left", (p) => {
       this.peers.get(p.id)?.close();
       this.peers.delete(p.id);
-      this.peerMeta.delete(p.id);
-      this.emitPeers();
+      this.participants = this.participants.filter((x) => x.id !== p.id);
+      this.callbacks.onPeersChange?.(this.participants);
     });
 
     this.signaling.on("webrtc-offer", async (from, sdp) => {
@@ -86,7 +76,7 @@ export class PeerConnectionManager {
     this.signaling.on("webrtc-ice", (from, candidate) => {
       const pc = this.peers.get(from);
       if (!pc) return;
-      void pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+      pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
     });
   }
 
@@ -99,6 +89,20 @@ export class PeerConnectionManager {
 
   getLocalStream() {
     return this.localStream;
+  }
+
+  join() {
+    this.signaling.join(this.sessionId, this.role);
+  }
+
+  leave() {
+    this.signaling.leave();
+    this.localStream?.getTracks().forEach((t) => t.stop());
+    this.localStream = null;
+
+    this.peers.forEach((pc) => pc.close());
+    this.peers.clear();
+    this.participants = [];
   }
 
   setAudioEnabled(enabled: boolean) {
@@ -114,35 +118,16 @@ export class PeerConnectionManager {
   }
 
   async replaceOutgoingVideoTrack(track: MediaStreamTrack | null) {
-    const replaceJobs: Promise<void>[] = [];
+    const tasks: Promise<void>[] = [];
 
     this.peers.forEach((pc) => {
       const sender = pc.getSenders().find((s) => s.track?.kind === "video");
       if (sender) {
-        replaceJobs.push(
-          sender.replaceTrack(track).then(() => undefined).catch(() => undefined)
-        );
+        tasks.push(sender.replaceTrack(track).then(() => undefined));
       }
     });
 
-    await Promise.all(replaceJobs);
-  }
-
-  join() {
-    this.signaling.join(this.sessionId, this.role);
-  }
-
-  leave() {
-    this.signaling.leave();
-    this.localStream?.getTracks().forEach((t) => t.stop());
-    this.peers.forEach((pc) => pc.close());
-    this.peers.clear();
-    this.peerMeta.clear();
-    this.emitPeers();
-  }
-
-  private emitPeers() {
-    this.callbacks.onPeersChange?.(Array.from(this.peerMeta.values()));
+    await Promise.all(tasks);
   }
 
   private getOrCreatePeer(peerId: ClientId): RTCPeerConnection {
