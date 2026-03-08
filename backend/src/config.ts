@@ -9,13 +9,16 @@ function splitList(raw: string | undefined): string[] {
 const NODE_ENV = process.env.NODE_ENV || "development";
 const IS_PROD = NODE_ENV === "production";
 
-// IMPORTANT: never ship a hardcoded prod secret.
 const jwtSecret = process.env.JWT_SECRET;
-if (IS_PROD && (!jwtSecret || jwtSecret.length < 24)) {
+
+// В проде требуем реальный секрет
+if (IS_PROD && (!jwtSecret || jwtSecret.trim().length < 32)) {
   throw new Error(
     "JWT_SECRET is missing/too short in production. Set a strong secret (32+ chars)."
   );
 }
+
+const wsRequireAuthRaw = (process.env.WS_REQUIRE_AUTH || "").trim().toLowerCase();
 
 export const CONFIG = {
   nodeEnv: NODE_ENV,
@@ -25,26 +28,33 @@ export const CONFIG = {
   wsPath: "/ws",
   chatWsPath: "/ws-chat",
 
-  // Comma-separated allowlist.
-  // Example: CORS_ORIGINS="http://localhost:3000,https://elas.app"
-  corsOrigins: splitList(process.env.CORS_ORIGINS || process.env.CORS_ORIGIN),
+  // HTTP CORS
+  corsOrigins: splitList(
+    process.env.CORS_ORIGINS || process.env.CORS_ORIGIN
+  ),
 
-  // WS origin allowlist (falls back to corsOrigins if not provided)
+  // WS origins
   wsAllowedOrigins: splitList(
     process.env.WS_ALLOWED_ORIGINS ||
       process.env.CORS_ORIGINS ||
       process.env.CORS_ORIGIN
   ),
 
-  // WS auth requirement (default true in production)
+  // Если явно указали true/false — используем это.
+  // Если не указали вообще:
+  //   prod -> true
+  //   dev  -> false
   wsRequireAuth:
-    (process.env.WS_REQUIRE_AUTH || "").toLowerCase() === "true" || IS_PROD,
+    wsRequireAuthRaw === "true"
+      ? true
+      : wsRequireAuthRaw === "false"
+        ? false
+        : IS_PROD,
 
-  jwtSecret: jwtSecret || "elas-dev-secret-change-me",
+  jwtSecret: jwtSecret?.trim() || "elas-dev-secret-change-me",
 
   jsonBodyLimit: process.env.JSON_BODY_LIMIT || "256kb",
 
-  /** Закреплённый админ: задаётся через ADMIN_EMAIL и ADMIN_PASSWORD в .env; создаётся через seed. */
   adminEmail: process.env.ADMIN_EMAIL?.trim() || null,
   adminPassword: process.env.ADMIN_PASSWORD || null,
 };
