@@ -1,7 +1,7 @@
-import { getApiBaseUrl, getToken } from "@/lib/api/client";
+import { getWsBaseUrl } from "@/lib/env";
+import { getToken } from "@/lib/api/client";
 
 type ChatEventHandler = (event: any) => void;
-
 type RoomKind = "group" | "session";
 
 export class ChatClient {
@@ -12,11 +12,11 @@ export class ChatClient {
   private ready = false;
   private pendingRooms: { kind: RoomKind; id: string }[] = [];
   private onEvent: ChatEventHandler | null = null;
+  private reconnectAttempts = 0;
+  private manuallyClosed = false;
 
   constructor(onEvent?: ChatEventHandler) {
-    const base = getApiBaseUrl();
-    const wsBase = base.replace(/^http/, "ws");
-    this.url = `${wsBase}/ws-chat`;
+    this.url = `${getWsBaseUrl()}/ws-chat`;
     if (onEvent) this.onEvent = onEvent;
   }
 
@@ -25,32 +25,43 @@ export class ChatClient {
   }
 
   connect() {
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (
+      this.socket &&
+      (this.socket.readyState === WebSocket.OPEN ||
+        this.socket.readyState === WebSocket.CONNECTING)
+    ) {
       return;
     }
+
     const token = getToken();
     if (!token) return;
 
-    this.socket = new WebSocket(this.url);
+    this.manuallyClosed = false;
+
+    try {
+      this.socket = new WebSocket(this.url, ["elas", "bearer", token]);
+    } catch {
+      return;
+    }
+
     this.connected = false;
     this.ready = false;
 
     this.socket.onopen = () => {
       this.connected = true;
-      this.send({ type: "auth", token });
+      this.ready = true;
+      this.reconnectAttempts = 0;
+
+      for (const r of this.pendingRooms) {
+        this.send({ type: "join", room: r.kind, id: r.id });
+      }
+      this.pendingRooms = [];
     };
 
     this.socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        if (msg.type === "ready") {
-          this.ready = true;
-          // join any rooms queued before ready
-          for (const r of this.pendingRooms) {
-            this.send({ type: "join", room: r.kind, id: r.id });
-          }
-          this.pendingRooms = [];
-        } else if (msg.type === "chat-event" && this.onEvent) {
+        if (msg.type === "chat-event" && this.onEvent) {
           this.onEvent(msg);
         }
       } catch {
@@ -62,17 +73,35 @@ export class ChatClient {
       this.connected = false;
       this.ready = false;
       this.socket = null;
-      if (this.reconnectTimer === null) {
-        this.reconnectTimer = window.setTimeout(() => {
-          this.reconnectTimer = null;
-          this.connect();
-        }, 2000);
-      }
+
+      if (this.manuallyClosed) return;
+      if (this.reconnectAttempts >= 5) return;
+      if (this.reconnectTimer !== null) return;
+
+      this.reconnectAttempts += 1;
+      this.reconnectTimer = window.setTimeout(() => {
+        this.reconnectTimer = null;
+        this.connect();
+      }, 1500);
     };
 
     this.socket.onerror = () => {
-      // noop, handled by close
+      // handled by close
     };
+  }
+
+  disconnect() {
+    this.manuallyClosed = true;
+
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    this.socket?.close();
+    this.socket = null;
+    this.connected = false;
+    this.ready = false;
   }
 
   private send(msg: any) {
@@ -83,21 +112,24 @@ export class ChatClient {
   joinGroup(groupId: string) {
     if (!groupId) return;
     if (!this.connected) this.connect();
+
     if (!this.ready) {
       this.pendingRooms.push({ kind: "group", id: groupId });
       return;
     }
+
     this.send({ type: "join", room: "group", id: groupId });
   }
 
   joinSession(sessionId: string) {
     if (!sessionId) return;
     if (!this.connected) this.connect();
+
     if (!this.ready) {
       this.pendingRooms.push({ kind: "session", id: sessionId });
       return;
     }
+
     this.send({ type: "join", room: "session", id: sessionId });
   }
 }
-
