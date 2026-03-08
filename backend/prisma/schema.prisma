@@ -86,17 +86,18 @@ model Invitation {
 }
 
 model Session {
-  id          String   @id @default(uuid())
-  title       String
-  type        String   // "lecture" | "exam"
-  status      String   @default("draft") // "draft" | "active" | "finished"
-  code        String   @unique // e.g. ELAS-9K2A for join
-  groupId     String
-  createdById String
-  startedAt   DateTime?
-  endedAt     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(uuid())
+  title            String
+  type             String   // "lecture" | "exam"
+  status           String   @default("draft") // "draft" | "active" | "finished"
+  code             String   @unique // e.g. ELAS-9K2A for join
+  groupId          String
+  createdById      String
+  startedAt        DateTime?
+  endedAt          DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  analyticsSummary Json?    // persisted summary at session end or from ML service
 
   group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   teacher User    @relation(fields: [createdById], references: [id], onDelete: Cascade)

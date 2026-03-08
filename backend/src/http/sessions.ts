@@ -22,6 +22,55 @@ function getOrCreateSessionMetrics(sessionId: string): Map<string, { emotion: st
   return m;
 }
 
+/** Build analytics summary from live metrics and session times. */
+function buildSummaryFromLiveMetrics(
+  sessionId: string,
+  startedAt: Date | null,
+  endedAt: Date | null
+): Record<string, unknown> {
+  const start = startedAt ?? new Date(0);
+  const end = endedAt ?? new Date();
+  const durationSeconds = Math.max(0, (end.getTime() - start.getTime()) / 1000);
+  const metrics = liveMetricsStore.get(sessionId);
+  let avgRisk = 0;
+  let avgConfidence = 0;
+  let dominantEmotion = "neutral";
+  if (metrics && metrics.size > 0) {
+    const entries = Array.from(metrics.values());
+    avgRisk = entries.reduce((s, m) => s + m.risk, 0) / entries.length;
+    avgConfidence = entries.reduce((s, m) => s + m.confidence, 0) / entries.length;
+    const emotionCounts = new Map<string, number>();
+    for (const m of entries) {
+      const e = (m.dominant_emotion || "Neutral").toLowerCase();
+      emotionCounts.set(e, (emotionCounts.get(e) ?? 0) + 1);
+    }
+    const sorted = [...emotionCounts.entries()].sort((a, b) => b[1] - a[1]);
+    if (sorted.length > 0) dominantEmotion = sorted[0][0];
+  }
+  return {
+    sessionId,
+    startedAt: start.toISOString(),
+    endedAt: end.toISOString(),
+    durationSeconds: Math.round(durationSeconds * 10) / 10,
+    metrics: {
+      avgEngagement: 1 - avgRisk,
+      avgStress: avgRisk * 0.6,
+      avgFatigue: (1 - avgConfidence) * 0.4,
+      stability: avgConfidence,
+    },
+    dominantEmotion,
+    group: {
+      engagement: 1 - avgRisk,
+      stress: avgRisk * 0.6,
+      fatigue: (1 - avgConfidence) * 0.4,
+      tzState: "stable",
+      groupState: avgRisk > 0.5 ? "low_engagement" : "high_engagement",
+      emotionDistribution: { [dominantEmotion]: 1 },
+    },
+    attentionDrops: [],
+  };
+}
+
 function randomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "ELAS-";
@@ -292,7 +341,14 @@ export function registerSessionsRoutes(app: Express) {
         return;
       }
       const body = req.body as { title?: string; status?: string; type?: string };
-      const updates: { title?: string; status?: string; type?: string; startedAt?: Date; endedAt?: Date } = {};
+      const updates: {
+        title?: string;
+        status?: string;
+        type?: string;
+        startedAt?: Date;
+        endedAt?: Date;
+        analyticsSummary?: unknown;
+      } = {};
       if (body.title !== undefined) updates.title = String(body.title).trim();
       if (body.type === "lecture" || body.type === "exam") updates.type = body.type;
       if (body.status === "active") {
@@ -301,7 +357,13 @@ export function registerSessionsRoutes(app: Express) {
         await logAudit(user.userId, "session_started", "session", id, null);
       } else if (body.status === "finished") {
         updates.status = "finished";
-        updates.endedAt = new Date();
+        const endedAt = new Date();
+        updates.endedAt = endedAt;
+        updates.analyticsSummary = buildSummaryFromLiveMetrics(
+          id,
+          session.startedAt,
+          endedAt
+        );
         await logAudit(user.userId, "session_ended", "session", id, null);
       } else if (body.status === "draft") {
         updates.status = "draft";
@@ -433,6 +495,86 @@ export function registerSessionsRoutes(app: Express) {
     } catch (e) {
       console.error("POST /sessions/:id/consent", e);
       res.status(500).json({ error: "Failed to record consent" });
+    }
+  });
+
+  // GET /sessions/:id/analytics/summary — ML/analytics summary (from DB or live metrics)
+  app.get("/sessions/:id/analytics/summary", async (req, res) => {
+    const user = getUser(req);
+    try {
+      const sessionId = req.params.id;
+      const session = await prisma.session.findUnique({ where: { id: sessionId } });
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      const isOwner = session.createdById === user.userId;
+      const isAdmin = user.role === "admin";
+      if (!isOwner && !isAdmin) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      const stored = session.analyticsSummary as Record<string, unknown> | null;
+      if (stored && typeof stored === "object" && (stored.sessionId != null || stored.metrics != null)) {
+        const startedAt = session.startedAt ?? session.createdAt;
+        const endedAt = session.endedAt ?? new Date();
+        res.json({
+          sessionId: (stored.sessionId as string) ?? sessionId,
+          startedAt: (stored.startedAt as string) ?? (startedAt instanceof Date ? startedAt.toISOString() : new Date(startedAt).toISOString()),
+          endedAt: (stored.endedAt as string) ?? (endedAt instanceof Date ? endedAt.toISOString() : new Date(endedAt).toISOString()),
+          durationSeconds: (stored.durationSeconds as number) ?? 0,
+          metrics: (stored.metrics as Record<string, number>) ?? {},
+          dominantEmotion: (stored.dominantEmotion as string) ?? "neutral",
+          group: (stored.group as Record<string, unknown>) ?? {},
+          attentionDrops: Array.isArray(stored.attentionDrops) ? stored.attentionDrops : [],
+        });
+        return;
+      }
+      const summary = buildSummaryFromLiveMetrics(
+        sessionId,
+        session.startedAt,
+        session.endedAt ?? new Date()
+      );
+      res.json(summary);
+    } catch (e) {
+      console.error("GET /sessions/:id/analytics/summary", e);
+      res.status(500).json({ error: "Failed to get analytics summary" });
+    }
+  });
+
+  // POST /sessions/:id/analytics/ingest — save full summary (e.g. from Python ML service)
+  app.post("/sessions/:id/analytics/ingest", requireRole("teacher", "admin"), async (req, res) => {
+    const user = getUser(req);
+    try {
+      const sessionId = req.params.id;
+      const session = await prisma.session.findUnique({ where: { id: sessionId } });
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      if (user.role !== "admin" && session.createdById !== user.userId) {
+        res.status(403).json({ error: "Forbidden" });
+        return;
+      }
+      const body = req.body as Record<string, unknown>;
+      const summary = {
+        sessionId: body.sessionId ?? sessionId,
+        startedAt: body.startedAt ?? (session.startedAt?.toISOString() ?? session.createdAt.toISOString()),
+        endedAt: body.endedAt ?? (session.endedAt?.toISOString() ?? new Date().toISOString()),
+        durationSeconds: typeof body.durationSeconds === "number" ? body.durationSeconds : 0,
+        metrics: (body.metrics as Record<string, number>) ?? {},
+        dominantEmotion: (body.dominantEmotion as string) ?? "neutral",
+        group: (body.group as Record<string, unknown>) ?? {},
+        attentionDrops: Array.isArray(body.attentionDrops) ? body.attentionDrops : [],
+      };
+      await prisma.session.update({
+        where: { id: sessionId },
+        data: { analyticsSummary: summary },
+      });
+      res.status(200).json({ ok: true, sessionId });
+    } catch (e) {
+      console.error("POST /sessions/:id/analytics/ingest", e);
+      res.status(500).json({ error: "Failed to ingest analytics summary" });
     }
   });
 }
