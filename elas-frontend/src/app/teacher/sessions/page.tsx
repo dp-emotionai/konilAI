@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
-import Table, { THead, TRow, TCell, TMuted } from "@/components/ui/Table";
+import Table, { THead, TBody, TRow, TCell, TH, TMuted } from "@/components/ui/Table";
 
 import { nextTeacherAction, setSessionStatusOverride } from "@/lib/mock/sessionLifecycle";
 import { getTeacherAllSessions, updateSessionStatus } from "@/lib/api/teacher";
@@ -143,69 +143,66 @@ export default function TeacherSessionsPage() {
               <div className="mt-6">
                 <Table>
                   <THead>
-                    <div className="grid grid-cols-12 items-center">
-                      <div className="col-span-5">Название</div>
-                      <div className="col-span-3">Группа</div>
-                      <div className="col-span-2">Статус</div>
-                      <div className="col-span-2 text-right">Действия</div>
-                    </div>
+                    <TRow>
+                      <TH className="w-[40%]">Название</TH>
+                      <TH className="w-[20%]">Группа</TH>
+                      <TH className="w-[15%]">Статус</TH>
+                      <TH className="w-[25%] text-right">Действия</TH>
+                    </TRow>
                   </THead>
+                  <TBody>
+                    {loading ? (
+                      <TRow>
+                        <TCell colSpan={4}>
+                          <div className="h-10 rounded-elas-lg bg-surface-subtle animate-pulse" />
+                        </TCell>
+                      </TRow>
+                    ) : filtered.length === 0 ? (
+                      <TRow>
+                        <TCell colSpan={4} className="py-8 text-center">
+                          <div className="text-sm font-medium text-fg">Ничего не найдено</div>
+                          <div className="mt-2 text-sm text-muted">Попробуйте изменить поиск или фильтр.</div>
+                        </TCell>
+                      </TRow>
+                    ) : (
+                      filtered.map((s) => {
+                        const action = nextTeacherAction(s.status);
+                        const label =
+                          action.label === "Start"
+                            ? "Старт"
+                            : action.label === "End"
+                            ? "Завершить"
+                            : "Повторно открыть";
 
-                  {loading ? (
-                    <TRow>
-                      <div className="h-10 rounded-elas-lg bg-surface-subtle animate-pulse" />
-                    </TRow>
-                  ) : filtered.length === 0 ? (
-                    <TRow>
-                      <div className="py-8 text-center">
-                        <div className="text-sm font-medium text-fg">Ничего не найдено</div>
-                        <div className="mt-2 text-sm text-muted">Попробуйте изменить поиск или фильтр.</div>
-                      </div>
-                    </TRow>
-                  ) : (
-                    filtered.map((s) => {
-                      const action = nextTeacherAction(s.status);
-                      const label =
-                        action.label === "Start"
-                          ? "Старт"
-                          : action.label === "End"
-                          ? "Завершить"
-                          : "Повторно открыть";
-
-                      return (
-                        <TRow key={s.id}>
-                          <div className="grid grid-cols-12 items-center gap-2">
-                            <div className="col-span-5">
-                              <TCell className="font-medium">{s.title}</TCell>
+                        return (
+                          <TRow key={s.id}>
+                            <TCell>
+                              <div className="font-medium">{s.title}</div>
                               <TMuted>ID: {s.id}</TMuted>
-                            </div>
-
-                            <div className="col-span-3">
-                              <TCell>{s.groupId}</TCell>
-                            </div>
-
-                            <div className="col-span-2">{statusBadge(s.status)}</div>
-
-                            <div className="col-span-2 flex justify-end gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleLifecycle(s)}
-                                disabled={actioningId === s.id}
-                              >
-                                {actioningId === s.id ? "…" : label}
-                              </Button>
-
-                              <Link href={`/teacher/session/${s.id}`}>
-                                <Button size="sm" variant="outline">
-                                  Открыть
+                            </TCell>
+                            <TCell>{s.groupId}</TCell>
+                            <TCell>{statusBadge(s.status)}</TCell>
+                            <TCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleLifecycle(s)}
+                                  disabled={actioningId === s.id}
+                                >
+                                  {actioningId === s.id ? "…" : label}
                                 </Button>
-                              </Link>
-                            </div>
-                          </div>
-                        </TRow>
-                      );
-                    })
-                  )}
+                                <Link href={`/teacher/session/${s.id}`}>
+                                  <Button size="sm" variant="outline">
+                                    Открыть
+                                  </Button>
+                                </Link>
+                              </div>
+                            </TCell>
+                          </TRow>
+                        );
+                      })
+                    )}
+                  </TBody>
                 </Table>
               </div>
 

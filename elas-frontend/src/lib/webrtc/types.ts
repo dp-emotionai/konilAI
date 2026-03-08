@@ -7,6 +7,9 @@ export type Participant = {
   id: ClientId;
   role: Role;
   sessionId: SessionId;
+  displayName?: string;
+  email?: string;
+  name?: string;
 };
 
 // Messages mirrored from backend (subset needed on frontend)
@@ -61,4 +64,3 @@ export type ClientMessage =
       to: ClientId;
       candidate: any;
     };
-

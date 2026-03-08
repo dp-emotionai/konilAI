@@ -148,16 +148,10 @@ export async function mlStopSession(
   };
 }
 
-/**
- * Fetch summary JSON for a finished session.
- * Later: GET /sessions/{id}/summary.
- */
-export async function mlGetSessionSummary(
-  _sessionId: MlSessionId
-): Promise<MlSessionSummary> {
-  // Simple placeholder for wiring UI; numbers are arbitrary mock.
+/** Fallback mock when backend is unavailable. */
+function mockSessionSummary(sessionId: MlSessionId): MlSessionSummary {
   return {
-    sessionId: _sessionId,
+    sessionId,
     startedAt: new Date().toISOString(),
     endedAt: new Date().toISOString(),
     durationSeconds: 45 * 60,
@@ -185,6 +179,38 @@ export async function mlGetSessionSummary(
       { t: 420, duration: 20, severity: "moderate", note: "Mid-lecture drop (mock)" },
     ],
   };
+}
+
+/**
+ * Fetch summary JSON for a finished session.
+ * Uses GET /sessions/{id}/analytics/summary when backend and auth are available; otherwise returns mock.
+ */
+export async function mlGetSessionSummary(sessionId: MlSessionId): Promise<MlSessionSummary> {
+  if (typeof window === "undefined") return mockSessionSummary(sessionId);
+  const { getApiBaseUrl, getToken } = await import("./client");
+  const base = getApiBaseUrl();
+  const token = getToken();
+  if (!base || !token) return mockSessionSummary(sessionId);
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return mockSessionSummary(sessionId);
+    const data = (await res.json()) as MlSessionSummary;
+    return {
+      sessionId: data.sessionId ?? sessionId,
+      startedAt: data.startedAt ?? new Date().toISOString(),
+      endedAt: data.endedAt ?? new Date().toISOString(),
+      durationSeconds: data.durationSeconds ?? 0,
+      metrics: data.metrics ?? mockSessionSummary(sessionId).metrics,
+      dominantEmotion: data.dominantEmotion ?? "neutral",
+      group: data.group ?? mockSessionSummary(sessionId).group,
+      attentionDrops: Array.isArray(data.attentionDrops) ? data.attentionDrops : [],
+    };
+  } catch {
+    return mockSessionSummary(sessionId);
+  }
 }
 
 /**

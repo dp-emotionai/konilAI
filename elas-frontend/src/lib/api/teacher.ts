@@ -277,6 +277,8 @@ export type SessionMessage = {
   id: string;
   sessionId: string;
   senderId: string;
+  senderName?: string | null;
+  senderEmail?: string | null;
   type: string;
   text: string;
   channel: "public" | "help";
@@ -290,18 +292,51 @@ export async function getSessionMessages(
   sessionId: string,
   opts: { channel?: "public" | "help"; helpStudentId?: string } = {}
 ): Promise<SessionMessage[]> {
+  if (!getApiBaseUrl() || !hasAuth()) return [];
   const params = new URLSearchParams();
   if (opts.channel) params.set("channel", opts.channel);
   if (opts.helpStudentId) params.set("helpStudentId", opts.helpStudentId);
   const qs = params.toString();
   const path = qs ? `sessions/${sessionId}/messages?${qs}` : `sessions/${sessionId}/messages`;
-  const list = await api.get<SessionMessage[]>(path);
-  return Array.isArray(list) ? list : [];
+  try {
+    const list = await api.get<SessionMessage[]>(path);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function postSessionMessage(
   sessionId: string,
   payload: { type: string; text: string; channel?: "public" | "help"; helpStudentId?: string | null }
-): Promise<SessionMessage> {
-  return api.post<SessionMessage>(`sessions/${sessionId}/messages`, payload);
+): Promise<SessionMessage | null> {
+  try {
+    return await api.post<SessionMessage>(`sessions/${sessionId}/messages`, payload);
+  } catch {
+    return null;
+  }
+}
+
+/** Chat policy for session (mode + slowmode). */
+export type SessionChatPolicy = {
+  sessionId: string;
+  mode: "lecture_open" | "questions_only" | "locked" | "exam_help_only";
+  slowmodeSec: number;
+  updatedAt: string;
+};
+
+export async function getSessionChatPolicy(sessionId: string): Promise<SessionChatPolicy | null> {
+  if (!getApiBaseUrl() || !hasAuth()) return null;
+  try {
+    return await api.get<SessionChatPolicy>(`sessions/${sessionId}/chat-policy`);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateSessionChatPolicy(
+  sessionId: string,
+  payload: { mode?: SessionChatPolicy["mode"]; slowmodeSec?: number }
+): Promise<SessionChatPolicy> {
+  return api.patch<SessionChatPolicy>(`sessions/${sessionId}/chat-policy`, payload);
 }
