@@ -20,9 +20,15 @@ export default function RoleGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { state } = useUI();
 
-  const isPublic = useMemo(() => publicPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/")), [pathname]);
+  // В некоторых состояниях рендеринга pathname может быть временно undefined/null.
+  // В этом случае считаем страницу публичной и не пытаемся делать startsWith.
+  const isPublic = useMemo(() => {
+    if (!pathname) return true;
+    return publicPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  }, [pathname]);
 
   useEffect(() => {
+    if (!pathname) return;
     if (isPublic) return;
 
     const rule = rules.find((r) => pathname.startsWith(r.prefix));
@@ -40,6 +46,7 @@ export default function RoleGuard({ children }: { children: React.ReactNode }) {
 
   // Важно: чтобы не мигало — можно показать пусто, пока редирект
   if (!isPublic) {
+    if (!pathname) return null;
     const rule = rules.find((r) => pathname.startsWith(r.prefix));
     if (rule) {
       if (!state.loggedIn) return null;
