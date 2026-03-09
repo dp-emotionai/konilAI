@@ -597,7 +597,7 @@ export default function StudentJoinSessionPage() {
                     </div>
 
                     <div className="border-t border-white/10 px-5 py-4">
-                      <div className="flex items-center justify-center gap-3">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
                         <button
                           type="button"
                           className="rounded-full border border-white/10 bg-white/5 p-3 text-white transition hover:bg-white/10"

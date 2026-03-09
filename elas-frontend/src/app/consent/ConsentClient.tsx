@@ -12,7 +12,8 @@ import { ROLE_HOME } from "@/lib/routes";
 export default function ConsentClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get("returnUrl");
+  const returnUrl =
+    searchParams.get("next") ?? searchParams.get("returnUrl") ?? null;
   const { state, setConsent } = useUI();
 
   const roleLabel =
