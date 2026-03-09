@@ -77,7 +77,7 @@ export default function TeacherLectureAnalyticsPage() {
         right={
           <div className="flex items-center gap-2 flex-wrap">
             {useMock ? (
-              <Badge variant="outline" className="gap-1">
+              <Badge variant="secondary" className="gap-1">
                 MOCK
               </Badge>
             ) : (
