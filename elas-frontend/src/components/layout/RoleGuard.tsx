@@ -13,45 +13,62 @@ const rules: Rule[] = [
   { prefix: "/admin", roles: ["admin"] },
 ];
 
-const publicPrefixes = ["/", "/privacy", "/ethics", "/faq", "/auth", "/consent", "/settings", "/403"];
+const publicPrefixes = [
+  "/",
+  "/privacy",
+  "/ethics",
+  "/faq",
+  "/auth",
+  "/consent",
+  "/settings",
+  "/403",
+];
 
-export default function RoleGuard({ children }: { children: React.ReactNode }) {
+export default function RoleGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { state } = useUI();
 
-  // В некоторых состояниях рендеринга pathname может быть временно undefined/null.
-  // В этом случае считаем страницу публичной и не пытаемся делать startsWith.
+  const safePathname = typeof pathname === "string" ? pathname : "";
+
   const isPublic = useMemo(() => {
-    if (!pathname) return true;
-    return publicPrefixes.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  }, [pathname]);
+    if (!safePathname) return true;
+
+    return publicPrefixes.some((p) => {
+      if (p === "/") return safePathname === "/";
+      return safePathname === p || safePathname.startsWith(`${p}/`);
+    });
+  }, [safePathname]);
+
+  const matchedRule = useMemo(() => {
+    if (!safePathname) return null;
+    return rules.find((r) => safePathname.startsWith(r.prefix)) ?? null;
+  }, [safePathname]);
 
   useEffect(() => {
-    if (!pathname) return;
+    if (!safePathname) return;
     if (isPublic) return;
+    if (!matchedRule) return;
 
-    const rule = rules.find((r) => pathname.startsWith(r.prefix));
-    if (!rule) return;
-
-    // must be logged in + correct role
     if (!state.loggedIn) {
       router.replace("/auth/login");
       return;
     }
-    if (!rule.roles.includes(state.role)) {
+
+    if (!state.role || !matchedRule.roles.includes(state.role)) {
       router.replace("/403");
     }
-  }, [pathname, router, isPublic, state.loggedIn, state.role]);
+  }, [safePathname, isPublic, matchedRule, state.loggedIn, state.role, router]);
 
-  // Важно: чтобы не мигало — можно показать пусто, пока редирект
-  if (!isPublic) {
-    if (!pathname) return null;
-    const rule = rules.find((r) => pathname.startsWith(r.prefix));
-    if (rule) {
-      if (!state.loggedIn) return null;
-      if (!rule.roles.includes(state.role)) return null;
-    }
+  if (!safePathname) return null;
+
+  if (!isPublic && matchedRule) {
+    if (!state.loggedIn) return null;
+    if (!state.role || !matchedRule.roles.includes(state.role)) return null;
   }
 
   return <>{children}</>;

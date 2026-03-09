@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   NAV_PUBLIC_LEFT,
   NAV_PUBLIC_RIGHT,
@@ -70,8 +70,10 @@ const PUBLIC_ICONS: Record<
 };
 
 function Logo({ href = "/" }: { href?: string }) {
+  const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
+
   return (
-    <Link href={href} className="flex items-center gap-2 shrink-0">
+    <Link href={safeHref} className="flex items-center gap-2 shrink-0">
       <div className="relative h-9 w-9 rounded-elas-lg bg-primary-muted grid place-items-center overflow-hidden ring-1 ring-[color:var(--border)]/25">
         <div
           className="absolute inset-0 opacity-95"
@@ -98,9 +100,11 @@ function NavLink({
   active?: boolean;
   className?: string;
 }) {
+  const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
+
   return (
     <Link
-      href={href}
+      href={safeHref}
       className={cn(
         "px-3 py-2 rounded-full text-sm font-medium transition-[background-color,color] duration-150",
         active
@@ -116,23 +120,34 @@ function NavLink({
 
 function PublicNavItem({ item }: { item: NavItem }) {
   const path = usePathname();
+  const safePath = typeof path === "string" ? path : "";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     };
+
     if (open) document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
   }, [open]);
 
   if (item.type === "link") {
-    return <NavLink href={item.href} label={item.label} active={path === item.href} />;
+    return (
+      <NavLink
+        href={item.href}
+        label={item.label}
+        active={safePath === item.href}
+      />
+    );
   }
 
   const dropdown = item as NavDropdownItem;
-  const hasCardStyle = dropdown.children.some((c) => c.subtitle ?? c.icon);
+  const children = Array.isArray(dropdown.children) ? dropdown.children : [];
+  const hasCardStyle = children.some((c) => Boolean(c.subtitle ?? c.icon));
 
   return (
     <div className="relative" ref={ref}>
@@ -147,7 +162,10 @@ function PublicNavItem({ item }: { item: NavItem }) {
         )}
       >
         {dropdown.label}
-        <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", open && "rotate-180")}
+        />
       </button>
 
       {open && (
@@ -159,12 +177,17 @@ function PublicNavItem({ item }: { item: NavItem }) {
               : "min-w-[200px] rounded-xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-1"
           )}
         >
-          {dropdown.children.map((child) => {
+          {children.map((child) => {
             const IconComp = child.icon ? PUBLIC_ICONS[child.icon] : null;
+            const childHref =
+              typeof child.href === "string" && child.href.length > 0
+                ? child.href
+                : "/";
+
             return (
               <Link
-                key={child.href}
-                href={child.href}
+                key={childHref}
+                href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
                   "flex items-center gap-3 transition-colors",
@@ -178,6 +201,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                     <IconComp size={18} />
                   </span>
                 )}
+
                 <div className="min-w-0 flex-1">
                   <div className="font-medium text-fg truncate">{child.label}</div>
                   {child.subtitle && (
@@ -186,6 +210,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                     </div>
                   )}
                 </div>
+
                 <ChevronRight size={16} className="shrink-0 text-muted" />
               </Link>
             );
@@ -198,7 +223,6 @@ function PublicNavItem({ item }: { item: NavItem }) {
 
 function AppNavItem({
   item,
-  role,
   liveSessionId,
 }: {
   item: import("@/lib/nav").AppNavItem;
@@ -206,39 +230,46 @@ function AppNavItem({
   liveSessionId: string | null;
 }) {
   const path = usePathname();
+  const safePath = typeof path === "string" ? path : "";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
     };
+
     if (open) document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
   }, [open]);
 
   if (item.type === "link") {
-    const href = item.href;
+    const href = typeof item.href === "string" && item.href.length > 0 ? item.href : "/";
     const active =
-      !!path &&
-      (path === href ||
-        path.startsWith(href + "/") ||
-        (path.startsWith("/teacher/session/") && href.includes("filter=live")));
+      !!safePath &&
+      (safePath === href ||
+        safePath.startsWith(`${href}/`) ||
+        (safePath.startsWith("/teacher/session/") && href.includes("filter=live")));
+
     return (
       <NavLink
         href={href}
         label={item.label}
         active={active}
         className={
-  "badge" in item && item.badge === "live" && liveSessionId
-    ? "text-[rgb(var(--primary))]"
-    : undefined
-}
+          "badge" in item && item.badge === "live" && liveSessionId
+            ? "text-[rgb(var(--primary))]"
+            : undefined
+        }
       />
     );
   }
 
   const dropdown = item as NavDropdownItem;
+  const children = Array.isArray(dropdown.children) ? dropdown.children : [];
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -252,34 +283,46 @@ function AppNavItem({
         )}
       >
         {dropdown.label}
-        <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", open && "rotate-180")}
+        />
       </button>
 
       {open && (
         <div className="absolute left-0 top-full mt-2 min-w-[220px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
-          {dropdown.children.map((child) => (
-            <Link
-              key={child.href}
-              href={child.href}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors rounded-xl mx-1",
-                child.accent
-                  ? "bg-primary-muted/50 text-[rgb(var(--primary))] font-medium hover:bg-primary-muted"
-                  : "text-fg hover:bg-surface-subtle/80"
-              )}
-            >
-              <span className="truncate">{child.label}</span>
-              {child.badge === "live" && liveSessionId && (
-                <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
-                  Live
-                </span>
-              )}
-              {!child.accent && !(child.badge === "live" && liveSessionId) && (
-                <ChevronRight size={14} className="shrink-0 text-muted" />
-              )}
-            </Link>
-          ))}
+          {children.map((child) => {
+            const childHref =
+              typeof child.href === "string" && child.href.length > 0
+                ? child.href
+                : "/";
+
+            return (
+              <Link
+                key={childHref}
+                href={childHref}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors rounded-xl mx-1",
+                  child.accent
+                    ? "bg-primary-muted/50 text-[rgb(var(--primary))] font-medium hover:bg-primary-muted"
+                    : "text-fg hover:bg-surface-subtle/80"
+                )}
+              >
+                <span className="truncate">{child.label}</span>
+
+                {child.badge === "live" && liveSessionId && (
+                  <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
+                    Live
+                  </span>
+                )}
+
+                {!child.accent && !(child.badge === "live" && liveSessionId) && (
+                  <ChevronRight size={14} className="shrink-0 text-muted" />
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
@@ -313,15 +356,34 @@ function ThemeToggle({
 export default function TopNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const safePathname = typeof pathname === "string" ? pathname : "/";
+
   const { state, setLoggedIn, setConsent } = useUI();
   const { theme, setTheme } = useTheme();
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
   const profileRef = useRef<HTMLDivElement>(null);
-  const liveSession = useTeacherLiveSession(state.role);
+
+  const safeRole: Role | null = state.role ?? null;
+  const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
 
   const nextTheme = theme === "dark" ? "light" : "dark";
+
+  const appNavItems = useMemo(() => {
+    if (!safeRole) return [];
+    return NAV_APP_BY_ROLE[safeRole] ?? [];
+  }, [safeRole]);
+
+  const homeHref = useMemo(() => {
+    if (!state.loggedIn) return "/";
+    if (!safeRole) return "/";
+    return ROLE_HOME[safeRole] ?? "/";
+  }, [state.loggedIn, safeRole]);
+
+  const consentRequired = Boolean(state.loggedIn && !state.consent);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -330,6 +392,7 @@ export default function TopNav() {
         setSearchOpen((o) => !o);
       }
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -340,6 +403,7 @@ export default function TopNav() {
         setProfileOpen(false);
       }
     };
+
     if (profileOpen) document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen]);
@@ -353,22 +417,18 @@ export default function TopNav() {
     router.push("/");
   }, [router, setLoggedIn, setConsent]);
 
-  const consentRequired = state.loggedIn && !state.consent;
-  const appNavItems = NAV_APP_BY_ROLE[state.role];
-
   return (
     <>
       <header className="sticky top-0 z-50 pt-3 pb-1 px-3 sm:px-4">
         <div className="mx-auto max-w-6xl rounded-full bg-surface/80 backdrop-blur-xl shadow-card ring-1 ring-[color:var(--border)]/25">
           <div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
             <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-              <Logo href={state.loggedIn ? ROLE_HOME[state.role] : "/"} />
+              <Logo href={homeHref} />
             </div>
 
-            {/* Desktop nav */}
             <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center max-w-2xl">
               {!state.loggedIn &&
-                NAV_PUBLIC_LEFT.map((item) => (
+                (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
                   <PublicNavItem
                     key={item.type === "dropdown" ? item.label : item.href}
                     item={item}
@@ -380,13 +440,12 @@ export default function TopNav() {
                   <AppNavItem
                     key={item.type === "dropdown" ? item.label : item.href}
                     item={item}
-                    role={state.role}
+                    role={safeRole ?? "student"}
                     liveSessionId={liveSession?.id ?? null}
                   />
                 ))}
             </nav>
 
-            {/* Center: Quick Search bar (logged in) */}
             {state.loggedIn && (
               <div className="hidden md:flex flex-1 max-w-md justify-center min-w-0">
                 <button
@@ -408,9 +467,8 @@ export default function TopNav() {
               </div>
             )}
 
-            {/* Right */}
             <div className="flex items-center gap-2 shrink-0">
-              {state.loggedIn && state.role === "student" && (
+              {state.loggedIn && safeRole === "student" && (
                 <Link
                   href="/student/sessions?join=1"
                   onClick={() => setMobileOpen(false)}
@@ -421,14 +479,14 @@ export default function TopNav() {
                 </Link>
               )}
 
-              {state.loggedIn && state.role === "teacher" && liveSession && (
+              {state.loggedIn && safeRole === "teacher" && liveSession && (
                 <Link
                   href={`/teacher/session/${liveSession.id}`}
                   className="text-xs font-medium text-[rgb(var(--primary))] bg-primary/10 px-2.5 py-1.5 rounded-full ring-1 ring-[rgb(var(--primary))]/20 hover:bg-primary/15 transition-colors"
                 >
                   LIVE •{" "}
-                  {liveSession.title.length > 18
-                    ? liveSession.title.slice(0, 18) + "…"
+                  {typeof liveSession.title === "string" && liveSession.title.length > 18
+                    ? `${liveSession.title.slice(0, 18)}…`
                     : liveSession.title}
                 </Link>
               )}
@@ -462,7 +520,6 @@ export default function TopNav() {
 
                     {profileOpen && (
                       <div className="absolute right-0 top-full mt-2 min-w-[200px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
-                        {/* ✅ PROFILE */}
                         <Link
                           href="/profile"
                           onClick={() => setProfileOpen(false)}
@@ -493,7 +550,7 @@ export default function TopNav() {
                         {consentRequired && (
                           <Link
                             href={`/consent?next=${encodeURIComponent(
-                              pathname || "/"
+                              safePathname || "/"
                             )}`}
                             onClick={() => setProfileOpen(false)}
                             className="flex items-center gap-2 px-4 py-2.5 text-sm text-warning hover:bg-surface-subtle/80 rounded-xl mx-1"
@@ -521,20 +578,24 @@ export default function TopNav() {
 
               {!state.loggedIn && (
                 <div className="flex items-center gap-2">
-                  <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
-                    <Button variant="outline" size="sm">
-                      {NAV_PUBLIC_RIGHT.signIn.label}
-                    </Button>
-                  </Link>
-                  <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
-                    <Button size="sm">
-                      {NAV_PUBLIC_RIGHT.getStarted.label}
-                    </Button>
-                  </Link>
+                  {NAV_PUBLIC_RIGHT?.signIn?.href && (
+                    <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
+                      <Button variant="outline" size="sm">
+                        {NAV_PUBLIC_RIGHT.signIn.label}
+                      </Button>
+                    </Link>
+                  )}
+
+                  {NAV_PUBLIC_RIGHT?.getStarted?.href && (
+                    <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
+                      <Button size="sm">
+                        {NAV_PUBLIC_RIGHT.getStarted.label}
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               )}
 
-              {/* Mobile menu trigger */}
               <button
                 type="button"
                 aria-label="Menu"
@@ -547,16 +608,15 @@ export default function TopNav() {
           </div>
         </div>
 
-        {/* Mobile drawer */}
         {mobileOpen && (
           <div className="lg:hidden border-b border-border/40 bg-surface/95 backdrop-blur-xl">
             <div className="mx-auto max-w-elas-page px-4 py-4 space-y-3">
               {!state.loggedIn &&
-                NAV_PUBLIC_LEFT.map((item) => (
+                (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
                   <div key={item.type === "dropdown" ? item.label : item.href}>
                     {item.type === "link" ? (
                       <Link
-                        href={item.href}
+                        href={typeof item.href === "string" ? item.href : "/"}
                         onClick={() => setMobileOpen(false)}
                         className="block py-2 text-fg"
                       >
@@ -568,10 +628,10 @@ export default function TopNav() {
                           {(item as NavDropdownItem).label}
                         </div>
                         <div className="pl-3 mt-1 space-y-1">
-                          {(item as NavDropdownItem).children.map((c) => (
+                          {((item as NavDropdownItem).children ?? []).map((c) => (
                             <Link
                               key={c.href}
-                              href={c.href}
+                              href={typeof c.href === "string" ? c.href : "/"}
                               onClick={() => setMobileOpen(false)}
                               className="block py-1.5 text-sm text-fg"
                             >
@@ -603,7 +663,7 @@ export default function TopNav() {
                         <div key={item.type === "dropdown" ? item.label : item.href}>
                           {item.type === "link" ? (
                             <Link
-                              href={item.href}
+                              href={typeof item.href === "string" ? item.href : "/"}
                               onClick={() => setMobileOpen(false)}
                               className="block py-2 text-fg"
                             >
@@ -615,10 +675,10 @@ export default function TopNav() {
                                 {(item as NavDropdownItem).label}
                               </div>
                               <div className="pl-3 mt-1 space-y-1">
-                                {(item as NavDropdownItem).children.map((c) => (
+                                {((item as NavDropdownItem).children ?? []).map((c) => (
                                   <Link
                                     key={c.href}
-                                    href={c.href}
+                                    href={typeof c.href === "string" ? c.href : "/"}
                                     onClick={() => setMobileOpen(false)}
                                     className="block py-1.5 text-sm text-fg"
                                   >
@@ -645,6 +705,7 @@ export default function TopNav() {
                       >
                         Profile
                       </Link>
+
                       <Link
                         href="/settings"
                         onClick={() => setMobileOpen(false)}
@@ -655,7 +716,7 @@ export default function TopNav() {
 
                       {consentRequired && (
                         <Link
-                          href={`/consent?next=${encodeURIComponent(pathname || "/")}`}
+                          href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
                           onClick={() => setMobileOpen(false)}
                           className="block py-2 text-warning"
                         >
@@ -679,7 +740,11 @@ export default function TopNav() {
         )}
       </header>
 
-      <QuickSearch open={searchOpen} onClose={() => setSearchOpen(false)} role={state.role} />
+      <QuickSearch
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        role={safeRole ?? "student"}
+      />
     </>
   );
 }
