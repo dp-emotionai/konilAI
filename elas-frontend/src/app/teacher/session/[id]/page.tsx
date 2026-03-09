@@ -323,6 +323,26 @@ export default function TeacherLiveMonitorPage() {
     }
   };
 
+  const liveSuggestion = useMemo(() => {
+    if (!isLive) return null;
+    const mins = Math.floor(liveSeconds / 60);
+    const riskPct = Math.round(avgRisk * 100);
+
+    if (mins >= 20 && mins < 35 && riskPct < 40) {
+      return "20–30 минута: хорошее окно для короткого опроса или обсуждения — закрепите материал.";
+    }
+    if (riskPct >= 60) {
+      return "Сейчас у части группы повышенный риск/напряжение. Подойдёт пауза на дыхание или смена активности.";
+    }
+    if (mins >= 35) {
+      return "После 35-й минуты внимание часто падает. Добавьте практическое задание или разбор кейса.";
+    }
+    if (participants.length === 0) {
+      return "Ждите подключений студентов. Как только кто-то зайдёт, начните с короткого чек-ина по самочувствию.";
+    }
+    return "Следите за live-графиком и помечайте важные моменты маркерами — это улучшит итоговый отчёт.";
+  }, [isLive, liveSeconds, avgRisk, participants.length]);
+
   return (
     <div className="pb-12 space-y-6">
       <Breadcrumbs
@@ -713,7 +733,23 @@ export default function TeacherLiveMonitorPage() {
                     </div>
 
                     {isSettingsOpen && (
-                      <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/75">
+                      <div className="mx-auto mt-4 max-w-xl space-y-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/75">
+                          <div className="flex items-start gap-2">
+                            <div className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-200">
+                              <Sparkles size={16} />
+                            </div>
+                            <div>
+                              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
+                                Live assistant
+                              </div>
+                              <div className="mt-1 text-sm text-white/85">
+                                {liveSuggestion}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="grid gap-3 sm:grid-cols-3">
                           <LiveInfoCard label="Mic" value={isMicEnabled ? "On" : "Off"} />
                           <LiveInfoCard label="Camera" value={isCameraEnabled ? "On" : "Off"} />

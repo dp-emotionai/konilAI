@@ -387,11 +387,7 @@ export default function TopNav() {
     return NAV_APP_BY_ROLE[safeRole] ?? [];
   }, [safeRole]);
 
-  const homeHref = useMemo(() => {
-    if (!state.loggedIn) return "/";
-    if (!safeRole) return "/";
-    return ROLE_HOME[safeRole] ?? "/";
-  }, [state.loggedIn, safeRole]);
+  const homeHref = "/"; // логотип всегда ведёт на главную
 
   const consentRequired = Boolean(state.loggedIn && !state.consent);
 

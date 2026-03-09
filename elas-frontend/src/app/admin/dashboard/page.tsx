@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
@@ -14,6 +14,9 @@ import { cn } from "@/lib/cn";
 import { NAV_BY_ROLE } from "@/lib/routes";
 import { getAdminUsers } from "@/lib/api/admin";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
+import { getTeacherDashboardSessions } from "@/lib/api/teacher";
+import type { Session } from "@/lib/mock/sessions";
+import { getSessionMetrics } from "@/lib/utils/metrics";
 
 function StatBadge({
   children,
@@ -57,16 +60,25 @@ const adminNav = NAV_BY_ROLE.admin;
 
 export default function AdminDashboardPage() {
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [pendingTeachers, setPendingTeachers] = useState<number | null>(null);
+  const [backendOk, setBackendOk] = useState<boolean>(false);
+  const [sessions, setSessions] = useState<Session[]>([]);
 
   useEffect(() => {
     let mounted = true;
     const base = getApiBaseUrl();
-    if (!base || !hasAuth()) return;
+    const ok = Boolean(base && hasAuth());
+    setBackendOk(ok);
+    if (!ok) return;
     (async () => {
       try {
         const users = await getAdminUsers();
         if (!mounted) return;
         setUserCount(users.length);
+        const pending = users.filter(
+          (u) => u.role === "teacher" && u.status === "pending"
+        ).length;
+        setPendingTeachers(pending);
       } catch {
         // оставляем null — в этом случае покажем демо-значение
       }
@@ -75,6 +87,41 @@ export default function AdminDashboardPage() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    getTeacherDashboardSessions()
+      .then((list) => {
+        if (!mounted) return;
+        setSessions(list);
+      })
+      .catch(() => {
+        /* оставляем mock */
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const groupHeat = useMemo(() => {
+    if (!sessions.length) return [];
+    const byGroup = new Map<string, Session[]>();
+    for (const s of sessions) {
+      const key = s.group || "—";
+      if (!byGroup.has(key)) byGroup.set(key, []);
+      byGroup.get(key)!.push(s);
+    }
+    return Array.from(byGroup.entries()).map(([group, list]) => {
+      const metrics = list.map((s) => getSessionMetrics(s));
+      const avg =
+        metrics.length === 0
+          ? 0
+          : Math.round(
+              metrics.reduce((a, m) => a + m.engagement, 0) / metrics.length
+            );
+      return { group, avg };
+    });
+  }, [sessions]);
 
   return (
     <div className="relative space-y-12 pb-20">
@@ -111,6 +158,13 @@ export default function AdminDashboardPage() {
                 </Link>
               ))}
             </div>
+
+            {!backendOk && (
+              <p className="mt-4 text-xs text-zinc-500">
+                Сейчас показаны демо-данные. Настройте <code className="text-[11px]">NEXT_PUBLIC_API_URL</code> и авторизацию,
+                чтобы видеть реальные метрики из backend.
+              </p>
+            )}
           </GlassCard>
         </Reveal>
       </Section>
@@ -140,12 +194,18 @@ export default function AdminDashboardPage() {
           <Reveal>
             <Stagger ms={80}>
               <GlassCard className="space-y-4 p-6">
-                <p className="text-sm text-zinc-400">Активные сессии</p>
+                <p className="text-sm text-zinc-400">Заявки преподавателей</p>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">37</h3>
-                  <StatBadge tone="info">В эфире</StatBadge>
+                  <h3 className="text-3xl font-semibold">
+                    {pendingTeachers != null ? pendingTeachers : "—"}
+                  </h3>
+                  <StatBadge tone={pendingTeachers && pendingTeachers > 0 ? "warning" : "info"}>
+                    {pendingTeachers && pendingTeachers > 0 ? "Ожидают одобрения" : "Нет заявок"}
+                  </StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">Лекции и экзамены в реальном времени</p>
+                <p className="text-xs text-zinc-500">
+                  Количество аккаунтов с ролью преподавателя в статусе PENDING.
+                </p>
               </GlassCard>
             </Stagger>
           </Reveal>
@@ -215,6 +275,62 @@ export default function AdminDashboardPage() {
                 <Button variant="outline" className="rounded-2xl">Аудит</Button>
               </Link>
             </div>
+          </GlassCard>
+        </Reveal>
+      </Section>
+
+      {/* GROUP HEATMAP */}
+      <Section>
+        <Reveal>
+          <GlassCard className="space-y-6 p-8">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-xl font-semibold text-zinc-100">
+                Карта вовлечённости по группам
+              </h2>
+              <StatBadge tone="info">
+                {backendOk ? "demo + backend" : "demo по mock-сессиям"}
+              </StatBadge>
+            </div>
+
+            {groupHeat.length === 0 ? (
+              <p className="text-sm text-zinc-500">
+                Данных по сессиям пока нет. Запустите несколько занятий, чтобы
+                увидеть распределение вовлечённости по группам.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="min-w-[320px] grid gap-2">
+                  {groupHeat.map(({ group, avg }) => {
+                    const intensity = Math.max(0, Math.min(100, avg));
+                    const color = `hsla(260, 90%, ${80 - intensity * 0.3}%, 1)`;
+                    return (
+                      <div
+                        key={group}
+                        className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ring-1 ring-white/10 bg-gradient-to-r from-transparent"
+                        style={{
+                          backgroundImage: `linear-gradient(to right, ${color}, transparent 60%)`,
+                        }}
+                      >
+                        <div className="text-sm font-medium text-zinc-100 truncate">
+                          {group}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-zinc-50">
+                            {avg}%
+                          </span>
+                          <div className="h-2 w-20 rounded-full bg-zinc-800/70 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400"
+                              style={{ width: `${intensity}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </GlassCard>
         </Reveal>
       </Section>

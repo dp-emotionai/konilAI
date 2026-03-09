@@ -33,6 +33,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useUI } from "@/components/layout/Providers";
 
 function KPI({
   icon,
@@ -134,6 +135,7 @@ const QUICK_ACTIONS = [
 
 export default function TeacherDashboard() {
   const toast = useToast();
+  const ui = useUI();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -159,6 +161,20 @@ export default function TeacherDashboard() {
   const recentSessions = sessions.slice(0, 6);
   const live = summary.live;
   const liveNow = live[0];
+
+  const status = ui.state.status ?? null;
+  const statusBanner =
+    status === "pending"
+      ? {
+          label: "Аккаунт ожидает одобрения",
+          text: "Вы можете использовать дашборд и демо‑сессии. Полный доступ появится после одобрения администратором.",
+        }
+      : status === "limited"
+      ? {
+          label: "Ограниченный доступ",
+          text: "Сейчас включён ограниченный режим: часть функций может быть недоступна. Для полного доступа обратитесь к администратору.",
+        }
+      : null;
 
   return (
     <div className="pb-16">
@@ -189,6 +205,15 @@ export default function TeacherDashboard() {
           </div>
         }
       />
+
+      {statusBanner && (
+        <Section spacing="none" className="mt-3">
+          <div className="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 flex flex-col gap-1">
+            <div className="font-medium">{statusBanner.label}</div>
+            <div className="text-xs text-amber-100/90">{statusBanner.text}</div>
+          </div>
+        </Section>
+      )}
 
       {/* Быстрые действия — всегда на виду */}
       <Section spacing="none" className="mt-6">

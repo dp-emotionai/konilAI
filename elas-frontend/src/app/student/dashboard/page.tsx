@@ -120,7 +120,7 @@ export default function StudentDashboardPage() {
 
       <PageHero
         overline="Student"
-        title={displayName ? `Welcome back, ${displayName}` : "Welcome back to ELAS"}
+        title={displayName ? `С возвращением, ${displayName}` : "С возвращением в ELAS"}
         subtitle="Сессии, приглашения и управление согласием — в одном месте."
         right={
           <div className="flex flex-wrap items-center gap-2">
@@ -148,6 +148,18 @@ export default function StudentDashboardPage() {
           </div>
         }
       />
+
+      {!consent && (
+        <Section spacing="none" className="mt-4">
+          <div className="rounded-elas-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            <div className="font-medium">Согласие ещё не дано</div>
+            <div className="mt-1 text-xs text-amber-100/90">
+              Перед подключением к LIVE-сессии пройдите через центр согласия. Камера используется только для аналитики,
+              без записи видео.
+            </div>
+          </div>
+        </Section>
+      )}
 
       {/* Overview stats */}
       <Section spacing="none" className="mt-8 space-y-6">

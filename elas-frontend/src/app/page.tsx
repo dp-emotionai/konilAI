@@ -93,7 +93,7 @@ export default function HomePage() {
               </Badge>
             </div>
 
-            <h1 className="mt-8 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-fg leading-[1.06]">
+            <h1 className="mt-8 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-fg leading-[1.06]">
               Real-time уроки с{" "}
               <span className="text-[rgb(var(--primary))]">AI-аналитикой</span>
             </h1>
@@ -121,8 +121,8 @@ export default function HomePage() {
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               <MiniPill icon={<Users size={18} />} title="Rooms" value="Session-based" />
-              <MiniPill icon={<Video size={18} />} title="Transport" value="WS + WebRTC" />
-              <MiniPill icon={<Lock size={18} />} title="Security" value="JWT + consent" />
+              <MiniPill icon={<Video size={18} />} title="Transport" value="WebRTC + чат" />
+              <MiniPill icon={<Lock size={18} />} title="Privacy" value="Consent-first" />
             </div>
           </div>
 
@@ -216,7 +216,7 @@ export default function HomePage() {
       <SectionLightStrip>
         <Section spacing="loose" className="relative">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-fg">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-fg">
               Понятная аналитика,{" "}
               <span className="text-[rgb(var(--primary))]">без вреда</span>{" "}
               для приватности
@@ -234,20 +234,11 @@ export default function HomePage() {
         </Section>
       </SectionLightStrip>
 
-      {/* Dark stats — оставляем, но делаем компактнее */}
-      <SectionDark spacing="loose">
-        <div className="grid gap-8 md:grid-cols-3 text-center">
-          <Stat title="Consent-first" value="Прозрачно" desc="Согласие до любой аналитики. Без записи видео." />
-          <Stat title="1–2 fps" value="Легко" desc="Анализ по кадрам, не поток. Минимум нагрузки." />
-          <Stat title="Агрегаты" value="Этично" desc="Только метрики и инсайты. Не для оценивания личности." />
-        </div>
-      </SectionDark>
-
       {/* How it works */}
       <SectionLightStrip>
         <Section spacing="loose" className="relative">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-fg">
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-fg">
               Как это <span className="text-[rgb(var(--primary))]">работает</span>
             </h2>
             <p className="mt-5 text-muted leading-relaxed text-base md:text-lg">
@@ -312,19 +303,19 @@ export default function HomePage() {
         </div>
       </SectionDark>
 
-      {/* Roles */}
+      {/* Roles / For whom */}
       <SectionLightStrip>
         <Section spacing="loose" className="relative">
           <div className="mx-auto max-w-3xl text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-fg">
-              Платформа для двух ролей
+              Для кого ELAS
             </h2>
             <p className="mt-4 text-muted leading-relaxed">
-              Всё необходимое для преподавателя и студента в одном месте.
+              Платформа для преподавателей, студентов и учебных организаций.
             </p>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-2">
+          <div className="grid gap-8 lg:grid-cols-3">
             <Card variant="elevated" interactive className="overflow-hidden">
               <CardContent className="p-10">
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-elas-lg bg-primary-muted text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/15">
@@ -349,18 +340,82 @@ export default function HomePage() {
                 <p className="mt-3 text-muted leading-relaxed">
                   Простой вход в сессию, камера-чек, управление согласием и личная сводка (опционально).
                 </p>
-                <div className="mt-8 h-44 rounded-elas-lg bg-surface-subtle/70 ring-1 ring-[color:var(--border)]/25" />
+                <div className="mt-8 h-36 rounded-elas-lg bg-surface-subtle/70 ring-1 ring-[color:var(--border)]/25" />
+              </CardContent>
+            </Card>
+
+            <Card variant="elevated" interactive className="overflow-hidden">
+              <CardContent className="p-10">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-elas-lg bg-primary-muted text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/15">
+                  <Users size={24} />
+                </div>
+                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Institution</div>
+                <div className="mt-2 text-2xl font-bold text-fg">Для университетов и школ</div>
+                <p className="mt-3 text-muted leading-relaxed">
+                  Обзор качества занятий, риск‑группы и отчёты для аккредитации — без хранения видео и с учётом согласия.
+                </p>
+                <div className="mt-8 h-36 rounded-elas-lg bg-surface-subtle/70 ring-1 ring-[color:var(--border)]/25" />
               </CardContent>
             </Card>
           </div>
         </Section>
       </SectionLightStrip>
 
+      {/* Ethics / privacy highlight */}
+      <SectionDark spacing="loose">
+        <div className="max-w-3xl mx-auto text-center">
+          <p className="text-xs font-medium uppercase tracking-wider text-white/55">
+            Этичная аналитика
+          </p>
+          <h2 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight text-white">
+            Аналитика без записи видео и оценки личности
+          </h2>
+          <p className="mt-4 text-sm md:text-base text-white/70 leading-relaxed">
+            ELAS проектирован как consent‑first система: студент сам решает, участвовать ли в аналитике,
+            а преподаватель получает только агрегированные метрики для улучшения урока.
+          </p>
+
+          <div className="mt-8 grid gap-4 md:grid-cols-3 text-left">
+            <div className="rounded-elas-lg bg-white/5 ring-1 ring-white/10 px-4 py-4">
+              <div className="text-sm font-semibold text-white/85">Без хранения raw‑видео</div>
+              <div className="mt-2 text-sm text-white/70">
+                В хранилище попадают только числовые метрики и события, а не потоки с камеры.
+              </div>
+            </div>
+            <div className="rounded-elas-lg bg-white/5 ring-1 ring-white/10 px-4 py-4">
+              <div className="text-sm font-semibold text-white/85">Контроль у студента</div>
+              <div className="mt-2 text-sm text-white/70">
+                Согласие можно дать или отозвать в центре согласия — для каждой сессии.
+              </div>
+            </div>
+            <div className="rounded-elas-lg bg-white/5 ring-1 ring-white/10 px-4 py-4">
+              <div className="text-sm font-semibold text-white/85">Не для оценивания</div>
+              <div className="mt-2 text-sm text-white/70">
+                Метрики не используются для выставления оценок или наказаний, только для поддержки преподавателя.
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link href="/privacy">
+              <Button variant="outline" size="sm">
+                Политика конфиденциальности
+              </Button>
+            </Link>
+            <Link href="/ethics">
+              <Button variant="ghost" size="sm">
+                Этические принципы
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </SectionDark>
+
       {/* Final CTA */}
       <SectionDark spacing="loose">
         <div className="text-center max-w-2xl mx-auto">
           <p className="text-xs font-medium uppercase tracking-wider text-white/50">Get started</p>
-          <h2 className="mt-4 text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-white">
+          <h2 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight text-white">
             Войдите или зарегистрируйтесь, чтобы пользоваться live-занятиями и аналитикой.
           </h2>
           <div className="mt-10 flex flex-wrap justify-center gap-4">

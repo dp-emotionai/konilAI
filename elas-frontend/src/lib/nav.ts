@@ -21,45 +21,28 @@ export type NavDropdownItem = {
 };
 export type NavItem = NavLinkItem | NavDropdownItem;
 
-/** Public TopBar (logged out): Product, Solutions, Pricing, Resources, Demo/Contact; right: Sign in, Get started */
+/** Public TopBar (logged out): краткое меню без лишних разделов; right: Sign in, Get started */
 export const NAV_PUBLIC_LEFT: NavItem[] = [
   {
-    type: "dropdown",
-    label: "Product",
-    children: [
-      { type: "link", label: "Overview", href: "/", subtitle: "Platform overview and features", icon: "LayoutDashboard" },
-      { type: "link", label: "Live Classroom", href: "/product/live", subtitle: "WebRTC lessons and sessions", icon: "Video" },
-      { type: "link", label: "Live Analytics", href: "/product/analytics", subtitle: "Engagement and consent-first metrics", icon: "BarChart3" },
-      { type: "link", label: "Consent & Privacy", href: "/product/consent", subtitle: "Ethical data handling", icon: "ShieldCheck" },
-      { type: "link", label: "Integrations / API", href: "/product/integrations", subtitle: "Connect your tools", icon: "Code" },
-    ],
+    type: "link",
+    label: "Продукт",
+    href: "/",
+  },
+  {
+    type: "link",
+    label: "Документация",
+    href: "/docs",
   },
   {
     type: "dropdown",
-    label: "Solutions",
+    label: "Политики",
     children: [
-      { type: "link", label: "Schools / K-12", href: "/solutions/schools", subtitle: "For schools and K-12", icon: "GraduationCap" },
-      { type: "link", label: "Tutoring centers", href: "/solutions/tutoring", subtitle: "Tutoring and coaching", icon: "Users" },
-      { type: "link", label: "Higher Ed", href: "/solutions/higher-ed", subtitle: "Universities and colleges", icon: "BookOpen" },
-      { type: "link", label: "Corporate training", href: "/solutions/corporate", subtitle: "Enterprise learning", icon: "Briefcase" },
-    ],
-  },
-  { type: "link", label: "Pricing", href: "/pricing" },
-  {
-    type: "dropdown",
-    label: "Resources",
-    children: [
-      { type: "link", label: "Docs / Help Center", href: "/docs", subtitle: "Documentation and guides", icon: "BookOpen" },
-      { type: "link", label: "Case Studies", href: "/case-studies", subtitle: "Success stories", icon: "FileText" },
-      { type: "link", label: "Blog", href: "/blog", subtitle: "Updates and articles", icon: "Newspaper" },
-      { type: "link", label: "Security", href: "/security", subtitle: "Security practices", icon: "Shield" },
+      { type: "link", label: "Privacy", href: "/privacy", subtitle: "Политика конфиденциальности", icon: "Lock" },
+      { type: "link", label: "Ethics", href: "/ethics", subtitle: "Этичное использование AI", icon: "Heart" },
       { type: "link", label: "Privacy", href: "/privacy", subtitle: "Privacy policy", icon: "Lock" },
-      { type: "link", label: "Ethics", href: "/ethics", subtitle: "Ethical AI use", icon: "Heart" },
-      { type: "link", label: "Status", href: "/status", subtitle: "Service status", icon: "Activity" },
-      { type: "link", label: "FAQ", href: "/faq", subtitle: "Frequently asked questions", icon: "HelpCircle" },
+      { type: "link", label: "FAQ", href: "/faq", subtitle: "Частые вопросы", icon: "HelpCircle" },
     ],
   },
-  { type: "link", label: "Demo / Contact", href: "/demo" },
 ];
 
 export const NAV_PUBLIC_RIGHT = {

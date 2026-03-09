@@ -1,34 +1,103 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
-import {Card} from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import { mockSessions } from "@/lib/mock/sessions";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
+import { getTeacherSessionsAsReports, type ReportRow } from "@/lib/api/reports";
+import { getSessionSummary, type SessionSummary } from "@/lib/api/teacher";
 
 export default function TeacherComparePage() {
   const toast = useToast();
 
-  const [a, setA] = useState(mockSessions[0]?.id ?? "1");
-  const [b, setB] = useState(mockSessions[1]?.id ?? "2");
+  const [sessions, setSessions] = useState<ReportRow[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [a, setA] = useState<string | null>(null);
+  const [b, setB] = useState<string | null>(null);
   const [tab, setTab] = useState<"metrics" | "summary">("metrics");
 
-  const A = useMemo(() => mockSessions.find((x) => x.id === a) ?? mockSessions[0], [a]);
-  const B = useMemo(() => mockSessions.find((x) => x.id === b) ?? mockSessions[1], [b]);
+  const [summaryA, setSummaryA] = useState<SessionSummary | null>(null);
+  const [summaryB, setSummaryB] = useState<SessionSummary | null>(null);
+  const [loadingA, setLoadingA] = useState(false);
+  const [loadingB, setLoadingB] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingSessions(true);
+    setError(null);
+
+    getTeacherSessionsAsReports()
+      .then((rows) => {
+        if (!mounted) return;
+        setSessions(rows);
+        if (!a && rows[0]) setA(rows[0].id);
+        if (!b && rows[1]) setB(rows[1].id);
+      })
+      .catch((e: any) => {
+        if (!mounted) return;
+        setError(e?.message || "Не удалось загрузить сессии.");
+      })
+      .finally(() => {
+        if (mounted) setLoadingSessions(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!a) {
+      setSummaryA(null);
+      return;
+    }
+    setLoadingA(true);
+    getSessionSummary(a)
+      .then((s) => setSummaryA(s))
+      .finally(() => setLoadingA(false));
+  }, [a]);
+
+  useEffect(() => {
+    if (!b) {
+      setSummaryB(null);
+      return;
+    }
+    setLoadingB(true);
+    getSessionSummary(b)
+      .then((s) => setSummaryB(s))
+      .finally(() => setLoadingB(false));
+  }, [b]);
+
+  const A = useMemo(
+    () => (a ? sessions.find((x) => x.id === a) ?? null : null),
+    [a, sessions]
+  );
+  const B = useMemo(
+    () => (b ? sessions.find((x) => x.id === b) ?? null : null),
+    [b, sessions]
+  );
 
   return (
     <div className="space-y-6">
       <PageHero
         overline="Teacher"
         title="Compare sessions"
-        subtitle="Compare engagement, stress and attention drops between 2 sessions (mock now)."
+        subtitle="Сравнение вовлечённости, стресса и attention drops между двумя реальными сессиями."
         right={
           <Button
-            onClick={() => toast.push({ type: "info", title: "Export queued", text: "Mock comparison export created." })}
+            onClick={() =>
+              toast.push({
+                type: "info",
+                title: "Экспорт",
+                text: "Реальный экспорт добавим отдельным endpoint'ом на бэкенде.",
+              })
+            }
           >
             Export comparison
           </Button>
@@ -43,32 +112,36 @@ export default function TeacherComparePage() {
               <div className="mt-2 text-lg font-semibold">A vs B</div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge>{A.type.toUpperCase()}</Badge>
-              <Badge>{B.type.toUpperCase()}</Badge>
+              {A && <Badge>{A.type.toUpperCase()}</Badge>}
+              {B && <Badge>{B.type.toUpperCase()}</Badge>}
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-3">
             <select
-              value={a}
-              onChange={(e) => setA(e.target.value)}
+              value={a ?? ""}
+              onChange={(e) => setA(e.target.value || null)}
               className="h-11 rounded-2xl bg-black/30 border border-white/10 px-4 text-white/80 outline-none"
+              disabled={loadingSessions || !sessions.length}
             >
-              {mockSessions.map((s) => (
+              {!sessions.length && <option>Нет сессий</option>}
+              {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.title} ({s.group})
+                  {s.title} ({s.groupName})
                 </option>
               ))}
             </select>
 
             <select
-              value={b}
-              onChange={(e) => setB(e.target.value)}
+              value={b ?? ""}
+              onChange={(e) => setB(e.target.value || null)}
               className="h-11 rounded-2xl bg-black/30 border border-white/10 px-4 text-white/80 outline-none"
+              disabled={loadingSessions || !sessions.length}
             >
-              {mockSessions.map((s) => (
+              {!sessions.length && <option>Нет сессий</option>}
+              {sessions.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.title} ({s.group})
+                  {s.title} ({s.groupName})
                 </option>
               ))}
             </select>
@@ -105,13 +178,58 @@ export default function TeacherComparePage() {
       {tab === "metrics" && (
         <div className="grid lg:grid-cols-3 gap-4">
           <Reveal>
-            <MetricCard title="Avg engagement" a="68%" b="61%" hint="Higher is better" />
+            <MetricCard
+              title="Avg engagement"
+              a={
+                summaryA?.avgEngagement != null
+                  ? `${summaryA.avgEngagement}%`
+                  : "—"
+              }
+              b={
+                summaryB?.avgEngagement != null
+                  ? `${summaryB.avgEngagement}%`
+                  : "—"
+              }
+              hint="Выше — лучше (вовлечённость группы)."
+              loadingA={loadingA}
+              loadingB={loadingB}
+            />
           </Reveal>
           <Reveal>
-            <MetricCard title="Avg stress" a="41%" b="53%" hint="Lower is better" />
+            <MetricCard
+              title="Avg stress"
+              a={
+                summaryA?.avgStress != null
+                  ? `${summaryA.avgStress}%`
+                  : "—"
+              }
+              b={
+                summaryB?.avgStress != null
+                  ? `${summaryB.avgStress}%`
+                  : "—"
+              }
+              hint="Ниже — лучше (меньше напряжения)."
+              loadingA={loadingA}
+              loadingB={loadingB}
+            />
           </Reveal>
           <Reveal>
-            <MetricCard title="Attention drops" a="9" b="14" hint="Lower is better" />
+            <MetricCard
+              title="Attention drops"
+              a={
+                summaryA?.attentionDrops != null
+                  ? String(summaryA.attentionDrops)
+                  : "—"
+              }
+              b={
+                summaryB?.attentionDrops != null
+                  ? String(summaryB.attentionDrops)
+                  : "—"
+              }
+              hint="Ниже — лучше (меньше провалов внимания)."
+              loadingA={loadingA}
+              loadingB={loadingB}
+            />
           </Reveal>
         </div>
       )}
@@ -122,18 +240,61 @@ export default function TeacherComparePage() {
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
                 <div className="text-sm text-white/60">Auto summary</div>
-                <div className="mt-2 text-lg font-semibold">Key differences (mock)</div>
+                <div className="mt-2 text-lg font-semibold">
+                  Ключевые отличия (по summary)
+                </div>
                 <div className="mt-2 text-sm text-white/60">
-                  Later: real computation from event logs + ML pipeline.
+                  Текст формируется из агрегатов по сессиям (без raw-видео).
                 </div>
               </div>
-              <Button variant="outline">Regenerate</Button>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  toast.push({
+                    type: "success",
+                    title: "Summary обновлён",
+                    text: "Данные подтягиваются из /sessions/:id/summary.",
+                  })
+                }
+              >
+                Regenerate
+              </Button>
             </div>
 
             <div className="mt-5 grid md:grid-cols-3 gap-3">
-              <Insight title="Engagement" text="Session A is more stable after minute 20." />
-              <Insight title="Stress" text="Session B has 2 major peaks (anxiety spikes)." />
-              <Insight title="Recommendation" text="Use interactive break around minute 25 for B." />
+              <Insight
+                title="Engagement"
+                text={
+                  summaryA?.avgEngagement != null &&
+                  summaryB?.avgEngagement != null
+                    ? summaryA.avgEngagement > summaryB.avgEngagement
+                      ? "Сессия A показывает более стабильную и высокую вовлечённость."
+                      : "Сессия B показывает более стабильную и высокую вовлечённость."
+                    : "Когда summary по обеим сессиям будут готовы, здесь появится сравнение вовлечённости."
+                }
+              />
+              <Insight
+                title="Stress"
+                text={
+                  summaryA?.avgStress != null &&
+                  summaryB?.avgStress != null
+                    ? summaryA.avgStress < summaryB.avgStress
+                      ? "В сессии A средний стресс ниже — атмосфера более спокойная."
+                      : "В сессии B средний стресс ниже — атмосфера более спокойная."
+                    : "Как только backend начнёт отдавать avgStress, здесь появится сравнение."
+                }
+              />
+              <Insight
+                title="Recommendation"
+                text={
+                  summaryA?.attentionDrops != null &&
+                  summaryB?.attentionDrops != null
+                    ? summaryA.attentionDrops > summaryB.attentionDrops
+                      ? "Попробуйте добавить больше интерактива в сессию A в моменты падения внимания."
+                      : "Попробуйте добавить больше интерактива в сессию B в моменты падения внимания."
+                    : "Рекомендации появятся после того, как будут известны attention drops по обеим сессиям."
+                }
+              />
             </div>
           </Card>
         </Reveal>
@@ -142,18 +303,36 @@ export default function TeacherComparePage() {
   );
 }
 
-function MetricCard({ title, a, b, hint }: { title: string; a: string; b: string; hint: string }) {
+function MetricCard({
+  title,
+  a,
+  b,
+  hint,
+  loadingA,
+  loadingB,
+}: {
+  title: string;
+  a: string;
+  b: string;
+  hint: string;
+  loadingA?: boolean;
+  loadingB?: boolean;
+}) {
   return (
     <Card className="p-6 md:p-7">
       <div className="text-sm text-white/60">{title}</div>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="text-xs text-white/60">Session A</div>
-          <div className="mt-1 text-2xl font-semibold">{a}</div>
+          <div className="mt-1 text-2xl font-semibold">
+            {loadingA ? "…" : a}
+          </div>
         </div>
         <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
           <div className="text-xs text-white/60">Session B</div>
-          <div className="mt-1 text-2xl font-semibold">{b}</div>
+          <div className="mt-1 text-2xl font-semibold">
+            {loadingB ? "…" : b}
+          </div>
         </div>
       </div>
       <div className="mt-3 text-sm text-white/50">{hint}</div>
