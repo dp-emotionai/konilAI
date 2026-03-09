@@ -220,9 +220,10 @@ function AppNavItem({
   if (item.type === "link") {
     const href = item.href;
     const active =
-      path === href ||
-      path.startsWith(href + "/") ||
-      (path.startsWith("/teacher/session/") && href.includes("filter=live"));
+      !!path &&
+      (path === href ||
+        path.startsWith(href + "/") ||
+        (path.startsWith("/teacher/session/") && href.includes("filter=live")));
     return (
       <NavLink
         href={href}
