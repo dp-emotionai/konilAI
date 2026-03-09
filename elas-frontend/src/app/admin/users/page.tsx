@@ -20,10 +20,10 @@ import Table, {
 } from "@/components/ui/Table";
 import { mockUsers } from "@/lib/mock/users";
 import type { AdminUser } from "@/lib/api/admin";
-import { getAdminUsers } from "@/lib/api/admin";
+import { getAdminUsers, approveAdminUser, blockAdminUser } from "@/lib/api/admin";
 
 type RoleFilter = "all" | "student" | "teacher" | "admin";
-type StatusFilter = "all" | "active" | "blocked";
+type StatusFilter = "all" | "approved" | "pending" | "limited" | "blocked";
 
 export default function AdminUsersPage() {
   const [q, setQ] = useState("");
@@ -33,6 +33,7 @@ export default function AdminUsersPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const [actionUserId, setActionUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -78,6 +79,32 @@ export default function AdminUsersPage() {
     setEditOpen(true);
   };
 
+  const handleApprove = async (user: AdminUser) => {
+    setActionUserId(user.id);
+    try {
+      const updated = await approveAdminUser(user.id);
+      if (!updated) return;
+      setUsers((prev) =>
+        prev ? prev.map((u) => (u.id === updated.id ? updated : u)) : prev
+      );
+    } finally {
+      setActionUserId(null);
+    }
+  };
+
+  const handleToggleBlock = async (user: AdminUser) => {
+    setActionUserId(user.id);
+    try {
+      const updated = await blockAdminUser(user.id);
+      if (!updated) return;
+      setUsers((prev) =>
+        prev ? prev.map((u) => (u.id === updated.id ? updated : u)) : prev
+      );
+    } finally {
+      setActionUserId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Breadcrumbs
@@ -121,7 +148,9 @@ export default function AdminUsersPage() {
                 className="h-11 rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
               >
                 <option value="all">Любой статус</option>
-                <option value="active">Активен</option>
+                <option value="approved">Подтверждён</option>
+                <option value="pending">Ожидает одобрения</option>
+                <option value="limited">Ограничен</option>
                 <option value="blocked">Заблокирован</option>
               </select>
 
@@ -170,13 +199,18 @@ export default function AdminUsersPage() {
                     </TCell>
 
                     <TCell>
-                      <span
-                        className={
-                          u.status === "blocked" ? "text-red-300" : "text-emerald-300"
-                        }
-                      >
-                        {u.status === "blocked" ? "Заблокирован" : "Активен"}
-                      </span>
+                      {u.status === "blocked" && (
+                        <span className="text-red-300">Заблокирован</span>
+                      )}
+                      {u.status === "approved" && (
+                        <span className="text-emerald-300">Подтверждён</span>
+                      )}
+                      {u.status === "pending" && (
+                        <span className="text-yellow-300">Ожидает одобрения</span>
+                      )}
+                      {u.status === "limited" && (
+                        <span className="text-sky-300">Ограничен</span>
+                      )}
                     </TCell>
 
                     <TCell>
@@ -185,15 +219,28 @@ export default function AdminUsersPage() {
                           Изменить
                         </Button>
 
-                        <Button size="sm" variant="ghost">
-                          Сброс пароля
-                        </Button>
+                        {u.status === "pending" && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            disabled={actionUserId === u.id}
+                            onClick={() => handleApprove(u)}
+                          >
+                            {actionUserId === u.id ? "..." : "Одобрить"}
+                          </Button>
+                        )}
 
                         <Button
                           size="sm"
                           variant={u.status === "blocked" ? "primary" : "outline"}
+                          disabled={actionUserId === u.id}
+                          onClick={() => handleToggleBlock(u)}
                         >
-                          {u.status === "blocked" ? "Разблокировать" : "Заблокировать"}
+                          {actionUserId === u.id
+                            ? "..."
+                            : u.status === "blocked"
+                            ? "Разблокировать"
+                            : "Заблокировать"}
                         </Button>
                       </div>
                     </TCell>

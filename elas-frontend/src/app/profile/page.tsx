@@ -452,7 +452,7 @@ export default function ProfilePage() {
                           </Badge>
 
                           {statusLabel(me?.status ?? uiStatus) && (
-                            <Badge variant="outline" className="gap-1">
+                            <Badge variant="secondary" className="gap-1">
                               {statusLabel(me?.status ?? uiStatus)}
                             </Badge>
                           )}

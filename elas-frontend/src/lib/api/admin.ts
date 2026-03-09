@@ -53,8 +53,8 @@ export type RawAdminUser = {
   id: string;
   email: string;
   name: string | null;
-  role: string; // \"STUDENT\" | \"TEACHER\" | \"ADMIN\" ...
-  status: string | null; // \"active\" | \"blocked\" | null
+  role: string;   // "STUDENT" | "TEACHER" | "ADMIN" ...
+  status: string; // "PENDING" | "APPROVED" | "LIMITED" | "BLOCKED"
   createdAt: string;
   updatedAt: string;
 };
@@ -64,7 +64,7 @@ export type AdminUser = {
   email: string;
   name: string | null;
   role: "student" | "teacher" | "admin";
-  status: "active" | "blocked";
+  status: "pending" | "approved" | "limited" | "blocked";
   createdAt: string;
 };
 
@@ -76,8 +76,11 @@ function mapRawRole(role: string): AdminUser["role"] {
 }
 
 function mapRawStatus(status: string | null): AdminUser["status"] {
-  const s = status?.toLowerCase?.() ?? "";
-  return s === "blocked" ? "blocked" : "active";
+  const s = status?.toUpperCase?.() ?? "";
+  if (s === "BLOCKED") return "blocked";
+  if (s === "PENDING") return "pending";
+  if (s === "LIMITED") return "limited";
+  return "approved";
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
@@ -95,6 +98,38 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     }));
   } catch {
     return [];
+  }
+}
+
+export async function approveAdminUser(userId: string): Promise<AdminUser | null> {
+  try {
+    const res = await api.put<RawAdminUser>(`admin/users/${userId}/approve`);
+    return {
+      id: res.id,
+      email: res.email,
+      name: res.name ?? null,
+      role: mapRawRole(res.role),
+      status: mapRawStatus(res.status),
+      createdAt: res.createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function blockAdminUser(userId: string): Promise<AdminUser | null> {
+  try {
+    const res = await api.put<RawAdminUser>(`admin/users/${userId}/block`);
+    return {
+      id: res.id,
+      email: res.email,
+      name: res.name ?? null,
+      role: mapRawRole(res.role),
+      status: mapRawStatus(res.status),
+      createdAt: res.createdAt,
+    };
+  } catch {
+    return null;
   }
 }
 
