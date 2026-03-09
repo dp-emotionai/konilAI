@@ -55,7 +55,7 @@ export default function AdminUsersPage() {
           email: u.email,
           name: null,
           role: u.role,
-          status: u.status,
+          status: u.status === "blocked" ? "blocked" : "approved",
           createdAt: u.createdAt,
         }));
 
