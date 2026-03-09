@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
@@ -11,6 +12,8 @@ import Button from "@/components/ui/Button";
 import Glow from "@/components/common/Glow";
 import { cn } from "@/lib/cn";
 import { NAV_BY_ROLE } from "@/lib/routes";
+import { getAdminUsers } from "@/lib/api/admin";
+import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 
 function StatBadge({
   children,
@@ -53,6 +56,26 @@ function Stagger({ children, ms }: { children: React.ReactNode; ms: number }) {
 const adminNav = NAV_BY_ROLE.admin;
 
 export default function AdminDashboardPage() {
+  const [userCount, setUserCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const base = getApiBaseUrl();
+    if (!base || !hasAuth()) return;
+    (async () => {
+      try {
+        const users = await getAdminUsers();
+        if (!mounted) return;
+        setUserCount(users.length);
+      } catch {
+        // оставляем null — в этом случае покажем демо-значение
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <div className="relative space-y-12 pb-20">
       <Glow />
@@ -100,10 +123,16 @@ export default function AdminDashboardPage() {
               <GlassCard className="space-y-4 p-6">
                 <p className="text-sm text-zinc-400">Всего пользователей</p>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">1 248</h3>
-                  <StatBadge tone="success">+12%</StatBadge>
+                  <h3 className="text-3xl font-semibold">
+                    {userCount != null ? userCount : "—"}
+                  </h3>
+                  <StatBadge tone={userCount != null ? "success" : "neutral"}>
+                    {userCount != null ? "из backend" : "demo"}
+                  </StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">Рост за последний месяц</p>
+                <p className="text-xs text-zinc-500">
+                  Количество записей в базе пользователей.
+                </p>
               </GlassCard>
             </Stagger>
           </Reveal>
