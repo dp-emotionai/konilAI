@@ -7,6 +7,7 @@ type RoomKind = "group" | "session";
 export class ChatClient {
   private socket: WebSocket | null = null;
   private url: string;
+  private token: string | null = null;
   private reconnectTimer: number | null = null;
   private connected = false;
   private ready = false;
@@ -35,6 +36,7 @@ export class ChatClient {
 
     const token = getToken();
     if (!token) return;
+    this.token = token;
 
     this.manuallyClosed = false;
 
@@ -49,9 +51,16 @@ export class ChatClient {
 
     this.socket.onopen = () => {
       this.connected = true;
-      this.ready = true;
+      this.ready = false;
       this.reconnectAttempts = 0;
 
+      // WS‑чат требует явной аутентификации сообщением { type: \"auth\", token }.
+      // Только после этого join в комнаты будет принят.
+      if (this.token) {
+        this.send({ type: "auth", token: this.token });
+      }
+
+      this.ready = true;
       for (const r of this.pendingRooms) {
         this.send({ type: "join", room: r.kind, id: r.id });
       }
