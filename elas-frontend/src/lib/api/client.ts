@@ -72,7 +72,8 @@ async function request<T>(
     ...(fetchOptions.headers as Record<string, string>),
   };
   if (token) (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
-  const res = await fetch(`${base}${path.startsWith("/") ? path : "/" + path}`, {
+  const safePath = typeof path === "string" ? path : "";
+  const res = await fetch(`${base}${safePath.startsWith("/") ? safePath : "/" + safePath}`, {
     ...fetchOptions,
     headers,
   });
