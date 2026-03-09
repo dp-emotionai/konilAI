@@ -1,15 +1,17 @@
-"use client";
+ "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
-import {Card} from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { mockSessions } from "@/lib/mock/sessions";
 import { cn } from "@/lib/cn";
 import { TeacherSessionTabs } from "@/components/session/TeacherSessionTabs";
+import { getSessionSummary, type SessionSummary } from "@/lib/api/teacher";
+import { isApiAvailable, hasAuth } from "@/lib/api/client";
 
 function ChartMock({ title }: { title: string }) {
   return (
@@ -26,8 +28,45 @@ function ChartMock({ title }: { title: string }) {
 
 export default function TeacherLectureAnalyticsPage() {
   const params = useParams<{ id: string }>();
-  const session = useMemo(() => mockSessions.find((s) => s.id === params.id) ?? mockSessions[0], [params.id]);
-  const [tab, setTab] = useState<"overview" | "timeline" | "insights">("overview");
+  const session = useMemo(
+    () => mockSessions.find((s) => s.id === params.id) ?? mockSessions[0],
+    [params.id]
+  );
+  const [tab, setTab] = useState<"overview" | "timeline" | "insights">(
+    "overview"
+  );
+  const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const useMock = !summary;
+
+  useEffect(() => {
+    const id = params.id;
+    if (!id || !isApiAvailable() || !hasAuth()) {
+      setSummary(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    getSessionSummary(id)
+      .then((data) => {
+        if (cancelled) return;
+        setSummary(data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id]);
+
+  const avgEngagement = summary?.avgEngagement ?? 68;
+  const attentionDrops = summary?.attentionDrops ?? 9;
+  const quality = (summary?.quality as string | undefined) ?? session.quality;
 
   return (
     <div className="space-y-6">
@@ -37,6 +76,15 @@ export default function TeacherLectureAnalyticsPage() {
         subtitle="Engagement timeline, attention drops, emotion distribution and actionable insights."
         right={
           <div className="flex items-center gap-2 flex-wrap">
+            {useMock ? (
+              <Badge variant="outline" className="gap-1">
+                MOCK
+              </Badge>
+            ) : (
+              <Badge variant="success" className="gap-1">
+                LIVE
+              </Badge>
+            )}
             <Button variant="outline">Generate summary</Button>
             <Button>Export report</Button>
           </div>
@@ -74,9 +122,30 @@ export default function TeacherLectureAnalyticsPage() {
 
       {tab === "overview" && (
         <div className="grid lg:grid-cols-3 gap-4">
-          <Reveal><Kpi title="Avg engagement" value="68%" hint="This session (mock)" /></Reveal>
-          <Reveal><Kpi title="Attention drops" value="9" hint="Detected markers" /></Reveal>
-          <Reveal><Kpi title="Data quality" value={session.quality} hint="From camera indicators" /></Reveal>
+          <Reveal>
+            <Kpi
+              title="Avg engagement"
+              value={`${avgEngagement}%`}
+              hint={useMock ? "This session (mock)" : "Backend summary"}
+              loading={loading}
+            />
+          </Reveal>
+          <Reveal>
+            <Kpi
+              title="Attention drops"
+              value={`${attentionDrops}`}
+              hint={useMock ? "Detected markers (mock)" : "From summary"}
+              loading={loading}
+            />
+          </Reveal>
+          <Reveal>
+            <Kpi
+              title="Data quality"
+              value={quality}
+              hint={useMock ? "From camera indicators (mock)" : "From summary"}
+              loading={loading}
+            />
+          </Reveal>
         </div>
       )}
 
@@ -95,9 +164,13 @@ export default function TeacherLectureAnalyticsPage() {
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
                 <div className="text-sm text-white/60">Insights</div>
-                <div className="mt-2 text-lg font-semibold">Auto recommendations (mock)</div>
+                <div className="mt-2 text-lg font-semibold">
+                  Auto recommendations {useMock ? "(mock)" : "from summary"}
+                </div>
                 <div className="mt-2 text-sm text-white/60">
-                  Later: computed using your Python ML pipeline + event logs.
+                  {useMock
+                    ? "Later: computed using your Python ML pipeline + event logs."
+                    : "Based on aggregated engagement and risk metrics."}
                 </div>
               </div>
               <Button variant="outline">Refresh</Button>
@@ -115,11 +188,23 @@ export default function TeacherLectureAnalyticsPage() {
   );
 }
 
-function Kpi({ title, value, hint }: { title: string; value: string; hint: string }) {
+function Kpi({
+  title,
+  value,
+  hint,
+  loading,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  loading?: boolean;
+}) {
   return (
     <Card className="p-6 md:p-7">
       <div className="text-sm text-white/60">{title}</div>
-      <div className="mt-2 text-3xl font-semibold">{value}</div>
+      <div className="mt-2 text-3xl font-semibold">
+        {loading ? "…" : value}
+      </div>
       <div className="mt-2 text-sm text-white/50">{hint}</div>
     </Card>
   );

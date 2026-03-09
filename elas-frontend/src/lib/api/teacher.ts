@@ -173,6 +173,42 @@ export async function getSessionLiveMetrics(sessionId: string): Promise<SessionL
   }
 }
 
+// --- Session summary / analytics ---
+
+export type SessionSummary = {
+  sessionId: string;
+  avgEngagement: number;
+  attentionDrops: number;
+  quality: "good" | "medium" | "poor" | string;
+  avgStress?: number | null;
+  durationMinutes?: number | null;
+};
+
+export async function getSessionSummary(sessionId: string): Promise<SessionSummary | null> {
+  if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
+  try {
+    // Ожидаемый endpoint партнёра: GET /sessions/:id/summary
+    const raw = await api.get<SessionSummary | (SessionSummary & { id?: string })>(
+      `sessions/${sessionId}/summary`
+    );
+    if (!raw) return null;
+    const baseId = (raw as any).sessionId ?? (raw as any).id ?? sessionId;
+    return {
+      sessionId: baseId,
+      avgEngagement: typeof raw.avgEngagement === "number" ? raw.avgEngagement : 0,
+      attentionDrops:
+        typeof raw.attentionDrops === "number" ? raw.attentionDrops : 0,
+      quality: (raw.quality as any) ?? "medium",
+      avgStress:
+        typeof raw.avgStress === "number" ? raw.avgStress : null,
+      durationMinutes:
+        typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export type CreateGroupResult = { id: string; name: string; teacherId: string; createdAt: string };
 
 export async function createGroup(name: string): Promise<CreateGroupResult> {

@@ -370,6 +370,16 @@ export default function TopNav() {
   const safeRole: Role | null = state.role ?? null;
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
 
+  const statusLabel = useMemo(() => {
+    const s = state.status;
+    if (!s) return null;
+    if (s === "approved") return "Подтверждённый доступ";
+    if (s === "pending") return "Ожидает одобрения";
+    if (s === "limited") return "Ограниченный доступ";
+    if (s === "blocked") return "Аккаунт заблокирован";
+    return null;
+  }, [state.status]);
+
   const nextTheme = theme === "dark" ? "light" : "dark";
 
   const appNavItems = useMemo(() => {
@@ -493,6 +503,14 @@ export default function TopNav() {
 
               <ThemeToggle theme={theme} onToggle={() => setTheme(nextTheme)} />
 
+              {state.loggedIn && statusLabel && (
+                <div className="hidden sm:inline-flex items-center max-w-xs">
+                  <span className="truncate rounded-full bg-surface-subtle/80 px-3 py-1 text-xs text-muted ring-1 ring-[color:var(--border)]/40">
+                    {statusLabel}
+                  </span>
+                </div>
+              )}
+
               {state.loggedIn && (
                 <>
                   <Link
@@ -520,6 +538,12 @@ export default function TopNav() {
 
                     {profileOpen && (
                       <div className="absolute right-0 top-full mt-2 min-w-[200px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
+                        {statusLabel && (
+                          <div className="px-4 pb-1 text-xs text-muted">
+                            {statusLabel}
+                          </div>
+                        )}
+
                         <Link
                           href="/profile"
                           onClick={() => setProfileOpen(false)}

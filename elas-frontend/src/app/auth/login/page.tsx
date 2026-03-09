@@ -17,6 +17,7 @@ type LoginRes = {
     email?: string;
     role?: string;
     name?: string | null;
+    status?: string | null;
   };
   token?: string;
   accessToken?: string;
@@ -71,6 +72,8 @@ export default function LoginPage() {
         typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
       const role = normalizedRole as Role;
       const token = data?.token ?? data?.accessToken;
+      const rawStatus =
+        typeof user?.status === "string" ? user.status.trim().toLowerCase() : null;
 
       console.log("RAW ROLE:", rawRole);
       console.log("NORMALIZED ROLE:", normalizedRole);
@@ -103,6 +106,13 @@ export default function LoginPage() {
         role,
         email: user.email,
         name: user.name ?? undefined,
+        status:
+          rawStatus === "pending" ||
+          rawStatus === "approved" ||
+          rawStatus === "limited" ||
+          rawStatus === "blocked"
+            ? rawStatus
+            : null,
       });
 
       setRole(role);
@@ -111,7 +121,33 @@ export default function LoginPage() {
       router.push(safeHome);
     } catch (err) {
       console.error("LOGIN PAGE ERROR:", err);
-      setError(err instanceof Error ? err.message : "Ошибка входа. Проверьте данные.");
+      let message = "Ошибка входа. Проверьте данные.";
+      const raw =
+        err instanceof Error
+          ? err.message
+          : err != null
+          ? String(err)
+          : "";
+      const normalized = raw.toLowerCase();
+
+      if (
+        normalized.includes("awaiting admin approval") ||
+        normalized.includes("pending approval") ||
+        normalized.includes("ожидает одобрения")
+      ) {
+        message =
+          "Ваш аккаунт ожидает одобрения администратором. После подтверждения вы получите письмо и сможете войти в систему.";
+      } else if (
+        normalized.includes("blocked") ||
+        normalized.includes("заблокирован")
+      ) {
+        message =
+          "Ваш аккаунт заблокирован. Обратитесь к администратору вашей организации.";
+      } else if (raw) {
+        message = raw;
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }

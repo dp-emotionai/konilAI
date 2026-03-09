@@ -59,6 +59,11 @@ export default function RoleGuard({
       return;
     }
 
+    if (state.status === "blocked") {
+      router.replace("/403");
+      return;
+    }
+
     if (!state.role || !matchedRule.roles.includes(state.role)) {
       router.replace("/403");
     }
@@ -68,6 +73,7 @@ export default function RoleGuard({
 
   if (!isPublic && matchedRule) {
     if (!state.loggedIn) return null;
+    if (state.status === "blocked") return null;
     if (!state.role || !matchedRule.roles.includes(state.role)) return null;
   }
 

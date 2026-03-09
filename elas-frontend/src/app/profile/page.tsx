@@ -68,6 +68,16 @@ function roleLabel(role?: Role) {
   return "Студент";
 }
 
+function statusLabel(status?: string | null) {
+  if (!status) return null;
+  const s = status.toLowerCase();
+  if (s === "approved") return "Подтверждённый доступ";
+  if (s === "pending") return "Ожидает одобрения";
+  if (s === "limited") return "Ограниченный доступ";
+  if (s === "blocked") return "Аккаунт заблокирован";
+  return null;
+}
+
 function PermissionPill({
   label,
   state,
@@ -150,6 +160,7 @@ export default function ProfilePage() {
   const [err, setErr] = useState<string | null>(null);
 
   const consentGranted = ui.state.consent;
+  const uiStatus = ui.state.status ?? null;
 
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
@@ -439,6 +450,12 @@ export default function ProfilePage() {
                           <Badge className="bg-surface-subtle ring-1 ring-[color:var(--border)]/30 shadow-none">
                             {roleLabel(showRole)}
                           </Badge>
+
+                          {statusLabel(me?.status ?? uiStatus) && (
+                            <Badge variant="outline" className="gap-1">
+                              {statusLabel(me?.status ?? uiStatus)}
+                            </Badge>
+                          )}
 
                           {consentGranted ? (
                             <Badge variant="success" className="gap-1">

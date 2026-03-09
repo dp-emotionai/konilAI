@@ -1,30 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {Card} from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { useUI } from "@/components/layout/Providers";
-import { ROLE_HOME } from "@/lib/routes";
-import { api, setAuth, isApiAvailable } from "@/lib/api/client";
+import { api, isApiAvailable } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
 
-type RegisterRes = { user: { id: string; email: string; role: Role; name?: string | null }; token: string };
+type RegisterRes = {
+  user?: { id: string; email: string; role: Role; name?: string | null };
+  token?: string;
+  message?: string;
+};
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { setLoggedIn, setRole } = useUI();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRoleInput] = useState<Role>("student");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     setError("");
+    setInfo("");
     const e = email.trim();
     const p = password;
     if (!e || !p) {
@@ -47,16 +48,17 @@ export default function RegisterPage() {
         name: name.trim() || undefined,
         role: role === "admin" ? "student" : role,
       });
-      setAuth({
-        token: data.token,
-        role: data.user.role,
-        email: data.user.email,
-        name: data.user.name ?? undefined,
-      });
-      setRole(data.user.role);
-      setLoggedIn(true);
-      router.push(ROLE_HOME[data.user.role]);
+
+      console.log("REGISTER RESPONSE:", data);
+
+      setInfo(
+        "Заявка на регистрацию отправлена. После одобрения администратором на ваш email придёт письмо, и вы сможете войти в систему."
+      );
+      setEmail("");
+      setPassword("");
+      setName("");
     } catch (err) {
+      setInfo("");
       setError(err instanceof Error ? err.message : "Ошибка регистрации.");
     } finally {
       setLoading(false);
@@ -92,7 +94,8 @@ export default function RegisterPage() {
               Создать аккаунт
             </h2>
             <p className="text-sm text-[color:var(--muted)]">
-              Заполните форму. После регистрации вы автоматически войдёте в систему.
+              Заполните форму. После регистрации ваша заявка будет отправлена администратору
+              на одобрение.
             </p>
           </div>
 
@@ -162,6 +165,7 @@ export default function RegisterPage() {
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
+          {info && !error && <p className="text-sm text-emerald-400">{info}</p>}
           <Button className="w-full" onClick={handleRegister} disabled={loading}>
             {loading ? "Создание аккаунта…" : "Зарегистрироваться"}
           </Button>

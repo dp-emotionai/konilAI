@@ -5,7 +5,15 @@
 
 const AUTH_KEY = "elas_auth_v1";
 
-export type AuthPayload = { token: string; role: "student" | "teacher" | "admin"; email: string; name?: string | null };
+export type UserStatus = "pending" | "approved" | "limited" | "blocked";
+
+export type AuthPayload = {
+  token: string;
+  role: "student" | "teacher" | "admin";
+  email: string;
+  name?: string | null;
+  status?: UserStatus | null;
+};
 
 export function getApiBaseUrl(): string {
   if (typeof window === "undefined") return "";
