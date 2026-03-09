@@ -15,11 +15,14 @@ type LoginRes = {
   user?: {
     id?: string;
     email?: string;
-    role?: Role;
+    role?: string;
     name?: string | null;
   };
   token?: string;
   accessToken?: string;
+  device?: string;
+  location?: string;
+  isNewDevice?: boolean;
   message?: string;
 };
 
@@ -63,8 +66,15 @@ export default function LoginPage() {
       console.log("LOGIN RESPONSE:", data);
 
       const user = data?.user;
-      const role = user?.role;
+      const rawRole = user?.role;
+      const normalizedRole =
+        typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
+      const role = normalizedRole as Role;
       const token = data?.token ?? data?.accessToken;
+
+      console.log("RAW ROLE:", rawRole);
+      console.log("NORMALIZED ROLE:", normalizedRole);
+      console.log("ROLE_HOME:", ROLE_HOME);
 
       if (!user) {
         throw new Error("Сервер не вернул данные пользователя.");
@@ -74,12 +84,13 @@ export default function LoginPage() {
         throw new Error("Сервер не вернул email пользователя.");
       }
 
-      if (!role || !(role in ROLE_HOME)) {
-        throw new Error("Сервер вернул неизвестную роль пользователя.");
-      }
-
       if (!token) {
         throw new Error("Сервер не вернул токен авторизации.");
+      }
+
+      if (!normalizedRole || !(normalizedRole in ROLE_HOME)) {
+        console.error("UNKNOWN ROLE FROM SERVER:", rawRole);
+        throw new Error(`Сервер вернул неизвестную роль пользователя: ${String(rawRole)}`);
       }
 
       const safeHome =
@@ -162,6 +173,7 @@ export default function LoginPage() {
               >
                 Войти через Google
               </Button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -197,6 +209,11 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               autoComplete="current-password"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  void handleLogin();
+                }
+              }}
             />
           </div>
 
