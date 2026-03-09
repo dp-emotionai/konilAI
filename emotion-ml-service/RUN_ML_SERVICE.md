@@ -52,3 +52,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 После этого снова выполните `.\venv\Scripts\Activate.ps1`.
+
+## Остановка сервера (Ctrl+C)
+
+При нажатии Ctrl+C в консоли появится сообщение с `KeyboardInterrupt` и `CancelledError` — это нормально, сервер корректно завершился.

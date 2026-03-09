@@ -6,4 +6,12 @@
 **/.env.local
 **/__pycache__/
 **/.venv/
-**/*.pyc
+**/*.pycnode_modules/
+.next/
+dist/
+venv/
+emotion-ml-service/venv/
+__pycache__/
+*.pyc
+.env
+.env.local

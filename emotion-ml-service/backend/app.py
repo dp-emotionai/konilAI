@@ -8,14 +8,19 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(
     title="Emotion Risk API",
     version="1.0.0",
-    description="Emotion-based risk assessment service"
+    description="Emotion-based risk assessment service",
 )
 
 emotion_engine = EmotionRiskModel("emotion_model.h5")
 
+# CORS: разрешаем frontend как локальный, так и продовый (Vercel).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://elasweb.vercel.app",
+    ],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
