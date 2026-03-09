@@ -47,6 +47,57 @@ function metaToRecord(meta: string | null): Record<string, string> {
   return {};
 }
 
+// ===== Admin: users from backend-main (напарницы) =====
+
+export type RawAdminUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string; // \"STUDENT\" | \"TEACHER\" | \"ADMIN\" ...
+  status: string | null; // \"active\" | \"blocked\" | null
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: "student" | "teacher" | "admin";
+  status: "active" | "blocked";
+  createdAt: string;
+};
+
+function mapRawRole(role: string): AdminUser["role"] {
+  const r = role?.toUpperCase?.() ?? "";
+  if (r === "TEACHER") return "teacher";
+  if (r === "ADMIN") return "admin";
+  return "student";
+}
+
+function mapRawStatus(status: string | null): AdminUser["status"] {
+  const s = status?.toLowerCase?.() ?? "";
+  return s === "blocked" ? "blocked" : "active";
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  if (!getApiBaseUrl() || !hasAuth()) return [];
+  try {
+    const list = await api.get<RawAdminUser[]>("admin/users");
+    const arr = Array.isArray(list) ? list : [];
+    return arr.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name ?? null,
+      role: mapRawRole(u.role),
+      status: mapRawStatus(u.status),
+      createdAt: u.createdAt,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function getAuditLog(): Promise<AuditRow[]> {
   if (!getApiBaseUrl() || !hasAuth()) return [];
   try {

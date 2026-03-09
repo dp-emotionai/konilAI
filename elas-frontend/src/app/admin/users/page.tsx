@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -19,6 +19,8 @@ import Table, {
   TMuted,
 } from "@/components/ui/Table";
 import { mockUsers } from "@/lib/mock/users";
+import type { AdminUser } from "@/lib/api/admin";
+import { getAdminUsers } from "@/lib/api/admin";
 
 type RoleFilter = "all" | "student" | "teacher" | "admin";
 type StatusFilter = "all" | "active" | "blocked";
@@ -29,16 +31,41 @@ export default function AdminUsersPage() {
   const [status, setStatus] = useState<StatusFilter>("all");
 
   const [editOpen, setEditOpen] = useState(false);
-  const [selected, setSelected] = useState<(typeof mockUsers)[number] | null>(null);
+  const [selected, setSelected] = useState<AdminUser | null>(null);
+  const [users, setUsers] = useState<AdminUser[] | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const list = await getAdminUsers();
+      if (!mounted) return;
+      setUsers(list.length ? list : null);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const source: AdminUser[] =
+    users && users.length > 0
+      ? users
+      : mockUsers.map((u) => ({
+          id: u.id,
+          email: u.email,
+          name: null,
+          role: u.role,
+          status: u.status,
+          createdAt: u.createdAt,
+        }));
 
   const data = useMemo(() => {
-    return mockUsers
+    return source
       .filter((u) => (role === "all" ? true : u.role === role))
       .filter((u) => (status === "all" ? true : u.status === status))
       .filter((u) =>
         q.trim() ? u.email.toLowerCase().includes(q.trim().toLowerCase()) : true
       );
-  }, [q, role, status]);
+  }, [q, role, status, source]);
 
   const resetFilters = () => {
     setQ("");
@@ -46,7 +73,7 @@ export default function AdminUsersPage() {
     setStatus("all");
   };
 
-  const openEdit = (user: (typeof mockUsers)[number]) => {
+  const openEdit = (user: AdminUser) => {
     setSelected(user);
     setEditOpen(true);
   };
