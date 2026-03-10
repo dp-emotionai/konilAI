@@ -171,10 +171,10 @@ function PublicNavItem({ item }: { item: NavItem }) {
       {open && (
         <div
           className={cn(
-            "absolute left-0 top-full mt-2 z-50",
+            "absolute left-0 top-full mt-2 z-50 backdrop-blur-md",
             hasCardStyle
-              ? "min-w-[280px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2"
-              : "min-w-[200px] rounded-xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-1"
+              ? "min-w-[280px] rounded-2xl bg-surface/95 shadow-card ring-1 ring-[color:var(--border)]/25 py-2"
+              : "min-w-[200px] rounded-xl bg-surface/95 shadow-card ring-1 ring-[color:var(--border)]/25 py-1"
           )}
         >
           {children.map((child) => {

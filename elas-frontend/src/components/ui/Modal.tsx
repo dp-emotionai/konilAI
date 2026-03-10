@@ -37,7 +37,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-[100]">
       <div
-        className="absolute inset-0 bg-black/30 dark:bg-black/55"
+        className="absolute inset-0 bg-black/40 dark:bg-black/65 backdrop-blur-sm"
         onMouseDown={onClose}
         aria-hidden
       />
