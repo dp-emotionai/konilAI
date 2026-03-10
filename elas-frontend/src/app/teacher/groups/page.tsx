@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import Alert from "@/components/ui/Alert";
 
 import { getTeacherGroups, createGroup, type TeacherGroup } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
@@ -279,12 +280,18 @@ export default function TeacherGroupsPage() {
               </div>
 
               {loadError && (
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-elas-lg bg-red-500/10 px-4 py-3 text-sm text-red-100 ring-1 ring-red-400/20">
-                  <span>{loadError}</span>
-                  <Button variant="outline" size="sm" onClick={() => void refresh()}>
-                    Повторить
-                  </Button>
-                </div>
+                <Alert
+                  variant="error"
+                  title="Ошибка загрузки"
+                  className="mt-4"
+                  action={
+                    <Button variant="outline" size="sm" onClick={() => void refresh()}>
+                      Повторить
+                    </Button>
+                  }
+                >
+                  {loadError}
+                </Alert>
               )}
 
               {loading ? (

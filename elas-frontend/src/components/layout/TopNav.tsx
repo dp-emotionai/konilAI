@@ -465,7 +465,7 @@ export default function TopNav() {
                   )}
                 >
                   <Search size={18} className="shrink-0 text-muted" />
-                  <span className="flex-1 truncate text-sm">Quick search...</span>
+                  <span className="flex-1 truncate text-sm">Поиск…</span>
                   <kbd className="hidden sm:inline-flex h-6 items-center px-1.5 rounded bg-surface text-[10px] font-medium text-muted border border-[color:var(--border)]/40">
                     ⌘K
                   </kbd>
@@ -478,9 +478,10 @@ export default function TopNav() {
                 <Link
                   href="/student/sessions?join=1"
                   onClick={() => setMobileOpen(false)}
+                  className="hidden sm:inline-block"
                 >
                   <Button variant="outline" size="sm">
-                    Join by code
+                    Войти по коду
                   </Button>
                 </Link>
               )}
@@ -527,7 +528,7 @@ export default function TopNav() {
                       type="button"
                       onClick={() => setProfileOpen((o) => !o)}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg hover:bg-surface-subtle shadow-soft transition-colors"
-                      aria-label="Account menu"
+                      aria-label="Меню аккаунта"
                     >
                       <User size={18} />
                     </button>
@@ -546,7 +547,7 @@ export default function TopNav() {
                           className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1"
                         >
                           <User size={16} />
-                          Profile
+                          Профиль
                         </Link>
 
                         <Link
@@ -555,7 +556,7 @@ export default function TopNav() {
                           className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1 md:hidden"
                         >
                           <Settings size={16} />
-                          Settings
+                          Настройки
                         </Link>
 
                         <Link
@@ -564,7 +565,7 @@ export default function TopNav() {
                           className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1"
                         >
                           <HelpCircle size={16} />
-                          Help
+                          Помощь
                         </Link>
 
                         {consentRequired && (
@@ -576,7 +577,7 @@ export default function TopNav() {
                             className="flex items-center gap-2 px-4 py-2.5 text-sm text-warning hover:bg-surface-subtle/80 rounded-xl mx-1"
                           >
                             <ShieldCheck size={16} />
-                            Consent required
+                            Нужно согласие
                           </Link>
                         )}
 
@@ -588,7 +589,7 @@ export default function TopNav() {
                           className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1 text-left"
                         >
                           <LogOut size={16} />
-                          Logout
+                          Выйти
                         </button>
                       </div>
                     )}
@@ -618,7 +619,7 @@ export default function TopNav() {
 
               <button
                 type="button"
-                aria-label="Menu"
+                aria-label="Открыть меню"
                 onClick={() => setMobileOpen((o) => !o)}
                 className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft"
               >
@@ -676,7 +677,7 @@ export default function TopNav() {
 
                   <div className="pt-1">
                     <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted px-1">
-                      Navigation
+                      Навигация
                     </div>
                     <div className="mt-2 space-y-1">
                       {appNavItems.map((item) => (
@@ -715,7 +716,7 @@ export default function TopNav() {
 
                   <div className="pt-2 border-t border-border/40">
                     <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted px-1">
-                      Account
+                      Аккаунт
                     </div>
                     <div className="mt-2 space-y-1">
                       <Link
@@ -723,7 +724,7 @@ export default function TopNav() {
                         onClick={() => setMobileOpen(false)}
                         className="block py-2 text-fg"
                       >
-                        Profile
+                        Профиль
                       </Link>
 
                       <Link
@@ -731,7 +732,7 @@ export default function TopNav() {
                         onClick={() => setMobileOpen(false)}
                         className="block py-2 text-fg"
                       >
-                        Settings
+                        Настройки
                       </Link>
 
                       {consentRequired && (
@@ -740,7 +741,7 @@ export default function TopNav() {
                           onClick={() => setMobileOpen(false)}
                           className="block py-2 text-warning"
                         >
-                          Consent required
+                          Нужно согласие
                         </Link>
                       )}
 
@@ -749,7 +750,7 @@ export default function TopNav() {
                         onClick={handleLogout}
                         className="w-full text-left block py-2 text-fg"
                       >
-                        Logout
+                        Выйти
                       </button>
                     </div>
                   </div>

@@ -275,6 +275,8 @@ export default function TeacherGroupDetailPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{ memberId: string; memberName: string } | null>(null);
+  const [confirmBlockMember, setConfirmBlockMember] = useState<{ memberId: string; memberName: string } | null>(null);
 
   useEffect(() => {
     if (!apiAvailable || !id) {
@@ -921,14 +923,16 @@ export default function TeacherGroupDetailPage() {
                                 {(m.status ?? "active") === "active" && (
                                   <MemberActionsDropdown
                                     onRemove={() =>
-                                      removeMemberFromGroup(id, m.id)
-                                        .then(refetchGroup)
-                                        .then(() => setTick((x) => x + 1))
+                                      setConfirmRemoveMember({
+                                        memberId: m.id,
+                                        memberName: m.name ?? m.email ?? "Участник",
+                                      })
                                     }
                                     onBlock={() =>
-                                      blockMemberInGroup(id, m.id)
-                                        .then(refetchGroup)
-                                        .then(() => setTick((x) => x + 1))
+                                      setConfirmBlockMember({
+                                        memberId: m.id,
+                                        memberName: m.name ?? m.email ?? "Участник",
+                                      })
                                     }
                                   />
                                 )}
@@ -1105,6 +1109,70 @@ export default function TeacherGroupDetailPage() {
           </Reveal>
         </div>
       </Section>
+
+      <Modal
+        open={!!confirmRemoveMember}
+        onClose={() => setConfirmRemoveMember(null)}
+        title="Исключить из группы?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmRemoveMember(null)}>
+              Отмена
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => {
+                if (confirmRemoveMember && id) {
+                  removeMemberFromGroup(id, confirmRemoveMember.memberId)
+                    .then(refetchGroup)
+                    .then(() => setTick((x) => x + 1))
+                    .finally(() => setConfirmRemoveMember(null));
+                }
+              }}
+            >
+              Исключить
+            </Button>
+          </div>
+        }
+      >
+        {confirmRemoveMember && (
+          <p className="text-sm text-muted">
+            Участник «{confirmRemoveMember.memberName}» будет исключён из группы. Он потеряет доступ к сессиям группы. Вы сможете пригласить его снова позже.
+          </p>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!confirmBlockMember}
+        onClose={() => setConfirmBlockMember(null)}
+        title="Заблокировать участника?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmBlockMember(null)}>
+              Отмена
+            </Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-600"
+              onClick={() => {
+                if (confirmBlockMember && id) {
+                  blockMemberInGroup(id, confirmBlockMember.memberId)
+                    .then(refetchGroup)
+                    .then(() => setTick((x) => x + 1))
+                    .finally(() => setConfirmBlockMember(null));
+                }
+              }}
+            >
+              Заблокировать
+            </Button>
+          </div>
+        }
+      >
+        {confirmBlockMember && (
+          <p className="text-sm text-muted">
+            Участник «{confirmBlockMember.memberName}» будет заблокирован в группе. Он не сможет подключаться к сессиям до снятия блокировки.
+          </p>
+        )}
+      </Modal>
 
       <Modal
         open={inviteOpen}

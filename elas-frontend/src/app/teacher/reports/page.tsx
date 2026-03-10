@@ -145,7 +145,7 @@ export default function TeacherReportsPage() {
         subtitle="Отчёты строятся из реальных сессий. В эфире показываются текущие агрегаты (avgRisk / avgConfidence)."
         right={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-primary/10">{filtered.length} items</Badge>
+            <Badge className="bg-primary/10">{filtered.length} записей</Badge>
             <Button variant="outline" onClick={() => setQ("")}>
               Очистить
             </Button>

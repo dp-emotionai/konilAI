@@ -11,6 +11,8 @@ import Reveal from "@/components/common/Reveal";
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
+import Alert from "@/components/ui/Alert";
 
 import { useUI } from "@/components/layout/Providers";
 import {
@@ -159,24 +161,25 @@ export default function StudentDashboardPage() {
 
       {sessionsError && (
         <Section spacing="none" className="mt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-elas-lg border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            <span>{sessionsError}</span>
-            <Button variant="outline" size="sm" onClick={() => fetchSessions()}>
-              Повторить
-            </Button>
-          </div>
+          <Alert
+            variant="error"
+            title="Ошибка загрузки"
+            action={
+              <Button variant="outline" size="sm" onClick={() => fetchSessions()}>
+                Повторить
+              </Button>
+            }
+          >
+            {sessionsError}
+          </Alert>
         </Section>
       )}
 
       {!consent && (
         <Section spacing="none" className="mt-4">
-          <div className="rounded-elas-lg border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            <div className="font-medium">Согласие ещё не дано</div>
-            <div className="mt-1 text-xs text-amber-100/90">
-              Перед подключением к LIVE-сессии пройдите через центр согласия. Камера используется только для аналитики,
-              без записи видео.
-            </div>
-          </div>
+          <Alert variant="warning" title="Согласие ещё не дано">
+            Перед подключением к эфиру пройдите центр согласия. Камера используется только для аналитики вовлечённости, без записи видео.
+          </Alert>
         </Section>
       )}
 
@@ -479,31 +482,55 @@ function InvitationCard({
   onDecline: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false);
 
   const handleAccept = () => {
     setBusy(true);
     onAccept().finally(() => setBusy(false));
   };
   const handleDecline = () => {
+    setConfirmDeclineOpen(false);
     setBusy(true);
     onDecline().finally(() => setBusy(false));
   };
 
   return (
-    <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-4 flex items-center justify-between gap-3">
-      <div className="min-w-0">
-        <div className="font-semibold text-fg truncate">{inv.groupName ?? "Группа"}</div>
-        <div className="mt-1 text-sm text-muted">Приглашение в группу</div>
+    <>
+      <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-fg truncate">{inv.groupName ?? "Группа"}</div>
+          <div className="mt-1 text-sm text-muted">Приглашение в группу</div>
+        </div>
+
+        <div className="flex gap-2 shrink-0">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDeclineOpen(true)} className="rounded-full">
+            Отклонить
+          </Button>
+          <Button size="sm" disabled={busy} onClick={handleAccept} className="rounded-full">
+            Принять
+          </Button>
+        </div>
       </div>
 
-      <div className="flex gap-2 shrink-0">
-        <Button size="sm" variant="outline" disabled={busy} onClick={handleDecline} className="rounded-full">
-          Отклонить
-        </Button>
-        <Button size="sm" disabled={busy} onClick={handleAccept} className="rounded-full">
-          Принять
-        </Button>
-      </div>
-    </div>
+      <Modal
+        open={confirmDeclineOpen}
+        onClose={() => setConfirmDeclineOpen(false)}
+        title="Отклонить приглашение?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmDeclineOpen(false)}>
+              Отмена
+            </Button>
+            <Button variant="outline" className="border-red-400/50 text-red-400 hover:bg-red-500/10" onClick={handleDecline}>
+              Отклонить
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          Вы уверены? Приглашение в группу «{inv.groupName ?? "Группа"}» будет отклонено. Повторно пригласить сможет только преподаватель.
+        </p>
+      </Modal>
+    </>
   );
-};
+}

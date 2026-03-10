@@ -52,10 +52,11 @@ export default function Modal({
           onMouseDown={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
+          aria-labelledby={title ? "modal-title" : undefined}
         >
           <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50">
             <div className="min-w-0">
-              {title ? <div className="text-base font-semibold truncate">{title}</div> : null}
+              {title ? <h2 id="modal-title" className="text-base font-semibold truncate">{title}</h2> : null}
             </div>
             <button
               type="button"
@@ -65,7 +66,7 @@ export default function Modal({
                 "bg-surface-subtle/80 hover:bg-surface-subtle transition-colors",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
               )}
-              aria-label="Close"
+              aria-label="Закрыть"
             >
               <X size={18} />
             </button>

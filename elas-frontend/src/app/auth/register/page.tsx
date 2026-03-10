@@ -98,6 +98,7 @@ export default function RegisterPage() {
       const data = await api.post<VerifyRes>("auth/verify-email", {
         email: e,
         code: c,
+        password: password,
       });
 
       console.log("VERIFY EMAIL RESPONSE:", data);

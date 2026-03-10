@@ -13,6 +13,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import Table, { THead, TBody, TRow, TCell, TH, TMuted } from "@/components/ui/Table";
+import Modal from "@/components/ui/Modal";
 
 import { getTeacherAllSessions, updateSessionStatus, type GroupSession } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
@@ -31,6 +32,7 @@ export default function TeacherSessionsPage() {
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [confirmEndSession, setConfirmEndSession] = useState<GroupSession | null>(null);
 
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "live" | "waiting" | "ended">("all");
@@ -77,6 +79,7 @@ export default function TeacherSessionsPage() {
           : { label: "Reopen", next: "upcoming" as const };
 
     setActioningId(s.id);
+    setConfirmEndSession(null);
     try {
       await updateSessionStatus(s.id, statusToBackend(action.next));
       setTick((x) => x + 1);
@@ -134,7 +137,7 @@ export default function TeacherSessionsPage() {
                     ))}
                   </div>
 
-                  <Badge className="bg-primary/10">{filtered.length} items</Badge>
+                  <Badge className="bg-primary/10">{filtered.length} записей</Badge>
                 </div>
               </div>
 
@@ -202,7 +205,11 @@ export default function TeacherSessionsPage() {
                               <div className="flex justify-end gap-2">
                                 <Button
                                   size="sm"
-                                  onClick={() => handleLifecycle(s)}
+                                  onClick={() =>
+                                    action.label === "End"
+                                      ? setConfirmEndSession(s)
+                                      : void handleLifecycle(s)
+                                  }
                                   disabled={actioningId === s.id}
                                 >
                                   {actioningId === s.id ? "…" : label}
@@ -226,6 +233,31 @@ export default function TeacherSessionsPage() {
           </Card>
         </Reveal>
       </Section>
+
+      <Modal
+        open={!!confirmEndSession}
+        onClose={() => setConfirmEndSession(null)}
+        title="Завершить сессию?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmEndSession(null)}>
+              Отмена
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => confirmEndSession && void handleLifecycle(confirmEndSession)}
+            >
+              Завершить сессию
+            </Button>
+          </div>
+        }
+      >
+        {confirmEndSession && (
+          <p className="text-sm text-muted">
+            Сессия «{confirmEndSession.title}» будет завершена. Участники будут отключены. Отменить нельзя.
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

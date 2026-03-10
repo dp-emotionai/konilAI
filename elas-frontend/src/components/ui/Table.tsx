@@ -11,7 +11,7 @@ type TCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
 type THeadCellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
 
 const tableWrapClass =
-  "w-full overflow-x-auto rounded-2xl border border-[color:var(--border)] bg-surface shadow-card";
+  "w-full overflow-x-auto rounded-elas-lg ring-1 ring-[color:var(--border)]/25 bg-surface shadow-soft";
 
 const cellBaseClass =
   "px-4 py-3 text-sm align-middle border-b border-[color:var(--border)] last:border-b-0";

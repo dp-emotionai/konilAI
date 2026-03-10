@@ -244,14 +244,14 @@ export default function TeacherDashboard() {
                       Обзор по сессиям за сегодня и последним занятиям.
                     </p>
                   </div>
-                  <Badge className="bg-primary/10 text-[rgb(var(--primary))]">Dashboard</Badge>
+                  <Badge className="bg-primary/10 text-[rgb(var(--primary))]">Дашборд</Badge>
                 </div>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                  <KPI icon={<Users size={22} />} label="Групп в работе" value={`${summary.activeGroups}`} hint="Active groups" />
-                  <KPI icon={<PlayCircle size={22} />} label="Сессий сегодня" value={`${summary.sessionsToday}`} hint="Sessions today" accent={summary.sessionsToday > 0} />
+                  <KPI icon={<Users size={22} />} label="Групп в работе" value={`${summary.activeGroups}`} hint="Активные группы" />
+                  <KPI icon={<PlayCircle size={22} />} label="Сессий сегодня" value={`${summary.sessionsToday}`} hint="За сегодня" accent={summary.sessionsToday > 0} />
                   <KPI icon={<BarChart3 size={22} />} label="Средняя вовлечённость" value={`${summary.avgEngagement}%`} hint="По сессиям" />
-                  <KPI icon={<AlertTriangle size={22} />} label="Маркеры внимания" value={`${summary.attentionAlerts}`} hint="Attention alerts" />
+                  <KPI icon={<AlertTriangle size={22} />} label="Маркеры внимания" value={`${summary.attentionAlerts}`} hint="Оповещения" />
                 </div>
               </CardContent>
             </Card>
@@ -264,7 +264,7 @@ export default function TeacherDashboard() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Zap size={18} className="text-[rgb(var(--primary))]" />
-                      <span className="text-xs font-medium uppercase tracking-wider text-muted">Live</span>
+                      <span className="text-xs font-medium uppercase tracking-wider text-muted">Эфир</span>
                     </div>
                     <h2 className="mt-2 text-xl font-bold text-fg">
                       {liveNow ? "Сессия в эфире" : "Сейчас нет LIVE"}
@@ -277,7 +277,7 @@ export default function TeacherDashboard() {
                   </div>
                   <Badge variant={liveNow ? "success" : "default"} className={liveNow ? "gap-1.5" : ""}>
                     {liveNow && <span className="inline-flex h-1.5 w-1.5 rounded-full bg-current animate-pulse" />}
-                    {liveNow ? "LIVE" : "Idle"}
+                    {liveNow ? "В эфире" : "Нет эфира"}
                   </Badge>
                 </div>
 

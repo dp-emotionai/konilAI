@@ -68,7 +68,7 @@ export default function QuickSearch({ open, onClose, role }: Props) {
       className="fixed inset-0 z-[100]"
       aria-modal="true"
       role="dialog"
-      aria-label="Quick search"
+      aria-label="Быстрый поиск"
     >
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
@@ -80,7 +80,7 @@ export default function QuickSearch({ open, onClose, role }: Props) {
           <Search size={20} className="shrink-0 text-muted" />
           <Input
             type="text"
-            placeholder="Search sessions, groups…"
+            placeholder="Поиск сессий, групп…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -132,7 +132,7 @@ export default function QuickSearch({ open, onClose, role }: Props) {
           )}
 
           {available && loading && query.length >= minLength && (
-            <div className="p-6 text-center text-sm text-muted">Searching…</div>
+            <div className="p-6 text-center text-sm text-muted">Поиск…</div>
           )}
 
           {available && data && query.length >= minLength && !loading && (
@@ -288,7 +288,7 @@ export function QuickSearchTrigger({
       )}
     >
       <Search size={16} />
-      <span>Search…</span>
+      <span>Поиск…</span>
       <kbd className="hidden rounded bg-surface px-1.5 py-0.5 text-[10px] sm:inline">
         ⌘K
       </kbd>

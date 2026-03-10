@@ -28,8 +28,21 @@ const config: Config = {
       },
       borderRadius: {
         elas: "var(--radius)",
+        "elas-sm": "var(--radius-sm)",
         "elas-lg": "var(--radius-lg)",
+        "elas-xl": "var(--radius-xl)",
         "elas-pill": "var(--radius-pill)",
+      },
+      spacing: {
+        "elas-1": "var(--space-1)",
+        "elas-2": "var(--space-2)",
+        "elas-3": "var(--space-3)",
+        "elas-4": "var(--space-4)",
+        "elas-5": "var(--space-5)",
+        "elas-6": "var(--space-6)",
+        "elas-8": "var(--space-8)",
+        "elas-10": "var(--space-10)",
+        "elas-12": "var(--space-12)",
       },
       boxShadow: {
         soft: "var(--shadow-soft)",
