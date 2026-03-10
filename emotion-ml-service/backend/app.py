@@ -26,6 +26,11 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 class FrameRequest(BaseModel):
     image: list  # grayscale 2D array (64x64)
 
