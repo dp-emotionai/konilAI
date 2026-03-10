@@ -117,6 +117,29 @@ export async function approveAdminUser(userId: string): Promise<AdminUser | null
   }
 }
 
+export async function updateAdminUser(
+  userId: string,
+  payload: { role: "student" | "teacher" | "admin"; status: "approved" | "pending" | "limited" | "blocked" }
+): Promise<AdminUser | null> {
+  try {
+    const body = {
+      role: payload.role,
+      status: payload.status,
+    };
+    const res = await api.put<RawAdminUser>(`admin/users/${userId}/approve`, body);
+    return {
+      id: res.id,
+      email: res.email,
+      name: res.name ?? null,
+      role: mapRawRole(res.role),
+      status: mapRawStatus(res.status),
+      createdAt: res.createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function blockAdminUser(userId: string): Promise<AdminUser | null> {
   try {
     const res = await api.put<RawAdminUser>(`admin/users/${userId}/block`);

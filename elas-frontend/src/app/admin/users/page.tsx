@@ -20,7 +20,7 @@ import Table, {
 } from "@/components/ui/Table";
 import { mockUsers } from "@/lib/mock/users";
 import type { AdminUser } from "@/lib/api/admin";
-import { getAdminUsers, approveAdminUser, blockAdminUser } from "@/lib/api/admin";
+import { getAdminUsers, approveAdminUser, blockAdminUser, updateAdminUser } from "@/lib/api/admin";
 
 type RoleFilter = "all" | "student" | "teacher" | "admin";
 type StatusFilter = "all" | "approved" | "pending" | "limited" | "blocked";
@@ -34,6 +34,9 @@ export default function AdminUsersPage() {
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [editRoleValue, setEditRoleValue] = useState<"student" | "teacher" | "admin">("student");
+  const [editStatusValue, setEditStatusValue] =
+    useState<"approved" | "pending" | "limited" | "blocked">("approved");
 
   useEffect(() => {
     let mounted = true;
@@ -76,7 +79,31 @@ export default function AdminUsersPage() {
 
   const openEdit = (user: AdminUser) => {
     setSelected(user);
+    setEditRoleValue(user.role);
+    setEditStatusValue(user.status);
     setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selected) {
+      setEditOpen(false);
+      return;
+    }
+    setActionUserId(selected.id);
+    try {
+      const updated = await updateAdminUser(selected.id, {
+        role: editRoleValue,
+        status: editStatusValue,
+      });
+      if (!updated) return;
+      setUsers((prev) =>
+        prev ? prev.map((u) => (u.id === updated.id ? updated : u)) : prev
+      );
+      setSelected(updated);
+      setEditOpen(false);
+    } finally {
+      setActionUserId(null);
+    }
   };
 
   const handleApprove = async (user: AdminUser) => {
@@ -267,7 +294,9 @@ export default function AdminUsersPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)}>
               Отмена
             </Button>
-            <Button onClick={() => setEditOpen(false)}>Сохранить</Button>
+            <Button onClick={handleSaveEdit} disabled={actionUserId === selected?.id}>
+              {actionUserId === selected?.id ? "Сохранение…" : "Сохранить"}
+            </Button>
           </div>
         }
       >
@@ -284,18 +313,34 @@ export default function AdminUsersPage() {
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
               <div className="text-sm text-muted">Роль</div>
-              <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35">
-                <option>student</option>
-                <option>teacher</option>
-                <option>admin</option>
+              <select
+                className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
+                value={editRoleValue}
+                onChange={(e) =>
+                  setEditRoleValue(e.target.value as "student" | "teacher" | "admin")
+                }
+              >
+                <option value="student">student</option>
+                <option value="teacher">teacher</option>
+                <option value="admin">admin</option>
               </select>
             </div>
 
             <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
               <div className="text-sm text-muted">Статус</div>
-              <select className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35">
-                <option>active</option>
-                <option>blocked</option>
+              <select
+                className="mt-2 h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface px-4 text-sm text-fg outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
+                value={editStatusValue}
+                onChange={(e) =>
+                  setEditStatusValue(
+                    e.target.value as "approved" | "pending" | "limited" | "blocked"
+                  )
+                }
+              >
+                <option value="approved">approved</option>
+                <option value="pending">pending</option>
+                <option value="limited">limited</option>
+                <option value="blocked">blocked</option>
               </select>
             </div>
           </div>
