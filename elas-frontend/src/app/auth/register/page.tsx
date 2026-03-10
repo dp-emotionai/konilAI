@@ -40,7 +40,7 @@ export default function RegisterPage() {
   const handleStartRegister = async () => {
     setError("");
     setInfo("");
-    const e = email.trim();
+    const e = email.trim().toLowerCase();
     const p = password;
     if (!e || !p) {
       setError("Email и пароль обязательны.");
@@ -79,7 +79,7 @@ export default function RegisterPage() {
 
   const handleVerify = async () => {
     setError("");
-    const e = email.trim();
+    const e = email.trim().toLowerCase();
     const c = code.trim();
     if (!e || !c) {
       setError("Укажите email и 6-значный код из письма.");

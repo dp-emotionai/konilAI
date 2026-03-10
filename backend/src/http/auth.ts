@@ -60,15 +60,18 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Email and password required" });
         return;
       }
+      const normalizedEmail = String(email).trim().toLowerCase();
       const user = await prisma.user.findUnique({
-        where: { email: String(email).trim().toLowerCase() },
+        where: { email: normalizedEmail },
       });
       if (!user || user.status !== "active") {
+        console.warn("[auth/login] 401:", user ? "status not active" : "user not found");
         res.status(401).json({ error: "Invalid credentials" });
         return;
       }
       const ok = await bcrypt.compare(String(password), user.passwordHash);
       if (!ok) {
+        console.warn("[auth/login] 401: password mismatch");
         res.status(401).json({ error: "Invalid credentials" });
         return;
       }

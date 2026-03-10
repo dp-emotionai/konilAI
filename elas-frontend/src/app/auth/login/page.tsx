@@ -44,7 +44,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setError("");
 
-    const e = email.trim();
+    const e = email.trim().toLowerCase();
     const p = password;
 
     if (!e || !p) {

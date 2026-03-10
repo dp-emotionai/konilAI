@@ -46,12 +46,24 @@ function fmtDateTime(iso?: string) {
   }).format(d);
 }
 
-function statusTone(s: "live" | "ended" | "upcoming"): Tone {
+type SessionStatus = "live" | "ended" | "upcoming";
+type SessionType = "lecture" | "exam";
+
+type GroupSessionRow = {
+  id: string;
+  title: string;
+  type: SessionType;
+  status: SessionStatus;
+  groupId: string;
+  startsAt?: string;
+};
+
+function statusTone(s: SessionStatus): Tone {
   if (s === "live") return "warning";
   if (s === "ended") return "neutral";
   return "info";
 }
-function typeTone(t: "lecture" | "exam"): Tone {
+function typeTone(t: SessionType): Tone {
   return t === "exam" ? "purple" : "info";
 }
 
@@ -89,7 +101,7 @@ export default function StudentGroupDetailPage() {
       }
     : null;
 
-  const sessions =
+  const sessions: GroupSessionRow[] =
     apiDetail?.sessions?.map((s) => ({
       id: s.id,
       title: s.title,
