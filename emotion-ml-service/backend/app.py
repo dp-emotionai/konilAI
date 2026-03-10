@@ -19,6 +19,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "https://elasweb.vercel.app",
+        "https://www.konilai.space",
+        "https://konilai.space",
     ],
     allow_credentials=False,
     allow_methods=["*"],
