@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -15,120 +15,48 @@ import Badge from "@/components/ui/Badge";
 import SparkArea from "@/components/common/SparkArea";
 import DonutMini from "@/components/common/DonutMini";
 
-import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
-import { getSessionMetrics, isToday, type DashboardSession } from "@/lib/utils/metrics";
+import { getStudentEmotionsSummary, type StudentEmotionsSummary } from "@/lib/api/student";
 import { readConsent } from "@/lib/consent";
 import { useUI } from "@/components/layout/Providers";
 
 import { Download, ShieldCheck } from "lucide-react";
 
-function avg(nums: number[]) {
-  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
-}
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-/** адаптер: приводим student row к минимальному формату, который ждёт getSessionMetrics */
-function toSessionLike(s: StudentSessionRow): DashboardSession {
-  return {
-    id: s.id,
-    title: s.title,
-    group: "", // студенту не всегда нужно
-    date: s.date,
-    status: s.status === "live" ? "active" : "draft",
-    type: s.type,
-    quality: "good",
-  };
-}
-
 export default function StudentSummaryPage() {
   const { state } = useUI();
   const consent = state.consent || readConsent();
 
-  const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
+  const [summary, setSummary] = useState<StudentEmotionsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getStudentSessionsList()
+    getStudentEmotionsSummary()
       .then((data) => {
         if (!mounted) return;
-        setSessions(data);
+        setSummary(data);
         setUpdatedAt(new Date());
       })
-      .finally(() => mounted && setLoading(false));
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const sessionLikes = useMemo(() => sessions.map(toSessionLike), [sessions]);
-  const metrics = useMemo(() => sessionLikes.map(getSessionMetrics), [sessionLikes]);
-
-  const analyzedCount = sessions.length;
-
-  const avgEng = useMemo(() => Math.round(avg(metrics.map((m) => m.engagement))), [metrics]);
-
-  const stressPeaks = useMemo(() => {
-    return metrics.reduce((acc, m) => acc + (m.stress >= 60 ? 1 : 0), 0);
-  }, [metrics]);
-
-  const bestTime = useMemo(() => {
-    if (!sessionLikes.length) return "—";
-    const m = getSessionMetrics(sessionLikes[0]);
-    let bestIdx = 0;
-    for (let i = 1; i < m.series.length; i++) if (m.series[i] > m.series[bestIdx]) bestIdx = i;
-
-    const start = 8 + Math.floor((bestIdx / 24) * 10);
-    const end = start + 2;
-    const pad = (x: number) => String(x).padStart(2, "0");
-    return `${pad(start)}:00–${pad(end)}:00`;
-  }, [sessionLikes]);
-
-  const engagementSeries = useMemo(() => {
-    const last = sessionLikes.slice(0, 3);
-    if (!last.length) return null;
-
-    const seriesList = last.map((s) => getSessionMetrics(s).series);
-    const len = seriesList[0].length;
-    return Array.from({ length: len }, (_, i) => Math.round(avg(seriesList.map((arr) => arr[i] ?? 0))));
-  }, [sessionLikes]);
-
-  const dropsSeries = useMemo(() => {
-    const base = engagementSeries ?? Array.from({ length: 24 }, () => 50);
-    const totalDrops = metrics.reduce((a, m) => a + m.drops, 0) || 1;
-    return base.map((v, i) => {
-      const bump = i % 6 === 0 ? 18 : i % 5 === 0 ? 10 : 0;
-      return clamp(Math.round((100 - v) * 0.6 + bump + totalDrops), 10, 95);
-    });
-  }, [engagementSeries, metrics]);
-
-  const weekCompare = useMemo(() => {
-    const thisWeek = sessionLikes.filter((s: any) => isToday(s.date) || s.status === "active");
-    const prevWeek = sessionLikes.filter((s: any) => !isToday(s.date) && s.status !== "active");
-
-    const a = avg(thisWeek.map((s: any) => getSessionMetrics(s).engagement));
-    const b = avg(prevWeek.map((s: any) => getSessionMetrics(s).engagement));
-    const delta = Math.round((a - b) || 0);
-    return { a: Math.round(a || 0), b: Math.round(b || 0), delta };
-  }, [sessionLikes]);
-
-  const emotions = useMemo(() => {
-    const e = avgEng || 50;
-    const s = avg(metrics.map((m) => m.stress)) || 40;
-
-    const calm = clamp(60 - Math.round(s * 0.5), 10, 60);
-    const focus = clamp(Math.round(e * 0.6), 10, 65);
-    const tense = clamp(Math.round(s * 0.7), 10, 60);
-    const tired = clamp(100 - (calm + focus + tense), 5, 35);
-
-    const vals = [calm, focus, tense, tired];
-    const sum = vals.reduce((a, b) => a + b, 0) || 1;
-    return vals.map((v) => Math.round((v / sum) * 100));
-  }, [avgEng, metrics]);
+  const analyzedCount = summary?.analyzedSessions ?? 0;
+  const avgEng = summary ? Math.round((summary.avgEngagement ?? 0) * 100) : 0;
+  const stressPeaks = summary?.stressPeaks ?? 0;
+  const bestTime = summary?.bestTimeWindow ?? "—";
+  const engagementSeries = summary?.engagementSeries?.length ? summary.engagementSeries : null;
+  const dropsSeries = summary?.dropsSeries?.length ? summary.dropsSeries : null;
+  const weekCompare = summary?.weekCompare ?? { thisWeek: 0, prevWeek: 0, delta: 0 };
+  const emotionLabels = summary ? Object.keys(summary.emotionsDistribution ?? {}) : [];
+  const emotionValues = summary
+    ? emotionLabels.map((k) => Math.round((summary.emotionsDistribution[k] ?? 0) * 100))
+    : [];
 
   const hasData = analyzedCount > 0 && !loading;
 
@@ -209,8 +137,8 @@ export default function StudentSummaryPage() {
             <ChartCard title="Распределение эмоций" tag="Summary">
               {loading ? (
                 <div className="h-[210px] rounded-elas-lg bg-surface-subtle animate-pulse" />
-              ) : hasData ? (
-                <DonutMini labels={["Спокойствие", "Фокус", "Напряжение", "Усталость"]} values={emotions} />
+              ) : hasData && emotionLabels.length > 0 ? (
+                <DonutMini labels={emotionLabels} values={emotionValues} />
               ) : (
                 <EmptyChart />
               )}

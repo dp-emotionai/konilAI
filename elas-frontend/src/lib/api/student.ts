@@ -141,6 +141,30 @@ export async function getStudentGroupDetail(groupId: string): Promise<StudentGro
   }
 }
 
+export type StudentEmotionsSummary = {
+  analyzedSessions: number;
+  avgEngagement: number;
+  stressPeaks: number;
+  bestTimeWindow: string | null;
+  engagementSeries: number[];
+  dropsSeries: number[];
+  weekCompare: {
+    thisWeek: number;
+    prevWeek: number;
+    delta: number;
+  };
+  emotionsDistribution: Record<string, number>;
+};
+
+export async function getStudentEmotionsSummary(): Promise<StudentEmotionsSummary | null> {
+  if (!getApiBaseUrl() || !hasAuth()) return null;
+  try {
+    return await api.get<StudentEmotionsSummary>("student/me/emotions-summary");
+  } catch {
+    return null;
+  }
+}
+
 export async function getStudentSessionsList(): Promise<StudentSessionRow[]> {
   if (getApiBaseUrl() && hasAuth()) {
     try {
