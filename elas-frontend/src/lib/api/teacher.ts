@@ -1,7 +1,38 @@
 import { api, hasAuth, getApiBaseUrl } from "./client";
-import type { Session } from "@/lib/mock/sessions";
-import type { GroupSession } from "@/lib/mock/groupSessions";
-import type { Group } from "@/lib/mock/groups";
+
+export type TeacherDashboardSession = {
+  id: string;
+  code: string;
+  type: "lecture" | "exam";
+  title: string;
+  group: string;
+  teacher: string;
+  date: string;
+  participants: number;
+  status: "draft" | "active" | "finished";
+  quality: "good" | "medium" | "poor";
+};
+
+export type GroupSession = {
+  id: string;
+  title: string;
+  type: "lecture" | "exam";
+  status: "live" | "ended" | "upcoming";
+  groupId: string;
+  startsAt?: string;
+};
+
+export type FullGroup = {
+  id: string;
+  name: string;
+  program: string;
+  status: "active" | "archived";
+  teacher: { id: string; name: string; email: string };
+  students: { id: string; name: string; email?: string | null }[];
+  createdAt: string;
+  description?: string;
+  imageUrl?: string;
+};
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -22,7 +53,7 @@ function mapBackendToSession(raw: {
   startedAt?: string | null;
   endedAt?: string | null;
   createdAt?: string;
-}): Session {
+}): TeacherDashboardSession {
   const date = raw.startedAt || raw.createdAt || new Date().toISOString();
   return {
     id: raw.id,
@@ -60,7 +91,7 @@ function mapBackendToGroupSession(raw: {
   };
 }
 
-export async function getTeacherDashboardSessions(): Promise<Session[]> {
+export async function getTeacherDashboardSessions(): Promise<TeacherDashboardSession[]> {
   if (getApiBaseUrl() && hasAuth()) {
     try {
       const list = await api.get<Parameters<typeof mapBackendToSession>[0][]>("sessions");
@@ -104,7 +135,7 @@ export type GroupDetailResponse = {
   createdAt: string;
 };
 
-export type GroupWithSessions = { group: Group; sessions: GroupSession[] };
+export type GroupWithSessions = { group: FullGroup; sessions: GroupSession[] };
 
 export async function getGroupById(groupId: string): Promise<GroupWithSessions | null> {
   if (!getApiBaseUrl() || !hasAuth()) return null;
@@ -118,7 +149,7 @@ export async function getGroupById(groupId: string): Promise<GroupWithSessions |
       groupId: raw.id,
       startsAt: s.startedAt ?? undefined,
     }));
-    const group: Group = {
+    const group: FullGroup = {
       id: raw.id,
       name: raw.name,
       program: raw.name,
@@ -204,6 +235,29 @@ export async function getSessionSummary(sessionId: string): Promise<SessionSumma
       durationMinutes:
         typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
     };
+  } catch {
+    return null;
+  }
+}
+
+export type SessionTimelineBucket = {
+  index: number;
+  fromSec: number;
+  toSec: number;
+  avgEngagement: number;
+  avgStress: number;
+  avgRisk: number;
+};
+
+export type SessionTimeline = {
+  sessionId: string;
+  buckets: SessionTimelineBucket[];
+};
+
+export async function getSessionTimeline(sessionId: string): Promise<SessionTimeline | null> {
+  if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
+  try {
+    return await api.get<SessionTimeline>(`sessions/${sessionId}/timeline`);
   } catch {
     return null;
   }

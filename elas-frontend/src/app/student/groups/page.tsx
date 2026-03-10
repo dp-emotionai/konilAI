@@ -12,8 +12,6 @@ import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 import { getStudentGroups, type StudentGroupRow } from "@/lib/api/student";
-import { groups } from "@/lib/mock/groups";
-import { getSessionsByGroup } from "@/lib/mock/groupSessions";
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 function ToneBadge({
@@ -65,23 +63,12 @@ export default function StudentGroupsPage() {
     });
   }, [apiAvailable]);
 
-  const mockFiltered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return groups.map((g) => {
-      const sessions = getSessionsByGroup(g.id);
-      const hasLive = sessions.some((x) => x.status === "live");
-      return { group: g, sessionsCount: sessions.length, hasLive };
-    }).filter(({ group }) => !s || group.name.toLowerCase().includes(s) || group.program.toLowerCase().includes(s));
-  }, [q]);
-
   const apiFiltered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return apiGroups.filter((g) => !s || g.name.toLowerCase().includes(s) || (g.teacherName ?? g.teacher).toLowerCase().includes(s));
   }, [apiGroups, q]);
 
-  const useApi = apiAvailable && apiGroups.length >= 0;
-  const list = useApi ? apiFiltered : mockFiltered;
-  const isApiList = useApi;
+  const list = apiFiltered;
 
   return (
     <div className="space-y-10 pb-16">

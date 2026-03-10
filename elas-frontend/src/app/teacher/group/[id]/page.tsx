@@ -29,13 +29,8 @@ import {
   type GroupMemberRow,
   type GroupMessage,
 } from "@/lib/api/teacher";
-import { getGroupById } from "@/lib/mock/groups";
-import { getSessionsByGroup, type GroupSession } from "@/lib/mock/groupSessions";
-import type { Group } from "@/lib/mock/groups";
-import {
-  nextTeacherAction,
-  setSessionStatusOverride,
-} from "@/lib/mock/sessionLifecycle";
+import type { Group } from "@/types/group";
+import type { GroupSession } from "@/types/session";
 import Glow from "@/components/common/Glow";
 import {
   Edit3,
@@ -280,11 +275,8 @@ export default function TeacherGroupDetailPage() {
     });
   }, [id, apiAvailable, tick]);
 
-  const mockGroup = useMemo(() => getGroupById(id), [id]);
-  const mockSessions = useMemo(() => getSessionsByGroup(id), [id, tick]);
-
-  const group: Group | null = apiData?.group ?? mockGroup ?? null;
-  const sessions: GroupSession[] = apiData ? apiData.sessions : mockSessions;
+  const group: Group | null = apiData?.group ?? null;
+  const sessions: GroupSession[] = apiData?.sessions ?? [];
 
   const refetchGroup = () => setTick((x) => x + 1);
 

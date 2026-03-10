@@ -13,8 +13,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 
 import { useToast } from "@/components/ui/Toast";
-import { getTeacherDashboardSessions } from "@/lib/api/teacher";
-import type { Session } from "@/lib/mock/sessions";
+import { getTeacherDashboardSessions, type TeacherDashboardSession } from "@/lib/api/teacher";
 
 import { buildInsightsFromSessions, summarizeTeacherDashboard } from "@/lib/utils/metrics";
 import {
@@ -137,7 +136,7 @@ export default function TeacherDashboard() {
   const toast = useToast();
   const ui = useUI();
 
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<TeacherDashboardSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

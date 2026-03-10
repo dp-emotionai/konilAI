@@ -117,13 +117,13 @@ export default function ExamAnalyticsPage() {
                 placeholder="Min confidence"
               />
             </div>
-            <Button
-              type="button"
-              className="ring-1 ring-purple-400/25 bg-purple-500/20 hover:bg-purple-500/25 text-purple-100"
-              onClick={() => navigator.clipboard?.writeText("EXPORT_EXAM_ANALYTICS_MOCK")}
-            >
-              Export (Mock)
-            </Button>
+              <Button
+                type="button"
+                disabled
+                className="ring-1 ring-purple-400/25 bg-purple-500/10 text-purple-100 cursor-not-allowed"
+              >
+                Export (скоро)
+              </Button>
           </div>
         </div>
 
@@ -306,7 +306,7 @@ export default function ExamAnalyticsPage() {
                   <Button
                     type="button"
                     className="w-full ring-1 ring-purple-400/25 bg-purple-500/20 hover:bg-purple-500/25 text-purple-100"
-                    onClick={() => navigator.clipboard?.writeText("COPY_FLAGGED_TIMESTAMPS_MOCK")}
+                    disabled
                   >
                     Copy flagged timestamps
                   </Button>

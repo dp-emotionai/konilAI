@@ -13,8 +13,6 @@ import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 
-import { groups as mockGroups } from "@/lib/mock/groups";
-import { getSessionsByGroup } from "@/lib/mock/groupSessions";
 import { getTeacherGroups, createGroup, type TeacherGroup } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
 
@@ -107,9 +105,9 @@ export default function TeacherGroupsPage() {
     }
   };
 
-  const list: GroupRow[] = useMemo(() => {
-    if (apiAvailable) {
-      return apiGroups.map((g) => ({
+  const list: GroupRow[] = useMemo(
+    () =>
+      apiGroups.map((g) => ({
         id: g.id,
         name: g.name,
         program: undefined,
@@ -117,18 +115,9 @@ export default function TeacherGroupsPage() {
         imageUrl: undefined,
         sessionCount: g.sessionCount ?? 0,
         studentsCount: 0,
-      }));
-    }
-    return mockGroups.map((g) => ({
-      id: g.id,
-      name: g.name,
-      program: g.program,
-      description: (g as { description?: string }).description,
-      imageUrl: (g as { imageUrl?: string }).imageUrl,
-      sessionCount: getSessionsByGroup(g.id).length,
-      studentsCount: g.students.length,
-    }));
-  }, [apiAvailable, apiGroups]);
+      })),
+    [apiGroups]
+  );
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();

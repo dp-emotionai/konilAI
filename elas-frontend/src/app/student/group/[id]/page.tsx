@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -13,9 +13,7 @@ import {Card} from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 import { getStudentGroupDetail, type StudentGroupDetail } from "@/lib/api/student";
-import { getGroupById } from "@/lib/mock/groups";
-import { getSessionsByGroup, type GroupSession } from "@/lib/mock/groupSessions";
-import { readConsent } from "@/lib/mock/sessionLifecycle";
+import { readConsent } from "@/lib/consent";
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 function ToneBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: Tone }) {
@@ -48,12 +46,12 @@ function fmtDateTime(iso?: string) {
   }).format(d);
 }
 
-function statusTone(s: GroupSession["status"]): Tone {
+function statusTone(s: "live" | "ended" | "upcoming"): Tone {
   if (s === "live") return "warning";
   if (s === "ended") return "neutral";
   return "info";
 }
-function typeTone(t: GroupSession["type"]): Tone {
+function typeTone(t: "lecture" | "exam"): Tone {
   return t === "exam" ? "purple" : "info";
 }
 
@@ -77,22 +75,36 @@ export default function StudentGroupDetailPage() {
     });
   }, [apiAvailable, id]);
 
-  const mockGroup = useMemo(() => getGroupById(id), [id]);
-  const mockSessions = useMemo(() => getSessionsByGroup(id), [id]);
+  const group = apiDetail
+    ? {
+        id: apiDetail.id,
+        name: apiDetail.name,
+        program: apiDetail.name,
+        status: "active" as const,
+        teacher: {
+          id: "",
+          name: apiDetail.teacherName,
+          email: apiDetail.teacher,
+        },
+      }
+    : null;
 
-  const group = mockGroup ?? (apiDetail ? { id: apiDetail.id, name: apiDetail.name, program: apiDetail.name, status: "active" as const, teacher: { id: "", name: apiDetail.teacherName, email: apiDetail.teacher }, students: (apiDetail.members ?? []).map((m) => ({ id: m.id, name: m.name ?? m.email ?? "", email: m.email })), createdAt: apiDetail.createdAt } : null);
-  const sessions: GroupSession[] = apiDetail
-    ? (apiDetail.sessions ?? []).map((s) => ({
-        id: s.id,
-        title: s.title,
-        type: s.type as "lecture" | "exam",
-        status: s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming",
-        groupId: id,
-        startsAt: s.startedAt ?? undefined,
-      }))
-    : mockSessions;
+  const sessions =
+    apiDetail?.sessions?.map((s) => ({
+      id: s.id,
+      title: s.title,
+      type: s.type === "exam" ? "exam" : "lecture",
+      status: s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming",
+      groupId: id,
+      startsAt: s.startedAt ?? undefined,
+    })) ?? [];
 
-  const members = apiDetail?.members ?? group?.students.map((s) => ({ id: s.id, name: s.name, email: s.email ?? null })) ?? [];
+  const members =
+    apiDetail?.members?.map((m) => ({
+      id: m.id,
+      name: m.name ?? m.email ?? "",
+      email: m.email ?? null,
+    })) ?? [];
 
   type TabId = "sessions" | "members";
   const [activeTab, setActiveTab] = useState<TabId>("sessions");

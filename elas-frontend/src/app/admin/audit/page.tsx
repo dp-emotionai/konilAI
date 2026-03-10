@@ -73,13 +73,7 @@ function roleTone(r: AuditRow["role"]): Tone {
   return "neutral";
 }
 
-const MOCK_ROWS: AuditRow[] = [
-  { id: "AUD-10491", at: "Today 10:12", actor: "admin@nurbadev", role: "admin", action: "Updated model threshold", resource: "ModelConfig", status: "ok", meta: { field: "stressThreshold", from: "0.70", to: "0.72" } },
-  { id: "AUD-10483", at: "Today 09:44", actor: "system", role: "system", action: "Nightly retention sweep", resource: "Storage", status: "ok", meta: { freed: "1.2GB", retentionDays: "30" } },
-  { id: "AUD-10472", at: "Yesterday 18:10", actor: "teacher@demo", role: "teacher", action: "Exported analytics report", resource: "Reports", status: "ok", meta: { format: "PDF (mock)", session: "AI Midterm" } },
-  { id: "AUD-10466", at: "Yesterday 16:27", actor: "student@demo", role: "student", action: "Attempted access to admin route", resource: "/admin/users", status: "warn", meta: { reason: "RoleGuard denied (mock)" } },
-  { id: "AUD-10458", at: "Yesterday 11:05", actor: "admin@nurbadev", role: "admin", action: "Created user", resource: "Users", status: "ok", meta: { created: "teacher_new@demo", role: "teacher" } },
-];
+const MOCK_ROWS: AuditRow[] = [];
 
 export default function AdminAuditPage() {
   const [query, setQuery] = useState("");

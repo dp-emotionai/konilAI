@@ -12,7 +12,14 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Glow from "@/components/common/Glow";
 import { cn } from "@/lib/cn";
-import { groups, type Group } from "@/lib/mock/groups";
+type Group = {
+  id: string;
+  name: string;
+  program: string;
+  status: string;
+  teacher: { name: string };
+  students: { id: string }[];
+};
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 function ToneBadge({
@@ -49,6 +56,8 @@ function statusTone(s: Group["status"]): Tone {
 export default function AdminGroupsPage() {
   const [q, setQ] = useState("");
 
+  const [groups] = useState<Group[]>([]);
+
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
     return groups.filter((g) => {
@@ -61,7 +70,7 @@ export default function AdminGroupsPage() {
         g.status.toLowerCase().includes(s)
       );
     });
-  }, [q]);
+  }, [q, groups]);
 
   return (
     <div className="relative space-y-14 pb-20">
@@ -85,13 +94,6 @@ export default function AdminGroupsPage() {
               </div>
               <div className="flex items-center gap-2">
                 <ToneBadge tone="info">{filtered.length} групп</ToneBadge>
-                <Button
-                  type="button"
-                  className="ring-1 ring-purple-400/25 bg-purple-500/20 hover:bg-purple-500/25 text-purple-100"
-                  onClick={() => navigator.clipboard?.writeText("ADMIN_CREATE_GROUP_MOCK")}
-                >
-                  Создать группу (пример)
-                </Button>
               </div>
             </div>
 

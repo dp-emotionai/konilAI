@@ -14,8 +14,7 @@ import { cn } from "@/lib/cn";
 import { NAV_BY_ROLE } from "@/lib/routes";
 import { getAdminUsers } from "@/lib/api/admin";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
-import { getTeacherDashboardSessions } from "@/lib/api/teacher";
-import type { Session } from "@/lib/mock/sessions";
+import { getTeacherDashboardSessions, type TeacherDashboardSession } from "@/lib/api/teacher";
 import { getSessionMetrics } from "@/lib/utils/metrics";
 
 function StatBadge({
@@ -62,7 +61,7 @@ export default function AdminDashboardPage() {
   const [userCount, setUserCount] = useState<number | null>(null);
   const [pendingTeachers, setPendingTeachers] = useState<number | null>(null);
   const [backendOk, setBackendOk] = useState<boolean>(false);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<TeacherDashboardSession[]>([]);
 
   useEffect(() => {
     let mounted = true;

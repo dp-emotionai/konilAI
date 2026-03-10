@@ -3,7 +3,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import type { Session } from "@/lib/mock/sessions";
 
 import Section from "@/components/common/Section";
 import SectionDark from "@/components/common/SectionDark";
@@ -26,11 +25,11 @@ import {
   Zap,
 } from "lucide-react";
 
-import { getTeacherDashboardSessions } from "@/lib/api/teacher";
-import { summarizeTeacherDashboard, getSessionMetrics } from "@/lib/utils/metrics";
+import { getTeacherDashboardSessions, type TeacherDashboardSession } from "@/lib/api/teacher";
+import { summarizeTeacherDashboard, getSessionMetrics, type DashboardSession } from "@/lib/utils/metrics";
 
 export default function HomePage() {
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<TeacherDashboardSession[]>([]);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -45,9 +44,9 @@ export default function HomePage() {
     };
   }, []);
 
-  const summary = useMemo(() => summarizeTeacherDashboard(sessions), [sessions]);
+  const summary = useMemo(() => summarizeTeacherDashboard(sessions as unknown as DashboardSession[]), [sessions]);
 
-  const previewSession = summary.live[0] ?? summary.today[0] ?? sessions[0];
+  const previewSession = summary.live[0] ?? summary.today[0] ?? (sessions[0] as DashboardSession | undefined);
   const previewMetrics = previewSession ? getSessionMetrics(previewSession) : null;
 
   const previewLabel = previewSession

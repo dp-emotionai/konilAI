@@ -16,8 +16,8 @@ import SparkArea from "@/components/common/SparkArea";
 import DonutMini from "@/components/common/DonutMini";
 
 import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
-import { getSessionMetrics, isToday } from "@/lib/utils/metrics";
-import { readConsent } from "@/lib/mock/sessionLifecycle";
+import { getSessionMetrics, isToday, type DashboardSession } from "@/lib/utils/metrics";
+import { readConsent } from "@/lib/consent";
 import { useUI } from "@/components/layout/Providers";
 
 import { Download, ShieldCheck } from "lucide-react";
@@ -30,7 +30,7 @@ function clamp(n: number, min: number, max: number) {
 }
 
 /** адаптер: приводим student row к минимальному формату, который ждёт getSessionMetrics */
-function toSessionLike(s: StudentSessionRow) {
+function toSessionLike(s: StudentSessionRow): DashboardSession {
   return {
     id: s.id,
     title: s.title,
@@ -39,7 +39,7 @@ function toSessionLike(s: StudentSessionRow) {
     status: s.status === "live" ? "active" : "draft",
     type: s.type,
     quality: "good",
-  } as any;
+  };
 }
 
 export default function StudentSummaryPage() {

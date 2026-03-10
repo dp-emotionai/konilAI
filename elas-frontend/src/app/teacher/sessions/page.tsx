@@ -14,10 +14,8 @@ import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import Table, { THead, TBody, TRow, TCell, TH, TMuted } from "@/components/ui/Table";
 
-import { nextTeacherAction, setSessionStatusOverride } from "@/lib/mock/sessionLifecycle";
-import { getTeacherAllSessions, updateSessionStatus } from "@/lib/api/teacher";
+import { getTeacherAllSessions, updateSessionStatus, type GroupSession } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
-import type { GroupSession } from "@/lib/mock/groupSessions";
 
 const statusToBackend = (next: string): "active" | "finished" | "draft" =>
   next === "live" ? "active" : next === "ended" ? "finished" : "draft";
@@ -72,12 +70,16 @@ export default function TeacherSessionsPage() {
   }, [sessions, q, filter]);
 
   const handleLifecycle = async (s: GroupSession) => {
-    const action = nextTeacherAction(s.status);
+    const action =
+      s.status === "upcoming"
+        ? { label: "Start", next: "live" as const }
+        : s.status === "live"
+          ? { label: "End", next: "ended" as const }
+          : { label: "Reopen", next: "upcoming" as const };
 
     setActioningId(s.id);
     try {
       await updateSessionStatus(s.id, statusToBackend(action.next));
-      setSessionStatusOverride(s.id, action.next);
       setTick((x) => x + 1);
     } finally {
       setActioningId(null);
@@ -161,7 +163,12 @@ export default function TeacherSessionsPage() {
                       </TRow>
                     ) : (
                       filtered.map((s) => {
-                        const action = nextTeacherAction(s.status);
+                        const action =
+                          s.status === "upcoming"
+                            ? { label: "Start", next: "live" as const }
+                            : s.status === "live"
+                              ? { label: "End", next: "ended" as const }
+                              : { label: "Reopen", next: "upcoming" as const };
                         const label =
                           action.label === "Start"
                             ? "Старт"

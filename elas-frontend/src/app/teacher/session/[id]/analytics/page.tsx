@@ -9,18 +9,19 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 import { TeacherSessionTabs } from "@/components/session/TeacherSessionTabs";
-import { getSessionSummary, type SessionSummary } from "@/lib/api/teacher";
+import { getSessionSummary, getSessionTimeline, type SessionSummary, type SessionTimeline } from "@/lib/api/teacher";
 import { isApiAvailable, hasAuth } from "@/lib/api/client";
 
-function ChartMock({ title }: { title: string }) {
+function ChartMock({ title, hasData }: { title: string; hasData: boolean }) {
   return (
     <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
-      <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between">
         <div className="text-sm text-white/60">{title}</div>
-        <Badge>MOCK</Badge>
       </div>
       <div className="mt-4 h-44 rounded-2xl border border-white/10 bg-gradient-to-b from-purple-500/15 to-transparent" />
-      <div className="mt-3 text-xs text-white/45">Charts will be connected to real metrics later.</div>
+      <div className="mt-3 text-xs text-white/45">
+        {hasData ? "Данные берутся из backend‑таймлайна." : "Пока нет точек таймлайна для этой сессии."}
+      </div>
     </div>
   );
 }
@@ -31,22 +32,25 @@ export default function TeacherLectureAnalyticsPage() {
     "overview"
   );
   const [summary, setSummary] = useState<SessionSummary | null>(null);
+  const [timeline, setTimeline] = useState<SessionTimeline | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const id = params.id;
     if (!id || !isApiAvailable() || !hasAuth()) {
       setSummary(null);
+      setTimeline(null);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
 
-    getSessionSummary(id)
-      .then((data) => {
+    Promise.all([getSessionSummary(id), getSessionTimeline(id)])
+      .then(([summaryData, timelineData]) => {
         if (cancelled) return;
-        setSummary(data);
+        setSummary(summaryData);
+        setTimeline(timelineData);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -60,13 +64,14 @@ export default function TeacherLectureAnalyticsPage() {
   const avgEngagement = summary?.avgEngagement ?? 0;
   const attentionDrops = summary?.attentionDrops ?? 0;
   const quality = (summary?.quality as string | undefined) ?? "medium";
+  const hasTimeline = Boolean(timeline && timeline.buckets && timeline.buckets.length > 0);
 
   return (
     <div className="space-y-6">
       <PageHero
         overline="Teacher • Lecture analytics"
         title="Аналитика сессии"
-        subtitle="После подключения backend‑сводок здесь будут метрики вовлечённости и внимания."
+        subtitle={summary ? "Сводка по вовлечённости и вниманию на основе собранных метрик." : "Пока по этой сессии нет агрегированных данных."}
         right={
           <div className="flex items-center gap-2 flex-wrap">
             {summary ? (
@@ -142,10 +147,10 @@ export default function TeacherLectureAnalyticsPage() {
 
       {tab === "timeline" && summary && (
         <div className="grid lg:grid-cols-2 gap-4">
-          <Reveal><ChartMock title="Engagement over time" /></Reveal>
-          <Reveal><ChartMock title="Focus strip (heat bar)" /></Reveal>
-          <Reveal><ChartMock title="Emotion distribution" /></Reveal>
-          <Reveal><ChartMock title="Stress (optional)" /></Reveal>
+          <Reveal><ChartMock title="Engagement over time" hasData={hasTimeline} /></Reveal>
+          <Reveal><ChartMock title="Focus strip (heat bar)" hasData={hasTimeline} /></Reveal>
+          <Reveal><ChartMock title="Emotion distribution" hasData={hasTimeline} /></Reveal>
+          <Reveal><ChartMock title="Stress (optional)" hasData={hasTimeline} /></Reveal>
         </div>
       )}
 

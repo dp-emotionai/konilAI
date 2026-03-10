@@ -1,4 +1,12 @@
-import type { Session } from "@/lib/mock/sessions";
+export type DashboardSession = {
+  id: string;
+  title: string;
+  group: string;
+  date: string;
+  status: string;
+  type: string;
+  quality: "good" | "medium" | "poor" | string;
+};
 
 function hashTo01(str: string) {
   // детерминированный генератор 0..1 из строки (id)
@@ -19,7 +27,7 @@ export type SessionMetrics = {
   series: number[];       // 24 points 0..100
 };
 
-export function getSessionMetrics(s: Session): SessionMetrics {
+export function getSessionMetrics(s: DashboardSession): SessionMetrics {
   const base = hashTo01(String(s.id));
 
   // базовые метрики (детерминировано)
@@ -53,7 +61,7 @@ export function isToday(date: string | number | Date) {
     d.getDate() === now.getDate();
 }
 
-export function summarizeTeacherDashboard(sessions: Session[]) {
+export function summarizeTeacherDashboard(sessions: DashboardSession[]) {
   const groups = new Set(sessions.map(s => s.group));
   const today = sessions.filter(s => isToday(s.date));
   const live = sessions.filter(s => s.status === "active");
@@ -72,7 +80,7 @@ export function summarizeTeacherDashboard(sessions: Session[]) {
   };
 }
 
-export function buildInsightsFromSessions(sessions: Session[]) {
+export function buildInsightsFromSessions(sessions: DashboardSession[]) {
   const items: { title: string; text: string }[] = [];
 
   const anyLowQuality = sessions.find(s => s.quality === "poor");

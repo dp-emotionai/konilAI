@@ -22,7 +22,7 @@ import {
   type InvitationRow,
 } from "@/lib/api/student";
 import { getApiBaseUrl, getStoredAuth, hasAuth } from "@/lib/api/client";
-import { readConsent } from "@/lib/mock/sessionLifecycle";
+import { readConsent } from "@/lib/consent";
 
 import { Video, ShieldCheck, Calendar, Sparkles, ArrowRight } from "lucide-react";
 

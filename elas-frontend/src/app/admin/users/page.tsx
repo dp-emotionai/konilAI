@@ -18,7 +18,6 @@ import Table, {
   TCell,
   TMuted,
 } from "@/components/ui/Table";
-import { mockUsers } from "@/lib/mock/users";
 import type { AdminUser } from "@/lib/api/admin";
 import { getAdminUsers, approveAdminUser, blockAdminUser, updateAdminUser } from "@/lib/api/admin";
 
@@ -50,17 +49,7 @@ export default function AdminUsersPage() {
     };
   }, []);
 
-  const source: AdminUser[] =
-    users && users.length > 0
-      ? users
-      : mockUsers.map((u) => ({
-          id: u.id,
-          email: u.email,
-          name: null,
-          role: u.role,
-          status: u.status === "blocked" ? "blocked" : "approved",
-          createdAt: u.createdAt,
-        }));
+  const source: AdminUser[] = users ?? [];
 
   const data = useMemo(() => {
     return source
