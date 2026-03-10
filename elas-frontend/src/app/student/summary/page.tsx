@@ -170,8 +170,8 @@ export default function StudentSummaryPage() {
               ) : hasData ? (
                 <>
                   <div className="grid grid-cols-3 gap-3">
-                    <MiniCompare label="Эта неделя" value={`${weekCompare.a}%`} />
-                    <MiniCompare label="Прошлая" value={`${weekCompare.b}%`} />
+                    <MiniCompare label="Эта неделя" value={`${weekCompare.thisWeek}%`} />
+                    <MiniCompare label="Прошлая" value={`${weekCompare.prevWeek}%`} />
                     <MiniCompare
                       label="Δ"
                       value={`${weekCompare.delta >= 0 ? "+" : ""}${weekCompare.delta}%`}

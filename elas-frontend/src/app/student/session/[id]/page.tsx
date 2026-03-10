@@ -126,6 +126,8 @@ export default function StudentJoinSessionPage() {
   }, [sessionId, state.consent]);
 
   const title = joinInfo?.title ?? "Сессия";
+  const sessionType: "lecture" | "exam" =
+    joinInfo?.type === "exam" ? "exam" : "lecture";
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
@@ -694,7 +696,7 @@ export default function StudentJoinSessionPage() {
                       <SessionChatPanel
                         sessionId={roomId}
                         role="student"
-                        type={session.type === "exam" ? "exam" : "lecture"}
+                        type={sessionType}
                       />
                     </div>
 

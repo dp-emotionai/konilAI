@@ -28,9 +28,9 @@ import {
   type GroupInvitationRow,
   type GroupMemberRow,
   type GroupMessage,
+  type FullGroup,
+  type GroupSession,
 } from "@/lib/api/teacher";
-import type { Group } from "@/types/group";
-import type { GroupSession } from "@/types/session";
 import Glow from "@/components/common/Glow";
 import {
   Edit3,
@@ -97,6 +97,20 @@ function statusTone(s: GroupSession["status"]): Tone {
 
 function typeTone(t: GroupSession["type"]): Tone {
   return t === "exam" ? "purple" : "info";
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  Start: "Старт",
+  End: "Завершить",
+  Reopen: "Открыть снова",
+};
+
+function nextTeacherAction(
+  status: GroupSession["status"]
+): { next: "live" | "ended" | "draft"; label: keyof typeof ACTION_LABELS } {
+  if (status === "upcoming") return { next: "live", label: "Start" };
+  if (status === "live") return { next: "ended", label: "End" };
+  return { next: "draft", label: "Reopen" };
 }
 
 function TabButton({
@@ -234,9 +248,10 @@ export default function TeacherGroupDetailPage() {
   const id = params?.id ?? "";
   const apiAvailable = getApiBaseUrl() && hasAuth();
 
-  const [apiData, setApiData] = useState<{ group: Group; sessions: GroupSession[] } | null>(null);
+  const [apiData, setApiData] = useState<{ group: FullGroup; sessions: GroupSession[] } | null>(null);
   const [groupLoading, setGroupLoading] = useState(!!apiAvailable);
   const [tick, setTick] = useState(0);
+  const [sessionStatusOverride, setSessionStatusOverride] = useState<Record<string, string>>({});
 
   const [activeTab, setActiveTab] = useState<TabId>("sessions");
 
@@ -275,7 +290,7 @@ export default function TeacherGroupDetailPage() {
     });
   }, [id, apiAvailable, tick]);
 
-  const group: Group | null = apiData?.group ?? null;
+  const group: FullGroup | null = apiData?.group ?? null;
   const sessions: GroupSession[] = apiData?.sessions ?? [];
 
   const refetchGroup = () => setTick((x) => x + 1);
@@ -713,14 +728,12 @@ export default function TeacherGroupDetailPage() {
                                               : "draft";
                                         updateSessionStatus(s.id, backendStatus).then(refetchGroup);
                                       } else {
-                                        setSessionStatusOverride(s.id, action.next);
+                                        setSessionStatusOverride((prev) => ({ ...prev, [s.id]: action.next }));
                                         setTick((x) => x + 1);
                                       }
                                     }}
                                   >
-                                    {({ Start: "Старт", End: "Завершить", Reopen: "Открыть снова" }[
-                                      action.label
-                                    ]) || action.label}
+                                    {ACTION_LABELS[action.label] ?? action.label}
                                   </Button>
 
                                   <Link
@@ -857,7 +870,7 @@ export default function TeacherGroupDetailPage() {
                     ) : (
                       <div className="mt-6 space-y-3">
                         {!apiAvailable &&
-                          group.students.map((s) => (
+                          group?.students?.map((s: { id: string; name: string; email?: string | null }) => (
                             <div
                               key={s.id}
                               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"

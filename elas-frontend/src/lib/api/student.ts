@@ -9,10 +9,6 @@ export type StudentSessionRow = {
   status: "upcoming" | "live" | "ended";
 };
 
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function mapBackendToRow(raw: {
   id: string;
   title: string;
@@ -166,16 +162,10 @@ export async function getStudentEmotionsSummary(): Promise<StudentEmotionsSummar
 }
 
 export async function getStudentSessionsList(): Promise<StudentSessionRow[]> {
-  if (getApiBaseUrl() && hasAuth()) {
-    try {
-      const list = await api.get<Parameters<typeof mapBackendToRow>[0][]>("sessions");
-      const arr = Array.isArray(list) ? list : [];
-      return arr.map(mapBackendToRow);
-    } catch {
-      await delay(80);
-      return [];
-    }
+  if (!getApiBaseUrl() || !hasAuth()) {
+    return [];
   }
-  await delay(130);
-  return [];
+  const list = await api.get<Parameters<typeof mapBackendToRow>[0][]>("sessions");
+  const arr = Array.isArray(list) ? list : [];
+  return arr.map(mapBackendToRow);
 }

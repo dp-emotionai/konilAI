@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +11,8 @@ import { Card, CardContent } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
-import { CalendarDays, Clock, RadioTower } from "lucide-react";
+import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
+import { CalendarDays, Clock, RadioTower, RefreshCw, AlertCircle } from "lucide-react";
 
 function statusLabel(status: StudentSessionRow["status"]) {
   if (status === "live") return "В эфире";
@@ -23,25 +24,26 @@ export default function StudentSessionsPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
+
+  const load = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const list = await getStudentSessionsList();
+      setSessions(list);
+    } catch (e) {
+      setSessions([]);
+      setError(e instanceof Error ? e.message : "Не удалось загрузить список сессий.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-
-    const load = async () => {
-      try {
-        const list = await getStudentSessionsList();
-        if (mounted) setSessions(list);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-
     void load();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  }, [load]);
 
   const hasSessions = sessions.length > 0;
 
@@ -72,26 +74,39 @@ export default function StudentSessionsPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 text-xs text-white/80 md:w-72">
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
-                    <RadioTower size={14} /> Live
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="grid grid-cols-2 gap-3 text-xs text-white/80 md:w-72">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
+                      <RadioTower size={14} /> Live
+                    </div>
+                    <div className="mt-1 text-lg font-semibold">
+                      {sessions.filter((s) => s.status === "live").length || 0}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-white/55">Сеансов «в эфире» сейчас</div>
                   </div>
-                  <div className="mt-1 text-lg font-semibold">
-                    {sessions.filter((s) => s.status === "live").length || 0}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
+                      <CalendarDays size={14} /> Upcoming
+                    </div>
+                    <div className="mt-1 text-lg font-semibold">
+                      {sessions.filter((s) => s.status === "upcoming").length || 0}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-white/55">Будущие сессии</div>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-white/55">Сеансов «в эфире» сейчас</div>
                 </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
-                    <CalendarDays size={14} /> Upcoming
-                  </div>
-                  <div className="mt-1 text-lg font-semibold">
-                    {sessions.filter((s) => s.status === "upcoming").length || 0}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-white/55">Будущие сессии</div>
-                </div>
+                {apiAvailable && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void load()}
+                    disabled={loading}
+                    className="shrink-0 gap-1.5 border-white/20 text-white/90 hover:bg-white/10"
+                  >
+                    <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                    Обновить
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -108,10 +123,36 @@ export default function StudentSessionsPage() {
                   <div className="h-11 rounded-2xl bg-surface-subtle animate-pulse" />
                   <div className="h-11 rounded-2xl bg-surface-subtle animate-pulse" />
                 </div>
+              ) : error ? (
+                <div className="py-8 flex flex-col items-center justify-center gap-4 text-center">
+                  <div className="flex items-center gap-2 text-sm text-[color:var(--error)]">
+                    <AlertCircle size={18} />
+                    <span>{error}</span>
+                  </div>
+                  <Button variant="outline" onClick={() => void load()} className="gap-2">
+                    <RefreshCw size={14} />
+                    Повторить
+                  </Button>
+                </div>
+              ) : !apiAvailable ? (
+                <div className="py-8 text-center text-sm text-muted">
+                  Войдите в аккаунт и убедитесь, что указан адрес сервера, чтобы видеть свои сессии.
+                  <div className="mt-3">
+                    <Link href="/auth/login">
+                      <Button variant="outline" size="sm">Войти</Button>
+                    </Link>
+                  </div>
+                </div>
               ) : !hasSessions ? (
                 <div className="py-8 text-center text-sm text-muted">
                   Сессий пока нет. Когда преподаватель создаст и откроет сессию для вашей
                   группы, она появится здесь.
+                  <div className="mt-3">
+                    <Button variant="ghost" size="sm" onClick={() => void load()} className="gap-1">
+                      <RefreshCw size={14} />
+                      Обновить
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">

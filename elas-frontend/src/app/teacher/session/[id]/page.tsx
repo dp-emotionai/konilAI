@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -257,7 +257,7 @@ export default function TeacherLiveMonitorPage() {
 
   const mainParticipant = participants[0];
   const sessionTitle = "Сессия";
-  const sessionType: "lecture" | "exam" = "lecture";
+  const sessionType = "lecture" as "lecture" | "exam";
 
   const stopScreenShare = async () => {
     const manager = peerManagerRef.current;

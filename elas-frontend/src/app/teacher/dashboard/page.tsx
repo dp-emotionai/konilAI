@@ -84,13 +84,13 @@ function Insight({ title, text }: { title: string; text: string }) {
   );
 }
 
-function StatusBadge({ status }: { status: Session["status"] }) {
+function StatusBadge({ status }: { status: TeacherDashboardSession["status"] }) {
   if (status === "active") return <Badge variant="success" className="gap-1.5"><span className="inline-flex h-1.5 w-1.5 rounded-full bg-current animate-pulse" /> LIVE</Badge>;
   if (status === "finished") return <Badge className="bg-surface-subtle text-muted">Завершена</Badge>;
   return <Badge variant="warning">Черновик</Badge>;
 }
 
-function SessionCard({ session }: { session: Session }) {
+function SessionCard({ session }: { session: TeacherDashboardSession }) {
   const qualityLabel = session.quality === "good" ? "Хорошо" : session.quality === "medium" ? "Средне" : "Низко";
   return (
     <div className="group rounded-2xl bg-surface-subtle/50 ring-1 ring-[color:var(--border)]/20 hover:ring-[color:var(--border)]/35 p-4 md:p-5 transition-all duration-200 hover:shadow-soft">
