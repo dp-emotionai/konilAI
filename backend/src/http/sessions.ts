@@ -103,7 +103,7 @@ function buildSummaryFromLiveMetrics(
 
 function randomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "ELAS-";
+  let s = "KONI-";
   for (let i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
   return s;
 }
@@ -114,7 +114,7 @@ async function ensureUniqueCode(): Promise<string> {
     const exists = await prisma.session.findUnique({ where: { code } });
     if (!exists) return code;
   }
-  return "ELAS-" + Date.now().toString(36).toUpperCase().slice(-4);
+  return "KONI-" + Date.now().toString(36).toUpperCase().slice(-4);
 }
 
 export function registerSessionsRoutes(app: Express) {

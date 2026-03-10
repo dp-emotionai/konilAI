@@ -173,11 +173,11 @@ export default function LoginPage() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              ELAS · Emotion-Aware Learning
+              Konilai · Emotion-Aware Learning
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight">
-                Добро пожаловать в ELAS
+                Добро пожаловать в Konilai
               </h1>
               <p className="text-sm text-white/70 max-w-md">
                 Войдите как преподаватель, студент или администратор, чтобы управлять

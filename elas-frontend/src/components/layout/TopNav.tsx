@@ -84,7 +84,7 @@ function Logo({ href = "/" }: { href?: string }) {
         />
         <div className="h-2.5 w-2.5 rounded-full bg-[rgb(var(--primary))] shadow-soft" />
       </div>
-      <span className="font-semibold tracking-wide text-fg">ELAS</span>
+      <span className="font-semibold tracking-wide text-fg">Konilai</span>
     </Link>
   );
 }

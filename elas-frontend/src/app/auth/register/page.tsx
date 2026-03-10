@@ -147,11 +147,11 @@ export default function RegisterPage() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
               <span className="h-1.5 w-1.5 rounded-full bg-purple-200" />
-              Создайте ELAS‑аккаунт
+              Создайте Konilai‑аккаунт
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-semibold tracking-tight">
-                Начните работу с ELAS
+                Начните работу с Konilai
               </h1>
               <p className="text-sm text-white/70 max-w-md">
                 Зарегистрируйтесь как студент или преподаватель, чтобы подключаться к сессиям и

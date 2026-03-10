@@ -120,7 +120,7 @@ export default function StudentDashboardPage() {
 
       <PageHero
         overline="Student"
-        title={displayName ? `С возвращением, ${displayName}` : "С возвращением в ELAS"}
+        title={displayName ? `С возвращением, ${displayName}` : "С возвращением в Konilai"}
         subtitle="Сессии, приглашения и управление согласием — в одном месте."
         right={
           <div className="flex flex-wrap items-center gap-2">

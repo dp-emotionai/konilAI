@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="border-t border-border/60 dark:border-border/40">
         <div className="mx-auto max-w-elas-page px-4 py-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="text-sm text-muted">
-            © {new Date().getFullYear()} ELAS — live-аналитика обучения (consent-first)
+            © {new Date().getFullYear()} Konilai — live-аналитика обучения (consent-first)
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-sm">

@@ -99,7 +99,7 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-6 text-base md:text-lg text-muted leading-relaxed max-w-xl">
-              ELAS — платформа для live-занятий: WebRTC видео, чат внутри сессии и аналитика вовлечённости в реальном времени — с фокусом
+              Konilai — платформа для live-занятий: WebRTC видео, чат внутри сессии и аналитика вовлечённости в реальном времени — с фокусом
               на этику, согласие и приватность.
             </p>
 
