@@ -290,7 +290,7 @@ function AppNavItem({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 min-w-[220px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
+        <div className="absolute left-0 top-full mt-2 min-w-[220px] rounded-2xl bg-surface/95 backdrop-blur-md shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
           {children.map((child) => {
             const childHref =
               typeof child.href === "string" && child.href.length > 0
