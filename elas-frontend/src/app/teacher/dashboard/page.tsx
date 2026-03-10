@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -139,20 +139,19 @@ export default function TeacherDashboard() {
   const [sessions, setSessions] = useState<TeacherDashboardSession[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
+  const loadSessions = useCallback(async () => {
     setLoading(true);
-
-    getTeacherDashboardSessions().then((data) => {
-      if (!mounted) return;
+    try {
+      const data = await getTeacherDashboardSessions();
       setSessions(data);
+    } finally {
       setLoading(false);
-    });
-
-    return () => {
-      mounted = false;
-    };
+    }
   }, []);
+
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions]);
 
   const summary = useMemo(() => summarizeTeacherDashboard(sessions), [sessions]);
   const insights = useMemo(() => buildInsightsFromSessions(sessions), [sessions]);
@@ -201,6 +200,9 @@ export default function TeacherDashboard() {
             <Link href="/teacher/reports">
               <Button variant="outline">Отчёты</Button>
             </Link>
+            <Button variant="outline" size="sm" onClick={() => void loadSessions()} disabled={loading}>
+              Обновить
+            </Button>
           </div>
         }
       />

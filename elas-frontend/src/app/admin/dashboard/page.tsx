@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
         setSessions(list);
       })
       .catch(() => {
-        /* оставляем mock */
+        setSessions([]);
       });
     return () => {
       mounted = false;
@@ -287,7 +287,7 @@ export default function AdminDashboardPage() {
                 Карта вовлечённости по группам
               </h2>
               <StatBadge tone="info">
-                {backendOk ? "demo + backend" : "demo по mock-сессиям"}
+                {backendOk ? "подключён к API" : "API недоступен"}
               </StatBadge>
             </div>
 

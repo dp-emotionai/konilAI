@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -37,20 +37,19 @@ export default function TeacherSessionsPage() {
 
   const apiAvailable = getApiBaseUrl() && hasAuth();
 
-  useEffect(() => {
-    let mounted = true;
+  const loadSessions = useCallback(async () => {
     setLoading(true);
-
-    getTeacherAllSessions().then((data) => {
-      if (!mounted) return;
+    try {
+      const data = await getTeacherAllSessions();
       setSessions(data);
+    } finally {
       setLoading(false);
-    });
+    }
+  }, []);
 
-    return () => {
-      mounted = false;
-    };
-  }, [tick]);
+  useEffect(() => {
+    void loadSessions();
+  }, [loadSessions, tick]);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -111,6 +110,9 @@ export default function TeacherSessionsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => void loadSessions()} disabled={loading}>
+                    Обновить
+                  </Button>
                   <div className="inline-flex items-center gap-1 rounded-full bg-surface-subtle p-1">
                     {[
                       { id: "all", label: "Все" },
@@ -157,8 +159,20 @@ export default function TeacherSessionsPage() {
                     ) : filtered.length === 0 ? (
                       <TRow>
                         <TCell colSpan={4} className="py-8 text-center">
-                          <div className="text-sm font-medium text-fg">Ничего не найдено</div>
-                          <div className="mt-2 text-sm text-muted">Попробуйте изменить поиск или фильтр.</div>
+                          {sessions.length === 0 ? (
+                            <>
+                              <div className="text-sm font-medium text-fg">Нет сессий</div>
+                              <div className="mt-2 text-sm text-muted">Создайте первую сессию.</div>
+                              <Link href="/teacher/sessions/new" className="mt-4 inline-block">
+                                <Button size="sm">Создать сессию</Button>
+                              </Link>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-sm font-medium text-fg">Ничего не найдено</div>
+                              <div className="mt-2 text-sm text-muted">Попробуйте изменить поиск или фильтр.</div>
+                            </>
+                          )}
                         </TCell>
                       </TRow>
                     ) : (

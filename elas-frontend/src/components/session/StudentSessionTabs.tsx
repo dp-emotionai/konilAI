@@ -12,8 +12,8 @@ export function StudentSessionTabs({
   onChange: (next: StudentSessionTab) => void;
 }) {
   const items: { id: StudentSessionTab; label: string }[] = [
-    { id: "prepare", label: "Prepare (consent & camera)" },
-    { id: "live", label: "Live analytics (mock)" },
+    { id: "prepare", label: "Подготовка (согласие и камера)" },
+    { id: "live", label: "Эфир" },
   ];
 
   return (
@@ -36,7 +36,7 @@ export function StudentSessionTabs({
         ))}
       </div>
       <span className="text-xs text-slate-500 dark:text-white/45">
-        Step 1: consent & camera • Step 2: live mock analytics.
+        Шаг 1: согласие и камера • Шаг 2: подключение к эфиру.
       </span>
     </div>
   );

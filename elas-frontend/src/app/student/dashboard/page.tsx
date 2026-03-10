@@ -63,6 +63,7 @@ export default function StudentDashboardPage() {
 
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [invitationsLoading, setInvitationsLoading] = useState(false);
@@ -72,9 +73,16 @@ export default function StudentDashboardPage() {
   const [displayName, setDisplayName] = useState<string | null>(null);
 
   const fetchSessions = useCallback(() => {
+    setSessionsError(null);
     setLoading(true);
     getStudentSessionsList()
-      .then((data) => setSessions(data))
+      .then((data) => {
+        setSessions(data);
+      })
+      .catch((e) => {
+        setSessionsError(e instanceof Error ? e.message : "Не удалось загрузить список сессий.");
+        setSessions([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -119,7 +127,7 @@ export default function StudentDashboardPage() {
       <Breadcrumbs items={[{ label: "Студент", href: "/student/dashboard" }, { label: "Дашборд" }]} />
 
       <PageHero
-        overline="Student"
+        overline="Студент"
         title={displayName ? `С возвращением, ${displayName}` : "С возвращением в Konilai"}
         subtitle="Сессии, приглашения и управление согласием — в одном месте."
         right={
@@ -142,12 +150,23 @@ export default function StudentDashboardPage() {
 
             <Link href="/student/sessions?join=1">
               <Button variant="outline" className="rounded-full px-4 text-sm">
-                Join by code
+                Войти по коду
               </Button>
             </Link>
           </div>
         }
       />
+
+      {sessionsError && (
+        <Section spacing="none" className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-elas-lg border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            <span>{sessionsError}</span>
+            <Button variant="outline" size="sm" onClick={() => fetchSessions()}>
+              Повторить
+            </Button>
+          </div>
+        </Section>
+      )}
 
       {!consent && (
         <Section spacing="none" className="mt-4">
@@ -219,7 +238,7 @@ export default function StudentDashboardPage() {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <StatMini label="Ближайшие" value={`${upcoming.length}`} />
                   <StatMini label="Live сейчас" value={`${live.length}`} />
-                  <StatMini label="Consent" value={consent ? "Yes" : "No"} />
+                  <StatMini label="Согласие" value={consent ? "Да" : "Нет"} />
                 </div>
               </CardContent>
             </Card>

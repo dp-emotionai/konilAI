@@ -251,7 +251,7 @@ export default function AdminAuditPage() {
                   <ToneBadge tone="purple">Security</ToneBadge>
                   {loading && <span className="text-xs text-zinc-500">Загрузка…</span>}
                   {!loading && apiRows.length > 0 && <span className="text-xs text-zinc-500">Backend audit log</span>}
-                  {!loading && apiRows.length === 0 && <span className="text-xs text-zinc-500">Пример (mock)</span>}
+                  {!loading && apiRows.length === 0 && <span className="text-xs text-zinc-500">Нет записей</span>}
                 </div>
 
                 <div className="flex gap-2">

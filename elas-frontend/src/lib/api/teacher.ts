@@ -165,15 +165,9 @@ export async function getGroupById(groupId: string): Promise<GroupWithSessions |
 }
 
 export async function getTeacherGroups(): Promise<TeacherGroup[]> {
-  if (getApiBaseUrl() && hasAuth()) {
-    try {
-      const list = await api.get<TeacherGroup[]>("groups");
-      return Array.isArray(list) ? list : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
+  if (!getApiBaseUrl() || !hasAuth()) return [];
+  const list = await api.get<TeacherGroup[]>("groups");
+  return Array.isArray(list) ? list : [];
 }
 
 /** Участник с ML-метриками для live-монитора. */

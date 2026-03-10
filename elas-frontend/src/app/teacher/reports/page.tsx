@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
 import Section from "@/components/common/Section";
@@ -70,26 +70,31 @@ export default function TeacherReportsPage() {
 
   // live-metrics cache: sessionId -> LiveMetrics
   const [liveCache, setLiveCache] = useState<Record<string, LiveMetrics>>({});
+  const acRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
+  const loadReports = useCallback(() => {
+    acRef.current?.abort();
     const ac = new AbortController();
+    acRef.current = ac;
     setLoading(true);
     setError(null);
-
     getTeacherSessionsAsReports({ signal: ac.signal })
       .then(setRows)
       .catch((e) => {
         if (ac.signal.aborted) return;
-        setError(e?.message ?? "Failed to load sessions");
+        setError(e?.message ?? "Не удалось загрузить сессии.");
         setRows([]);
       })
       .finally(() => {
         if (ac.signal.aborted) return;
         setLoading(false);
       });
-
-    return () => ac.abort();
   }, []);
+
+  useEffect(() => {
+    loadReports();
+    return () => acRef.current?.abort();
+  }, [loadReports]);
 
   // Filter client-side (можно потом перенести на server-side)
   const filtered = useMemo(() => {
@@ -136,13 +141,13 @@ export default function TeacherReportsPage() {
       <Glow />
 
       <PageHero
-        title="Reports"
-        subtitle="Отчёты строятся из реальных сессий. Live-сессии показывают текущие агрегаты (avgRisk/avgConfidence)."
+        title="Отчёты"
+        subtitle="Отчёты строятся из реальных сессий. В эфире показываются текущие агрегаты (avgRisk / avgConfidence)."
         right={
           <div className="flex flex-wrap items-center gap-2">
             <Badge className="bg-primary/10">{filtered.length} items</Badge>
             <Button variant="outline" onClick={() => setQ("")}>
-              Clear
+              Очистить
             </Button>
           </div>
         }
@@ -153,7 +158,7 @@ export default function TeacherReportsPage() {
           <GlassCard className="p-6 md:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-[260px] flex-1">
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by title / group / code…" />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию, группе, коду…" />
               </div>
 
               <div className="flex items-center gap-2">
@@ -166,14 +171,17 @@ export default function TeacherReportsPage() {
                 <Button
                   onClick={() => alert("Реальный экспорт добавим отдельным endpoint'ом: POST /reports/export")}
                 >
-                  Export
+                  Экспорт
                 </Button>
               </div>
             </div>
 
             {error && (
-              <div className="mt-4 rounded-elas-lg bg-[rgba(255,77,109,0.10)] px-4 py-3 text-sm text-fg shadow-soft">
-                {error}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-elas-lg bg-[rgba(255,77,109,0.10)] px-4 py-3 text-sm text-fg shadow-soft">
+                <span>{error}</span>
+                <Button variant="outline" size="sm" onClick={() => loadReports()}>
+                  Повторить
+                </Button>
               </div>
             )}
           </GlassCard>

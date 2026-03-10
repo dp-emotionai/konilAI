@@ -57,6 +57,7 @@ export default function TeacherGroupsPage() {
   const [q, setQ] = useState("");
   const [apiGroups, setApiGroups] = useState<TeacherGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -69,12 +70,17 @@ export default function TeacherGroupsPage() {
   async function refresh() {
     if (!apiAvailable) {
       setLoading(false);
+      setLoadError(null);
       return;
     }
+    setLoadError(null);
     setLoading(true);
     try {
       const list = await getTeacherGroups();
       setApiGroups(list);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Не удалось загрузить список групп.");
+      setApiGroups([]);
     } finally {
       setLoading(false);
     }
@@ -271,6 +277,15 @@ export default function TeacherGroupsPage() {
                   className="pl-11 rounded-xl"
                 />
               </div>
+
+              {loadError && (
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-elas-lg bg-red-500/10 px-4 py-3 text-sm text-red-100 ring-1 ring-red-400/20">
+                  <span>{loadError}</span>
+                  <Button variant="outline" size="sm" onClick={() => void refresh()}>
+                    Повторить
+                  </Button>
+                </div>
+              )}
 
               {loading ? (
                 <div className="mt-6 space-y-4">

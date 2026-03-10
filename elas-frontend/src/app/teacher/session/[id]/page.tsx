@@ -12,6 +12,7 @@ import Section from "@/components/common/Section";
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
 
 import {
   getSessionLiveMetrics,
@@ -113,6 +114,7 @@ export default function TeacherLiveMonitorPage() {
   const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [wsDisconnected, setWsDisconnected] = useState(false);
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
@@ -587,10 +589,7 @@ export default function TeacherLiveMonitorPage() {
                   variant="outline"
                   size="sm"
                   className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
-                  onClick={() => {
-                    setPhase("ended");
-                    setWsDisconnected(false);
-                  }}
+                  onClick={() => setConfirmEndOpen(true)}
                 >
                   Завершить сессию
                 </Button>
@@ -857,10 +856,10 @@ export default function TeacherLiveMonitorPage() {
                         size="sm"
                         variant="outline"
                         className="border-white/10 bg-white/5 text-white hover:bg-white/10"
-                        onClick={() => setPhase("ended")}
+                        onClick={() => setConfirmEndOpen(true)}
                       >
                         <LogOut size={14} />
-                        End
+                        Завершить
                       </Button>
                     </div>
 
@@ -1037,7 +1036,7 @@ export default function TeacherLiveMonitorPage() {
               <CardContent className="space-y-4 p-6 md:p-8">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm text-muted">Session summary (mock)</div>
+                    <div className="text-sm text-muted">Итог сессии</div>
                     <div className="mt-2 text-lg font-semibold text-fg">Сессия завершена</div>
                     <div className="mt-2 text-sm text-muted">
                       Здесь позже появится отчёт: длительность, участники, средняя вовлечённость,
@@ -1086,6 +1085,33 @@ export default function TeacherLiveMonitorPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        open={confirmEndOpen}
+        onClose={() => setConfirmEndOpen(false)}
+        title="Завершить сессию?"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmEndOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => {
+                setConfirmEndOpen(false);
+                setPhase("ended");
+                setWsDisconnected(false);
+              }}
+            >
+              Завершить сессию
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted">
+          Участники будут отключены от эфира. Это действие нельзя отменить.
+        </p>
+      </Modal>
     </div>
   );
 }
