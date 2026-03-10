@@ -137,7 +137,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
           </div>
 
           {/* body */}
-          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.25fr)_360px]">
+          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_340px] items-start">
             {/* preview */}
             <div className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03]">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
@@ -155,7 +155,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 </div>
               </div>
 
-              <div className="relative aspect-[16/10] bg-black">
+              <div className="relative aspect-[4/3] sm:aspect-[16/10] bg-black">
                 <video
                   ref={videoRef}
                   className="h-full w-full object-cover opacity-95"

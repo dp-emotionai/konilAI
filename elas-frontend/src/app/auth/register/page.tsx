@@ -2,28 +2,41 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {Card} from "@/components/ui/Card";
+import { useRouter } from "next/navigation";
+import { Card } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { api, isApiAvailable } from "@/lib/api/client";
+import { api, isApiAvailable, setAuth } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
+import { useUI } from "@/components/layout/Providers";
+import { ROLE_HOME } from "@/lib/nav";
 
-type RegisterRes = {
-  user?: { id: string; email: string; role: Role; name?: string | null };
-  token?: string;
+type RegisterStartRes = {
   message?: string;
 };
 
+type VerifyRes = {
+  user?: { id?: string; email?: string; role?: string; name?: string | null; status?: string | null };
+  token?: string;
+};
+
+type Step = "form" | "verify";
+
 export default function RegisterPage() {
+  const router = useRouter();
+  const { setLoggedIn, setRole } = useUI();
+
+  const [step, setStep] = useState<Step>("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [role, setRoleInput] = useState<Role>("student");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = async () => {
+  const handleStartRegister = async () => {
     setError("");
     setInfo("");
     const e = email.trim();
@@ -42,28 +55,85 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const data = await api.post<RegisterRes>("auth/register", {
+      const data = await api.post<RegisterStartRes>("auth/register", {
         email: e,
         password: p,
         name: name.trim() || undefined,
         role: role === "admin" ? "student" : role,
       });
 
-      console.log("REGISTER RESPONSE:", data);
+      console.log("REGISTER START RESPONSE:", data);
 
-      const isTeacher = role === "teacher";
-
+      setStep("verify");
       setInfo(
-        isTeacher
-          ? "Заявка преподавателя отправлена администратору. После одобрения вы получите письмо с подтверждением и сможете войти как преподаватель."
-          : "Регистрация студента выполнена. Если ваш вуз подключён к ELAS, доступ будет активирован автоматически или после быстрой проверки администратором."
+        "Мы отправили 6-значный код на ваш email. Введите его ниже, чтобы завершить регистрацию."
       );
-      setEmail("");
-      setPassword("");
-      setName("");
     } catch (err) {
       setInfo("");
       setError(err instanceof Error ? err.message : "Ошибка регистрации.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setError("");
+    const e = email.trim();
+    const c = code.trim();
+    if (!e || !c) {
+      setError("Укажите email и 6-значный код из письма.");
+      return;
+    }
+    if (!/^[0-9]{6}$/.test(c)) {
+      setError("Код должен состоять из 6 цифр.");
+      return;
+    }
+    if (!isApiAvailable()) {
+      setError("Сервер недоступен. Попробуйте позже или обратитесь к администратору.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await api.post<VerifyRes>("auth/verify-email", {
+        email: e,
+        code: c,
+      });
+
+      console.log("VERIFY EMAIL RESPONSE:", data);
+
+      const user = data.user;
+      const rawRole = user?.role;
+      const normalizedRole =
+        typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
+      const token = data.token;
+
+      if (!user || !user.email) {
+        throw new Error("Сервер не вернул данные пользователя.");
+      }
+      if (!token) {
+        throw new Error("Сервер не вернул токен авторизации.");
+      }
+      if (!normalizedRole || !(normalizedRole in ROLE_HOME)) {
+        throw new Error(`Сервер вернул неизвестную роль пользователя: ${String(rawRole)}`);
+      }
+
+      const r = normalizedRole as Role;
+      const home =
+        typeof ROLE_HOME[r] === "string" && ROLE_HOME[r].length > 0 ? ROLE_HOME[r] : "/";
+
+      setAuth({
+        token,
+        role: r,
+        email: user.email,
+        name: user.name ?? undefined,
+        status: null,
+      });
+      setRole(r);
+      setLoggedIn(true);
+
+      router.push(home);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка подтверждения email.");
     } finally {
       setLoading(false);
     }
@@ -130,49 +200,78 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <Input
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              autoComplete="email"
-            />
-            <Input
-              placeholder="Пароль (не менее 6 символов)"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              autoComplete="new-password"
-            />
-            <Input
-              placeholder="Имя (необязательно)"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={loading}
-              autoComplete="name"
-            />
-            <div className="flex gap-2 items-center">
-              <label className="text-sm text-[var(--muted)] shrink-0">Роль:</label>
-              <select
-                className="flex-1 rounded-2xl bg-black/30 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
-                value={role}
-                onChange={(e) => setRoleInput(e.target.value as Role)}
-                disabled={loading}
-              >
-                <option value="student">Студент</option>
-                <option value="teacher">Преподаватель</option>
-              </select>
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {info && !error && <p className="text-sm text-emerald-400">{info}</p>}
-          <Button className="w-full" onClick={handleRegister} disabled={loading}>
-            {loading ? "Создание аккаунта…" : "Зарегистрироваться"}
-          </Button>
+          {step === "form" ? (
+            <>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  autoComplete="email"
+                />
+                <Input
+                  placeholder="Пароль (не менее 6 символов)"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
+                  autoComplete="new-password"
+                />
+                <Input
+                  placeholder="Имя (необязательно)"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
+                  autoComplete="name"
+                />
+                <div className="flex gap-2 items-center">
+                  <label className="text-sm text-[var(--muted)] shrink-0">Роль:</label>
+                  <select
+                    className="flex-1 rounded-2xl bg-black/30 border border-white/10 text-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                    value={role}
+                    onChange={(e) => setRoleInput(e.target.value as Role)}
+                    disabled={loading}
+                  >
+                    <option value="student">Студент</option>
+                    <option value="teacher">Преподаватель</option>
+                  </select>
+                </div>
+              </div>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              {info && !error && <p className="text-sm text-emerald-400">{info}</p>}
+              <Button className="w-full" onClick={handleStartRegister} disabled={loading}>
+                {loading ? "Отправка кода…" : "Получить код на email"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
+                  autoComplete="email"
+                />
+                <Input
+                  placeholder="6-значный код из письма"
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={loading}
+                  maxLength={6}
+                />
+              </div>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+              {info && !error && <p className="text-sm text-emerald-400">{info}</p>}
+              <Button className="w-full" onClick={handleVerify} disabled={loading}>
+                {loading ? "Подтверждение…" : "Завершить регистрацию"}
+              </Button>
+            </>
+          )}
 
           <p className="text-sm text-[var(--muted)] text-center pt-2">
             Уже есть аккаунт?{" "}
