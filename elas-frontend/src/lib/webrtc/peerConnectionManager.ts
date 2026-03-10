@@ -6,6 +6,7 @@ const ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
 type PeerCallbacks = {
   onRemoteStream?: (peerId: ClientId, stream: MediaStream) => void;
   onPeersChange?: (peers: Participant[]) => void;
+  onDisconnect?: () => void;
 };
 
 export class PeerConnectionManager {
@@ -77,6 +78,10 @@ export class PeerConnectionManager {
       const pc = this.peers.get(from);
       if (!pc) return;
       pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+    });
+
+    this.signaling.on("close", () => {
+      this.callbacks.onDisconnect?.();
     });
   }
 

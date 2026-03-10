@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -16,10 +16,11 @@ import SparkArea from "@/components/common/SparkArea";
 import DonutMini from "@/components/common/DonutMini";
 
 import { getStudentEmotionsSummary, type StudentEmotionsSummary } from "@/lib/api/student";
+import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 import { readConsent } from "@/lib/consent";
 import { useUI } from "@/components/layout/Providers";
 
-import { Download, ShieldCheck } from "lucide-react";
+import { Download, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 
 export default function StudentSummaryPage() {
   const { state } = useUI();
@@ -27,24 +28,33 @@ export default function StudentSummaryPage() {
 
   const [summary, setSummary] = useState<StudentEmotionsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
+
+  const load = useCallback(async () => {
+    setError(null);
+    if (!apiAvailable) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    getStudentEmotionsSummary()
-      .then((data) => {
-        if (!mounted) return;
-        setSummary(data);
-        setUpdatedAt(new Date());
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    try {
+      const data = await getStudentEmotionsSummary();
+      setSummary(data ?? null);
+      setUpdatedAt(new Date());
+    } catch (e) {
+      setSummary(null);
+      setError(e instanceof Error ? e.message : "Не удалось загрузить сводку.");
+    } finally {
+      setLoading(false);
+    }
+  }, [apiAvailable]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const analyzedCount = summary?.analyzedSessions ?? 0;
   const avgEng = summary ? Math.round((summary.avgEngagement ?? 0) * 100) : 0;
@@ -58,7 +68,7 @@ export default function StudentSummaryPage() {
     ? emotionLabels.map((k) => Math.round((summary.emotionsDistribution[k] ?? 0) * 100))
     : [];
 
-  const hasData = analyzedCount > 0 && !loading;
+  const hasData = analyzedCount > 0 && !loading && !error;
 
   return (
     <div className="pb-12">
@@ -78,6 +88,10 @@ export default function StudentSummaryPage() {
             <Button variant="outline" disabled className="gap-2">
               <Download size={16} /> Export CSV
             </Button>
+            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-1.5">
+              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+              Обновить
+            </Button>
             <Link href="/student/dashboard">
               <Button variant="outline">На дашборд</Button>
             </Link>
@@ -86,8 +100,42 @@ export default function StudentSummaryPage() {
       />
 
       <Section spacing="none" className="mt-8 space-y-6">
+        {/* error */}
+        {error && (
+          <Reveal>
+            <Card className="border-amber-400/25 bg-amber-500/10">
+              <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                  <div>
+                    <div className="font-semibold text-fg">Ошибка загрузки</div>
+                    <div className="text-sm text-muted mt-0.5">{error}</div>
+                  </div>
+                </div>
+                <Button variant="outline" onClick={() => void load()} className="gap-2">
+                  <RefreshCw size={14} /> Повторить
+                </Button>
+              </CardContent>
+            </Card>
+          </Reveal>
+        )}
+
+        {/* no API */}
+        {!apiAvailable && !loading && !error && (
+          <Reveal>
+            <Card>
+              <CardContent className="p-6 md:p-7 text-center">
+                <div className="text-sm text-muted">Чтобы видеть сводку по сессиям, войдите в аккаунт и убедитесь, что указан адрес сервера.</div>
+                <Link href="/auth/login" className="inline-block mt-4">
+                  <Button variant="outline">Войти</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </Reveal>
+        )}
+
         {/* consent hint */}
-        {!consent && (
+        {!consent && apiAvailable && !error && (
           <Reveal>
             <Card>
               <CardContent className="p-6 md:p-7 flex flex-wrap items-center justify-between gap-4">
@@ -102,6 +150,22 @@ export default function StudentSummaryPage() {
                   <Button className="gap-2">
                     <ShieldCheck size={18} /> Управление согласием
                   </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </Reveal>
+        )}
+
+        {/* no data hint when API ok but no sessions analyzed yet */}
+        {apiAvailable && !loading && !error && !hasData && (
+          <Reveal>
+            <Card className="border-primary/20 bg-primary/5">
+              <CardContent className="p-5">
+                <div className="text-sm text-muted">
+                  Данных пока нет. Подключитесь к сессиям с включённым согласием — сводка заполнится после анализа (ML).
+                </div>
+                <Link href="/student/sessions" className="inline-block mt-3">
+                  <Button variant="outline" size="sm">К списку сессий</Button>
                 </Link>
               </CardContent>
             </Card>

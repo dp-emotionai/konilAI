@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -47,6 +47,7 @@ import {
   Settings,
   Sparkles,
   MonitorUp,
+  BarChart3,
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 
@@ -91,39 +92,38 @@ export default function StudentJoinSessionPage() {
   const [joinInfoLoading, setJoinInfoLoading] = useState(
     !!(getApiBaseUrl() && hasAuth())
   );
+  const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadJoinInfo = useCallback(async () => {
     if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
       setJoinInfoLoading(false);
       return;
     }
-
-    let mounted = true;
-
-    const run = async () => {
+    setJoinInfoError(null);
+    setJoinInfoLoading(true);
+    try {
       const info = await getSessionJoinInfo(sessionId);
-      if (!mounted) return;
-
       setJoinInfo(info ?? null);
-      setJoinInfoLoading(false);
-
       if (info?.reason === "consent_required" && state.consent) {
         try {
           await recordSessionConsent(sessionId);
           const updated = await getSessionJoinInfo(sessionId);
-          if (mounted && updated) setJoinInfo(updated);
+          if (updated) setJoinInfo(updated);
         } catch {
           // ignore
         }
       }
-    };
-
-    run();
-
-    return () => {
-      mounted = false;
-    };
+    } catch (e) {
+      setJoinInfo(null);
+      setJoinInfoError(e instanceof Error ? e.message : "Не удалось загрузить данные сессии.");
+    } finally {
+      setJoinInfoLoading(false);
+    }
   }, [sessionId, state.consent]);
+
+  useEffect(() => {
+    void loadJoinInfo();
+  }, [loadJoinInfo]);
 
   const title = joinInfo?.title ?? "Сессия";
   const sessionType: "lecture" | "exam" =
@@ -142,6 +142,11 @@ export default function StudentJoinSessionPage() {
 
   const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
   const [mlActive, setMlActive] = useState(false);
+  const [mlUnavailable, setMlUnavailable] = useState(false);
+
+  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [wsDisconnected, setWsDisconnected] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -153,34 +158,67 @@ export default function StudentJoinSessionPage() {
   const roomId = sessionId;
 
   useEffect(() => {
-    if (!live || !roomId) return;
+    if (!live || !roomId) {
+      setConnectionState("idle");
+      setConnectionError(null);
+      return;
+    }
+
+    setConnectionState("connecting");
+    setConnectionError(null);
 
     const wsBase = getWsBaseUrl();
-    const signaling = new SignalingClient(`${wsBase}/ws`);
+    if (!wsBase?.startsWith("ws")) {
+      setConnectionError("Не настроен адрес сервера эфира (WS). Обратитесь к администратору.");
+      setConnectionState("error");
+      setLive(false);
+      return;
+    }
 
+    const signaling = new SignalingClient(`${wsBase}/ws`);
     const manager = new PeerConnectionManager(signaling, roomId, "student", {
       onRemoteStream: (_peerId, stream) => setRemoteStream(stream),
       onPeersChange: (peers) => setParticipants(peers),
+      onDisconnect: () => setWsDisconnected(true),
     });
 
     signaling.connect();
 
     (async () => {
-      const stream = await manager.initLocalStream({ video: true, audio: true });
-      setLocalStream(stream);
+      try {
+        const stream = await manager.initLocalStream({ video: true, audio: true });
+        setLocalStream(stream);
 
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        await localVideoRef.current.play().catch(() => {});
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = stream;
+          await localVideoRef.current.play().catch(() => {});
+        }
+
+        if (localThumbRef.current) {
+          localThumbRef.current.srcObject = stream;
+          await localThumbRef.current.play().catch(() => {});
+        }
+
+        await signaling.waitForOpen(12000);
+        manager.join();
+        setConnectionState("connected");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Ошибка подключения";
+        const friendly =
+          msg.includes("timeout") || msg.includes("WebSocket")
+            ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
+            : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
+              ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
+              : msg;
+        setConnectionError(friendly);
+        setConnectionState("error");
+        setLive(false);
+        setTab("prepare");
+        manager.leave();
+        setRemoteStream(null);
+        setLocalStream(null);
+        setParticipants([]);
       }
-
-      if (localThumbRef.current) {
-        localThumbRef.current.srcObject = stream;
-        await localThumbRef.current.play().catch(() => {});
-      }
-
-      await signaling.waitForOpen();
-      manager.join();
     })();
 
     return () => {
@@ -188,6 +226,9 @@ export default function StudentJoinSessionPage() {
       setRemoteStream(null);
       setLocalStream(null);
       setParticipants([]);
+      setConnectionState("idle");
+      setConnectionError(null);
+      setWsDisconnected(false);
     };
   }, [live, roomId]);
 
@@ -207,10 +248,13 @@ export default function StudentJoinSessionPage() {
     if (!shouldRunMl || !localVideoRef.current) return;
 
     setMlActive(true);
+    setMlUnavailable(false);
 
     let cancelled = false;
     let inflight = false;
+    let consecutiveFailures = 0;
     const intervalMs = 650;
+    const failureThreshold = 4;
 
     const timer = setInterval(async () => {
       if (cancelled || inflight) return;
@@ -224,8 +268,15 @@ export default function StudentJoinSessionPage() {
       try {
         inflight = true;
         const result = await mlAnalyzeFrame(frame);
-        if (!result || cancelled) return;
+        if (cancelled) return;
 
+        if (!result) {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+          return;
+        }
+
+        consecutiveFailures = 0;
         setMlResult(result);
 
         if (sessionId && apiAvailable) {
@@ -247,6 +298,7 @@ export default function StudentJoinSessionPage() {
       clearInterval(timer);
       setMlActive(false);
       setMlResult(null);
+      setMlUnavailable(false);
     };
   }, [shouldRunMl, sessionId, apiAvailable]);
 
@@ -302,7 +354,26 @@ export default function StudentJoinSessionPage() {
         </Section>
       )}
 
-      {!joinInfoLoading && !canJoin && blockReason && (
+      {joinInfoError && (
+        <Section spacing="none" className="mt-6">
+          <Card className="border-amber-400/25 bg-amber-500/10">
+            <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <div>
+                  <div className="font-semibold text-fg">Ошибка загрузки</div>
+                  <div className="text-sm text-muted mt-0.5">{joinInfoError}</div>
+                </div>
+              </div>
+              <Button variant="outline" onClick={() => void loadJoinInfo()} className="gap-2">
+                Повторить
+              </Button>
+            </CardContent>
+          </Card>
+        </Section>
+      )}
+
+      {!joinInfoLoading && !joinInfoError && !canJoin && blockReason && (
         <Section spacing="none" className="mt-6">
           <Reveal>
             <Card className="mx-auto max-w-3xl">
@@ -353,12 +424,35 @@ export default function StudentJoinSessionPage() {
         </Section>
       )}
 
-      {!joinInfoLoading && canJoin && (
+      {!joinInfoLoading && !joinInfoError && canJoin && (
         <Section spacing="none" className="mt-6 space-y-6">
           {!live && <StudentSessionTabs tab={tab} onChange={setTab} />}
 
           {tab === "prepare" && !live && (
             <Reveal>
+              {connectionError && (
+                <Card className="mb-6 border-amber-400/25 bg-amber-500/10">
+                  <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      <div>
+                        <div className="font-semibold text-fg">Ошибка подключения</div>
+                        <div className="text-sm text-muted mt-0.5">{connectionError}</div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setConnectionError(null);
+                        setConnectionState("idle");
+                      }}
+                    >
+                      Попробовать снова
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="lg:col-span-7">
                   <Card className="overflow-hidden">
@@ -440,6 +534,34 @@ export default function StudentJoinSessionPage() {
 
           {tab === "live" && (
             <Reveal>
+              {connectionState === "connecting" && (
+                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                  Подключение к эфиру…
+                </div>
+              )}
+
+              {connectionState === "connected" && wsDisconnected && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle size={18} />
+                    Соединение потеряно. Выйдите и попробуйте подключиться снова.
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
+                    onClick={() => {
+                      setLive(false);
+                      setTab("prepare");
+                      setWsDisconnected(false);
+                    }}
+                  >
+                    Выйти
+                  </Button>
+                </div>
+              )}
+
               <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
                 <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px]">
                   <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
@@ -458,14 +580,22 @@ export default function StudentJoinSessionPage() {
                           {joinInfo?.type === "exam" ? "Exam" : "Lecture"}
                         </Badge>
 
-                        <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
-                          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                          Connected
-                        </Badge>
+                        {connectionState === "connected" && (
+                          <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
+                            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                            Connected
+                          </Badge>
+                        )}
 
-                        {shouldRunMl && mlActive && (
+                        {shouldRunMl && mlActive && !mlUnavailable && (
                           <Badge className="border border-violet-400/20 bg-violet-500/15 text-violet-300">
                             ML analyzing
+                          </Badge>
+                        )}
+
+                        {shouldRunMl && mlUnavailable && (
+                          <Badge className="border border-amber-400/20 bg-amber-500/15 text-amber-300">
+                            ML временно недоступен
                           </Badge>
                         )}
 
@@ -703,6 +833,16 @@ export default function StudentJoinSessionPage() {
                     <div className="border-t border-white/10 px-5 py-4 text-xs leading-relaxed text-white/50">
                       Подключение идёт по WebRTC. Raw-video не сохраняется. В backend
                       отправляются только агрегированные метрики при наличии consent.
+                    </div>
+
+                    <div className="border-t border-white/10 px-5 py-4">
+                      <Link
+                        href="/student/summary"
+                        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/90 transition hover:bg-white/10"
+                      >
+                        <BarChart3 size={16} />
+                        <span>После сессии → отчёт (Моя сводка)</span>
+                      </Link>
                     </div>
                   </aside>
                 </div>

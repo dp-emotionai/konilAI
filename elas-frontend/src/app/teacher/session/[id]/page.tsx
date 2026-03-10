@@ -110,6 +110,10 @@ export default function TeacherLiveMonitorPage() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
 
+  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [wsDisconnected, setWsDisconnected] = useState(false);
+
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
   const [cameraReady, setCameraReady] = useState(false);
@@ -124,12 +128,28 @@ export default function TeacherLiveMonitorPage() {
   }, [isLive]);
 
   useEffect(() => {
-    if (!isLive || !roomId) return;
+    if (!isLive || !roomId) {
+      setConnectionState("idle");
+      setConnectionError(null);
+      return;
+    }
+
+    setConnectionState("connecting");
+    setConnectionError(null);
+    setMediaError(null);
+
+    if (!wsUrl?.startsWith("ws")) {
+      setConnectionError("Не настроен адрес сервера эфира (WS). Проверьте NEXT_PUBLIC_WS_BASE_URL.");
+      setConnectionState("error");
+      setPhase("preflight");
+      return;
+    }
 
     const signaling = new SignalingClient(`${wsUrl}/ws`);
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
       onRemoteStream: (_peerId, stream) => setRemoteStream(stream),
       onPeersChange: (peers) => setParticipants(peers),
+      onDisconnect: () => setWsDisconnected(true),
     });
 
     peerManagerRef.current = manager;
@@ -141,7 +161,6 @@ export default function TeacherLiveMonitorPage() {
         setLocalStream(stream);
         setIsMicEnabled(true);
         setIsCameraEnabled(true);
-        setMediaError(null);
 
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
@@ -153,11 +172,24 @@ export default function TeacherLiveMonitorPage() {
           await localThumbRef.current.play().catch(() => {});
         }
 
-        await signaling.waitForOpen();
+        await signaling.waitForOpen(12000);
         manager.join();
+        setConnectionState("connected");
       } catch (err) {
-        console.error(err);
-        setMediaError("Не удалось получить доступ к камере или микрофону.");
+        const msg = err instanceof Error ? err.message : "Ошибка подключения";
+        const friendly =
+          msg.includes("timeout") || msg.includes("WebSocket")
+            ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
+            : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
+              ? "Камера или микрофон недоступны. Проверьте разрешения в браузере."
+              : "Не удалось запустить эфир. Проверьте камеру и подключение.";
+        setConnectionError(friendly);
+        setConnectionState("error");
+        setPhase("preflight");
+        manager.leave();
+        setRemoteStream(null);
+        setLocalStream(null);
+        setParticipants([]);
       }
     })();
 
@@ -171,6 +203,9 @@ export default function TeacherLiveMonitorPage() {
       setParticipants([]);
       setIsScreenSharing(false);
       setIsSettingsOpen(false);
+      setConnectionState("idle");
+      setConnectionError(null);
+      setWsDisconnected(false);
     };
   }, [isLive, roomId, wsUrl]);
 
@@ -441,6 +476,29 @@ export default function TeacherLiveMonitorPage() {
       {phase === "preflight" && (
         <Section spacing="none" className="mt-6">
           <Reveal>
+            {connectionError && (
+              <Card className="mb-6 border-amber-400/25 bg-amber-500/10">
+                <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-fg">Ошибка подключения</div>
+                      <div className="text-sm text-muted mt-0.5">{connectionError}</div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setConnectionError(null);
+                      setConnectionState("idle");
+                    }}
+                  >
+                    Попробовать снова
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid items-start gap-6 lg:grid-cols-12">
               <div className="space-y-4 lg:col-span-5">
                 <Card variant="elevated" className="overflow-hidden">
@@ -512,6 +570,33 @@ export default function TeacherLiveMonitorPage() {
       {phase === "live" && (
         <Section spacing="none" className="mt-6">
           <Reveal>
+            {connectionState === "connecting" && (
+              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
+                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                Подключение к эфиру…
+              </div>
+            )}
+
+            {connectionState === "connected" && wsDisconnected && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle size={18} />
+                  Соединение потеряно. Завершите сессию и перезапустите эфир при необходимости.
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
+                  onClick={() => {
+                    setPhase("ended");
+                    setWsDisconnected(false);
+                  }}
+                >
+                  Завершить сессию
+                </Button>
+              </div>
+            )}
+
             <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
               <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px]">
                 <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
@@ -530,10 +615,12 @@ export default function TeacherLiveMonitorPage() {
                           {sessionType === "exam" ? "Exam" : "Lecture"}
                       </Badge>
 
-                      <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
-                        <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                        LIVE
-                      </Badge>
+                      {connectionState === "connected" && (
+                        <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
+                          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                          LIVE
+                        </Badge>
+                      )}
 
                       {isScreenSharing && (
                         <Badge className="border border-sky-400/20 bg-sky-500/15 text-sky-300">

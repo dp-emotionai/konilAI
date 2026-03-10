@@ -9,6 +9,7 @@ type EventHandlers = {
   "webrtc-answer": (from: ClientId, sdp: any) => void;
   "webrtc-ice": (from: ClientId, candidate: any) => void;
   error: (message: string) => void;
+  close: () => void;
 };
 
 type PartialHandlers = Partial<EventHandlers>;
@@ -73,6 +74,7 @@ export class SignalingClient {
       this.rejectOpen?.(new Error("Signaling socket closed"));
       this.rejectOpen = undefined;
       this.resolveOpen = undefined;
+      this.handlers.close?.();
     };
 
     this.socket.onerror = () => {

@@ -45,11 +45,8 @@ export type SessionJoinInfo = {
 
 export async function getSessionJoinInfo(sessionId: string): Promise<SessionJoinInfo | null> {
   if (!getApiBaseUrl() || !hasAuth()) return null;
-  try {
-    return await api.get<SessionJoinInfo>(`sessions/${sessionId}/join-info`);
-  } catch {
-    return null;
-  }
+  const data = await api.get<SessionJoinInfo>(`sessions/${sessionId}/join-info`);
+  return data ?? null;
 }
 
 /** Записать согласие на сессию (после принятия на странице /consent). */
@@ -154,11 +151,8 @@ export type StudentEmotionsSummary = {
 
 export async function getStudentEmotionsSummary(): Promise<StudentEmotionsSummary | null> {
   if (!getApiBaseUrl() || !hasAuth()) return null;
-  try {
-    return await api.get<StudentEmotionsSummary>("student/me/emotions-summary");
-  } catch {
-    return null;
-  }
+  const data = await api.get<StudentEmotionsSummary>("student/me/emotions-summary");
+  return data;
 }
 
 export async function getStudentSessionsList(): Promise<StudentSessionRow[]> {

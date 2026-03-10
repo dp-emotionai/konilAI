@@ -12,7 +12,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
-import { CalendarDays, Clock, RadioTower, RefreshCw, AlertCircle } from "lucide-react";
+import { CalendarDays, Clock, RadioTower, RefreshCw, AlertCircle, BarChart3 } from "lucide-react";
 
 function statusLabel(status: StudentSessionRow["status"]) {
   if (status === "live") return "В эфире";
@@ -213,6 +213,34 @@ export default function StudentSessionsPage() {
           </Card>
         </Reveal>
       </Section>
+
+      {apiAvailable && (
+        <Section spacing="none" className="mt-4">
+          <Reveal>
+            <Link
+              href="/student/summary"
+              className="block rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 p-5 transition hover:bg-surface-subtle hover:border-[color:var(--border-strong)]"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-[rgb(var(--primary))]">
+                    <BarChart3 size={24} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-fg">Отчёт по сессиям (ML)</div>
+                    <div className="mt-1 text-sm text-muted">
+                      Вовлечённость, эмоции и динамика по вашим сессиям — в разделе «Моя сводка».
+                    </div>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="shrink-0">
+                  Открыть сводку
+                </Button>
+              </div>
+            </Link>
+          </Reveal>
+        </Section>
+      )}
 
       <Section spacing="none" className="mt-4">
         <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4 text-xs text-muted">
