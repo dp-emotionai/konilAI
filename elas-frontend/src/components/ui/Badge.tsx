@@ -1,7 +1,7 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "default" | "success" | "warning" | "danger" | "primary" | "secondary";
+type Variant = "default" | "outline" | "success" | "warning" | "danger" | "primary" | "secondary";
 
 export default function Badge({
   className,
@@ -18,6 +18,7 @@ export default function Badge({
 
   const styles: Record<Variant, string> = {
     default: "bg-surface-subtle/80 text-fg ring-[color:var(--border)]/35",
+    outline: "bg-transparent text-fg ring-[color:var(--border)]/45",
     secondary: "bg-surface-subtle text-muted ring-[color:var(--border)]/35",
     primary: "bg-primary/10 text-[rgb(var(--primary))] ring-[rgb(var(--primary))]/18",
     success: "bg-[rgb(var(--success))]/10 text-[rgb(var(--success))] ring-[rgb(var(--success))]/18",

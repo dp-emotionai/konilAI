@@ -73,7 +73,7 @@ export default function ResetPasswordPage() {
       await api.post<unknown>("auth/reset-password", {
         token,
         password: newPassword,
-      }, { parseJson: false });
+      });
       setSuccess(true);
     } catch (err) {
       console.error("RESET PASSWORD ERROR:", err);

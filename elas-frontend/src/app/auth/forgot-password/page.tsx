@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await api.post<unknown>("auth/forgot-password", { email: trimmed }, { parseJson: false });
+      await api.post<unknown>("auth/forgot-password", { email: trimmed });
       setSent(true);
     } catch (err) {
       // По соображениям безопасности сообщение не раскрывает, существует ли email.
