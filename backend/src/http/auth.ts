@@ -1,11 +1,14 @@
 import type { Express, Request } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { OAuth2Client } from "google-auth-library";
 import { prisma } from "../db";
 import { CONFIG } from "../config";
 import { authMiddleware, type JwtPayload } from "./middleware";
 
 const SALT_ROUNDS = 10;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "";
+const googleClient = GOOGLE_CLIENT_ID ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
 export function registerAuthRoutes(app: Express) {
   // POST /auth/register
@@ -78,6 +81,69 @@ export function registerAuthRoutes(app: Express) {
     } catch (e) {
       console.error("Login error", e);
       res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  // POST /auth/google — вход/регистрация через Google ID Token
+  app.post("/auth/google", async (req, res) => {
+    try {
+      if (!googleClient || !GOOGLE_CLIENT_ID) {
+        res.status(500).json({ error: "Google auth is not configured on server" });
+        return;
+      }
+
+      const { idToken, role } = req.body as { idToken?: string; role?: string };
+      if (!idToken) {
+        res.status(400).json({ error: "idToken is required" });
+        return;
+      }
+
+      const ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: GOOGLE_CLIENT_ID,
+      });
+      const payload = ticket.getPayload();
+
+      if (!payload?.email) {
+        res.status(400).json({ error: "Google did not return email" });
+        return;
+      }
+
+      const email = String(payload.email).trim().toLowerCase();
+      const name = payload.name ? String(payload.name).trim() || null : null;
+      const r = role === "teacher" ? "teacher" : "student";
+
+      let user = await prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email,
+            name,
+            role: r,
+          },
+        });
+      }
+
+      if (user.status && user.status !== "active") {
+        if (user.status === "blocked") {
+          res.status(403).json({ error: "Account is blocked" });
+          return;
+        }
+        res.status(401).json({ error: "Account is awaiting admin approval" });
+        return;
+      }
+
+      const payloadJwt: JwtPayload = { userId: user.id, email: user.email, role: user.role };
+      const token = jwt.sign(payloadJwt, CONFIG.jwtSecret, { expiresIn: "7d" });
+
+      res.json({
+        user: { id: user.id, email: user.email, role: user.role, name: user.name, status: user.status },
+        token,
+      });
+    } catch (e) {
+      console.error("Google auth error", e);
+      res.status(500).json({ error: "Google authentication failed" });
     }
   });
 

@@ -3,22 +3,38 @@
 import { useState } from "react";
 import Link from "next/link";
 import PageTitle from "@/components/common/PageTitle";
-import {Card} from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import { api } from "@/lib/api/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("Введите email.");
+      return;
+    }
+
     setLoading(true);
-    // Placeholder: backend can add POST /auth/forgot-password later
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
-    setSent(true);
+    try {
+      await api.post<unknown>("auth/forgot-password", { email: trimmed }, { parseJson: false });
+      setSent(true);
+    } catch (err) {
+      // По соображениям безопасности сообщение не раскрывает, существует ли email.
+      console.error("FORGOT PASSWORD ERROR:", err);
+      setSent(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -53,6 +69,7 @@ export default function ForgotPasswordPage() {
               required
               autoComplete="email"
             />
+            {error && <p className="text-sm text-red-400">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Отправка…" : "Отправить ссылку"}
             </Button>
