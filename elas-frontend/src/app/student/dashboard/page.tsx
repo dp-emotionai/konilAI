@@ -288,6 +288,18 @@ export default function StudentDashboardPage() {
                 </div>
 
                 <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
+                  <div className="font-semibold text-fg">Мои группы</div>
+                  <div className="mt-1 text-sm text-muted leading-relaxed">
+                    Группы, в которые вас пригласили. После принятия приглашения здесь появятся сессии группы.
+                  </div>
+                  <div className="mt-3">
+                    <Link href="/student/groups">
+                      <Button variant="outline" className="w-full rounded-full">Открыть группы</Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
                   <div className="font-semibold text-fg">Центр согласия</div>
                   <div className="mt-1 text-sm text-muted leading-relaxed">
                     Согласие нужно до начала аналитики по видео.
@@ -363,12 +375,18 @@ export default function StudentDashboardPage() {
                           key={inv.id}
                           inv={inv}
                           onAccept={() =>
-                            acceptInvitation(inv.id).then(() => {
-                              fetchInvitations();
-                              fetchSessions();
-                            })
+                            acceptInvitation(inv.id)
+                              .then(() => {
+                                fetchInvitations();
+                                fetchSessions();
+                              })
+                              .catch(() => {
+                                fetchInvitations();
+                              })
                           }
-                          onDecline={() => declineInvitation(inv.id).then(fetchInvitations)}
+                          onDecline={() =>
+                            declineInvitation(inv.id).then(fetchInvitations).catch(fetchInvitations)
+                          }
                         />
                       ))}
                     </div>

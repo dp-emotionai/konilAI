@@ -49,18 +49,26 @@ export default function StudentGroupsPage() {
   const apiAvailable = getApiBaseUrl() && hasAuth();
   const [apiGroups, setApiGroups] = useState<StudentGroupRow[]>([]);
   const [loading, setLoading] = useState(!!apiAvailable);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!apiAvailable) {
       setApiGroups([]);
       setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
-    getStudentGroups().then((data) => {
-      setApiGroups(data);
-      setLoading(false);
-    });
+    setError(null);
+    getStudentGroups()
+      .then((data) => {
+        setApiGroups(data);
+      })
+      .catch(() => {
+        setApiGroups([]);
+        setError("Не удалось загрузить список групп. Проверьте подключение.");
+      })
+      .finally(() => setLoading(false));
   }, [apiAvailable]);
 
   const apiFiltered = useMemo(() => {
@@ -100,11 +108,16 @@ export default function StudentGroupsPage() {
               />
             </div>
 
-            {loading ? (
+            {error ? (
+              <div className="mt-6 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-6 text-center">
+                <p className="text-sm text-amber-100">{error}</p>
+                <p className="mt-2 text-xs text-amber-100/80">Обновите страницу или зайдите позже.</p>
+              </div>
+            ) : loading ? (
               <div className="mt-6 h-40 rounded-2xl bg-white/5 animate-pulse" />
             ) : (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
-                {isApiList && apiFiltered.map((g) => (
+                {list.map((g) => (
                   <Link
                     key={g.id}
                     href={`/student/group/${g.id}`}
@@ -129,45 +142,12 @@ export default function StudentGroupsPage() {
                     </div>
                   </Link>
                 ))}
-                {!isApiList && mockFiltered.map(({ group: g, sessionsCount, hasLive }) => (
-                  <Link
-                    key={g.id}
-                    href={`/student/group/${g.id}`}
-                    className="rounded-3xl border border-black/5 bg-[color:var(--surface)] p-6 shadow-[0_14px_30px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-elas-soft-light dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="text-lg font-semibold text-[color:var(--text)]">{g.name}</p>
-                        <p className="text-sm text-[color:var(--muted)]">{g.program}</p>
-                        <p className="mt-2 text-xs text-[color:var(--muted)]">
-                          Teacher:{" "}
-                          <span className="text-slate-900 dark:text-zinc-200">
-                            {g.teacher.name}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <ToneBadge tone={g.status === "active" ? "success" : "neutral"}>{g.status}</ToneBadge>
-                        {hasLive && (
-                          <ToneBadge tone="warning" className="flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-amber-300 animate-pulse" />
-                            Live now
-                          </ToneBadge>
-                        )}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-2">
-                      <ToneBadge tone="purple">{g.students.length} students</ToneBadge>
-                      {sessionsCount > 0 && <ToneBadge tone="info">{sessionsCount} sessions</ToneBadge>}
-                    </div>
-                  </Link>
-                ))}
 
                 {list.length === 0 && !loading ? (
                   <div className="md:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
                     <p className="text-sm text-zinc-200">Групп не найдено.</p>
                     <p className="mt-1 text-xs text-zinc-500">
-                      {apiAvailable ? "Примите приглашение в группу на дашборде." : "Try a different keyword."}
+                      {apiAvailable ? "Примите приглашение в группу на дашборде." : "Войдите в аккаунт и примите приглашение на дашборде."}
                     </p>
                   </div>
                 ) : null}

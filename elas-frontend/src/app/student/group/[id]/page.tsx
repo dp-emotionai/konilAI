@@ -69,10 +69,10 @@ export default function StudentGroupDetailPage() {
       return;
     }
     setDetailLoading(true);
-    getStudentGroupDetail(id).then((data) => {
-      setApiDetail(data);
-      setDetailLoading(false);
-    });
+    getStudentGroupDetail(id)
+      .then((data) => setApiDetail(data))
+      .catch(() => setApiDetail(null))
+      .finally(() => setDetailLoading(false));
   }, [apiAvailable, id]);
 
   const group = apiDetail
