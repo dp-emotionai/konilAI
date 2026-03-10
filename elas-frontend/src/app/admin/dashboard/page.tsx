@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
 
   const groupHeat = useMemo(() => {
     if (!sessions.length) return [];
-    const byGroup = new Map<string, Session[]>();
+    const byGroup = new Map<string, TeacherDashboardSession[]>();
     for (const s of sessions) {
       const key = s.group || "—";
       if (!byGroup.has(key)) byGroup.set(key, []);
