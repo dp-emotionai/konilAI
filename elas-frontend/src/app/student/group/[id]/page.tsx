@@ -88,7 +88,7 @@ export default function StudentGroupDetailPage() {
         type: s.type as "lecture" | "exam",
         status: s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming",
         groupId: id,
-        startsAt: s.startsAt ?? s.startedAt ?? undefined,
+        startsAt: s.startedAt ?? undefined,
       }))
     : mockSessions;
 
