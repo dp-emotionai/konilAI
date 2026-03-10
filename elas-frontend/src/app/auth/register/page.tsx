@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Script from "next/script";
 import { Card } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
@@ -141,6 +142,7 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-[calc(100vh-96px)] flex items-center justify-center px-4 py-10">
+      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
       <div className="w-full max-w-5xl grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
         {/* Левая градиентная панель */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 text-white px-8 py-9 hidden md:flex flex-col justify-between">
@@ -180,7 +182,74 @@ export default function RegisterPage() {
                 type="button"
                 variant="outline"
                 className="w-full justify-center rounded-2xl border-slate-200/70 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white"
-                onClick={() => setError("Регистрация через Google пока не настроена. Используйте email и пароль.")}
+                onClick={() => {
+                  setError("");
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const anyWindow: any = window;
+                  const google = anyWindow.google;
+                  if (!google?.accounts?.id) {
+                    setError("Google auth недоступен. Обновите страницу и попробуйте снова.");
+                    return;
+                  }
+                  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+                  if (!clientId) {
+                    setError("Google client id не настроен на фронтенде.");
+                    return;
+                  }
+                  google.accounts.id.initialize({
+                    client_id: clientId,
+                    callback: async (response: { credential: string }) => {
+                      try {
+                        const data = await api.post<VerifyRes>("auth/google", {
+                          idToken: response.credential,
+                          role,
+                        });
+
+                        const user = data.user;
+                        const rawRole = user?.role;
+                        const normalizedRole =
+                          typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
+                        const token = data.token;
+
+                        if (!user || !user.email) {
+                          throw new Error("Сервер не вернул данные пользователя.");
+                        }
+                        if (!token) {
+                          throw new Error("Сервер не вернул токен авторизации.");
+                        }
+                        if (!normalizedRole || !(normalizedRole in ROLE_HOME)) {
+                          throw new Error(
+                            `Сервер вернул неизвестную роль пользователя: ${String(rawRole)}`
+                          );
+                        }
+
+                        const r = normalizedRole as Role;
+                        const home =
+                          typeof ROLE_HOME[r] === "string" && ROLE_HOME[r].length > 0
+                            ? ROLE_HOME[r]
+                            : "/";
+
+                        setAuth({
+                          token,
+                          role: r,
+                          email: user.email,
+                          name: user.name ?? undefined,
+                          status: null,
+                        });
+                        setRole(r);
+                        setLoggedIn(true);
+                        router.push(home);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Ошибка регистрации через Google. Попробуйте снова."
+                        );
+                      }
+                    },
+                  });
+                  google.accounts.id.prompt();
+                }}
               >
                 Регистрация через Google
               </Button>
