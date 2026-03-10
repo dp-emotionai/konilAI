@@ -1,6 +1,6 @@
 import { api, hasAuth, getApiBaseUrl } from "./client";
-import { mockSessions, type Session } from "@/lib/mock/sessions";
-import { groupSessions, type GroupSession } from "@/lib/mock/groupSessions";
+import type { Session } from "@/lib/mock/sessions";
+import type { GroupSession } from "@/lib/mock/groupSessions";
 import type { Group } from "@/lib/mock/groups";
 
 function delay(ms: number) {
@@ -68,11 +68,11 @@ export async function getTeacherDashboardSessions(): Promise<Session[]> {
       return arr.map(mapBackendToSession);
     } catch {
       await delay(80);
-      return mockSessions;
+      return [];
     }
   }
   await delay(120);
-  return mockSessions;
+  return [];
 }
 
 export async function getTeacherAllSessions(): Promise<GroupSession[]> {
@@ -83,11 +83,11 @@ export async function getTeacherAllSessions(): Promise<GroupSession[]> {
       return arr.map(mapBackendToGroupSession);
     } catch {
       await delay(80);
-      return groupSessions;
+      return [];
     }
   }
   await delay(140);
-  return groupSessions;
+  return [];
 }
 
 export type TeacherGroup = { id: string; name: string; teacherId: string; sessionCount?: number };

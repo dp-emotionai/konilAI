@@ -74,18 +74,13 @@ export default function TeacherSessionsPage() {
   const handleLifecycle = async (s: GroupSession) => {
     const action = nextTeacherAction(s.status);
 
-    if (apiAvailable) {
-      setActioningId(s.id);
-      try {
-        await updateSessionStatus(s.id, statusToBackend(action.next));
-        setSessionStatusOverride(s.id, action.next);
-        setTick((x) => x + 1);
-      } finally {
-        setActioningId(null);
-      }
-    } else {
+    setActioningId(s.id);
+    try {
+      await updateSessionStatus(s.id, statusToBackend(action.next));
       setSessionStatusOverride(s.id, action.next);
       setTick((x) => x + 1);
+    } finally {
+      setActioningId(null);
     }
   };
 
@@ -206,11 +201,6 @@ export default function TeacherSessionsPage() {
                 </Table>
               </div>
 
-              {!apiAvailable && (
-                <div className="mt-4 text-xs text-muted">
-                  Сейчас включён mock-режим (нет auth/backend). Статусы меняются локально.
-                </div>
-              )}
             </CardContent>
           </Card>
         </Reveal>

@@ -12,7 +12,6 @@ import Badge from "@/components/ui/Badge";
 import Glow from "@/components/common/Glow";
 import { cn } from "@/lib/cn";
 import { TeacherSessionTabs } from "@/components/session/TeacherSessionTabs";
-import { mockSessions } from "@/lib/mock/sessions";
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 
@@ -63,10 +62,6 @@ function MiniBar({ pct }: { pct: number }) {
 
 export default function ExamAnalyticsPage() {
   const params = useParams<{ id: string }>();
-  const session = useMemo(
-    () => mockSessions.find((s) => s.id === params.id) ?? mockSessions[0],
-    [params.id]
-  );
   const [group, setGroup] = useState("All students");
   const [minConfidence, setMinConfidence] = useState("0.60");
   const [tab, setTab] = useState<"overview" | "integrity" | "controls">("overview");
@@ -100,8 +95,8 @@ export default function ExamAnalyticsPage() {
 
       <PageHero
         overline="Teacher • Exam analytics"
-        title={session.title}
-        subtitle="Integrity signals, stress patterns and focus stability for proctored exams. Mock frontend only."
+        title="Экзаменационная аналитика"
+        subtitle="Интерфейс готов для будущей интеграции с ML‑отчётами экзамена."
       />
 
       <Section>
@@ -132,7 +127,7 @@ export default function ExamAnalyticsPage() {
           </div>
         </div>
 
-          <TeacherSessionTabs sessionId={session.id} />
+          <TeacherSessionTabs sessionId={params.id} />
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <div className="inline-flex items-center gap-1 rounded-2xl bg-white/5 p-1">

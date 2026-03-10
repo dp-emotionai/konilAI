@@ -1,5 +1,4 @@
 import { api, hasAuth, getApiBaseUrl } from "./client";
-import { mockSessions } from "@/lib/mock/sessions";
 
 export type StudentSessionRow = {
   id: string;
@@ -150,23 +149,9 @@ export async function getStudentSessionsList(): Promise<StudentSessionRow[]> {
       return arr.map(mapBackendToRow);
     } catch {
       await delay(80);
-      return mockSessions.map((s) => ({
-        id: s.id,
-        title: s.title,
-        type: s.type,
-        date: new Date(s.date).toLocaleString(),
-        teacher: s.teacher,
-        status: (s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming") as StudentSessionRow["status"],
-      }));
+      return [];
     }
   }
   await delay(130);
-  return mockSessions.map((s) => ({
-    id: s.id,
-    title: s.title,
-    type: s.type,
-    date: new Date(s.date).toLocaleString(),
-    teacher: s.teacher,
-    status: (s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming") as StudentSessionRow["status"],
-  }));
+  return [];
 }

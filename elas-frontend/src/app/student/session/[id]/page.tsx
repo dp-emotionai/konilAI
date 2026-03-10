@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -14,7 +14,6 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 
 import { useUI } from "@/components/layout/Providers";
-import { mockSessions } from "@/lib/mock/sessions";
 import {
   getSessionJoinInfo,
   recordSessionConsent,
@@ -88,11 +87,6 @@ export default function StudentJoinSessionPage() {
   const sessionId = params?.id ?? "";
   const { state } = useUI();
 
-  const session = useMemo(
-    () => mockSessions.find((s) => s.id === sessionId) ?? mockSessions[0],
-    [sessionId]
-  );
-
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(
     !!(getApiBaseUrl() && hasAuth())
@@ -131,7 +125,7 @@ export default function StudentJoinSessionPage() {
     };
   }, [sessionId, state.consent]);
 
-  const title = joinInfo?.title ?? session.title;
+  const title = joinInfo?.title ?? "Сессия";
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
@@ -154,7 +148,7 @@ export default function StudentJoinSessionPage() {
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
   const shouldRunMl = live && state.consent && mlApiAvailable;
 
-  const roomId = sessionId || session.id;
+  const roomId = sessionId;
 
   useEffect(() => {
     if (!live || !roomId) return;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -13,7 +13,6 @@ import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 
-import { mockSessions } from "@/lib/mock/sessions";
 import {
   getSessionLiveMetrics,
   getSessionChatPolicy,
@@ -87,11 +86,6 @@ export default function TeacherLiveMonitorPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
 
-  const session = useMemo(
-    () => mockSessions.find((s) => s.id === sessionId) ?? mockSessions[0],
-    [sessionId]
-  );
-
   const [phase, setPhase] = useState<SessionPhase>("preflight");
   const [liveSeconds, setLiveSeconds] = useState(0);
 
@@ -120,7 +114,7 @@ export default function TeacherLiveMonitorPage() {
   const wsUrl = getWsBaseUrl();
   const [cameraReady, setCameraReady] = useState(false);
 
-  const roomId = sessionId || session.id;
+  const roomId = sessionId;
   const isLive = phase === "live";
 
   useEffect(() => {
@@ -262,6 +256,8 @@ export default function TeacherLiveMonitorPage() {
   const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
 
   const mainParticipant = participants[0];
+  const sessionTitle = "Сессия";
+  const sessionType: "lecture" | "exam" = "lecture";
 
   const stopScreenShare = async () => {
     const manager = peerManagerRef.current;
@@ -349,7 +345,7 @@ export default function TeacherLiveMonitorPage() {
         items={[
           { label: "Преподаватель", href: "/teacher/dashboard" },
           { label: "Сессии", href: "/teacher/sessions" },
-          { label: session.title },
+              { label: sessionTitle },
         ]}
       />
 
@@ -364,12 +360,12 @@ export default function TeacherLiveMonitorPage() {
         <>
           <PageHero
             overline="Преподаватель · Live-монитор"
-            title={session.title}
+            title={sessionTitle}
             subtitle="Live-видео + метрики группы. Используется только для улучшения урока, не для оценивания личности."
             right={
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-surface-subtle">
-                  Type: {session.type === "exam" ? "Exam" : "Lecture"}
+                  Type: {sessionType === "exam" ? "Exam" : "Lecture"}
                 </Badge>
                 <Badge className={isLive ? "bg-primary/10 text-[rgb(var(--primary))]" : "bg-surface-subtle"}>
                   <span className="mr-1 inline-flex h-2 w-2 rounded-full bg-[rgb(var(--success))] animate-pulse" />
@@ -379,7 +375,7 @@ export default function TeacherLiveMonitorPage() {
             }
           />
 
-          <TeacherSessionTabs sessionId={session.id} />
+          <TeacherSessionTabs sessionId={sessionId} />
         </>
       )}
 
@@ -493,7 +489,7 @@ export default function TeacherLiveMonitorPage() {
                       <StatusPill label="Backend" value={gates.backend ? "OK" : "Off"} />
                       <StatusPill label="WS" value={gates.ws ? "OK" : "Off"} />
                       <StatusPill label="Camera" value={gates.camera ? "Ready" : "Check"} />
-                      <StatusPill label="Session type" value={session.type === "exam" ? "Exam" : "Lecture"} />
+                      <StatusPill label="Session type" value={sessionType === "exam" ? "Exam" : "Lecture"} />
                     </div>
 
                     {!criticalOk && (
@@ -525,13 +521,13 @@ export default function TeacherLiveMonitorPage() {
                         Teacher · Live monitor
                       </div>
                       <div className="mt-1 truncate text-xl font-semibold text-white">
-                        {session.title}
+                        {sessionTitle}
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="border border-white/10 bg-white/5 text-white/75">
-                        {session.type === "exam" ? "Exam" : "Lecture"}
+                          {sessionType === "exam" ? "Exam" : "Lecture"}
                       </Badge>
 
                       <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
@@ -793,7 +789,7 @@ export default function TeacherLiveMonitorPage() {
                     <SessionChatPanel
                       sessionId={roomId}
                       role="teacher"
-                      type={session.type === "exam" ? "exam" : "lecture"}
+                      type={sessionType === "exam" ? "exam" : "lecture"}
                     />
                   </div>
 
