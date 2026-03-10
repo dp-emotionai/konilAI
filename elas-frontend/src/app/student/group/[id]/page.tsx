@@ -82,13 +82,13 @@ export default function StudentGroupDetailPage() {
 
   const group = mockGroup ?? (apiDetail ? { id: apiDetail.id, name: apiDetail.name, program: apiDetail.name, status: "active" as const, teacher: { id: "", name: apiDetail.teacherName, email: apiDetail.teacher }, students: (apiDetail.members ?? []).map((m) => ({ id: m.id, name: m.name ?? m.email ?? "", email: m.email })), createdAt: apiDetail.createdAt } : null);
   const sessions: GroupSession[] = apiDetail
-    ? apiDetail.sessions.map((s) => ({
+    ? (apiDetail.sessions ?? []).map((s) => ({
         id: s.id,
         title: s.title,
         type: s.type as "lecture" | "exam",
         status: s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming",
         groupId: id,
-        startsAt: s.startedAt ?? undefined,
+        startsAt: s.startsAt ?? s.startedAt ?? undefined,
       }))
     : mockSessions;
 
