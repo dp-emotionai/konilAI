@@ -80,7 +80,9 @@ function LiveMetricCard({
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
-  return `${p.role} · ${p.id.slice(0, 6)}`;
+  const id = typeof p.id === "string" ? p.id : "";
+  const short = id ? id.slice(0, 6) : "—";
+  return `${p.role} · ${short}`;
 }
 
 export default function StudentJoinSessionPage() {
