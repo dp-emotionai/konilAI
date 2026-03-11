@@ -811,731 +811,506 @@ export default function TeacherLiveMonitorPage() {
       {phase === "live" && (
         <Section spacing="none" className="mt-6">
           <Reveal>
-            {connectionState === "connecting" && (
-              <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
-                <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                Подключение к эфиру…
-              </div>
-            )}
-
-            {connectionState === "connected" && wsDisconnected && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
-                <span className="flex items-center gap-2">
-                  <AlertTriangle size={18} />
-                  Соединение потеряно. Завершите сессию и перезапустите эфир при необходимости.
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
-                  onClick={() => setConfirmEndOpen(true)}
-                >
-                  Завершить сессию
-                </Button>
-              </div>
-            )}
-
-            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)] flex flex-col min-h-[70vh]">
-              <div className="flex flex-1 min-h-0 items-stretch flex-col xl:flex-row">
-                <div className="flex flex-1 min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
-                  <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">
-                        Teacher · Live monitor
-                      </div>
-                      <div className="mt-1 truncate text-xl font-semibold text-white">
-                        {sessionTitle}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="border border-white/10 bg-white/5 text-white/75">
-                          {sessionType === "exam" ? "Exam" : "Lecture"}
-                      </Badge>
-
-                      {connectionState === "connected" && (
-                        <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
-                          <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                          LIVE
-                        </Badge>
-                      )}
-
-                      {isScreenSharing && (
-                        <Badge className="border border-sky-400/20 bg-sky-500/15 text-sky-300">
-                          Screen sharing
-                        </Badge>
-                      )}
-
-                      <Badge className="border border-white/10 bg-white/5 font-mono text-white/75">
-                        {timerLabel}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="xl:hidden gap-1.5 border-white/10 bg-white/5 text-white hover:bg-white/10"
-                        onClick={() => setChatOpen(true)}
-                        aria-label="Открыть чат"
-                      >
-                        <MessageCircle size={14} />
-                        Чат
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Video area: focused layout (main + secondary grid) */}
-                  <div className="flex flex-1 flex-col p-5 min-h-0 gap-4 transition-all duration-300">
-                    {(() => {
-                      const totalTiles = 1 + participants.length; // teacher + students
-
-                      const focusedId =
-                        focusedParticipant === "local"
-                          ? "local"
-                          : focusedParticipant
-                            ? focusedParticipant.id
-                            : participants[0]?.id ?? "local";
-
-                      const mainIsLocal =
-                        focusedId === "local" ||
-                        (!participants.length && focusedId !== "local");
-
-                      const mainRemote =
-                        !mainIsLocal && participants.find((p) => p.id === focusedId);
-
-                      // Fallbacks if focused participant left
-                      const effectiveMainIsLocal = mainRemote ? false : true;
-                      const effectiveMainRemote =
-                        !effectiveMainIsLocal && mainRemote
-                          ? mainRemote
-                          : !effectiveMainIsLocal
-                            ? participants[0]
-                            : null;
-
-                      const secondary: Array<{ kind: "local" | "remote"; peer?: Participant }> = [];
-
-                      if (!effectiveMainIsLocal) {
-                        secondary.push({ kind: "local" });
-                      }
-                      participants.forEach((p) => {
-                        if (effectiveMainRemote && p.id === effectiveMainRemote.id) return;
-                        secondary.push({ kind: "remote", peer: p });
-                      });
-
-                      // Side‑by‑side layout when only two tiles total (desktop only; mobile uses grid)
-                      if (totalTiles <= 2) {
-                        const other =
-                          totalTiles === 2
-                            ? effectiveMainIsLocal
-                              ? participants[0]
-                              : null
-                            : null;
-
-                        return (
-                          <>
-                            {/* Mobile: grid-only */}
-                            <div className="sm:hidden">
-                              <div className="grid grid-cols-2 gap-3">
-                                <button
-                                  type="button"
-                                  className="rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer transition-all duration-300 hover:scale-[1.03]"
-                                  onClick={() => setFocusedParticipant("local")}
-                                >
-                                  <VideoTile
-                                    stream={localStream}
-                                    label="Вы · Teacher"
-                                    status={connectionState === "connected" ? "LIVE" : "—"}
-                                    isLocal
-                                    compact
-                                    videoRef={localVideoRef}
-                                  />
-                                </button>
-                                {participants[0] && (
-                                  <button
-                                    type="button"
-                                    className="rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer transition-all duration-300 hover:scale-[1.03]"
-                                    onClick={() => setFocusedParticipant(participants[0])}
-                                  >
-                                    <VideoTile
-                                      stream={remoteStreams[participants[0].id] ?? null}
-                                      label={formatParticipantLabel(participants[0])}
-                                      status={
-                                        remoteStreams[participants[0].id]
-                                          ? "LIVE"
-                                          : "Подключение..."
-                                      }
-                                      isLocal={false}
-                                      metrics={metricsForPeer(participants[0])}
-                                      compact
-                                      videoRef={(el) => {
-                                        (remoteVideoRefs.current as Record<
-                                          string,
-                                          HTMLVideoElement | null
-                                        >)[participants[0].id] = el;
-                                      }}
-                                    />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Desktop: side-by-side */}
-                            <div className="hidden sm:flex flex-1 min-h-0 flex-col gap-4 md:flex-row transition-all duration-300">
-                              <div className="flex-1 min-w-0 flex items-stretch">
-                                <div className="w-full transition-all duration-300">
-                                  {effectiveMainIsLocal ? (
-                                    <VideoTile
-                                      stream={localStream}
-                                      label="Вы · Teacher"
-                                      status={connectionState === "connected" ? "LIVE" : "—"}
-                                      isLocal
-                                      videoRef={localVideoRef}
-                                    />
-                                  ) : effectiveMainRemote ? (
-                                    <VideoTile
-                                      stream={remoteStreams[effectiveMainRemote.id] ?? null}
-                                      label={formatParticipantLabel(effectiveMainRemote)}
-                                      status={
-                                        remoteStreams[effectiveMainRemote.id]
-                                          ? "LIVE"
-                                          : "Подключение..."
-                                      }
-                                      isLocal={false}
-                                      metrics={metricsForPeer(effectiveMainRemote)}
-                                      videoRef={(el) => {
-                                        (remoteVideoRefs.current as Record<
-                                          string,
-                                          HTMLVideoElement | null
-                                        >)[effectiveMainRemote.id] = el;
-                                      }}
-                                    />
-                                  ) : null}
-                                </div>
-                              </div>
-
-                              {other && (
-                                <div className="flex-1 min-w-0 flex items-stretch">
-                                  <button
-                                    type="button"
-                                    className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:shadow-xl"
-                                    onClick={() => setFocusedParticipant(other)}
-                                  >
-                                    <VideoTile
-                                      stream={remoteStreams[other.id] ?? null}
-                                      label={formatParticipantLabel(other)}
-                                      status={
-                                        remoteStreams[other.id] ? "LIVE" : "Подключение..."
-                                      }
-                                      isLocal={false}
-                                      metrics={metricsForPeer(other)}
-                                      compact
-                                      videoRef={(el) => {
-                                        (remoteVideoRefs.current as Record<
-                                          string,
-                                          HTMLVideoElement | null
-                                        >)[other.id] = el;
-                                      }}
-                                    />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </>
-                        );
-                      }
-
-                      // Main focused video
-                      return (
-                        <>
-                          <div className="hidden sm:block w-full transition-all duration-300">
-                            <div className="w-full h-[60vh] min-h-[320px] rounded-xl overflow-hidden bg-black border border-white/10">
-                              {effectiveMainIsLocal ? (
-                                <VideoTile
-                                  stream={localStream}
-                                  label="Вы · Teacher"
-                                  status={connectionState === "connected" ? "LIVE" : "—"}
-                                  isLocal
-                                  aspect={false}
-                                  videoRef={localVideoRef}
-                                />
-                              ) : effectiveMainRemote ? (
-                                <VideoTile
-                                  stream={remoteStreams[effectiveMainRemote.id] ?? null}
-                                  label={formatParticipantLabel(effectiveMainRemote)}
-                                  status={
-                                    remoteStreams[effectiveMainRemote.id]
-                                      ? "LIVE"
-                                      : "Подключение..."
-                                  }
-                                  isLocal={false}
-                                  metrics={metricsForPeer(effectiveMainRemote)}
-                                  aspect={false}
-                                  videoRef={(el) => {
-                                    (remoteVideoRefs.current as Record<
-                                      string,
-                                      HTMLVideoElement | null
-                                    >)[effectiveMainRemote.id] = el;
-                                  }}
-                                />
-                              ) : null}
-                            </div>
-                          </div>
-
-                          {/* Controls directly under main video (desktop) */}
-                          <div className="hidden sm:flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2 transition-all duration-300">
-                            <button
-                              type="button"
-                              className={`rounded-full border p-3 transition ${
-                                isMicEnabled
-                                  ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                                  : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
-                              }`}
-                              title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
-                              onClick={toggleMic}
-                            >
-                              {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                            </button>
-
-                            <button
-                              type="button"
-                              className={`rounded-full border p-3 transition ${
-                                isCameraEnabled && !isScreenSharing
-                                  ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                                  : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
-                              }`}
-                              title={
-                                isScreenSharing
-                                  ? "Камера недоступна во время демонстрации"
-                                  : isCameraEnabled
-                                    ? "Выключить камеру"
-                                    : "Включить камеру"
-                              }
-                              onClick={toggleCamera}
-                              disabled={isScreenSharing}
-                            >
-                              {isCameraEnabled && !isScreenSharing ? (
-                                <Video size={20} />
-                              ) : (
-                                <VideoOff size={20} />
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              className={`rounded-full border p-3 transition ${
-                                isScreenSharing
-                                  ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
-                                  : "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                              }`}
-                              title={
-                                isScreenSharing
-                                  ? "Остановить демонстрацию экрана"
-                                  : "Запустить демонстрацию экрана"
-                              }
-                              onClick={toggleScreenShare}
-                            >
-                              <Monitor size={20} />
-                            </button>
-
-                            <button
-                              type="button"
-                              className={`rounded-full border p-3 transition ${
-                                isSettingsOpen
-                                  ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
-                                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                              }`}
-                              title="Показать настройки"
-                              onClick={() => setIsSettingsOpen((v) => !v)}
-                            >
-                              <Settings size={20} />
-                            </button>
-
-                            <button
-                              type="button"
-                              className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
-                              title="Завершить сессию"
-                              onClick={() => setPhase("ended")}
-                            >
-                              <PhoneOff size={22} />
-                            </button>
-                          </div>
-
-                          {/* Secondary participants grid */}
-                          {secondary.length > 0 && (
-                            <div className="flex-shrink-0">
-                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4 transition-all duration-300">
-                                {secondary.map((item, idx) => {
-                                  if (item.kind === "local") {
-                                    return (
-                                      <button
-                                        type="button"
-                                        key={`local-secondary-${idx}`}
-                                        className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03]"
-                                        onClick={() => setFocusedParticipant("local")}
-                                      >
-                                        <VideoTile
-                                          stream={localStream}
-                                          label="Вы · Teacher"
-                                          status={
-                                            connectionState === "connected" ? "LIVE" : "—"
-                                          }
-                                          isLocal
-                                          compact
-                                          videoRef={localVideoRef}
-                                        />
-                                      </button>
-                                    );
-                                  }
-
-                                  const peer = item.peer!;
-                                  return (
-                                    <button
-                                      type="button"
-                                      key={peer.id}
-                                      className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03]"
-                                      onClick={() => setFocusedParticipant(peer)}
-                                    >
-                                      <VideoTile
-                                        stream={remoteStreams[peer.id] ?? null}
-                                        label={formatParticipantLabel(peer)}
-                                        status={
-                                          remoteStreams[peer.id]
-                                            ? "LIVE"
-                                            : "Подключение..."
-                                        }
-                                        isLocal={false}
-                                        metrics={metricsForPeer(peer)}
-                                        compact
-                                        videoRef={(el) => {
-                                          (remoteVideoRefs.current as Record<
-                                            string,
-                                            HTMLVideoElement | null
-                                          >)[peer.id] = el;
-                                        }}
-                                      />
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-
-                    {/* Controls bar (mobile) */}
-                    <div className="sm:hidden flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2">
-                      <button
-                        type="button"
-                        className={`rounded-full border p-3 transition ${
-                          isMicEnabled
-                            ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                            : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
-                        }`}
-                        title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
-                        onClick={toggleMic}
-                      >
-                        {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`rounded-full border p-3 transition ${
-                          isCameraEnabled && !isScreenSharing
-                            ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                            : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
-                        }`}
-                        title={
-                          isScreenSharing
-                            ? "Камера недоступна во время демонстрации"
-                            : isCameraEnabled
-                              ? "Выключить камеру"
-                              : "Включить камеру"
-                        }
-                        onClick={toggleCamera}
-                        disabled={isScreenSharing}
-                      >
-                        {isCameraEnabled && !isScreenSharing ? (
-                          <Video size={20} />
-                        ) : (
-                          <VideoOff size={20} />
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`rounded-full border p-3 transition ${
-                          isScreenSharing
-                            ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
-                            : "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                        }`}
-                        title={
-                          isScreenSharing
-                            ? "Остановить демонстрацию экрана"
-                            : "Запустить демонстрацию экрана"
-                        }
-                        onClick={toggleScreenShare}
-                      >
-                        <Monitor size={20} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className={`rounded-full border p-3 transition ${
-                          isSettingsOpen
-                            ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
-                            : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                        }`}
-                        title="Показать настройки"
-                        onClick={() => setIsSettingsOpen((v) => !v)}
-                      >
-                        <Settings size={20} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="rounded-full border border-amber-400/20 bg-amber-500/15 p-3 text-amber-300 transition hover:bg-amber-500/20"
-                        title="Добавить маркер"
-                      >
-                        <Flag size={20} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
-                        title="Завершить сессию"
-                        onClick={() => setPhase("ended")}
-                      >
-                        <PhoneOff size={22} />
-                      </button>
-                    </div>
-
-                    {isSettingsOpen && (
-                      <div className="mx-auto mt-4 max-w-xl space-y-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/75">
-                          <div className="flex items-start gap-2">
-                            <div className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-200">
-                              <Sparkles size={16} />
-                            </div>
-                            <div>
-                              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
-                                Live assistant
-                              </div>
-                              <div className="mt-1 text-sm text-white/85">
-                                {liveSuggestion}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <LiveInfoCard label="Mic" value={isMicEnabled ? "On" : "Off"} />
-                          <LiveInfoCard label="Camera" value={isCameraEnabled ? "On" : "Off"} />
-                          <LiveInfoCard label="Screen" value={isScreenSharing ? "Sharing" : "Off"} />
-                        </div>
-                      </div>
-                    )}
-                  </div>
+            <>
+              {connectionState === "connecting" && (
+                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
+                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+                  Подключение к эфиру…
                 </div>
+              )}
 
-                {/* Chat sidebar: visible on xl; on mobile show toggle */}
-                <aside
-                  className={`flex min-h-0 flex-col border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)] w-full xl:w-[390px] xl:max-w-[390px] shrink-0 ${
-                    chatOpen ? "flex" : "hidden xl:flex"
-                  }`}
-                >
-                  <div className="border-b border-white/10 px-5 py-4 shrink-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-white">Control center</div>
-                        <div className="mt-1 text-xs text-white/45">
-                          Live metrics, participants and chat
+              {connectionState === "connected" && wsDisconnected && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                  <span className="flex items-center gap-2">
+                    <AlertTriangle size={18} />
+                    Соединение потеряно. Завершите сессию и перезапустите эфир при необходимости.
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
+                    onClick={() => setConfirmEndOpen(true)}
+                  >
+                    Завершить сессию
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
+                <div className="flex min-h-0 flex-1 flex-col items-stretch xl:flex-row">
+                  <div className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+                      <div className="min-w-0">
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">
+                          Teacher · Live monitor
                         </div>
+                        <div className="mt-1 truncate text-xl font-semibold text-white">{sessionTitle}</div>
                       </div>
-                      <div className="flex items-center gap-2">
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge className="border border-white/10 bg-white/5 text-white/75">
+                          {sessionType === "exam" ? "Exam" : "Lecture"}
+                        </Badge>
+
+                        {connectionState === "connected" && (
+                          <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
+                            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                            LIVE
+                          </Badge>
+                        )}
+
+                        {isScreenSharing && (
+                          <Badge className="border border-sky-400/20 bg-sky-500/15 text-sky-300">
+                            Screen sharing
+                          </Badge>
+                        )}
+
+                        <Badge className="border border-white/10 bg-white/5 font-mono text-white/75">
+                          {timerLabel}
+                        </Badge>
+
                         <Button
                           size="sm"
                           variant="outline"
-                          className="xl:hidden border-white/10 bg-white/5 text-white hover:bg-white/10"
-                          onClick={() => setChatOpen(false)}
-                          aria-label="Закрыть чат"
+                          className="gap-1.5 border-white/10 bg-white/5 text-white hover:bg-white/10 xl:hidden"
+                          onClick={() => setChatOpen(true)}
+                          aria-label="Открыть чат"
                         >
-                          Закрыть
+                          <MessageCircle size={14} />
+                          Чат
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      </div>
+                    </div>
+
+                    <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+                      <div className="relative h-[60vh] min-h-[320px] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                        {focusedParticipant && focusedParticipant !== "local" ? (
+                          <VideoTile
+                            stream={remoteStreams[focusedParticipant.id] ?? null}
+                            label={formatParticipantLabel(focusedParticipant)}
+                            status={remoteStreams[focusedParticipant.id] ? "LIVE" : "Подключение..."}
+                            isLocal={false}
+                            metrics={metricsForPeer(focusedParticipant)}
+                            aspect={false}
+                            videoRef={(el) => {
+                              (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[focusedParticipant.id] = el;
+                            }}
+                          />
+                        ) : (
+                          <VideoTile
+                            stream={localStream}
+                            label="Вы · Teacher"
+                            status={connectionState === "connected" ? "LIVE" : "—"}
+                            isLocal
+                            aspect={false}
+                            videoRef={localVideoRef}
+                          />
+                        )}
+                      </div>
+
+                      <div className="hidden flex-wrap justify-center gap-4 sm:flex">
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isMicEnabled
+                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                          }`}
+                          onClick={toggleMic}
+                        >
+                          {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isCameraEnabled && !isScreenSharing
+                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                          }`}
+                          onClick={toggleCamera}
+                          disabled={isScreenSharing}
+                        >
+                          {isCameraEnabled && !isScreenSharing ? <Video size={20} /> : <VideoOff size={20} />}
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isScreenSharing
+                              ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
+                              : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          }`}
+                          onClick={toggleScreenShare}
+                        >
+                          <Monitor size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isSettingsOpen
+                              ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
+                              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                          }`}
+                          onClick={() => setIsSettingsOpen((v) => !v)}
+                        >
+                          <Settings size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
                           onClick={() => setConfirmEndOpen(true)}
                         >
-                          <LogOut size={14} />
-                          Завершить
-                        </Button>
+                          <PhoneOff size={22} />
+                        </button>
                       </div>
-                    </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-3">
-                      <LiveInfoCard label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
-                      <LiveInfoCard label="Participants" value={`${participants.length}`} />
-                      <LiveInfoCard label="Avg engagement" value={hasMl ? formatPct100(avgEngagement) : "—"} />
-                      <LiveInfoCard label="Avg stress" value={hasMl ? formatPct100(avgStress) : "—"} />
-                      <LiveInfoCard label="Group state" value={hasMl ? (liveMetrics?.groupState ?? "—") : "—"} />
-                      <LiveInfoCard label="Pattern" value={hasMl ? (liveMetrics?.pattern ?? "—") : "—"} />
-                    </div>
-                  </div>
-
-                  <div className="min-h-0 flex-1 border-b border-white/10 p-4">
-                    <SessionChatPanel
-                      sessionId={roomId}
-                      role="teacher"
-                      type={sessionType === "exam" ? "exam" : "lecture"}
-                    />
-                  </div>
-
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <div className="text-sm font-semibold text-white">Session integrity</div>
-                    <div className="mt-4 grid gap-3">
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
-                        Backend:{" "}
-                        <span className={apiAvailable ? "text-emerald-300" : "text-amber-300"}>
-                          {apiAvailable ? "connected" : "offline"}
-                        </span>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
-                        Camera:{" "}
-                        <span className={cameraReady ? "text-emerald-300" : "text-amber-300"}>
-                          {cameraReady ? "ready" : "check required"}
-                        </span>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
-                        Consent model: <span className="text-emerald-300">active</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {apiAvailable && isRealSessionId(roomId) && (
-                    <div className="border-b border-white/10 px-5 py-4">
-                      <div className="text-sm font-semibold text-white">Chat mode</div>
-                      <div className="mt-3">
-                        <select
-                          className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none"
-                          value={chatPolicy?.mode ?? "lecture_open"}
-                          onChange={async (e) => {
-                            const mode = e.target.value as SessionChatPolicy["mode"];
-                            try {
-                              const updated = await updateSessionChatPolicy(roomId, { mode });
-                              setChatPolicy(updated);
-                            } catch (err) {
-                              console.error("updateSessionChatPolicy", err);
-                            }
-                          }}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        <button
+                          type="button"
+                          onClick={() => setFocusedParticipant("local")}
+                          className="cursor-pointer transition hover:scale-[1.03]"
                         >
-                          <option value="lecture_open">Открытый (все сообщения)</option>
-                          <option value="questions_only">Только вопросы</option>
-                          <option value="locked">Закрыт</option>
-                          <option value="exam_help_only">Экзамен (только help)</option>
-                        </select>
+                          <VideoTile
+                            stream={localStream}
+                            label="Вы · Teacher"
+                            status={connectionState === "connected" ? "LIVE" : "—"}
+                            isLocal
+                            compact
+                            videoRef={localVideoRef}
+                          />
+                        </button>
+
+                        {participants.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setFocusedParticipant(p)}
+                            className="cursor-pointer transition hover:scale-[1.03]"
+                          >
+                            <VideoTile
+                              stream={remoteStreams[p.id] ?? null}
+                              label={formatParticipantLabel(p)}
+                              status={remoteStreams[p.id] ? "LIVE" : "Подключение..."}
+                              isLocal={false}
+                              metrics={metricsForPeer(p)}
+                              compact
+                              videoRef={(el) => {
+                                (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
+                              }}
+                            />
+                          </button>
+                        ))}
                       </div>
 
-                      <div className="mt-2 text-xs text-white/45">
-                        {chatPolicy?.mode === "locked" && "Студенты не могут писать"}
-                        {chatPolicy?.mode === "questions_only" && "Студенты могут отправлять только вопросы"}
-                        {chatPolicy?.mode === "lecture_open" && "Стандартный чат лекции"}
-                        {chatPolicy?.mode === "exam_help_only" && "Только help-канал для экзамена"}
-                      </div>
-                    </div>
-                  )}
+                      <div className="mt-1 flex flex-shrink-0 flex-wrap justify-center gap-4 px-2 sm:hidden">
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isMicEnabled
+                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                          }`}
+                          title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
+                          onClick={toggleMic}
+                        >
+                          {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                        </button>
 
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-white">Participants & ML</div>
-                      <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70">
-                        <Users size={16} />
-                      </div>
-                    </div>
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isCameraEnabled && !isScreenSharing
+                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                          }`}
+                          title={
+                            isScreenSharing
+                              ? "Камера недоступна во время демонстрации"
+                              : isCameraEnabled
+                                ? "Выключить камеру"
+                                : "Включить камеру"
+                          }
+                          onClick={toggleCamera}
+                          disabled={isScreenSharing}
+                        >
+                          {isCameraEnabled && !isScreenSharing ? <Video size={20} /> : <VideoOff size={20} />}
+                        </button>
 
-                    <div className="mt-4 max-h-64 space-y-3 overflow-y-auto pr-1">
-                      {!hasMl ? (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
-                          Пока нет ML-метрик. Студенты должны дать consent, включить камеру и открыть урок.
-                        </div>
-                      ) : (
-                        liveMetrics!.participants.map((p) => (
-                          <div key={p.userId} className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-white">
-                                  {p.name || p.email || p.userId}
-                                </div>
-                                <div className="mt-1 text-[11px] text-white/40">
-                                  {new Date(p.updatedAt).toLocaleTimeString()}
-                                </div>
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isScreenSharing
+                              ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
+                              : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          }`}
+                          title={
+                            isScreenSharing
+                              ? "Остановить демонстрацию экрана"
+                              : "Запустить демонстрацию экрана"
+                          }
+                          onClick={toggleScreenShare}
+                        >
+                          <Monitor size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className={`rounded-full border p-3 transition ${
+                            isSettingsOpen
+                              ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
+                              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                          }`}
+                          title="Показать настройки"
+                          onClick={() => setIsSettingsOpen((v) => !v)}
+                        >
+                          <Settings size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="rounded-full border border-amber-400/20 bg-amber-500/15 p-3 text-amber-300 transition hover:bg-amber-500/20"
+                          title="Добавить маркер"
+                        >
+                          <Flag size={20} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
+                          title="Завершить сессию"
+                          onClick={() => setConfirmEndOpen(true)}
+                        >
+                          <PhoneOff size={22} />
+                        </button>
+                      </div>
+
+                      {isSettingsOpen && (
+                        <div className="mx-auto mt-4 max-w-xl space-y-3">
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/75">
+                            <div className="flex items-start gap-2">
+                              <div className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-200">
+                                <Sparkles size={16} />
                               </div>
-
-                              <Badge className="border border-white/10 bg-white/10 text-white/85">
-                                {p.emotion} • {(p.confidence * 100).toFixed(0)}%
-                              </Badge>
-                            </div>
-
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <Badge
-                                className={
-                                  p.state === "NORMAL"
-                                    ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
-                                    : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
-                                }
-                              >
-                                {p.state}
-                              </Badge>
-
-                              <Badge className="border border-white/10 bg-white/10 text-white/85">
-                                Risk {(p.risk * 100).toFixed(0)}%
-                              </Badge>
+                              <div>
+                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
+                                  Live assistant
+                                </div>
+                                <div className="mt-1 text-sm text-white/85">{liveSuggestion}</div>
+                              </div>
                             </div>
                           </div>
-                        ))
+
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <LiveInfoCard label="Mic" value={isMicEnabled ? "On" : "Off"} />
+                            <LiveInfoCard label="Camera" value={isCameraEnabled ? "On" : "Off"} />
+                            <LiveInfoCard label="Screen" value={isScreenSharing ? "Sharing" : "Off"} />
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-white">Alerts</div>
-                      <AlertTriangle size={16} className="text-amber-300" />
+                  <aside
+                    className={`w-full shrink-0 border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)] xl:flex xl:min-h-0 xl:w-[390px] xl:max-w-[390px] ${
+                      chatOpen ? "flex min-h-0 flex-col" : "hidden xl:flex xl:flex-col"
+                    }`}
+                  >
+                    <div className="shrink-0 border-b border-white/10 px-5 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">Control center</div>
+                          <div className="mt-1 text-xs text-white/45">Live metrics, participants and chat</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-white/10 bg-white/5 text-white hover:bg-white/10 xl:hidden"
+                            onClick={() => setChatOpen(false)}
+                            aria-label="Закрыть чат"
+                          >
+                            Закрыть
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            onClick={() => setConfirmEndOpen(true)}
+                          >
+                            <LogOut size={14} />
+                            Завершить
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <LiveInfoCard label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
+                        <LiveInfoCard label="Participants" value={`${participants.length}`} />
+                        <LiveInfoCard label="Avg engagement" value={hasMl ? formatPct100(avgEngagement) : "—"} />
+                        <LiveInfoCard label="Avg stress" value={hasMl ? formatPct100(avgStress) : "—"} />
+                        <LiveInfoCard label="Group state" value={hasMl ? (liveMetrics?.groupState ?? "—") : "—"} />
+                        <LiveInfoCard label="Pattern" value={hasMl ? (liveMetrics?.pattern ?? "—") : "—"} />
+                      </div>
                     </div>
 
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
-                      Пока нет событий attention drop. После подключения потоковых alerts здесь появятся провалы внимания,
-                      пики риска и таймлайн-маркеры.
+                    <div className="min-h-0 flex-1 border-b border-white/10 p-4">
+                      <SessionChatPanel
+                        sessionId={roomId}
+                        role="teacher"
+                        type={sessionType === "exam" ? "exam" : "lecture"}
+                      />
                     </div>
 
-                    {hasMl && apiAvailable && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="mt-3 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
-                        onClick={() => {
-                          const riskPct = (avgRisk * 100).toFixed(0);
-                          const text = `⚠ Средний риск сейчас ${riskPct}% (по текущим ML-метрикам группы).`;
-                          postSessionMessage(roomId, {
-                            type: "system",
-                            text,
-                            channel: "public",
-                          }).catch(() => {});
-                        }}
-                      >
-                        <Send size={14} />
-                        Отправить агрегат в чат
-                      </Button>
+                    <div className="border-b border-white/10 px-5 py-4">
+                      <div className="text-sm font-semibold text-white">Session integrity</div>
+                      <div className="mt-4 grid gap-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                          Backend:{" "}
+                          <span className={apiAvailable ? "text-emerald-300" : "text-amber-300"}>
+                            {apiAvailable ? "connected" : "offline"}
+                          </span>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                          Camera:{" "}
+                          <span className={cameraReady ? "text-emerald-300" : "text-amber-300"}>
+                            {cameraReady ? "ready" : "check required"}
+                          </span>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                          Consent model: <span className="text-emerald-300">active</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {apiAvailable && isRealSessionId(roomId) && (
+                      <div className="border-b border-white/10 px-5 py-4">
+                        <div className="text-sm font-semibold text-white">Chat mode</div>
+                        <div className="mt-3">
+                          <select
+                            className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none"
+                            value={chatPolicy?.mode ?? "lecture_open"}
+                            onChange={async (e) => {
+                              const mode = e.target.value as SessionChatPolicy["mode"];
+                              try {
+                                const updated = await updateSessionChatPolicy(roomId, { mode });
+                                setChatPolicy(updated);
+                              } catch (err) {
+                                console.error("updateSessionChatPolicy", err);
+                              }
+                            }}
+                          >
+                            <option value="lecture_open">Открытый (все сообщения)</option>
+                            <option value="questions_only">Только вопросы</option>
+                            <option value="locked">Закрыт</option>
+                            <option value="exam_help_only">Экзамен (только help)</option>
+                          </select>
+                        </div>
+
+                        <div className="mt-2 text-xs text-white/45">
+                          {chatPolicy?.mode === "locked" && "Студенты не могут писать"}
+                          {chatPolicy?.mode === "questions_only" && "Студенты могут отправлять только вопросы"}
+                          {chatPolicy?.mode === "lecture_open" && "Стандартный чат лекции"}
+                          {chatPolicy?.mode === "exam_help_only" && "Только help-канал для экзамена"}
+                        </div>
+                      </div>
                     )}
-                  </div>
 
-                  <div className="px-5 py-4 text-xs leading-relaxed text-white/45">
-                    Метрики отображаются только для студентов, которые дали согласие.
-                    Raw-video не сохраняется. Система показывает агрегированные emotion/state/risk
-                    для live-поддержки преподавателя.
-                  </div>
-                </aside>
+                    <div className="border-b border-white/10 px-5 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-white">Participants & ML</div>
+                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70">
+                          <Users size={16} />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 max-h-64 space-y-3 overflow-y-auto pr-1">
+                        {!hasMl ? (
+                          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
+                            Пока нет ML-метрик. Студенты должны дать consent, включить камеру и открыть урок.
+                          </div>
+                        ) : (
+                          liveMetrics!.participants.map((p) => (
+                            <div key={p.userId} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-semibold text-white">
+                                    {p.name || p.email || p.userId}
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-white/40">
+                                    {new Date(p.updatedAt).toLocaleTimeString()}
+                                  </div>
+                                </div>
+
+                                <Badge className="border border-white/10 bg-white/10 text-white/85">
+                                  {p.emotion} • {(p.confidence * 100).toFixed(0)}%
+                                </Badge>
+                              </div>
+
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <Badge
+                                  className={
+                                    p.state === "NORMAL"
+                                      ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
+                                      : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
+                                  }
+                                >
+                                  {p.state}
+                                </Badge>
+
+                                <Badge className="border border-white/10 bg-white/10 text-white/85">
+                                  Risk {(p.risk * 100).toFixed(0)}%
+                                </Badge>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="border-b border-white/10 px-5 py-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-white">Alerts</div>
+                        <AlertTriangle size={16} className="text-amber-300" />
+                      </div>
+
+                      <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
+                        Пока нет событий attention drop. После подключения потоковых alerts здесь появятся провалы внимания,
+                        пики риска и таймлайн-маркеры.
+                      </div>
+
+                      {hasMl && apiAvailable && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-3 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          onClick={() => {
+                            const riskPct = (avgRisk * 100).toFixed(0);
+                            const text = `⚠ Средний риск сейчас ${riskPct}% (по текущим ML-метрикам группы).`;
+                            postSessionMessage(roomId, {
+                              type: "system",
+                              text,
+                              channel: "public",
+                            }).catch(() => {});
+                          }}
+                        >
+                          <Send size={14} />
+                          Отправить агрегат в чат
+                        </Button>
+                      )}
+                    </div>
+
+                    <div className="px-5 py-4 text-xs leading-relaxed text-white/45">
+                      Метрики отображаются только для студентов, которые дали согласие.
+                      Raw-video не сохраняется. Система показывает агрегированные emotion/state/risk
+                      для live-поддержки преподавателя.
+                    </div>
+                  </aside>
+                </div>
               </div>
-            </div>
+            </>
           </Reveal>
         </Section>
       )}
