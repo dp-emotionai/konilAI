@@ -32,6 +32,7 @@ import {
   type GroupSession,
 } from "@/lib/api/teacher";
 import Glow from "@/components/common/Glow";
+import { GroupAnalyticsSection } from "@/components/analytics/GroupAnalyticsSection";
 import {
   Edit3,
   Mail,
@@ -622,6 +623,12 @@ export default function TeacherGroupDetailPage() {
           </CardContent>
         </Card>
       </Section>
+
+      {id && (
+        <Section>
+          <GroupAnalyticsSection groupId={id} />
+        </Section>
+      )}
 
       <Section>
         <div className="flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3 mb-5">

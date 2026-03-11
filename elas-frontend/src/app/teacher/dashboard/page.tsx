@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getTeacherDashboardSessions, type TeacherDashboardSession } from "@/lib/api/teacher";
 
 import { buildInsightsFromSessions, summarizeTeacherDashboard } from "@/lib/utils/metrics";
+import { TeacherAnalyticsCard } from "@/components/analytics/TeacherAnalyticsCard";
 import {
   Users,
   PlayCircle,
@@ -257,7 +258,8 @@ export default function TeacherDashboard() {
             </Card>
           </Reveal>
 
-          <Reveal className="lg:col-span-5">
+          <Reveal className="lg:col-span-5 space-y-6">
+            <TeacherAnalyticsCard />
             <Card
               variant="elevated"
               interactive
