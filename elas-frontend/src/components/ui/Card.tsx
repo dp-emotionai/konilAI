@@ -18,26 +18,26 @@ export function Card({
   interactive = false,
 }: CardProps) {
   const base =
-    "rounded-elas-lg bg-surface text-fg transition-[box-shadow,transform,background-color,border-color] duration-200";
+    "rounded-elas-lg bg-surface text-fg transition-all duration-200 ease-out";
 
   const variants: Record<NonNullable<CardProps["variant"]>, string> = {
     default:
-      "ring-1 ring-[color:var(--border)]/25 shadow-soft",
+      "ring-1 ring-[color:var(--border)]/30 shadow-soft",
     outline:
-      "border border-[color:var(--border)] bg-surface",
+      "ring-1 ring-[color:var(--border)]/40 bg-surface",
     subtle:
-      "bg-surface-subtle ring-1 ring-[color:var(--border)]/18",
+      "bg-surface-subtle/90 ring-1 ring-[color:var(--border)]/20 backdrop-blur-[2px]",
     elevated:
-      "ring-1 ring-[color:var(--border)]/22 shadow-elevated",
+      "ring-1 ring-[color:var(--border)]/25 shadow-card",
   };
 
   const hover = interactive
     ? cn(
-        "hover:-translate-y-[1px]",
+        "hover:-translate-y-0.5",
         variant === "elevated"
-          ? "hover:shadow-elevated hover:ring-[color:var(--border)]/35"
+          ? "hover:shadow-elevated hover:ring-[color:var(--border)]/40"
           : variant === "outline"
-            ? "hover:bg-[color:var(--surface-hover)] hover:border-[color:var(--border-strong)]"
+            ? "hover:ring-[color:var(--border-strong)] hover:shadow-soft"
             : "hover:shadow-card hover:ring-[color:var(--border)]/35"
       )
     : "";

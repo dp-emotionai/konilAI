@@ -1,41 +1,42 @@
 @import "tailwindcss";
 
 /* =========================
-   ELAS Design Tokens
-   Refined SaaS UI — Notion/Stripe/Linear quality
+   KonilAI Design Tokens
+   Premium SaaS — Stripe / Vercel / Linear quality
    ========================= */
 :root {
-  /* Backgrounds */
-  --bg: #f7f8fc;
+  /* Backgrounds — layered depth */
+  --bg: #f8f9fc;
   --surface: #ffffff;
-  --surface-subtle: #f3f5fa;
-  --surface-soft: #eef2f8;
-  --surface-hover: rgba(15, 18, 34, 0.05);
+  --surface-subtle: #f1f3f9;
+  --surface-soft: #e8ecf4;
+  --surface-hover: rgba(15, 18, 34, 0.04);
 
   /* Borders */
-  --border: rgba(15, 18, 34, 0.10);
-  --border-strong: rgba(15, 18, 34, 0.16);
+  --border: rgba(15, 18, 34, 0.08);
+  --border-strong: rgba(15, 18, 34, 0.14);
 
-  /* Text */
-  --text: #0f1222;
-  --muted: rgba(15, 18, 34, 0.64);
-  --muted-2: rgba(15, 18, 34, 0.44);
+  /* Text — clear hierarchy */
+  --text: #0d0f1a;
+  --muted: rgba(15, 18, 34, 0.6);
+  --muted-2: rgba(15, 18, 34, 0.42);
 
-  /* Primary */
-  --primary: 142 91 255;
-  --primary-hover: 164 123 255;
-  --primary-muted: rgba(142, 91, 255, 0.12);
+  /* Primary — KonilAI purple, refined */
+  --primary: 124 58 237;
+  --primary-hover: 139 92 246;
+  --primary-muted: rgba(124, 58, 237, 0.1);
+  --primary-glow: rgba(124, 58, 237, 0.35);
 
   --ring: rgb(var(--primary));
 
-  /* Radii — consistent scale */
+  /* Radii */
   --radius: 10px;
   --radius-sm: 6px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-pill: 9999px;
 
-  /* Spacing scale (for layout consistency) */
+  /* Spacing — 8/12/16/24/32/48/64 rhythm */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -45,8 +46,9 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+  --space-16: 64px;
 
-  /* Typography scale */
+  /* Typography — strong hierarchy */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -55,6 +57,8 @@
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
@@ -63,37 +67,43 @@
   --leading-relaxed: 1.625;
 
   /* Semantic states */
-  --success: 61 220 151;
-  --warning: 245 165 36;
-  --error: 255 77 109;
+  --success: 34 197 94;
+  --warning: 245 158 11;
+  --error: 239 68 68;
   --danger: 239 68 68;
 
-  /* Shadows */
-  --shadow-soft: 0 4px 12px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
-  --shadow-elevated: 0 16px 48px rgba(15, 23, 42, 0.12);
+  /* Shadows — layered elevation */
+  --shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 4px 16px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --shadow-elevated: 0 12px 40px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(15, 23, 42, 0.06);
+  --shadow-glow: 0 0 0 1px rgba(124, 58, 237, 0.1), 0 4px 20px rgba(124, 58, 237, 0.15);
+
+  /* Transitions */
+  --ease-default: 0.2s ease;
 }
 
 :root.dark {
-  --bg: #0f1117;
-  --surface: #151826;
-  --surface-subtle: #1b2032;
-  --surface-soft: #20263a;
-  --surface-hover: rgba(255, 255, 255, 0.06);
+  --bg: #0a0b0f;
+  --surface: #12141c;
+  --surface-subtle: #181b26;
+  --surface-soft: #1e2230;
+  --surface-hover: rgba(255, 255, 255, 0.05);
 
-  --border: rgba(255, 255, 255, 0.10);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
 
-  --text: rgba(255, 255, 255, 0.92);
-  --muted: rgba(255, 255, 255, 0.64);
-  --muted-2: rgba(255, 255, 255, 0.46);
+  --text: rgba(255, 255, 255, 0.94);
+  --muted: rgba(255, 255, 255, 0.62);
+  --muted-2: rgba(255, 255, 255, 0.44);
 
-  --primary-muted: rgba(142, 91, 255, 0.22);
+  --primary-muted: rgba(124, 58, 237, 0.2);
+  --primary-glow: rgba(124, 58, 237, 0.25);
   --ring: rgb(var(--primary));
 
-  --shadow-soft: 0 14px 36px rgba(0, 0, 0, 0.30);
-  --shadow-card: 0 18px 52px rgba(0, 0, 0, 0.40);
-  --shadow-elevated: 0 26px 84px rgba(0, 0, 0, 0.54);
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-elevated: 0 20px 56px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px rgba(124, 58, 237, 0.2), 0 0 32px rgba(124, 58, 237, 0.15);
 }
 
 html,
@@ -124,7 +134,7 @@ body {
 }
 
 ::selection {
-  background: rgba(142, 91, 255, 0.18);
+  background: rgba(124, 58, 237, 0.2);
 }
 
 h1,

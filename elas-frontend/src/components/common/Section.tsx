@@ -11,10 +11,10 @@ export default function Section({ className, children, spacing = "normal" }: Pro
     spacing === "none"
       ? ""
       : spacing === "tight"
-      ? "py-6 md:py-8"
+      ? "py-8 md:py-10"
       : spacing === "loose"
-      ? "py-14 md:py-20"
-      : "py-10 md:py-14";
+      ? "py-16 md:py-24"
+      : "py-12 md:py-16";
 
   return (
     <section className={cn("mx-auto max-w-elas-page px-4", pad, className)}>

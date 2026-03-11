@@ -49,7 +49,13 @@ const config: Config = {
         card: "var(--shadow-card)",
         "card-rich": "var(--shadow-card-rich)",
         elevated: "var(--shadow-elevated)",
-        glow: "0 0 0 1px rgba(142,91,255,0.22), 0 8px 32px rgba(142,91,255,0.14)",
+        glow: "var(--shadow-glow)",
+      },
+      transitionDuration: {
+        DEFAULT: "200ms",
+      },
+      transitionTimingFunction: {
+        DEFAULT: "ease",
       },
       maxWidth: {
         "elas-page": "1200px",

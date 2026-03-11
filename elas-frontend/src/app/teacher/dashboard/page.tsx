@@ -50,10 +50,10 @@ function KPI({
   return (
     <div
       className={cn(
-        "rounded-2xl p-5 transition-shadow duration-200",
+        "rounded-elas-lg p-6 transition-all duration-200 ease-out",
         accent
-          ? "bg-gradient-to-br from-primary-muted/40 to-primary-muted/10 ring-1 ring-[rgb(var(--primary))]/20 shadow-soft"
-          : "bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 hover:ring-[color:var(--border)]/30"
+          ? "bg-gradient-to-br from-primary-muted/50 to-primary-muted/15 ring-1 ring-[rgb(var(--primary))]/25 shadow-soft hover:shadow-glow hover:ring-[rgb(var(--primary))]/30"
+          : "bg-surface ring-1 ring-[color:var(--border)]/25 shadow-soft hover:shadow-card hover:ring-[color:var(--border)]/35 hover:-translate-y-0.5"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -65,7 +65,7 @@ function KPI({
         <div
           className={cn(
             "shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl",
-            accent ? "bg-[rgb(var(--primary))]/20 text-[rgb(var(--primary))]" : "bg-surface text-[rgb(var(--primary))] shadow-soft"
+            accent ? "bg-[rgb(var(--primary))]/20 text-[rgb(var(--primary))]" : "bg-surface-subtle text-[rgb(var(--primary))]"
           )}
         >
           {icon}
@@ -77,7 +77,7 @@ function KPI({
 
 function Insight({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-xl bg-surface-subtle/60 p-4 ring-1 ring-[color:var(--border)]/15 hover:ring-[color:var(--border)]/25 transition-shadow">
+    <div className="rounded-elas-lg bg-surface-subtle/70 p-5 ring-1 ring-[color:var(--border)]/20 hover:ring-[color:var(--border)]/30 hover:shadow-soft transition-all duration-200 ease-out">
       <div className="font-semibold text-fg">{title}</div>
       <div className="text-sm mt-1.5 text-muted leading-relaxed">{text}</div>
     </div>
@@ -93,7 +93,7 @@ function StatusBadge({ status }: { status: TeacherDashboardSession["status"] }) 
 function SessionCard({ session }: { session: TeacherDashboardSession }) {
   const qualityLabel = session.quality === "good" ? "Хорошо" : session.quality === "medium" ? "Средне" : "Низко";
   return (
-    <div className="group rounded-2xl bg-surface-subtle/50 ring-1 ring-[color:var(--border)]/20 hover:ring-[color:var(--border)]/35 p-4 md:p-5 transition-all duration-200 hover:shadow-soft">
+    <div className="group rounded-elas-lg bg-surface ring-1 ring-[color:var(--border)]/25 p-5 md:p-6 transition-all duration-200 ease-out hover:shadow-card hover:ring-[color:var(--border)]/40 hover:-translate-y-0.5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-fg truncate">{session.title}</div>
@@ -234,7 +234,7 @@ export default function TeacherDashboard() {
         {/* KPI + LIVE */}
         <div className="grid gap-6 lg:grid-cols-12">
           <Reveal className="lg:col-span-7">
-            <Card variant="elevated">
+            <Card variant="elevated" interactive>
               <CardContent className="p-6 md:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -258,7 +258,11 @@ export default function TeacherDashboard() {
           </Reveal>
 
           <Reveal className="lg:col-span-5">
-            <Card variant="elevated" className={liveNow ? "ring-[rgb(var(--primary))]/20" : ""}>
+            <Card
+              variant="elevated"
+              interactive
+              className={liveNow ? "ring-[rgb(var(--primary))]/30 shadow-glow" : ""}
+            >
               <CardContent className="p-6 md:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -316,7 +320,7 @@ export default function TeacherDashboard() {
 
         {/* Недавние сессии — карточки без таблицы */}
         <Reveal>
-          <Card variant="elevated">
+          <Card variant="elevated" interactive>
             <CardContent className="p-6 md:p-8">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -358,20 +362,20 @@ export default function TeacherDashboard() {
 
         {/* Insights */}
         <Reveal>
-          <Card variant="elevated">
+          <Card variant="elevated" interactive>
             <CardContent className="p-6 md:p-8">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted">
                     <Sparkles size={14} className="text-[rgb(var(--primary))]" />
-                    Insights
+                    Инсайты
                   </div>
                   <h2 className="mt-2 text-xl font-bold text-fg">Авто-рекомендации</h2>
                   <p className="mt-1 text-sm text-muted leading-relaxed">
                     Подсказки по паттернам сессий (пока детерминированно).
                   </p>
                 </div>
-                <Badge className="bg-primary/10 text-[rgb(var(--primary))]">smart</Badge>
+                <Badge className="bg-primary/10 text-[rgb(var(--primary))]">Умные</Badge>
               </div>
 
               <div className="mt-6 space-y-3">

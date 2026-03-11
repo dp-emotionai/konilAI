@@ -67,39 +67,38 @@ export default function HomePage() {
           className="absolute inset-0 opacity-100 dark:opacity-0"
           style={{
             background:
-              "radial-gradient(ellipse 100% 80% at 50% -20%, rgba(142,91,255,0.05) 0%, rgba(142,91,255,0.02) 36%, rgba(142,91,255,0.006) 62%, transparent 78%)",
+              "radial-gradient(ellipse 100% 80% at 50% -20%, rgba(124,58,237,0.06) 0%, rgba(124,58,237,0.02) 36%, rgba(124,58,237,0.008) 62%, transparent 78%)",
           }}
         />
         <div
           className="absolute inset-0 opacity-0 dark:opacity-100"
           style={{
             background:
-              "radial-gradient(ellipse 110% 85% at 50% -15%, rgba(142,91,255,0.12) 0%, rgba(142,91,255,0.055) 28%, rgba(142,91,255,0.02) 52%, rgba(142,91,255,0.006) 72%, transparent 86%)",
+              "radial-gradient(ellipse 110% 85% at 50% -15%, rgba(124,58,237,0.14) 0%, rgba(124,58,237,0.06) 28%, rgba(124,58,237,0.02) 52%, rgba(124,58,237,0.006) 72%, transparent 86%)",
           }}
         />
       </div>
 
       {/* HERO — без SectionLightStrip, чтобы не было “кирпича” */}
-      <Section spacing="loose" className="pt-20 md:pt-28 relative">
-        <div className="grid gap-10 lg:grid-cols-12 items-start">
+      <Section spacing="loose" className="pt-24 md:pt-32 relative">
+        <div className="grid gap-12 lg:grid-cols-12 items-start">
           {/* Left */}
           <div className="lg:col-span-6">
             <div className="inline-flex items-center gap-2 rounded-full bg-surface/80 dark:bg-surface-subtle/70 backdrop-blur-sm ring-1 ring-[color:var(--border)]/40 px-4 py-2.5 text-sm text-muted shadow-soft">
               <span className="h-2 w-2 rounded-full bg-[rgb(var(--primary))] shadow-soft" />
-              Live lessons • WebRTC • Chat • Analytics
+              Эфиры • WebRTC • Чат • Аналитика
               <Badge className="ml-2" variant="primary">
-                Consent-first
+                С согласия
               </Badge>
             </div>
 
-            <h1 className="mt-8 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-fg leading-[1.06]">
-              Real-time уроки с{" "}
+            <h1 className="mt-10 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-fg leading-[1.08]">
+              Уроки в реальном времени с{" "}
               <span className="text-[rgb(var(--primary))]">AI-аналитикой</span>
             </h1>
 
             <p className="mt-6 text-base md:text-lg text-muted leading-relaxed max-w-xl">
-              Konilai — платформа для live-занятий: WebRTC видео, чат внутри сессии и аналитика вовлечённости в реальном времени — с фокусом
-              на этику, согласие и приватность.
+              KonilAI — платформа для живых занятий: видео, чат и аналитика вовлечённости в реальном времени с фокусом на этику, согласие и приватность.
             </p>
 
             <div className="mt-10 flex flex-wrap gap-3">
@@ -118,22 +117,22 @@ export default function HomePage() {
               </Link>
             </div>
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              <MiniPill icon={<Users size={18} />} title="Rooms" value="Session-based" />
-              <MiniPill icon={<Video size={18} />} title="Transport" value="WebRTC + чат" />
-              <MiniPill icon={<Lock size={18} />} title="Privacy" value="Consent-first" />
+            <div className="mt-12 grid gap-4 sm:grid-cols-3">
+              <MiniPill icon={<Users size={18} />} title="Сессии" value="По занятиям" />
+              <MiniPill icon={<Video size={18} />} title="Транспорт" value="WebRTC + чат" />
+              <MiniPill icon={<Lock size={18} />} title="Приватность" value="С согласия" />
             </div>
           </div>
 
           {/* Right: один цельный “preview panel” */}
-          <div className="lg:col-span-6 lg:pl-6">
-            <Card variant="elevated" interactive className="overflow-hidden">
-              <CardContent className="p-6 md:p-7">
+          <div className="lg:col-span-6 lg:pl-8">
+            <Card variant="elevated" interactive className="overflow-hidden ring-1 ring-[color:var(--border)]/30 shadow-elevated">
+              <CardContent className="p-6 md:p-8">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 text-sm text-muted">
                       <ShieldCheck size={18} className="text-[rgb(var(--primary))]" />
-                      Consent-first preview
+                      Превью с согласия
                       <Badge variant="primary">{previewLabel}</Badge>
                     </div>
                     <div className="mt-2 text-lg font-semibold text-fg truncate">{previewSub}</div>
@@ -144,13 +143,13 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-6 grid grid-cols-3 gap-3">
-                  <Kpi label="Engagement" value={`${summary.avgEngagement || 0}%`} />
-                  <Kpi label="Stress" value={previewMetrics ? String(previewMetrics.stress) : "—"} />
-                  <Kpi label="Drops" value={String(summary.attentionAlerts || 0)} />
+                  <Kpi label="Вовлечённость" value={`${summary.avgEngagement || 0}%`} />
+                  <Kpi label="Стресс" value={previewMetrics ? String(previewMetrics.stress) : "—"} />
+                  <Kpi label="События" value={String(summary.attentionAlerts || 0)} />
                 </div>
 
-                <div className="mt-5 rounded-elas-lg bg-surface-subtle/70 ring-1 ring-[color:var(--border)]/25 p-3">
-                  <div className="text-xs text-muted mb-2">Engagement flow</div>
+                <div className="mt-6 rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/25 p-4">
+                  <div className="text-xs font-medium uppercase tracking-wider text-muted mb-2">Динамика вовлечённости</div>
                   <div className="h-20">
                     {previewMetrics ? (
                       <SparkArea values={previewMetrics.series} height={72} />
@@ -160,11 +159,7 @@ export default function HomePage() {
                   </div>
                   {updatedAt ? (
                     <div className="mt-2 text-[10px] text-muted">
-                      Updated{" "}
-                      {updatedAt.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      Обновлено {updatedAt.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   ) : null}
                 </div>
@@ -172,16 +167,16 @@ export default function HomePage() {
                 <div className="mt-6 flex flex-wrap items-center gap-2">
                   <Link href="/privacy">
                     <Button variant="outline" size="sm">
-                      Privacy
+                      Конфиденциальность
                     </Button>
                   </Link>
                   <Link href="/ethics">
                     <Button variant="outline" size="sm">
-                      Ethics
+                      Этика
                     </Button>
                   </Link>
                   <span className="text-xs text-muted">
-                    Preview без личной оценки личности.
+                    Без оценки личности.
                   </span>
                 </div>
               </CardContent>
@@ -195,7 +190,7 @@ export default function HomePage() {
         <div className="rounded-elas-lg bg-surface/70 dark:bg-surface-subtle/40 ring-1 ring-[color:var(--border)]/25 shadow-soft px-6 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="text-xs font-medium uppercase tracking-wider text-muted">
-              Trusted by innovative teams
+              Нам доверяют
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               {["Narxoz", "KnewIT", "ELAS Lab", "Digital Eng"].map((x) => (
@@ -226,9 +221,9 @@ export default function HomePage() {
           </div>
 
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
-            <Feature icon={<ShieldCheck size={22} />} title="Consent-first" text="Согласие до начала аналитики. Отзыв в любой момент." />
-            <Feature icon={<Activity size={22} />} title="Live monitoring" text="Таймлайн вовлечённости/стресса, события и подсказки." />
-            <Feature icon={<BarChart3 size={22} />} title="Reports & comparison" text="Отчёты по занятиям, KPI и сравнение сессий." />
+            <Feature icon={<ShieldCheck size={22} />} title="С согласия" text="Согласие до начала аналитики. Отзыв в любой момент." />
+            <Feature icon={<Activity size={22} />} title="Live-мониторинг" text="Таймлайн вовлечённости и стресса, события и подсказки." />
+            <Feature icon={<BarChart3 size={22} />} title="Отчёты и сравнение" text="Отчёты по занятиям, KPI и сравнение сессий." />
           </div>
         </Section>
       </SectionLightStrip>
@@ -307,7 +302,7 @@ export default function HomePage() {
         <Section spacing="loose" className="relative">
           <div className="mx-auto max-w-3xl text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-fg">
-              Для кого ELAS
+              Для кого KonilAI
             </h2>
             <p className="mt-4 text-muted leading-relaxed">
               Платформа для преподавателей, студентов и учебных организаций.
@@ -320,7 +315,7 @@ export default function HomePage() {
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-elas-lg bg-primary-muted text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/15">
                   <Gauge size={24} />
                 </div>
-                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Teacher</div>
+                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Преподаватель</div>
                 <div className="mt-2 text-2xl font-bold text-fg">Для преподавателя</div>
                 <p className="mt-3 text-muted leading-relaxed">
                   Запуск сессии, мониторинг группы, заметки, аналитика и отчёты — без лишнего шума.
@@ -334,7 +329,7 @@ export default function HomePage() {
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-elas-lg bg-primary-muted text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/15">
                   <Users size={24} />
                 </div>
-                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Student</div>
+                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Студент</div>
                 <div className="mt-2 text-2xl font-bold text-fg">Для студента</div>
                 <p className="mt-3 text-muted leading-relaxed">
                   Простой вход в сессию, камера-чек, управление согласием и личная сводка (опционально).
@@ -348,7 +343,7 @@ export default function HomePage() {
                 <div className="inline-flex h-12 w-12 items-center justify-center rounded-elas-lg bg-primary-muted text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/15">
                   <Users size={24} />
                 </div>
-                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Institution</div>
+                <div className="mt-5 text-xs font-medium uppercase tracking-wider text-muted">Организация</div>
                 <div className="mt-2 text-2xl font-bold text-fg">Для университетов и школ</div>
                 <p className="mt-3 text-muted leading-relaxed">
                   Обзор качества занятий, риск‑группы и отчёты для аккредитации — без хранения видео и с учётом согласия.
@@ -370,7 +365,7 @@ export default function HomePage() {
             Аналитика без записи видео и оценки личности
           </h2>
           <p className="mt-4 text-sm md:text-base text-white/70 leading-relaxed">
-            ELAS проектирован как consent‑first система: студент сам решает, участвовать ли в аналитике,
+            KonilAI проектирован как система с приоритетом согласия: студент сам решает, участвовать ли в аналитике,
             а преподаватель получает только агрегированные метрики для улучшения урока.
           </p>
 

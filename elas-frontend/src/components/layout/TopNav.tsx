@@ -79,12 +79,12 @@ function Logo({ href = "/" }: { href?: string }) {
           className="absolute inset-0 opacity-95"
           style={{
             background:
-              "radial-gradient(circle at 30% 20%, rgba(142,91,255,.34) 0%, rgba(142,91,255,.16) 38%, rgba(142,91,255,0) 62%)",
+              "radial-gradient(circle at 30% 20%, rgba(124,58,237,.34) 0%, rgba(124,58,237,.16) 38%, rgba(124,58,237,0) 62%)",
           }}
         />
         <div className="h-2.5 w-2.5 rounded-full bg-[rgb(var(--primary))] shadow-soft" />
       </div>
-      <span className="font-semibold tracking-wide text-fg">Konilai</span>
+      <span className="font-semibold tracking-wide text-fg">KonilAI</span>
     </Link>
   );
 }
