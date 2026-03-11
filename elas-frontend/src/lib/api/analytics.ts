@@ -142,8 +142,10 @@ function normTeacherAnalytics(raw: TeacherAnalyticsResponse): TeacherAnalytics {
 }
 
 // ——— Fetch analytics (JSON) ———
-
-const ANALYTICS_PREFIX = "api/analytics";
+// NOTE: backend mounts analytics under /api/analytics.
+// Так как getApiBaseUrl уже включает /api, здесь используем только /analytics/*,
+// чтобы избежать удвоения /api/api/...
+const ANALYTICS_PREFIX = "analytics";
 
 export async function fetchSessionAnalytics(sessionId: string): Promise<SessionAnalytics | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
@@ -197,7 +199,7 @@ export async function exportSessionReport(
   const base = getApiBaseUrl();
   const token = getToken();
   if (!base || !token) throw new Error("API not configured or not authenticated");
-  const path = `${base.replace(/\/$/, "")}/api/analytics/session/${sessionId}/export?format=${format}`;
+  const path = `${base.replace(/\/$/, "")}/analytics/session/${sessionId}/export?format=${format}`;
   const res = await fetch(path, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
@@ -213,7 +215,7 @@ export async function exportGroupReport(groupId: string): Promise<void> {
   const base = getApiBaseUrl();
   const token = getToken();
   if (!base || !token) throw new Error("API not configured or not authenticated");
-  const path = `${base.replace(/\/$/, "")}/api/analytics/group/${groupId}/export`;
+  const path = `${base.replace(/\/$/, "")}/analytics/group/${groupId}/export`;
   const res = await fetch(path, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
@@ -228,7 +230,7 @@ export async function exportTeacherReport(): Promise<void> {
   const base = getApiBaseUrl();
   const token = getToken();
   if (!base || !token) throw new Error("API not configured or not authenticated");
-  const path = `${base.replace(/\/$/, "")}/api/analytics/teacher/export`;
+  const path = `${base.replace(/\/$/, "")}/analytics/teacher/export`;
   const res = await fetch(path, {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
