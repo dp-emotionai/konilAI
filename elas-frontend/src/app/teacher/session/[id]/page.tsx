@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -21,6 +21,7 @@ import {
   postSessionMessage,
   type SessionLiveMetrics,
   type SessionChatPolicy,
+  type LiveMetricsParticipant,
 } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, isRealSessionId } from "@/lib/api/client";
 
@@ -56,6 +57,18 @@ import {
 
 type SessionPhase = "preflight" | "live" | "ended";
 
+function clamp01(x: number) {
+  // Accept either 0..1 or 0..100 inputs (normalize to 0..1).
+  const normalized = x > 1 && x <= 100 ? x / 100 : x;
+  if (Number.isNaN(x)) return 0;
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function formatPct100(x?: number | null) {
+  if (typeof x !== "number" || Number.isNaN(x)) return "—";
+  return `${Math.round(clamp01(x) * 100)}%`;
+}
+
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle px-3 py-3">
@@ -79,6 +92,74 @@ function formatPct01(x?: number) {
   return `${Math.round(x * 100)}%`;
 }
 
+function emotionTone(e?: string | null) {
+  const v = (e || "").toLowerCase();
+  if (v.includes("happy") || v.includes("joy") || v.includes("smile")) return "emerald";
+  if (v.includes("neutral") || v.includes("calm")) return "zinc";
+  if (v.includes("sad")) return "sky";
+  if (v.includes("angry") || v.includes("anger")) return "red";
+  if (v.includes("fear") || v.includes("anx")) return "amber";
+  if (v.includes("surprise")) return "violet";
+  if (v.includes("disgust")) return "lime";
+  return "zinc";
+}
+
+function EmotionBadge({ emotion }: { emotion?: string | null }) {
+  const tone = emotionTone(emotion);
+  const base =
+    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide border backdrop-blur";
+  const cls =
+    tone === "emerald"
+      ? "border-emerald-400/25 bg-emerald-500/15 text-emerald-200"
+      : tone === "red"
+        ? "border-red-400/25 bg-red-500/15 text-red-200"
+        : tone === "amber"
+          ? "border-amber-400/25 bg-amber-500/15 text-amber-200"
+          : tone === "violet"
+            ? "border-violet-400/25 bg-violet-500/15 text-violet-200"
+            : tone === "sky"
+              ? "border-sky-400/25 bg-sky-500/15 text-sky-200"
+              : tone === "lime"
+                ? "border-lime-400/25 bg-lime-500/15 text-lime-200"
+                : "border-white/10 bg-white/10 text-white/80";
+
+  return <span className={`${base} ${cls}`}>{emotion || "—"}</span>;
+}
+
+function MetricBar({
+  label,
+  value01,
+  tone = "primary",
+}: {
+  label: string;
+  value01?: number | null;
+  tone?: "primary" | "red" | "amber";
+}) {
+  const v = typeof value01 === "number" ? clamp01(value01) : null;
+  const bar =
+    tone === "red"
+      ? "bg-gradient-to-r from-red-500 to-rose-400"
+      : tone === "amber"
+        ? "bg-gradient-to-r from-amber-500 to-orange-400"
+        : "bg-gradient-to-r from-[rgb(var(--primary))] to-indigo-400";
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-[78px] text-[10px] uppercase tracking-[0.16em] text-white/45">
+        {label}
+      </div>
+      <div className="flex-1">
+        <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+          <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.round((v ?? 0) * 100)}%` }} />
+        </div>
+      </div>
+      <div className="w-10 text-right text-[10px] font-semibold text-white/80 tabular-nums">
+        {v == null ? "—" : `${Math.round(v * 100)}%`}
+      </div>
+    </div>
+  );
+}
+
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Студент";
   return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 8)}`;
@@ -90,15 +171,45 @@ function VideoTile({
   status,
   isLocal,
   videoRef,
+  metrics,
+  compact,
+  aspect = true,
 }: {
   stream: MediaStream | null;
   label: string;
   status: string;
   isLocal: boolean;
   videoRef: React.Ref<HTMLVideoElement | null>;
+  metrics?: LiveMetricsParticipant | null;
+  compact?: boolean;
+  aspect?: boolean;
 }) {
+  const engagement = metrics?.engagement ?? null;
+  const tone =
+    typeof engagement === "number"
+      ? clamp01(engagement) >= 0.7
+        ? "good"
+        : clamp01(engagement) >= 0.4
+          ? "mid"
+          : "bad"
+      : "neutral";
+  const engagementPill =
+    tone === "good"
+      ? "border-emerald-400/25 bg-emerald-500/15 text-emerald-200"
+      : tone === "mid"
+        ? "border-amber-400/25 bg-amber-500/15 text-amber-200"
+        : tone === "bad"
+          ? "border-red-400/25 bg-red-500/15 text-red-200"
+          : "border-white/10 bg-white/10 text-white/80";
+
   return (
-    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black aspect-video">
+    <div
+      className={
+        "relative overflow-hidden rounded-xl bg-black border border-white/10 " +
+        (aspect ? "aspect-video " : "") +
+        "cursor-default transition-all duration-300"
+      }
+    >
       <video
         ref={videoRef}
         className="h-full w-full object-cover"
@@ -108,9 +219,36 @@ function VideoTile({
       />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-2 p-2">
-        <span className="truncate rounded bg-black/50 px-2 py-1 text-xs font-medium text-white/90 backdrop-blur">
-          {label}
-        </span>
+        <div className="min-w-0 flex-1">
+          <div className="inline-flex max-w-full flex-col gap-1 rounded-lg bg-black/45 px-2 py-1.5 backdrop-blur border border-white/10">
+            <div className="truncate text-xs font-semibold text-white/90">{label}</div>
+
+            {!isLocal && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <EmotionBadge emotion={metrics?.emotion ?? null} />
+                <span
+                  className={
+                    "inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide border " +
+                    engagementPill
+                  }
+                >
+                  Engagement: {formatPct100(engagement)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {!compact && !isLocal && metrics && (
+            <div className="mt-2 rounded-lg bg-black/35 border border-white/10 p-2 backdrop-blur">
+              <div className="grid gap-1.5">
+                <MetricBar label="eng" value01={metrics.engagement ?? null} tone="primary" />
+                <MetricBar label="stress" value01={metrics.stress ?? null} tone="red" />
+                <MetricBar label="fatigue" value01={metrics.fatigue ?? null} tone="amber" />
+              </div>
+            </div>
+          )}
+        </div>
+
         <Badge className="shrink-0 border border-white/10 bg-black/50 text-[10px] text-white/80">
           {status}
         </Badge>
@@ -156,6 +294,7 @@ export default function TeacherLiveMonitorPage() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [wsDisconnected, setWsDisconnected] = useState(false);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>(null);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
@@ -334,6 +473,54 @@ export default function TeacherLiveMonitorPage() {
   const hasMl = Boolean(liveMetrics?.participants?.length);
   const avgRisk = liveMetrics?.avgRisk ?? 0;
   const avgConfidence = liveMetrics?.avgConfidence ?? 0;
+  const mlParticipants = liveMetrics?.participants ?? [];
+
+  const liveMetricsIndex = useMemo(() => {
+    const byKey = new Map<string, LiveMetricsParticipant>();
+    for (const m of mlParticipants) {
+      if (m.userId) byKey.set(`uid:${m.userId}`, m);
+      if (m.email) byKey.set(`email:${String(m.email).toLowerCase()}`, m);
+      if (m.name) byKey.set(`name:${String(m.name).toLowerCase()}`, m);
+    }
+    return byKey;
+  }, [mlParticipants]);
+
+  const metricsForPeer = useCallback(
+    (p: Participant): LiveMetricsParticipant | null => {
+      const uid = `uid:${p.id}`;
+      const email = p.email ? `email:${String(p.email).toLowerCase()}` : null;
+      const name = p.displayName || p.name;
+      const nameKey = name ? `name:${String(name).toLowerCase()}` : null;
+      return (
+        liveMetricsIndex.get(uid) ||
+        (email ? liveMetricsIndex.get(email) : undefined) ||
+        (nameKey ? liveMetricsIndex.get(nameKey) : undefined) ||
+        null
+      );
+    },
+    [liveMetricsIndex]
+  );
+
+  const avgEngagement =
+    liveMetrics?.avgEngagement ??
+    (mlParticipants.length
+      ? mlParticipants.reduce((a, p) => a + (typeof p.engagement === "number" ? p.engagement : 0), 0) /
+        Math.max(1, mlParticipants.filter((p) => typeof p.engagement === "number").length)
+      : null);
+
+  const avgStress =
+    liveMetrics?.avgStress ??
+    (mlParticipants.length
+      ? mlParticipants.reduce((a, p) => a + (typeof p.stress === "number" ? p.stress : 0), 0) /
+        Math.max(1, mlParticipants.filter((p) => typeof p.stress === "number").length)
+      : null);
+
+  const avgFatigue =
+    liveMetrics?.avgFatigue ??
+    (mlParticipants.length
+      ? mlParticipants.reduce((a, p) => a + (typeof p.fatigue === "number" ? p.fatigue : 0), 0) /
+        Math.max(1, mlParticipants.filter((p) => typeof p.fatigue === "number").length)
+      : null);
 
   const gates = {
     backend: apiAvailable,
@@ -695,39 +882,347 @@ export default function TeacherLiveMonitorPage() {
                     </div>
                   </div>
 
-                  {/* Video area: grid of all streams */}
-                  <div className="flex flex-1 flex-col p-5 min-h-0">
-                    <div
-                      className="grid gap-4 flex-1 min-h-0 w-full"
-                      style={{
-                        gridTemplateColumns: `repeat(auto-fill, minmax(200px, 1fr))`,
-                      }}
-                    >
-                      {/* Local (teacher) tile */}
-                      <VideoTile
-                        stream={localStream}
-                        label="Вы · Teacher"
-                        status={connectionState === "connected" ? "LIVE" : "—"}
-                        isLocal
-                        videoRef={localVideoRef}
-                      />
-                      {/* Remote participant tiles */}
-                      {participants.map((p) => (
-                        <VideoTile
-                          key={p.id}
-                          stream={remoteStreams[p.id] ?? null}
-                          label={formatParticipantLabel(p)}
-                          status={remoteStreams[p.id] ? "LIVE" : "Подключение..."}
-                          isLocal={false}
-                          videoRef={(el) => {
-                            (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
-                          }}
-                        />
-                      ))}
-                    </div>
+                  {/* Video area: focused layout (main + secondary grid) */}
+                  <div className="flex flex-1 flex-col p-5 min-h-0 gap-4 transition-all duration-300">
+                    {(() => {
+                      const totalTiles = 1 + participants.length; // teacher + students
 
-                    {/* Controls bar directly under video */}
-                    <div className="flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2">
+                      const focusedId =
+                        focusedParticipant === "local"
+                          ? "local"
+                          : focusedParticipant && focusedParticipant !== "local"
+                            ? focusedParticipant.id
+                            : participants[0]?.id ?? "local";
+
+                      const mainIsLocal =
+                        focusedId === "local" ||
+                        (!participants.length && focusedId !== "local");
+
+                      const mainRemote =
+                        !mainIsLocal && participants.find((p) => p.id === focusedId);
+
+                      // Fallbacks if focused participant left
+                      const effectiveMainIsLocal = mainRemote ? false : true;
+                      const effectiveMainRemote =
+                        !effectiveMainIsLocal && mainRemote
+                          ? mainRemote
+                          : !effectiveMainIsLocal
+                            ? participants[0]
+                            : null;
+
+                      const secondary: Array<{ kind: "local" | "remote"; peer?: Participant }> = [];
+
+                      if (!effectiveMainIsLocal) {
+                        secondary.push({ kind: "local" });
+                      }
+                      participants.forEach((p) => {
+                        if (effectiveMainRemote && p.id === effectiveMainRemote.id) return;
+                        secondary.push({ kind: "remote", peer: p });
+                      });
+
+                      // Side‑by‑side layout when only two tiles total (desktop only; mobile uses grid)
+                      if (totalTiles <= 2) {
+                        const other =
+                          totalTiles === 2
+                            ? effectiveMainIsLocal
+                              ? participants[0]
+                              : null
+                            : null;
+
+                        return (
+                          <>
+                            {/* Mobile: grid-only */}
+                            <div className="sm:hidden">
+                              <div className="grid grid-cols-2 gap-3">
+                                <button
+                                  type="button"
+                                  className="rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer transition-all duration-300 hover:scale-[1.03]"
+                                  onClick={() => setFocusedParticipant("local")}
+                                >
+                                  <VideoTile
+                                    stream={localStream}
+                                    label="Вы · Teacher"
+                                    status={connectionState === "connected" ? "LIVE" : "—"}
+                                    isLocal
+                                    compact
+                                    videoRef={localVideoRef}
+                                  />
+                                </button>
+                                {participants[0] && (
+                                  <button
+                                    type="button"
+                                    className="rounded-xl overflow-hidden bg-black border border-white/10 cursor-pointer transition-all duration-300 hover:scale-[1.03]"
+                                    onClick={() => setFocusedParticipant(participants[0])}
+                                  >
+                                    <VideoTile
+                                      stream={remoteStreams[participants[0].id] ?? null}
+                                      label={formatParticipantLabel(participants[0])}
+                                      status={
+                                        remoteStreams[participants[0].id]
+                                          ? "LIVE"
+                                          : "Подключение..."
+                                      }
+                                      isLocal={false}
+                                      metrics={metricsForPeer(participants[0])}
+                                      compact
+                                      videoRef={(el) => {
+                                        (remoteVideoRefs.current as Record<
+                                          string,
+                                          HTMLVideoElement | null
+                                        >)[participants[0].id] = el;
+                                      }}
+                                    />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Desktop: side-by-side */}
+                            <div className="hidden sm:flex flex-1 min-h-0 flex-col gap-4 md:flex-row transition-all duration-300">
+                              <div className="flex-1 min-w-0 flex items-stretch">
+                                <div className="w-full transition-all duration-300">
+                                  {effectiveMainIsLocal ? (
+                                    <VideoTile
+                                      stream={localStream}
+                                      label="Вы · Teacher"
+                                      status={connectionState === "connected" ? "LIVE" : "—"}
+                                      isLocal
+                                      videoRef={localVideoRef}
+                                    />
+                                  ) : effectiveMainRemote ? (
+                                    <VideoTile
+                                      stream={remoteStreams[effectiveMainRemote.id] ?? null}
+                                      label={formatParticipantLabel(effectiveMainRemote)}
+                                      status={
+                                        remoteStreams[effectiveMainRemote.id]
+                                          ? "LIVE"
+                                          : "Подключение..."
+                                      }
+                                      isLocal={false}
+                                      metrics={metricsForPeer(effectiveMainRemote)}
+                                      videoRef={(el) => {
+                                        (remoteVideoRefs.current as Record<
+                                          string,
+                                          HTMLVideoElement | null
+                                        >)[effectiveMainRemote.id] = el;
+                                      }}
+                                    />
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {other && (
+                                <div className="flex-1 min-w-0 flex items-stretch">
+                                  <button
+                                    type="button"
+                                    className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03] hover:shadow-xl"
+                                    onClick={() => setFocusedParticipant(other)}
+                                  >
+                                    <VideoTile
+                                      stream={remoteStreams[other.id] ?? null}
+                                      label={formatParticipantLabel(other)}
+                                      status={
+                                        remoteStreams[other.id] ? "LIVE" : "Подключение..."
+                                      }
+                                      isLocal={false}
+                                      metrics={metricsForPeer(other)}
+                                      compact
+                                      videoRef={(el) => {
+                                        (remoteVideoRefs.current as Record<
+                                          string,
+                                          HTMLVideoElement | null
+                                        >)[other.id] = el;
+                                      }}
+                                    />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        );
+                      }
+
+                      // Main focused video
+                      return (
+                        <>
+                          <div className="hidden sm:block w-full transition-all duration-300">
+                            <div className="w-full h-[60vh] min-h-[320px] rounded-xl overflow-hidden bg-black border border-white/10">
+                              {effectiveMainIsLocal ? (
+                                <VideoTile
+                                  stream={localStream}
+                                  label="Вы · Teacher"
+                                  status={connectionState === "connected" ? "LIVE" : "—"}
+                                  isLocal
+                                  aspect={false}
+                                  videoRef={localVideoRef}
+                                />
+                              ) : effectiveMainRemote ? (
+                                <VideoTile
+                                  stream={remoteStreams[effectiveMainRemote.id] ?? null}
+                                  label={formatParticipantLabel(effectiveMainRemote)}
+                                  status={
+                                    remoteStreams[effectiveMainRemote.id]
+                                      ? "LIVE"
+                                      : "Подключение..."
+                                  }
+                                  isLocal={false}
+                                  metrics={metricsForPeer(effectiveMainRemote)}
+                                  aspect={false}
+                                  videoRef={(el) => {
+                                    (remoteVideoRefs.current as Record<
+                                      string,
+                                      HTMLVideoElement | null
+                                    >)[effectiveMainRemote.id] = el;
+                                  }}
+                                />
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {/* Controls directly under main video (desktop) */}
+                          <div className="hidden sm:flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2 transition-all duration-300">
+                            <button
+                              type="button"
+                              className={`rounded-full border p-3 transition ${
+                                isMicEnabled
+                                  ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                                  : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              }`}
+                              title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
+                              onClick={toggleMic}
+                            >
+                              {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`rounded-full border p-3 transition ${
+                                isCameraEnabled && !isScreenSharing
+                                  ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                                  : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              }`}
+                              title={
+                                isScreenSharing
+                                  ? "Камера недоступна во время демонстрации"
+                                  : isCameraEnabled
+                                    ? "Выключить камеру"
+                                    : "Включить камеру"
+                              }
+                              onClick={toggleCamera}
+                              disabled={isScreenSharing}
+                            >
+                              {isCameraEnabled && !isScreenSharing ? (
+                                <Video size={20} />
+                              ) : (
+                                <VideoOff size={20} />
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`rounded-full border p-3 transition ${
+                                isScreenSharing
+                                  ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
+                                  : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              }`}
+                              title={
+                                isScreenSharing
+                                  ? "Остановить демонстрацию экрана"
+                                  : "Запустить демонстрацию экрана"
+                              }
+                              onClick={toggleScreenShare}
+                            >
+                              <Monitor size={20} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className={`rounded-full border p-3 transition ${
+                                isSettingsOpen
+                                  ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
+                                  : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                              }`}
+                              title="Показать настройки"
+                              onClick={() => setIsSettingsOpen((v) => !v)}
+                            >
+                              <Settings size={20} />
+                            </button>
+
+                            <button
+                              type="button"
+                              className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
+                              title="Завершить сессию"
+                              onClick={() => setPhase("ended")}
+                            >
+                              <PhoneOff size={22} />
+                            </button>
+                          </div>
+
+                          {/* Secondary participants grid */}
+                          {secondary.length > 0 && (
+                            <div className="flex-shrink-0">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4 transition-all duration-300">
+                                {secondary.map((item, idx) => {
+                                  if (item.kind === "local") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={`local-secondary-${idx}`}
+                                        className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03]"
+                                        onClick={() => setFocusedParticipant("local")}
+                                      >
+                                        <VideoTile
+                                          stream={localStream}
+                                          label="Вы · Teacher"
+                                          status={
+                                            connectionState === "connected" ? "LIVE" : "—"
+                                          }
+                                          isLocal
+                                          compact
+                                          videoRef={localVideoRef}
+                                        />
+                                      </button>
+                                    );
+                                  }
+
+                                  const peer = item.peer!;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={peer.id}
+                                      className="w-full cursor-pointer transition-all duration-300 hover:scale-[1.03]"
+                                      onClick={() => setFocusedParticipant(peer)}
+                                    >
+                                      <VideoTile
+                                        stream={remoteStreams[peer.id] ?? null}
+                                        label={formatParticipantLabel(peer)}
+                                        status={
+                                          remoteStreams[peer.id]
+                                            ? "LIVE"
+                                            : "Подключение..."
+                                        }
+                                        isLocal={false}
+                                        metrics={metricsForPeer(peer)}
+                                        compact
+                                        videoRef={(el) => {
+                                          (remoteVideoRefs.current as Record<
+                                            string,
+                                            HTMLVideoElement | null
+                                          >)[peer.id] = el;
+                                        }}
+                                      />
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+
+                    {/* Controls bar (mobile) */}
+                    <div className="sm:hidden flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2">
                       <button
                         type="button"
                         className={`rounded-full border p-3 transition ${
@@ -880,8 +1375,10 @@ export default function TeacherLiveMonitorPage() {
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <LiveInfoCard label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
                       <LiveInfoCard label="Participants" value={`${participants.length}`} />
-                      <LiveInfoCard label="Avg risk" value={hasMl ? formatPct01(avgRisk) : "—"} />
-                      <LiveInfoCard label="Avg confidence" value={hasMl ? formatPct01(avgConfidence) : "—"} />
+                      <LiveInfoCard label="Avg engagement" value={hasMl ? formatPct100(avgEngagement) : "—"} />
+                      <LiveInfoCard label="Avg stress" value={hasMl ? formatPct100(avgStress) : "—"} />
+                      <LiveInfoCard label="Group state" value={hasMl ? (liveMetrics?.groupState ?? "—") : "—"} />
+                      <LiveInfoCard label="Pattern" value={hasMl ? (liveMetrics?.pattern ?? "—") : "—"} />
                     </div>
                   </div>
 
