@@ -22,14 +22,30 @@ export default function Modal({
   footer,
   className,
 }: ModalProps) {
+  const closeRef = React.useRef<HTMLButtonElement>(null);
+  const previousActiveRef = React.useRef<HTMLElement | null>(null);
+
   React.useEffect(() => {
     if (!open) return;
+
+    previousActiveRef.current = document.activeElement as HTMLElement | null;
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    const t = requestAnimationFrame(() => {
+      closeRef.current?.focus();
+    });
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(t);
+      if (previousActiveRef.current?.focus) {
+        previousActiveRef.current.focus();
+      }
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -59,6 +75,7 @@ export default function Modal({
               {title ? <h2 id="modal-title" className="text-base font-semibold truncate">{title}</h2> : null}
             </div>
             <button
+              ref={closeRef}
               type="button"
               onClick={onClose}
               className={cn(

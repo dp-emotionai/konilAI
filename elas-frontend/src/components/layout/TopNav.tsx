@@ -47,6 +47,13 @@ import QuickSearch, { QuickSearchTrigger } from "./QuickSearch";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
 
+/* Glass dropdown: readable on any background (light/dark/gradient) */
+const DROPDOWN_PANEL =
+  "rounded-2xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
+  "ring-1 ring-black/[0.06] dark:ring-white/[0.08] " +
+  "bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl " +
+  "transition-[opacity,transform] duration-200 ease-out";
+
 const PUBLIC_ICONS: Record<
   string,
   React.ComponentType<{ size?: number; className?: string }>
@@ -69,21 +76,36 @@ const PUBLIC_ICONS: Record<
   HelpCircle,
 };
 
+/** KonilAI K mark — brand icon (replace with image/src if provided) */
+function KonilAILogoIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <path
+        d="M6 4v16h2.5V12l5.5 8h2.5l-5.5-7.5 5.5-8h-2.5L8.5 12V4H6z"
+        fill="currentColor"
+        className="text-[rgb(var(--primary))]"
+      />
+    </svg>
+  );
+}
+
 function Logo({ href = "/" }: { href?: string }) {
   const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
 
   return (
-    <Link href={safeHref} className="flex items-center gap-2 shrink-0">
-      <div className="relative h-9 w-9 rounded-elas-lg bg-primary-muted grid place-items-center overflow-hidden ring-1 ring-[color:var(--border)]/25">
-        <div
-          className="absolute inset-0 opacity-95"
-          style={{
-            background:
-              "radial-gradient(circle at 30% 20%, rgba(124,58,237,.34) 0%, rgba(124,58,237,.16) 38%, rgba(124,58,237,0) 62%)",
-          }}
-        />
-        <div className="h-2.5 w-2.5 rounded-full bg-[rgb(var(--primary))] shadow-soft" />
-      </div>
+    <Link
+      href={safeHref}
+      className="flex items-center gap-2.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] rounded-elas"
+    >
+      <span className="h-9 w-9 flex items-center justify-center rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25 flex-shrink-0">
+        <KonilAILogoIcon className="h-5 w-5" />
+      </span>
       <span className="font-semibold tracking-wide text-fg">KonilAI</span>
     </Link>
   );
@@ -149,13 +171,25 @@ function PublicNavItem({ item }: { item: NavItem }) {
   const children = Array.isArray(dropdown.children) ? dropdown.children : [];
   const hasCardStyle = children.some((c) => Boolean(c.subtitle ?? c.icon));
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   return (
     <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="true"
         className={cn(
           "inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
           open
             ? "text-fg bg-surface-subtle/80"
             : "text-muted hover:text-fg hover:bg-surface-subtle/60"
@@ -164,17 +198,16 @@ function PublicNavItem({ item }: { item: NavItem }) {
         {dropdown.label}
         <ChevronDown
           size={14}
-          className={cn("transition-transform", open && "rotate-180")}
+          className={cn("transition-transform duration-200", open && "rotate-180")}
         />
       </button>
 
       {open && (
         <div
           className={cn(
-            "absolute left-0 top-full mt-2 z-50 backdrop-blur-md",
-            hasCardStyle
-              ? "min-w-[280px] rounded-2xl bg-surface/95 shadow-card ring-1 ring-[color:var(--border)]/25 py-2"
-              : "min-w-[200px] rounded-xl bg-surface/95 shadow-card ring-1 ring-[color:var(--border)]/25 py-1"
+            "absolute left-0 top-full mt-2 z-50 py-2",
+            hasCardStyle ? "min-w-[280px]" : "min-w-[200px]",
+            DROPDOWN_PANEL
           )}
         >
           {children.map((child) => {
@@ -190,10 +223,10 @@ function PublicNavItem({ item }: { item: NavItem }) {
                 href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 transition-colors",
+                  "flex items-center gap-3 transition-colors rounded-lg mx-1.5",
                   hasCardStyle
-                    ? "px-4 py-3 hover:bg-surface-subtle/80"
-                    : "px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle"
+                    ? "px-4 py-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                    : "px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
                 )}
               >
                 {IconComp && (
@@ -243,6 +276,15 @@ function AppNavItem({
 
     if (open) document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
   if (item.type === "link") {
@@ -414,6 +456,15 @@ export default function TopNav() {
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen]);
 
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProfileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [profileOpen]);
+
   const handleLogout = useCallback(() => {
     clearAuth();
     setLoggedIn(false);
@@ -457,11 +508,12 @@ export default function TopNav() {
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
+                  aria-label="Открыть поиск (⌘K)"
                   className={cn(
                     "w-full max-w-sm flex items-center gap-2.5 h-10 pl-4 pr-3 rounded-full",
                     "bg-surface-subtle/80 hover:bg-surface-subtle text-muted hover:text-fg",
                     "ring-1 ring-[color:var(--border)]/30 shadow-soft",
-                    "transition-colors duration-150 text-left"
+                    "transition-colors duration-150 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                   )}
                 >
                   <Search size={18} className="shrink-0 text-muted" />
@@ -527,14 +579,16 @@ export default function TopNav() {
                     <button
                       type="button"
                       onClick={() => setProfileOpen((o) => !o)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg hover:bg-surface-subtle shadow-soft transition-colors"
+                      aria-expanded={profileOpen}
+                      aria-haspopup="true"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg hover:bg-surface-subtle shadow-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                       aria-label="Меню аккаунта"
                     >
                       <User size={18} />
                     </button>
 
                     {profileOpen && (
-                      <div className="absolute right-0 top-full mt-2 min-w-[200px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
+                      <div className={cn("absolute right-0 top-full mt-2 min-w-[200px] py-2 z-50", DROPDOWN_PANEL)}>
                         {statusLabel && (
                           <div className="px-4 pb-1 text-xs text-muted">
                             {statusLabel}
@@ -544,7 +598,7 @@ export default function TopNav() {
                         <Link
                           href="/profile"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1"
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
                         >
                           <User size={16} />
                           Профиль
@@ -553,7 +607,7 @@ export default function TopNav() {
                         <Link
                           href="/settings"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1 md:hidden"
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors md:hidden"
                         >
                           <Settings size={16} />
                           Настройки
@@ -562,7 +616,7 @@ export default function TopNav() {
                         <Link
                           href="/docs"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1"
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
                         >
                           <HelpCircle size={16} />
                           Помощь
@@ -574,19 +628,19 @@ export default function TopNav() {
                               safePathname || "/"
                             )}`}
                             onClick={() => setProfileOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-warning hover:bg-surface-subtle/80 rounded-xl mx-1"
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-warning hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
                           >
                             <ShieldCheck size={16} />
                             Нужно согласие
                           </Link>
                         )}
 
-                        <div className="my-1 h-px bg-[color:var(--border)]/60" />
+                        <div className="my-1 h-px bg-[color:var(--border)]/60 mx-2" />
 
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-surface-subtle/80 rounded-xl mx-1 text-left"
+                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 text-left transition-colors"
                         >
                           <LogOut size={16} />
                           Выйти
@@ -630,7 +684,7 @@ export default function TopNav() {
         </div>
 
         {mobileOpen && (
-          <div className="lg:hidden border-b border-border/40 bg-surface/95 backdrop-blur-xl">
+          <div className="lg:hidden border-b border-[color:var(--border)] bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl shadow-elevated">
             <div className="mx-auto max-w-elas-page px-4 py-4 space-y-3">
               {!state.loggedIn &&
                 (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (

@@ -213,10 +213,10 @@ function MemberActionsDropdown({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-2xl bg-surface shadow-card ring-1 ring-[color:var(--border)]/25 py-1">
+          <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-2xl py-1 shadow-elevated border border-[color:var(--border)] ring-1 ring-black/[0.06] dark:ring-white/[0.08] bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl">
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-fg hover:bg-surface-subtle"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1 transition-colors"
               onClick={() => {
                 setOpen(false);
                 onRemove();
@@ -227,7 +227,7 @@ function MemberActionsDropdown({
             </button>
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-warning hover:bg-surface-subtle"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-warning hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1 transition-colors"
               onClick={() => {
                 setOpen(false);
                 onBlock();
