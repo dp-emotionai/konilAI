@@ -890,7 +890,7 @@ export default function TeacherLiveMonitorPage() {
                       const focusedId =
                         focusedParticipant === "local"
                           ? "local"
-                          : focusedParticipant && focusedParticipant !== "local"
+                          : focusedParticipant
                             ? focusedParticipant.id
                             : participants[0]?.id ?? "local";
 

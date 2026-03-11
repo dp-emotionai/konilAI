@@ -208,22 +208,24 @@ export default function AdminDashboardPage() {
                     {pendingTeachers && pendingTeachers > 0 ? "Ожидают одобрения" : "Нет заявок"}
                   </StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted">
                   Количество аккаунтов с ролью преподавателя в статусе PENDING.
                 </p>
-              </GlassCard>
+                </CardContent>
+              </Card>
             </Stagger>
           </Reveal>
 
           <Reveal>
             <Stagger ms={160}>
-              <GlassCard className="space-y-4 p-6">
-                <p className="text-sm text-zinc-400">Точность модели</p>
-                <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">92,4%</h3>
-                  <StatBadge tone="purple">Стабильно</StatBadge>
-                </div>
-                <p className="text-xs text-muted">Уверенность детекции эмоций</p>
+              <Card variant="elevated" interactive className="overflow-hidden">
+                <CardContent className="space-y-4 p-6 md:p-8">
+                  <p className="text-sm text-muted">Точность модели</p>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-3xl md:text-4xl font-bold text-fg tracking-tight">92,4%</h3>
+                    <StatBadge tone="purple">Стабильно</StatBadge>
+                  </div>
+                  <p className="text-xs text-muted">Уверенность детекции эмоций</p>
                 </CardContent>
               </Card>
             </Stagger>
@@ -306,7 +308,7 @@ export default function AdminDashboardPage() {
             </div>
 
             {groupHeat.length === 0 ? (
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-muted">
                 Данных по сессиям пока нет. Запустите несколько занятий, чтобы
                 увидеть распределение вовлечённости по группам.
               </p>
@@ -319,21 +321,21 @@ export default function AdminDashboardPage() {
                     return (
                       <div
                         key={group}
-                        className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ring-1 ring-white/10 bg-gradient-to-r from-transparent"
+                        className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ring-1 ring-[color:var(--border)] dark:ring-white/10 bg-gradient-to-r from-transparent"
                         style={{
                           backgroundImage: `linear-gradient(to right, ${color}, transparent 60%)`,
                         }}
                       >
-                        <div className="text-sm font-medium text-zinc-100 truncate">
+                        <div className="text-sm font-medium text-fg truncate">
                           {group}
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-zinc-50">
+                          <span className="text-sm font-semibold text-fg">
                             {avg}%
                           </span>
-                          <div className="h-2 w-20 rounded-full bg-zinc-800/70 overflow-hidden">
+                          <div className="h-2 w-20 rounded-full bg-surface-subtle dark:bg-white/10 overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-emerald-400"
+                              className="h-full rounded-full bg-gradient-to-r from-[rgb(var(--primary))] to-emerald-500"
                               style={{ width: `${intensity}%` }}
                             />
                           </div>
@@ -344,20 +346,22 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             )}
-          </GlassCard>
+            </CardContent>
+          </Card>
         </Reveal>
       </Section>
 
       {/* ACTIVITY FEED */}
       <Section>
         <Reveal>
-          <GlassCard className="space-y-6 p-8">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold text-zinc-100">Недавняя активность</h2>
-              <Badge className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-zinc-200 ring-1 ring-white/10">
-                Пример
-              </Badge>
-            </div>
+          <Card variant="elevated" className="overflow-hidden">
+            <CardContent className="space-y-6 p-6 md:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <h2 className="text-xl font-semibold text-fg">Недавняя активность</h2>
+                <Badge className="rounded-full bg-surface-subtle px-2.5 py-1 text-xs text-muted ring-1 ring-[color:var(--border)]/40">
+                  Пример
+                </Badge>
+              </div>
 
             <div className="space-y-4 text-sm text-fg">
               <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
@@ -380,7 +384,7 @@ export default function AdminDashboardPage() {
                 <span className="text-muted">3 ч назад</span>
               </div>
             </div>
-            </CardContent>
+          </CardContent>
           </Card>
         </Reveal>
       </Section>

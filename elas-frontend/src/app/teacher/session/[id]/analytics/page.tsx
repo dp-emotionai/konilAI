@@ -87,7 +87,13 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
               <Tooltip
                 contentStyle={{ background: "rgba(20,20,35,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
                 labelStyle={{ color: "rgba(255,255,255,0.85)" }}
-                formatter={(value: unknown, name: string) => [`${typeof value === "number" ? value : 0}%`, name === "engagement" ? "Вовлечённость" : "Стресс"]}
+                formatter={(value: unknown, name) => {
+                  const key = typeof name === "string" ? name : "";
+                  return [
+                    `${typeof value === "number" ? value : 0}%`,
+                    key === "engagement" ? "Вовлечённость" : "Стресс",
+                  ];
+                }}
               />
               <Area type="monotone" dataKey="engagement" stroke={ENGAGEMENT_COLOR} fill={ENGAGEMENT_COLOR} fillOpacity={0.3} strokeWidth={2} name="engagement" />
               {hasStress && (
