@@ -51,22 +51,22 @@ function KPI({
   return (
     <div
       className={cn(
-        "rounded-elas-lg p-6 transition-all duration-200 ease-out",
+        "rounded-2xl p-6 md:p-8 transition-all duration-200 ease-out",
         accent
           ? "bg-gradient-to-br from-primary-muted/50 to-primary-muted/15 ring-1 ring-[rgb(var(--primary))]/25 shadow-soft hover:shadow-glow hover:ring-[rgb(var(--primary))]/30"
-          : "bg-surface ring-1 ring-[color:var(--border)]/25 shadow-soft hover:shadow-card hover:ring-[color:var(--border)]/35 hover:-translate-y-0.5"
+          : "bg-surface dark:bg-[rgba(25,25,40,0.7)] ring-1 ring-[color:var(--border)]/25 dark:ring-white/10 shadow-soft hover:shadow-card hover:ring-[color:var(--border)]/35 dark:hover:ring-primary/40 hover:-translate-y-0.5"
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-medium uppercase tracking-wider text-muted">{label}</div>
-          <div className="mt-2 text-2xl md:text-3xl font-bold text-fg tracking-tight">{value}</div>
-          <div className="mt-1 text-xs text-muted">{hint}</div>
+          <div className="mt-2 text-3xl md:text-4xl font-bold text-fg tracking-tight">{value}</div>
+          <div className="mt-1 text-sm text-muted">{hint}</div>
         </div>
         <div
           className={cn(
-            "shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-xl",
-            accent ? "bg-[rgb(var(--primary))]/20 text-[rgb(var(--primary))]" : "bg-surface-subtle text-[rgb(var(--primary))]"
+            "shrink-0 inline-flex h-14 w-14 items-center justify-center rounded-xl",
+            accent ? "bg-[rgb(var(--primary))]/20 text-[rgb(var(--primary))]" : "bg-surface-subtle dark:bg-white/10 text-[rgb(var(--primary))]"
           )}
         >
           {icon}
@@ -231,9 +231,11 @@ export default function TeacherDashboard() {
         </div>
       </Section>
 
-      <Section spacing="none" className="mt-8 space-y-8">
-        {/* KPI + LIVE */}
-        <div className="grid gap-6 lg:grid-cols-12">
+      <Section spacing="none" className="mt-8 space-y-12">
+        {/* Overview — KPI + LIVE */}
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Обзор</h2>
+          <div className="grid gap-6 lg:grid-cols-12">
           <Reveal className="lg:col-span-7">
             <Card variant="elevated" interactive>
               <CardContent className="p-6 md:p-8">
@@ -318,9 +320,12 @@ export default function TeacherDashboard() {
               </CardContent>
             </Card>
           </Reveal>
+          </div>
         </div>
 
-        {/* Недавние сессии — карточки без таблицы */}
+        {/* Sessions */}
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Сессии</h2>
         <Reveal>
           <Card variant="elevated" interactive>
             <CardContent className="p-6 md:p-8">
@@ -361,8 +366,11 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
         </Reveal>
+        </div>
 
-        {/* Insights */}
+        {/* Analytics & Insights */}
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Аналитика и инсайты</h2>
         <Reveal>
           <Card variant="elevated" interactive>
             <CardContent className="p-6 md:p-8">
@@ -414,6 +422,7 @@ export default function TeacherDashboard() {
             </CardContent>
           </Card>
         </Reveal>
+        </div>
       </Section>
     </div>
   );

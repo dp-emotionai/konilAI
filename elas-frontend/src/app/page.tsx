@@ -62,19 +62,26 @@ export default function HomePage() {
   return (
     <main className="relative">
       {/* Hero-only glow (не “полоса” на всю страницу) */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[520px] overflow-hidden">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[580px] overflow-hidden">
         <div
           className="absolute inset-0 opacity-100 dark:opacity-0"
           style={{
             background:
-              "radial-gradient(ellipse 100% 80% at 50% -20%, rgba(124,58,237,0.06) 0%, rgba(124,58,237,0.02) 36%, rgba(124,58,237,0.008) 62%, transparent 78%)",
+              "radial-gradient(ellipse 120% 90% at 50% -15%, rgba(124,58,237,0.12) 0%, rgba(124,58,237,0.04) 40%, transparent 70%)",
           }}
         />
         <div
           className="absolute inset-0 opacity-0 dark:opacity-100"
           style={{
             background:
-              "radial-gradient(ellipse 110% 85% at 50% -15%, rgba(124,58,237,0.14) 0%, rgba(124,58,237,0.06) 28%, rgba(124,58,237,0.02) 52%, rgba(124,58,237,0.006) 72%, transparent 86%)",
+              "radial-gradient(ellipse 120% 90% at 50% -10%, rgba(120,80,255,0.25) 0%, rgba(124,58,237,0.12) 30%, rgba(124,58,237,0.04) 55%, transparent 80%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-0 dark:opacity-100"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 30%, rgba(80,120,255,0.08) 0%, transparent 50%)",
           }}
         />
       </div>
@@ -92,12 +99,12 @@ export default function HomePage() {
               </Badge>
             </div>
 
-            <h1 className="mt-10 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-fg leading-[1.08]">
+            <h1 className="mt-10 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-fg leading-[1.08] heading-hero">
               Уроки в реальном времени с{" "}
               <span className="text-[rgb(var(--primary))]">AI-аналитикой</span>
             </h1>
 
-            <p className="mt-6 text-base md:text-lg text-muted leading-relaxed max-w-xl">
+            <p className="mt-6 text-lg text-muted leading-relaxed max-w-xl subtitle">
               KonilAI — платформа для живых занятий: видео, чат и аналитика вовлечённости в реальном времени с фокусом на этику, согласие и приватность.
             </p>
 

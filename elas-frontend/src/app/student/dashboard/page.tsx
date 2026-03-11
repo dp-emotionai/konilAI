@@ -30,9 +30,9 @@ import { Video, ShieldCheck, Calendar, Sparkles, ArrowRight } from "lucide-react
 
 function StatMini({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-4">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-fg">{value}</div>
+    <div className="rounded-2xl bg-surface-subtle/80 dark:bg-[rgba(25,25,40,0.6)] ring-1 ring-[color:var(--border)]/20 dark:ring-white/10 p-5 md:p-6">
+      <div className="text-xs font-medium uppercase tracking-wider text-muted">{label}</div>
+      <div className="mt-2 text-2xl md:text-3xl font-bold text-fg tracking-tight">{value}</div>
     </div>
   );
 }
@@ -183,15 +183,18 @@ export default function StudentDashboardPage() {
         </Section>
       )}
 
-      {/* Overview stats */}
-      <Section spacing="none" className="mt-8 space-y-6">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatMini label="Всего сессий" value={loading ? "…" : String(totalSessions)} />
-          <StatMini label="Предстоят" value={loading ? "…" : String(upcomingCount)} />
-          <StatMini label="Завершено" value={loading ? "…" : String(endedCount)} />
+      {/* Overview */}
+      <Section spacing="none" className="mt-8 space-y-12">
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Обзор</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <StatMini label="Всего сессий" value={loading ? "…" : String(totalSessions)} />
+            <StatMini label="Предстоят" value={loading ? "…" : String(upcomingCount)} />
+            <StatMini label="Завершено" value={loading ? "…" : String(endedCount)} />
+          </div>
         </div>
 
-      <div className="space-y-6">
+      <div className="space-y-12">
         {/* LIVE SESSION */}
         {firstLive && (
           <Reveal>
@@ -248,7 +251,9 @@ export default function StudentDashboardPage() {
           </Reveal>
         )}
 
-        {/* MAIN GRID */}
+        {/* Sessions */}
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Сессии</h2>
         <div className="grid gap-6 lg:grid-cols-12">
           {/* Upcoming */}
           <Reveal className="lg:col-span-8">
@@ -364,9 +369,11 @@ export default function StudentDashboardPage() {
             </Card>
           </Reveal>
         </div>
+        </div>
 
-
-        {/* INVITATIONS + Recent activity */}
+        {/* Invitations & activity */}
+        <div>
+          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Приглашения и активность</h2>
         <div className="grid gap-6 lg:grid-cols-12">
           {apiAvailable && (invitations.length > 0 || invitationsLoading) && (
             <Reveal className="lg:col-span-6">
@@ -457,6 +464,7 @@ export default function StudentDashboardPage() {
               </CardContent>
             </Card>
           </Reveal>
+        </div>
         </div>
 
         {/* Small info */}

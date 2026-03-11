@@ -29,10 +29,10 @@ export default function Button({
   const variants =
     variant === "primary"
       ? cn(
-          "bg-gradient-to-b from-[rgb(var(--primary))] to-[rgb(var(--primary-hover))] text-white",
+          "bg-gradient-to-r from-[rgb(var(--primary))] to-indigo-500 text-white",
           "shadow-soft shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset]",
-          "hover:shadow-glow hover:-translate-y-0.5 hover:brightness-105",
-          "active:translate-y-0 active:shadow-soft"
+          "hover:scale-[1.03] hover:shadow-lg hover:brightness-105",
+          "active:scale-[0.99] active:shadow-soft"
         )
       : variant === "danger"
         ? cn(
@@ -42,13 +42,13 @@ export default function Button({
           )
         : variant === "outline"
           ? cn(
-              "bg-surface text-fg ring-1 ring-[color:var(--border)]/40",
-              "hover:bg-surface-subtle hover:ring-[color:var(--border-strong)] hover:-translate-y-0.5 hover:shadow-soft",
+              "bg-surface text-fg ring-1 ring-[color:var(--border)] dark:ring-white/10",
+              "hover:bg-surface-subtle hover:ring-[color:var(--border-strong)] dark:hover:bg-white/5 hover:-translate-y-0.5 hover:shadow-soft",
               "active:translate-y-0"
             )
           : cn(
               "bg-transparent text-fg/90",
-              "hover:bg-surface-subtle hover:text-fg",
+              "hover:bg-surface-subtle dark:hover:bg-white/10 hover:text-fg",
               "active:bg-[color:var(--surface-hover)]"
             );
 

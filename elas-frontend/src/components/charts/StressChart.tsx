@@ -8,10 +8,11 @@ import {
   PointElement,
   LineElement,
   Tooltip,
+  Filler,
 } from "chart.js";
-import { gridColor, tickColor } from "./chartTheme";
+import { gridColor, tickColor, stressColor, stressFill } from "./chartTheme";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
 export default function StressChart({ labels, values }: { labels: string[]; values: number[] }) {
   return (
@@ -25,6 +26,9 @@ export default function StressChart({ labels, values }: { labels: string[]; valu
             tension: 0.4,
             borderWidth: 2,
             pointRadius: 0,
+            borderColor: stressColor,
+            backgroundColor: stressFill,
+            fill: true,
           },
         ],
       }}

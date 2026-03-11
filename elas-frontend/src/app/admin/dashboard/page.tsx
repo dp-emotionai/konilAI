@@ -6,7 +6,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
 import Section from "@/components/common/Section";
-import GlassCard from "@/components/ui/GlassCard";
+import { Card, CardContent } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Glow from "@/components/common/Glow";
@@ -146,8 +146,9 @@ export default function AdminDashboardPage() {
       {/* Quick links */}
       <Section>
         <Reveal>
-          <GlassCard className="p-6">
-            <h2 className="text-lg font-semibold text-zinc-100 mb-4">Разделы</h2>
+          <Card variant="elevated" className="overflow-hidden">
+            <CardContent className="p-6 md:p-8">
+            <h2 className="text-lg font-semibold text-fg mb-4">Разделы</h2>
             <div className="flex flex-wrap gap-3">
               {adminNav.map((item) => (
                 <Link key={item.href} href={item.href}>
@@ -159,43 +160,48 @@ export default function AdminDashboardPage() {
             </div>
 
             {!backendOk && (
-              <p className="mt-4 text-xs text-zinc-500">
+              <p className="mt-4 text-xs text-muted">
                 Сейчас показаны демо-данные. Настройте <code className="text-[11px]">NEXT_PUBLIC_API_URL</code> и авторизацию,
                 чтобы видеть реальные метрики из backend.
               </p>
             )}
-          </GlassCard>
+            </CardContent>
+          </Card>
         </Reveal>
       </Section>
 
       {/* KPI SECTION */}
       <Section>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Обзор</h2>
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
           <Reveal>
             <Stagger ms={0}>
-              <GlassCard className="space-y-4 p-6">
-                <p className="text-sm text-zinc-400">Всего пользователей</p>
+              <Card variant="elevated" interactive className="overflow-hidden">
+                <CardContent className="space-y-4 p-6 md:p-8">
+                <p className="text-sm text-muted">Всего пользователей</p>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">
+                  <h3 className="text-3xl md:text-4xl font-bold text-fg tracking-tight">
                     {userCount != null ? userCount : "—"}
                   </h3>
                   <StatBadge tone={userCount != null ? "success" : "neutral"}>
                     {userCount != null ? "из backend" : "demo"}
                   </StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted">
                   Количество записей в базе пользователей.
                 </p>
-              </GlassCard>
+                </CardContent>
+              </Card>
             </Stagger>
           </Reveal>
 
           <Reveal>
             <Stagger ms={80}>
-              <GlassCard className="space-y-4 p-6">
-                <p className="text-sm text-zinc-400">Заявки преподавателей</p>
+              <Card variant="elevated" interactive className="overflow-hidden">
+                <CardContent className="space-y-4 p-6 md:p-8">
+                <p className="text-sm text-muted">Заявки преподавателей</p>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">
+                  <h3 className="text-3xl md:text-4xl font-bold text-fg tracking-tight">
                     {pendingTeachers != null ? pendingTeachers : "—"}
                   </h3>
                   <StatBadge tone={pendingTeachers && pendingTeachers > 0 ? "warning" : "info"}>
@@ -217,21 +223,24 @@ export default function AdminDashboardPage() {
                   <h3 className="text-3xl font-semibold">92,4%</h3>
                   <StatBadge tone="purple">Стабильно</StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">Уверенность детекции эмоций</p>
-              </GlassCard>
+                <p className="text-xs text-muted">Уверенность детекции эмоций</p>
+                </CardContent>
+              </Card>
             </Stagger>
           </Reveal>
 
           <Reveal>
             <Stagger ms={240}>
-              <GlassCard className="space-y-4 p-6">
-                <p className="text-sm text-zinc-400">Занято хранилища</p>
+              <Card variant="elevated" interactive className="overflow-hidden">
+                <CardContent className="space-y-4 p-6 md:p-8">
+                <p className="text-sm text-muted">Занято хранилища</p>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-3xl font-semibold">68%</h3>
+                  <h3 className="text-3xl md:text-4xl font-bold text-fg tracking-tight">68%</h3>
                   <StatBadge tone="warning">Умеренно</StatBadge>
                 </div>
-                <p className="text-xs text-zinc-500">Видео и аналитика</p>
-              </GlassCard>
+                <p className="text-xs text-muted">Видео и аналитика</p>
+                </CardContent>
+              </Card>
             </Stagger>
           </Reveal>
         </div>
@@ -239,31 +248,33 @@ export default function AdminDashboardPage() {
 
       {/* SYSTEM HEALTH */}
       <Section>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Система</h2>
         <Reveal>
-          <GlassCard className="space-y-6 p-8">
+          <Card variant="elevated" className="overflow-hidden">
+            <CardContent className="space-y-6 p-6 md:p-8">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold text-zinc-100">Состояние системы</h2>
+              <h2 className="text-xl font-semibold text-fg">Состояние системы</h2>
               <StatBadge tone="success">Все системы в норме</StatBadge>
             </div>
 
             <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-2">
-                <p className="text-sm text-zinc-400">Задержка API</p>
-                <p className="text-lg font-medium text-zinc-200">132 мс</p>
+                <p className="text-sm text-muted">Задержка API</p>
+                <p className="text-lg font-medium text-fg">132 мс</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm text-zinc-400">База данных</p>
-                <p className="text-lg font-medium text-emerald-300">Работает</p>
+                <p className="text-sm text-muted">База данных</p>
+                <p className="text-lg font-medium text-emerald-600 dark:text-emerald-400">Работает</p>
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm text-zinc-400">Движок эмоций</p>
-                <p className="text-lg font-medium text-purple-300">v2.1.4</p>
+                <p className="text-sm text-muted">Движок эмоций</p>
+                <p className="text-lg font-medium text-[rgb(var(--primary))]">v2.1.4</p>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-white/10 flex flex-wrap gap-2">
+            <div className="pt-4 border-t border-[color:var(--border)] dark:border-white/10 flex flex-wrap gap-2">
               <Link href="/admin/model">
                 <Button variant="outline" className="rounded-2xl">Модель</Button>
               </Link>
@@ -274,16 +285,19 @@ export default function AdminDashboardPage() {
                 <Button variant="outline" className="rounded-2xl">Аудит</Button>
               </Link>
             </div>
-          </GlassCard>
+            </CardContent>
+          </Card>
         </Reveal>
       </Section>
 
       {/* GROUP HEATMAP */}
       <Section>
+        <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Аналитика</h2>
         <Reveal>
-          <GlassCard className="space-y-6 p-8">
+          <Card variant="elevated" className="overflow-hidden">
+            <CardContent className="space-y-6 p-6 md:p-8">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-xl font-semibold text-zinc-100">
+              <h2 className="text-xl font-semibold text-fg">
                 Карта вовлечённости по группам
               </h2>
               <StatBadge tone="info">
@@ -345,28 +359,29 @@ export default function AdminDashboardPage() {
               </Badge>
             </div>
 
-            <div className="space-y-4 text-sm text-zinc-300">
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+            <div className="space-y-4 text-sm text-fg">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
                 <span>Зарегистрирован новый преподаватель</span>
-                <span className="text-zinc-500">2 мин назад</span>
+                <span className="text-muted">2 мин назад</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
                 <span>Создана сессия «Экзамен по ИИ»</span>
-                <span className="text-zinc-500">15 мин назад</span>
+                <span className="text-muted">15 мин назад</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
                 <span>Выполнена очистка хранилища</span>
-                <span className="text-zinc-500">1 ч назад</span>
+                <span className="text-muted">1 ч назад</span>
               </div>
 
               <div className="flex items-center justify-between">
                 <span>Обновлён порог модели</span>
-                <span className="text-zinc-500">3 ч назад</span>
+                <span className="text-muted">3 ч назад</span>
               </div>
             </div>
-          </GlassCard>
+            </CardContent>
+          </Card>
         </Reveal>
       </Section>
     </div>

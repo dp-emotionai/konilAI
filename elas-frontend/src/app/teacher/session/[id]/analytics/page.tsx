@@ -41,23 +41,30 @@ function Kpi({
   loading?: boolean;
 }) {
   return (
-    <Card className="p-6 md:p-7">
-      <div className="text-sm text-white/60">{title}</div>
-      <div className="mt-2 text-3xl font-semibold">{loading ? "…" : value}</div>
-      <div className="mt-2 text-sm text-white/50">{hint}</div>
+    <Card variant="elevated" className="overflow-hidden">
+      <CardContent className="p-6 md:p-8">
+        <div className="text-sm font-medium uppercase tracking-wider text-muted">{title}</div>
+        <div className="mt-2 text-3xl md:text-4xl font-bold text-fg tracking-tight">{loading ? "…" : value}</div>
+        <div className="mt-2 text-sm text-muted">{hint}</div>
+      </CardContent>
     </Card>
   );
 }
 
+const ENGAGEMENT_COLOR = "rgb(var(--primary))";
+const STRESS_COLOR = "rgb(239, 68, 68)";
+
 function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
   if (!data?.length) {
     return (
-      <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
-        <div className="text-sm text-white/60">Engagement over time</div>
-        <div className="mt-4 h-44 rounded-2xl border border-white/10 bg-surface-subtle/30 flex items-center justify-center text-white/50 text-sm">
-          Нет точек таймлайна для этой сессии.
-        </div>
-      </div>
+      <Card variant="elevated" className="overflow-hidden">
+        <CardContent className="p-6 md:p-8">
+          <div className="text-sm font-medium uppercase tracking-wider text-muted">Engagement over time</div>
+          <div className="mt-4 h-52 rounded-2xl border border-[color:var(--border)] dark:border-white/10 bg-surface-subtle/30 dark:bg-white/5 flex items-center justify-center text-muted text-sm">
+            Нет точек таймлайна для этой сессии.
+          </div>
+        </CardContent>
+      </Card>
     );
   }
   const chartData = data.map((p) => ({
@@ -66,25 +73,31 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
     stress: p.stress ?? 0,
     name: `${Math.floor(p.timeSec / 60)} мин`,
   }));
+  const hasStress = chartData.some((d) => Number(d.stress) > 0);
   return (
-    <div className="rounded-3xl border border-white/10 bg-black/25 p-5">
-      <div className="text-sm text-white/60">Вовлечённость по времени</div>
-      <div className="mt-4 h-44">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-            <XAxis dataKey="name" tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 10 }} />
-            <YAxis tick={{ fill: "rgba(255,255,255,0.5)", fontSize: 10 }} domain={[0, 100]} />
-            <Tooltip
-              contentStyle={{ background: "rgba(20,20,30,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
-              labelStyle={{ color: "rgba(255,255,255,0.7)" }}
-              formatter={(value: unknown) => [`${typeof value === "number" ? value : 0}%`, "Вовлечённость"]}
-            />
-            <Area type="monotone" dataKey="engagement" stroke="rgb(var(--primary))" fill="rgb(var(--primary))" fillOpacity={0.3} strokeWidth={2} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+    <Card variant="elevated" className="overflow-hidden">
+      <CardContent className="p-6 md:p-8">
+        <div className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Вовлечённость и стресс по времени</div>
+        <div className="mt-4 h-52">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 10 }} />
+              <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} domain={[0, 100]} />
+              <Tooltip
+                contentStyle={{ background: "rgba(20,20,35,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                labelStyle={{ color: "rgba(255,255,255,0.85)" }}
+                formatter={(value: unknown, name: string) => [`${typeof value === "number" ? value : 0}%`, name === "engagement" ? "Вовлечённость" : "Стресс"]}
+              />
+              <Area type="monotone" dataKey="engagement" stroke={ENGAGEMENT_COLOR} fill={ENGAGEMENT_COLOR} fillOpacity={0.3} strokeWidth={2} name="engagement" />
+              {hasStress && (
+                <Area type="monotone" dataKey="stress" stroke={STRESS_COLOR} fill={STRESS_COLOR} fillOpacity={0.2} strokeWidth={2} name="stress" />
+              )}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -194,7 +207,7 @@ export default function TeacherLectureAnalyticsPage() {
       <TeacherSessionTabs sessionId={sessionId} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-2xl bg-white/5 p-1">
+        <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle dark:bg-white/10 p-1">
           {[
             { id: "overview", label: "Обзор" },
             { id: "timeline", label: "Таймлайн" },
@@ -207,15 +220,15 @@ export default function TeacherLectureAnalyticsPage() {
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-2xl transition",
                 tab === t.id
-                  ? "bg-white/20 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
-                  : "text-white/60 hover:text-white"
+                  ? "bg-surface dark:bg-white/20 text-fg shadow-soft dark:shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
+                  : "text-muted hover:text-fg"
               )}
             >
               {t.label}
             </button>
           ))}
         </div>
-        <span className="text-xs text-white/45">КПИ, графики и рекомендации.</span>
+        <span className="text-xs text-muted">КПИ, графики и рекомендации.</span>
       </div>
 
       <AnalyticsStates
@@ -266,24 +279,28 @@ export default function TeacherLectureAnalyticsPage() {
             )}
 
             {tab === "timeline" && (!analytics.timeline || analytics.timeline.length === 0) && (
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-6 text-center text-white/60">
-                Нет точек таймлайна для отображения.
-              </div>
+              <Card variant="elevated">
+                <CardContent className="p-6 md:p-8 text-center text-muted">
+                  Нет точек таймлайна для отображения.
+                </CardContent>
+              </Card>
             )}
 
             {tab === "insights" && (
               <Reveal>
-                <Card className="p-6 md:p-7">
-                  <div className="text-sm text-white/60">Рекомендации</div>
-                  <div className="mt-2 text-lg font-semibold">
-                    На основе агрегированных метрик вовлечённости и риска.
-                  </div>
-                  <div className="mt-2 text-sm text-white/60">
-                    Используйте таймлайн и КПИ выше для точечной настройки формата занятий.
-                  </div>
-                  <Button variant="outline" size="sm" className="mt-4" onClick={() => mutate()}>
-                    Обновить данные
-                  </Button>
+                <Card variant="elevated">
+                  <CardContent className="p-6 md:p-8">
+                    <div className="text-sm font-medium uppercase tracking-wider text-muted">Рекомендации</div>
+                    <div className="mt-2 text-lg font-semibold text-fg">
+                      На основе агрегированных метрик вовлечённости и риска.
+                    </div>
+                    <div className="mt-2 text-sm text-muted">
+                      Используйте таймлайн и КПИ выше для точечной настройки формата занятий.
+                    </div>
+                    <Button variant="outline" size="sm" className="mt-4" onClick={() => mutate()}>
+                      Обновить данные
+                    </Button>
+                  </CardContent>
                 </Card>
               </Reveal>
             )}

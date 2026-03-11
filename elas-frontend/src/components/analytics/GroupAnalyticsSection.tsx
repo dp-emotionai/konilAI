@@ -78,8 +78,8 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
               </div>
 
               {data.engagementTrend && data.engagementTrend.length > 0 ? (
-                <div>
-                  <div className="text-sm font-medium text-muted mb-2">Динамика вовлечённости</div>
+                <div className="rounded-2xl border border-[color:var(--border)]/20 dark:border-white/10 bg-surface-subtle/20 dark:bg-white/5 p-4 md:p-6">
+                  <div className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Динамика вовлечённости</div>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart

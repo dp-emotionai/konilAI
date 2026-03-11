@@ -18,24 +18,24 @@ export function Card({
   interactive = false,
 }: CardProps) {
   const base =
-    "rounded-elas-lg bg-surface text-fg transition-all duration-200 ease-out";
+    "rounded-2xl text-fg transition-all duration-200 ease-out";
 
   const variants: Record<NonNullable<CardProps["variant"]>, string> = {
     default:
-      "ring-1 ring-[color:var(--border)]/30 shadow-soft",
+      "bg-surface ring-1 ring-[color:var(--border)]/30 shadow-soft",
     outline:
-      "ring-1 ring-[color:var(--border)]/40 bg-surface",
+      "bg-surface ring-1 ring-[color:var(--border)]/40",
     subtle:
       "bg-surface-subtle/90 ring-1 ring-[color:var(--border)]/20 backdrop-blur-[2px]",
     elevated:
-      "ring-1 ring-[color:var(--border)]/25 shadow-card",
+      "bg-surface dark:bg-[rgba(25,25,40,0.7)] backdrop-blur-lg ring-1 ring-[color:var(--border)] dark:ring-white/10 shadow-lg",
   };
 
   const hover = interactive
     ? cn(
         "hover:-translate-y-0.5",
         variant === "elevated"
-          ? "hover:shadow-elevated hover:ring-[color:var(--border)]/40"
+          ? "hover:shadow-xl hover:ring-[rgb(var(--primary))]/40 dark:hover:border-[rgb(var(--primary))]/40"
           : variant === "outline"
             ? "hover:ring-[color:var(--border-strong)] hover:shadow-soft"
             : "hover:shadow-card hover:ring-[color:var(--border)]/35"
@@ -46,7 +46,7 @@ export function Card({
 }
 
 export function CardHeader({ className, children }: Props) {
-  return <div className={cn("px-6 pt-6", className)}>{children}</div>;
+  return <div className={cn("p-6 pb-0", className)}>{children}</div>;
 }
 
 export function CardContent({ className, children }: Props) {

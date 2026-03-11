@@ -55,8 +55,8 @@ const DROPDOWN_PANEL =
   "ring-1 ring-black/[0.06] dark:ring-white/[0.08]";
 
 const DROPDOWN_ITEM =
-  "rounded-lg px-3 py-2 transition-all duration-150 " +
-  "hover:bg-white/10 text-fg";
+  "rounded-lg px-3 py-2 transition-all duration-150 text-fg " +
+  "hover:bg-black/[0.04] dark:hover:bg-white/10";
 
 const PUBLIC_ICONS: Record<
   string,
@@ -590,9 +590,9 @@ export default function TopNav() {
                     </button>
 
                     {profileOpen && (
-                      <div className={cn("absolute right-0 top-full mt-2 min-w-[200px] py-2 z-50", DROPDOWN_PANEL)}>
+                      <div className={cn("absolute right-0 top-full mt-2 min-w-[200px] p-2 z-50", DROPDOWN_PANEL)}>
                         {statusLabel && (
-                          <div className="px-4 pb-1 text-xs text-muted">
+                          <div className="px-3 pb-2 pt-0.5 text-xs text-muted">
                             {statusLabel}
                           </div>
                         )}
@@ -600,7 +600,7 @@ export default function TopNav() {
                         <Link
                           href="/profile"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
+                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all", DROPDOWN_ITEM)}
                         >
                           <User size={16} />
                           Профиль
@@ -609,7 +609,7 @@ export default function TopNav() {
                         <Link
                           href="/settings"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors md:hidden"
+                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all md:hidden", DROPDOWN_ITEM)}
                         >
                           <Settings size={16} />
                           Настройки
@@ -618,7 +618,7 @@ export default function TopNav() {
                         <Link
                           href="/docs"
                           onClick={() => setProfileOpen(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
+                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all", DROPDOWN_ITEM)}
                         >
                           <HelpCircle size={16} />
                           Помощь
@@ -630,7 +630,7 @@ export default function TopNav() {
                               safePathname || "/"
                             )}`}
                             onClick={() => setProfileOpen(false)}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm text-warning hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 transition-colors"
+                            className={cn("flex items-center gap-2 px-3 py-2 text-sm text-warning rounded-lg transition-all", DROPDOWN_ITEM)}
                           >
                             <ShieldCheck size={16} />
                             Нужно согласие
@@ -642,7 +642,7 @@ export default function TopNav() {
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1.5 text-left transition-colors"
+                          className={cn("flex w-full items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg text-left transition-all", DROPDOWN_ITEM)}
                         >
                           <LogOut size={16} />
                           Выйти

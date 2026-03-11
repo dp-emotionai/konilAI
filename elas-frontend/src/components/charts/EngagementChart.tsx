@@ -10,7 +10,7 @@ import {
   Tooltip,
   Filler,
 } from "chart.js";
-import { gridColor, tickColor } from "./chartTheme";
+import { gridColor, tickColor, engagementColor, engagementFill, engagementFillEnd } from "./chartTheme";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -27,12 +27,13 @@ export default function EngagementChart({ labels, values }: { labels: string[]; 
             borderWidth: 2,
             pointRadius: 0,
             fill: true,
+            borderColor: engagementColor,
             backgroundColor: (ctx) => {
               const chart = ctx.chart;
               const { ctx: c } = chart;
               const g = c.createLinearGradient(0, 0, 0, 280);
-              g.addColorStop(0, "rgba(168,85,247,0.35)");
-              g.addColorStop(1, "rgba(168,85,247,0.02)");
+              g.addColorStop(0, engagementFill);
+              g.addColorStop(1, engagementFillEnd);
               return g;
             },
           },

@@ -14,7 +14,7 @@ export default function Section({ className, children, spacing = "normal" }: Pro
       ? "py-8 md:py-10"
       : spacing === "loose"
       ? "py-16 md:py-24"
-      : "py-12 md:py-16";
+      : "mt-12 mb-12 py-12 md:py-16";
 
   return (
     <section className={cn("mx-auto max-w-elas-page px-4", pad, className)}>

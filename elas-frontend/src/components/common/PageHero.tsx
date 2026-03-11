@@ -24,12 +24,12 @@ export default function PageHero({
               </div>
             ) : null}
 
-            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl text-fg leading-[1.15]">
+            <h1 className="text-4xl font-bold tracking-tight text-fg leading-[1.15] heading-page">
               {title}
             </h1>
 
             {subtitle ? (
-              <p className="text-sm leading-relaxed sm:text-base text-muted max-w-xl">
+              <p className="text-lg text-muted leading-relaxed max-w-xl subtitle">
                 {subtitle}
               </p>
             ) : null}
