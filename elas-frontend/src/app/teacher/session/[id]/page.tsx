@@ -294,7 +294,8 @@ export default function TeacherLiveMonitorPage() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [wsDisconnected, setWsDisconnected] = useState(false);
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
-  const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>(null);
+  // По умолчанию фокус на преподавателе, чтобы большой экран не был пустым
+  const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>("local");
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
