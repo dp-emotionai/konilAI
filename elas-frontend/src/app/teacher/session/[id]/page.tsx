@@ -80,7 +80,47 @@ function formatPct01(x?: number) {
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Студент";
-  return `${p.role} · ${p.id.slice(0, 6)}`;
+  return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 8)}`;
+}
+
+function VideoTile({
+  stream,
+  label,
+  status,
+  isLocal,
+  videoRef,
+}: {
+  stream: MediaStream | null;
+  label: string;
+  status: string;
+  isLocal: boolean;
+  videoRef: React.RefObject<HTMLVideoElement | null> | ((el: HTMLVideoElement | null) => void);
+}) {
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black aspect-video">
+      <video
+        ref={videoRef}
+        className="h-full w-full object-cover"
+        playsInline
+        muted={isLocal}
+        autoPlay
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-2 p-2">
+        <span className="truncate rounded bg-black/50 px-2 py-1 text-xs font-medium text-white/90 backdrop-blur">
+          {label}
+        </span>
+        <Badge className="shrink-0 border border-white/10 bg-black/50 text-[10px] text-white/80">
+          {status}
+        </Badge>
+      </div>
+      {!stream && (
+        <div className="absolute inset-0 grid place-items-center bg-black/40">
+          <span className="text-xs text-white/60">Ожидание...</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function TeacherLiveMonitorPage() {
@@ -91,12 +131,12 @@ export default function TeacherLiveMonitorPage() {
   const [liveSeconds, setLiveSeconds] = useState(0);
 
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
-  const localThumbRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -149,8 +189,20 @@ export default function TeacherLiveMonitorPage() {
 
     const signaling = new SignalingClient(`${wsUrl}/ws`);
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
-      onRemoteStream: (_peerId, stream) => setRemoteStream(stream),
-      onPeersChange: (peers) => setParticipants(peers),
+      onRemoteStream: (peerId, stream) => {
+        setRemoteStreams((prev) => ({ ...prev, [peerId]: stream }));
+      },
+      onPeersChange: (peers) => {
+        setParticipants(peers);
+        setRemoteStreams((prev) => {
+          const ids = new Set(peers.map((p) => p.id));
+          const next = { ...prev };
+          Object.keys(next).forEach((id) => {
+            if (!ids.has(id)) delete next[id];
+          });
+          return next;
+        });
+      },
       onDisconnect: () => setWsDisconnected(true),
     });
 
@@ -167,11 +219,6 @@ export default function TeacherLiveMonitorPage() {
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
           await localVideoRef.current.play().catch(() => {});
-        }
-
-        if (localThumbRef.current) {
-          localThumbRef.current.srcObject = stream;
-          await localThumbRef.current.play().catch(() => {});
         }
 
         await signaling.waitForOpen(12000);
@@ -212,16 +259,21 @@ export default function TeacherLiveMonitorPage() {
   }, [isLive, roomId, wsUrl]);
 
   useEffect(() => {
-    if (!remoteVideoRef.current || !remoteStream) return;
-    remoteVideoRef.current.srcObject = remoteStream;
-    remoteVideoRef.current.play().catch(() => {});
-  }, [remoteStream]);
-
-  useEffect(() => {
-    if (localThumbRef.current && localStream) {
-      localThumbRef.current.srcObject = localStream;
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(() => {});
     }
   }, [localStream]);
+
+  useEffect(() => {
+    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
+      const el = (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[peerId];
+      if (el && stream) {
+        el.srcObject = stream;
+        el.play().catch(() => {});
+      }
+    });
+  }, [remoteStreams]);
 
   useEffect(() => {
     if (!roomId || !apiAvailable || !isRealSessionId(roomId)) {
@@ -292,8 +344,10 @@ export default function TeacherLiveMonitorPage() {
   const liveLabel = phase === "ended" ? "Ended" : isLive ? "Live" : "Preflight";
   const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
 
-  const mainParticipant = participants[0];
   const sessionTitle = "Сессия";
+  const participantIds = participants.map((p) => p.id);
+  const streamCount = Object.keys(remoteStreams).length;
+  const gridCols = streamCount + 1 <= 2 ? 2 : streamCount + 1 <= 4 ? 3 : 4;
   const sessionType = "lecture" as "lecture" | "exam";
 
   const stopScreenShare = async () => {
@@ -596,9 +650,9 @@ export default function TeacherLiveMonitorPage() {
               </div>
             )}
 
-            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
-              <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_390px]">
-                <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
+            <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)] flex flex-col min-h-[70vh]">
+              <div className="flex flex-1 min-h-0 items-stretch flex-col xl:flex-row">
+                <div className="flex flex-1 min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
                   <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
                     <div className="min-w-0">
                       <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">
@@ -633,102 +687,39 @@ export default function TeacherLiveMonitorPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 overflow-x-auto border-b border-white/10 px-5 py-3">
-                    <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded-2xl border border-violet-400/30 bg-white/5">
-                      <video ref={localThumbRef} className="h-full w-full object-cover" playsInline muted />
-                      <div className="absolute inset-x-1.5 bottom-1.5 rounded-lg bg-black/50 px-2 py-1 text-[9px] text-white/80 backdrop-blur">
-                        Вы · Teacher
-                      </div>
-                    </div>
-
-                    {mainParticipant && (
-                      <div className="flex h-16 min-w-[148px] shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white/70">
-                        {formatParticipantLabel(mainParticipant)}
-                      </div>
-                    )}
-
-                    {!remoteStream && (
-                      <div className="flex h-16 w-48 shrink-0 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] text-sm text-white/40">
-                        Ожидание подключения студентов
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 p-5">
-                    <div className="relative mx-auto aspect-[16/10] max-h-[68vh] w-full overflow-hidden rounded-[30px] border border-white/10 bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-                      <video
-                        ref={remoteVideoRef}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        style={{ display: remoteStream ? "block" : "none" }}
-                        playsInline
+                  {/* Video area: grid of all streams */}
+                  <div className="flex flex-1 flex-col p-5 min-h-0">
+                    <div
+                      className="grid gap-4 flex-1 min-h-0 w-full"
+                      style={{
+                        gridTemplateColumns: `repeat(auto-fill, minmax(200px, 1fr))`,
+                      }}
+                    >
+                      {/* Local (teacher) tile */}
+                      <VideoTile
+                        stream={localStream}
+                        label="Вы · Teacher"
+                        status={connectionState === "connected" ? "LIVE" : "—"}
+                        isLocal
+                        videoRef={localVideoRef}
                       />
-
-                      {!remoteStream && (
-                        <div className="absolute inset-0 grid place-items-center">
-                          <div className="rounded-2xl border border-white/10 bg-black/45 px-5 py-3 text-sm text-white/80 backdrop-blur">
-                            Ожидание подключения студентов...
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.45),transparent_22%,transparent_78%,rgba(0,0,0,0.3))]" />
-
-                      <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white backdrop-blur">
-                        {remoteStream ? formatParticipantLabel(mainParticipant) : "Ожидание студента"}
-                        <span className="ml-2 text-xs text-white/60">
-                          {remoteStream ? "Participant" : "Live room"}
-                        </span>
-                      </div>
-
-                      <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white/90 backdrop-blur">
-                        Room: {roomId ? `${roomId.slice(0, 8)}…` : "—"}
-                      </div>
-
-                      <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-                        <Badge className="border border-white/10 bg-black/50 text-white/85">
-                          Peers: {participants.length}
-                        </Badge>
-                        <Badge className="border border-white/10 bg-black/50 text-white/85">
-                          Polling: {apiAvailable ? (polling ? "On" : "Idle") : "Off"}
-                        </Badge>
-                        <Badge className="border border-white/10 bg-black/50 text-white/85">
-                          Remote: {remoteStream ? "Yes" : "No"}
-                        </Badge>
-                      </div>
-
-                      {hasMl && (
-                        <div className="absolute left-4 bottom-14 flex flex-wrap gap-2">
-                          <Badge className="border border-white/10 bg-black/50 text-white/85">
-                            Avg risk: {formatPct01(avgRisk)}
-                          </Badge>
-                          <Badge className="border border-white/10 bg-black/50 text-white/85">
-                            Avg confidence: {formatPct01(avgConfidence)}
-                          </Badge>
-                        </div>
-                      )}
-
-                      <div className="absolute bottom-4 right-4 z-10 h-28 w-44 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-                        <video
-                          ref={localVideoRef}
-                          className="h-full w-full object-cover"
-                          playsInline
-                          muted
+                      {/* Remote participant tiles */}
+                      {participants.map((p) => (
+                        <VideoTile
+                          key={p.id}
+                          stream={remoteStreams[p.id] ?? null}
+                          label={formatParticipantLabel(p)}
+                          status={remoteStreams[p.id] ? "LIVE" : "Подключение..."}
+                          isLocal={false}
+                          videoRef={(el) => {
+                            (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
+                          }}
                         />
-                        <div className="absolute inset-x-2 bottom-2 rounded-xl bg-black/55 px-2 py-1 text-[10px] text-white/80 backdrop-blur">
-                          Вы · Teacher
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  </div>
 
-                  <div className="border-t border-white/10 px-5 py-4">
-                    {mediaError && (
-                      <div className="mb-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
-                        {mediaError}
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap items-center justify-center gap-3">
+                    {/* Controls bar directly under video */}
+                    <div className="flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap">
                       <button
                         type="button"
                         className={`rounded-full border p-3 transition ${
@@ -842,8 +833,13 @@ export default function TeacherLiveMonitorPage() {
                   </div>
                 </div>
 
-                <aside className="flex min-h-0 flex-col border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)]">
-                  <div className="border-b border-white/10 px-5 py-4">
+                {/* Chat sidebar: visible on xl; on mobile show toggle */}
+                <aside
+                  className={`flex min-h-0 flex-col border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)] w-full xl:w-[390px] xl:max-w-[390px] shrink-0 ${
+                    chatOpen ? "flex" : "hidden xl:flex"
+                  }`}
+                >
+                  <div className="border-b border-white/10 px-5 py-4 shrink-0">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-sm font-semibold text-white">Control center</div>
@@ -851,16 +847,26 @@ export default function TeacherLiveMonitorPage() {
                           Live metrics, participants and chat
                         </div>
                       </div>
-
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-white/10 bg-white/5 text-white hover:bg-white/10"
-                        onClick={() => setConfirmEndOpen(true)}
-                      >
-                        <LogOut size={14} />
-                        Завершить
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="xl:hidden border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          onClick={() => setChatOpen(false)}
+                          aria-label="Закрыть чат"
+                        >
+                          Закрыть
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          onClick={() => setConfirmEndOpen(true)}
+                        >
+                          <LogOut size={14} />
+                          Завершить
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3">

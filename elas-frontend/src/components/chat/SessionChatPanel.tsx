@@ -30,7 +30,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   const [policy, setPolicy] = useState<SessionChatPolicy | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const realSession = isRealSessionId(sessionId);
 
   useEffect(() => {
@@ -147,7 +147,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       {/* header */}
-      <div className="border-b border-white/10 px-4 py-3">
+      <div className="shrink-0 border-b border-white/10 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -177,11 +177,9 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
         </div>
       </div>
 
-      {/* messages */}
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-4 py-3"
-      >
+      {/* messages — scrollable container */}
+      <div className="min-h-0 max-h-[40vh] flex-1 overflow-y-auto px-4 py-3">
+        <div className="space-y-2.5">
         {!realSession && (
           <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-4 text-xs text-white/45">
             Чат доступен для сессий, созданных в системе. Откройте сессию с реальным ID.
@@ -263,10 +261,12 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
               </div>
             );
           })}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* composer */}
-      <div className="border-t border-white/10 bg-black/10 px-4 py-3">
+      <div className="shrink-0 border-t border-white/10 bg-black/10 px-4 py-3">
         {sendError && <p className="mb-2 text-xs text-red-400">{sendError}</p>}
 
         <div className="space-y-3">
