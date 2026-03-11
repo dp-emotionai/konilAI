@@ -274,8 +274,12 @@ export default function TeacherLiveMonitorPage() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
 
-  const localVideoRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  // Важно: один и тот же ref нельзя использовать одновременно в main и в превью —
+  // иначе React перепривяжет ref к последнему элементу, и одно из видео станет чёрным.
+  const localVideoMainRef = useRef<HTMLVideoElement | null>(null);
+  const localVideoThumbRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoMainRefs = useRef<Record<string, HTMLVideoElement | null>>({});
+  const remoteVideoThumbRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -357,9 +361,11 @@ export default function TeacherLiveMonitorPage() {
         setIsMicEnabled(true);
         setIsCameraEnabled(true);
 
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream;
-          await localVideoRef.current.play().catch(() => {});
+        // на старте подцепляем стрим к обоим элементам (main и превью)
+        for (const el of [localVideoMainRef.current, localVideoThumbRef.current]) {
+          if (!el) continue;
+          el.srcObject = stream;
+          await el.play().catch(() => {});
         }
 
         await signaling.waitForOpen(12000);
@@ -400,16 +406,22 @@ export default function TeacherLiveMonitorPage() {
   }, [isLive, roomId, wsUrl]);
 
   useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-      localVideoRef.current.play().catch(() => {});
+    if (!localStream) return;
+    for (const el of [localVideoMainRef.current, localVideoThumbRef.current]) {
+      if (!el) continue;
+      el.srcObject = localStream;
+      el.play().catch(() => {});
     }
   }, [localStream]);
 
   useEffect(() => {
     Object.entries(remoteStreams).forEach(([peerId, stream]) => {
-      const el = (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[peerId];
-      if (el && stream) {
+      const els = [
+        (remoteVideoMainRefs.current as Record<string, HTMLVideoElement | null>)[peerId],
+        (remoteVideoThumbRefs.current as Record<string, HTMLVideoElement | null>)[peerId],
+      ];
+      for (const el of els) {
+        if (!el || !stream) continue;
         el.srcObject = stream;
         el.play().catch(() => {});
       }
@@ -894,7 +906,7 @@ export default function TeacherLiveMonitorPage() {
                             metrics={metricsForPeer(focusedParticipant)}
                             aspect={false}
                             videoRef={(el) => {
-                              (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[focusedParticipant.id] = el;
+                              (remoteVideoMainRefs.current as Record<string, HTMLVideoElement | null>)[focusedParticipant.id] = el;
                             }}
                           />
                         ) : (
@@ -904,7 +916,7 @@ export default function TeacherLiveMonitorPage() {
                             status={connectionState === "connected" ? "LIVE" : "—"}
                             isLocal
                             aspect={false}
-                            videoRef={localVideoRef}
+                            videoRef={localVideoMainRef}
                           />
                         )}
                       </div>
@@ -980,7 +992,7 @@ export default function TeacherLiveMonitorPage() {
                             status={connectionState === "connected" ? "LIVE" : "—"}
                             isLocal
                             compact
-                            videoRef={localVideoRef}
+                            videoRef={localVideoThumbRef}
                           />
                         </button>
 
@@ -999,7 +1011,7 @@ export default function TeacherLiveMonitorPage() {
                               metrics={metricsForPeer(p)}
                               compact
                               videoRef={(el) => {
-                                (remoteVideoRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
+                                (remoteVideoThumbRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
                               }}
                             />
                           </button>
