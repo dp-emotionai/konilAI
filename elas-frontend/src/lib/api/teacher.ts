@@ -180,6 +180,12 @@ export type LiveMetricsParticipant = {
   risk: number;
   state: string;
   dominant_emotion: string;
+  /** 0..1 */
+  engagement?: number | null;
+  /** 0..1 */
+  stress?: number | null;
+  /** 0..1 */
+  fatigue?: number | null;
   updatedAt: string;
 };
 
@@ -187,6 +193,16 @@ export type SessionLiveMetrics = {
   participants: LiveMetricsParticipant[];
   avgRisk: number;
   avgConfidence: number;
+  /** 0..1 (optional if backend provides) */
+  avgEngagement?: number | null;
+  /** 0..1 (optional if backend provides) */
+  avgStress?: number | null;
+  /** 0..1 (optional if backend provides) */
+  avgFatigue?: number | null;
+  /** Optional group-level ML strings if backend provides */
+  groupState?: string | null;
+  /** Optional pattern label if backend provides */
+  pattern?: string | null;
 };
 
 export async function getSessionLiveMetrics(sessionId: string): Promise<SessionLiveMetrics | null> {
