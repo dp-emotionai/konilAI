@@ -258,6 +258,12 @@ export function mlConnectStream(
 // emotion-ml-service backend/app.py contract
 // -------------------------------
 
+/** Send at most 1 frame per second to avoid 429 from ML service. */
+export const ML_INTERVAL = 1000;
+
+/** Pause duration (ms) after 429 before retrying. */
+export const ML_429_PAUSE_MS = 3000;
+
 /**
  * NOTE:
  * In Next.js, NEXT_PUBLIC_* variables are inlined into client bundle.
@@ -316,13 +322,21 @@ export async function mlAnalyzeFrame(
       signal: controller.signal,
     });
 
+    if (res.status === 429) {
+      const e = new Error("RATE_LIMIT") as Error & { status?: number };
+      e.status = 429;
+      throw e;
+    }
+
     if (!res.ok) return null;
 
     const data = await res.json().catch(() => null);
     if (!data || (data as any).error) return null;
 
     return data as MlAnalyzeResponse;
-  } catch {
+  } catch (err) {
+    const e = err as Error & { status?: number };
+    if (e?.status === 429 || e?.message === "RATE_LIMIT") throw err;
     return null;
   } finally {
     clearTimeout(timeout);
@@ -331,37 +345,30 @@ export async function mlAnalyzeFrame(
 }
 
 /**
- * Safe ML polling loop (no overlap).
- * Waits for each request to finish before scheduling the next tick.
+ * ML polling loop using setInterval.
+ * Limits to 1 frame per second (ML_INTERVAL). On 429, pauses ML_429_PAUSE_MS before continuing.
+ * captureFrame64x64Grayscale (or getFrame) must only be invoked inside the interval tick.
  */
 export function startMlLoop(params: {
-  fps?: number; // default ~1.5 fps
   getFrame: () => number[][] | null;
   onResult: (r: MlAnalyzeResponse) => void;
   onTickError?: () => void;
   shouldSend?: () => boolean;
 }) {
-  const fps = params.fps ?? 1.5;
-  const intervalMs = Math.max(250, Math.round(1000 / fps));
-
   let stopped = false;
-  let timer: number | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
   const controller = new AbortController();
+  let pausedUntil = 0;
 
   const tick = async () => {
     if (stopped) return;
+    if (Date.now() < pausedUntil) return;
 
     try {
-      if (params.shouldSend && !params.shouldSend()) {
-        timer = window.setTimeout(tick, intervalMs);
-        return;
-      }
+      if (params.shouldSend && !params.shouldSend()) return;
 
       const frame = params.getFrame();
-      if (!frame) {
-        timer = window.setTimeout(tick, intervalMs);
-        return;
-      }
+      if (!frame) return;
 
       const result = await mlAnalyzeFrame(frame, {
         signal: controller.signal,
@@ -370,20 +377,22 @@ export function startMlLoop(params: {
 
       if (result) params.onResult(result);
       else params.onTickError?.();
-    } catch {
+    } catch (err) {
+      const e = err as Error & { status?: number };
+      if (e?.status === 429 || e?.message === "RATE_LIMIT") {
+        pausedUntil = Date.now() + ML_429_PAUSE_MS;
+      }
       params.onTickError?.();
-    } finally {
-      if (!stopped) timer = window.setTimeout(tick, intervalMs);
     }
   };
 
-  timer = window.setTimeout(tick, intervalMs);
+  intervalId = setInterval(tick, ML_INTERVAL);
 
   return {
     stop() {
       stopped = true;
       controller.abort();
-      if (timer) window.clearTimeout(timer);
+      if (intervalId) clearInterval(intervalId);
     },
   };
 }
@@ -406,7 +415,7 @@ export function captureFrame64x64Grayscale(
     _canvas = document.createElement("canvas");
     _canvas.width = size;
     _canvas.height = size;
-    _ctx = _canvas.getContext("2d");
+    _ctx = _canvas.getContext("2d", { willReadFrequently: true });
   }
 
   const ctx = _ctx;

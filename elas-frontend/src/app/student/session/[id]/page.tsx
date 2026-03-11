@@ -25,6 +25,8 @@ import {
   getMlApiBaseUrl,
   mlAnalyzeFrame,
   captureFrame64x64Grayscale,
+  ML_INTERVAL,
+  ML_429_PAUSE_MS,
   type MlAnalyzeResponse,
 } from "@/lib/api/ml";
 
@@ -253,11 +255,12 @@ export default function StudentJoinSessionPage() {
     let cancelled = false;
     let inflight = false;
     let consecutiveFailures = 0;
-    const intervalMs = 650;
+    let pausedUntil = 0;
     const failureThreshold = 4;
 
     const timer = setInterval(async () => {
       if (cancelled || inflight) return;
+      if (Date.now() < pausedUntil) return;
 
       const video = localVideoRef.current;
       if (!video) return;
@@ -288,10 +291,18 @@ export default function StudentJoinSessionPage() {
             dominant_emotion: result.dominant_emotion,
           }).catch(() => {});
         }
+      } catch (err) {
+        const e = err as Error & { status?: number };
+        if (e?.status === 429 || e?.message === "RATE_LIMIT") {
+          pausedUntil = Date.now() + ML_429_PAUSE_MS;
+        } else {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+        }
       } finally {
         inflight = false;
       }
-    }, intervalMs);
+    }, ML_INTERVAL);
 
     return () => {
       cancelled = true;

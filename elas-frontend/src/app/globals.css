@@ -125,23 +125,92 @@ body {
   font-family: var(--font-sans);
   background: var(--bg);
   position: relative;
+  min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.dark body {
-  background: var(--bg);
+/* Premium SaaS global background — depth and gradient glows */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(120, 80, 255, 0.06), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(80, 120, 255, 0.05), transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(120, 60, 200, 0.04), transparent 50%);
+}
+
+:root.dark body {
+  background: #0b0b12;
+}
+
+:root.dark body::after {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(120, 80, 255, 0.15), transparent 40%),
+    radial-gradient(circle at 80% 10%, rgba(80, 120, 255, 0.15), transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(120, 60, 200, 0.1), transparent 50%);
 }
 
 ::selection {
   background: rgba(124, 58, 237, 0.2);
 }
 
+/* Typography — visual hierarchy */
 h1,
 h2,
 h3,
 h4 {
   letter-spacing: -0.02em;
+}
+
+.heading-hero {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-bold);
+  letter-spacing: -0.03em;
+  line-height: var(--leading-tight);
+}
+
+@media (min-width: 768px) {
+  .heading-hero {
+    font-size: var(--text-5xl);
+  }
+}
+
+.heading-page {
+  font-size: var(--text-4xl);
+  font-weight: var(--font-bold);
+  letter-spacing: -0.025em;
+}
+
+.subtitle {
+  font-size: var(--text-lg);
+  color: var(--muted);
+  line-height: var(--leading-relaxed);
+}
+
+.body-muted {
+  font-size: var(--text-base);
+  color: var(--muted);
+  line-height: var(--leading-normal);
+}
+
+/* Dropdown open animation */
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-dropdown-in {
+  animation: dropdown-in 0.2s ease-out forwards;
 }
 
 :focus-visible {

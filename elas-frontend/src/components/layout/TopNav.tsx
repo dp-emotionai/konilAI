@@ -47,12 +47,16 @@ import QuickSearch, { QuickSearchTrigger } from "./QuickSearch";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
 
-/* Glass dropdown: readable on any background (light/dark/gradient) */
+/* Premium dropdown: glass, readable on any background */
 const DROPDOWN_PANEL =
-  "rounded-2xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
-  "ring-1 ring-black/[0.06] dark:ring-white/[0.08] " +
-  "bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl " +
-  "transition-[opacity,transform] duration-200 ease-out";
+  "rounded-xl overflow-hidden shadow-2xl border border-[color:var(--border)] dark:border-white/10 " +
+  "bg-white/[0.98] dark:bg-[rgba(20,20,35,0.95)] backdrop-blur-xl " +
+  "p-2 animate-dropdown-in " +
+  "ring-1 ring-black/[0.06] dark:ring-white/[0.08]";
+
+const DROPDOWN_ITEM =
+  "rounded-lg px-3 py-2 transition-all duration-150 " +
+  "hover:bg-white/10 text-fg";
 
 const PUBLIC_ICONS: Record<
   string,
@@ -223,10 +227,8 @@ function PublicNavItem({ item }: { item: NavItem }) {
                 href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 transition-colors rounded-lg mx-1.5",
-                  hasCardStyle
-                    ? "px-4 py-3 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-                    : "px-4 py-2.5 text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-white/10",
+                  hasCardStyle ? "px-4 py-3" : "px-3 py-2"
                 )}
               >
                 {IconComp && (
@@ -332,7 +334,7 @@ function AppNavItem({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-2 min-w-[220px] rounded-2xl bg-surface/95 backdrop-blur-md shadow-card ring-1 ring-[color:var(--border)]/25 py-2 z-50">
+        <div className={cn("absolute left-0 top-full mt-2 min-w-[220px] z-50", DROPDOWN_PANEL)}>
           {children.map((child) => {
             const childHref =
               typeof child.href === "string" && child.href.length > 0
@@ -345,10 +347,10 @@ function AppNavItem({
                 href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center justify-between gap-2 px-4 py-2.5 text-sm transition-colors rounded-xl mx-1",
+                  "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-white/10",
                   child.accent
-                    ? "bg-primary-muted/50 text-[rgb(var(--primary))] font-medium hover:bg-primary-muted"
-                    : "text-fg hover:bg-surface-subtle/80"
+                    ? "bg-primary-muted/50 text-[rgb(var(--primary))] font-medium hover:bg-primary-muted/70"
+                    : ""
                 )}
               >
                 <span className="truncate">{child.label}</span>
@@ -476,9 +478,9 @@ export default function TopNav() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 pt-3 pb-1 px-3 sm:px-4">
-        <div className="mx-auto max-w-6xl rounded-full bg-surface/80 backdrop-blur-xl shadow-card ring-1 ring-[color:var(--border)]/25">
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
+      <header className="fixed top-0 left-0 right-0 z-50 pt-4 px-4 sm:px-6">
+        <div className="mx-auto max-w-6xl rounded-2xl backdrop-blur-xl bg-white/80 dark:bg-[rgba(10,10,20,0.65)] border border-[color:var(--border)] dark:border-white/10 shadow-xl px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 sm:gap-4 shrink-0">
               <Logo href={homeHref} />
             </div>

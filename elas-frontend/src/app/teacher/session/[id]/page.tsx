@@ -51,6 +51,7 @@ import {
   Monitor,
   MicOff,
   VideoOff,
+  MessageCircle,
 } from "lucide-react";
 
 type SessionPhase = "preflight" | "live" | "ended";
@@ -94,7 +95,7 @@ function VideoTile({
   label: string;
   status: string;
   isLocal: boolean;
-  videoRef: React.RefObject<HTMLVideoElement | null> | ((el: HTMLVideoElement | null) => void);
+  videoRef: React.Ref<HTMLVideoElement | null>;
 }) {
   return (
     <div className="relative overflow-hidden rounded-xl border border-white/10 bg-black aspect-video">
@@ -236,7 +237,7 @@ export default function TeacherLiveMonitorPage() {
         setConnectionState("error");
         setPhase("preflight");
         manager.leave();
-        setRemoteStream(null);
+        setRemoteStreams({});
         setLocalStream(null);
         setParticipants([]);
       }
@@ -247,7 +248,7 @@ export default function TeacherLiveMonitorPage() {
       screenStreamRef.current = null;
       peerManagerRef.current = null;
       manager.leave();
-      setRemoteStream(null);
+      setRemoteStreams({});
       setLocalStream(null);
       setParticipants([]);
       setIsScreenSharing(false);
@@ -345,9 +346,6 @@ export default function TeacherLiveMonitorPage() {
   const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
 
   const sessionTitle = "Сессия";
-  const participantIds = participants.map((p) => p.id);
-  const streamCount = Object.keys(remoteStreams).length;
-  const gridCols = streamCount + 1 <= 2 ? 2 : streamCount + 1 <= 4 ? 3 : 4;
   const sessionType = "lecture" as "lecture" | "exam";
 
   const stopScreenShare = async () => {
@@ -684,6 +682,16 @@ export default function TeacherLiveMonitorPage() {
                       <Badge className="border border-white/10 bg-white/5 font-mono text-white/75">
                         {timerLabel}
                       </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="xl:hidden gap-1.5 border-white/10 bg-white/5 text-white hover:bg-white/10"
+                        onClick={() => setChatOpen(true)}
+                        aria-label="Открыть чат"
+                      >
+                        <MessageCircle size={14} />
+                        Чат
+                      </Button>
                     </div>
                   </div>
 
@@ -719,7 +727,7 @@ export default function TeacherLiveMonitorPage() {
                     </div>
 
                     {/* Controls bar directly under video */}
-                    <div className="flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap">
+                    <div className="flex flex-shrink-0 justify-center gap-4 mt-4 flex-wrap px-2">
                       <button
                         type="button"
                         className={`rounded-full border p-3 transition ${

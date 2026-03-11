@@ -96,8 +96,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   );
 
   useEffect(() => {
-    if (!scrollRef.current) return;
-    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [orderedMessages.length]);
 
   const chatLocked = policy?.mode === "locked" && role === "student";
