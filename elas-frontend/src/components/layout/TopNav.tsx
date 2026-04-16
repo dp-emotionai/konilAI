@@ -7,7 +7,6 @@ import {
   NAV_PUBLIC_LEFT,
   NAV_PUBLIC_RIGHT,
   NAV_APP_BY_ROLE,
-  ROLE_HOME,
 } from "@/lib/nav";
 import type { NavItem, NavDropdownItem } from "@/lib/nav";
 import type { Role } from "@/lib/roles";
@@ -47,7 +46,6 @@ import QuickSearch, { QuickSearchTrigger } from "./QuickSearch";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
 
-/* Premium dropdown: glass, readable on any background */
 const DROPDOWN_PANEL =
   "rounded-xl overflow-hidden shadow-2xl border border-[color:var(--border)] dark:border-white/10 " +
   "bg-white/[0.98] dark:bg-[rgba(20,20,35,0.95)] backdrop-blur-xl " +
@@ -80,7 +78,6 @@ const PUBLIC_ICONS: Record<
   HelpCircle,
 };
 
-/** KonilAI K mark — brand icon (replace with image/src if provided) */
 function KonilAILogoIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -105,9 +102,9 @@ function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link
       href={safeHref}
-      className="flex items-center gap-2.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] rounded-elas"
+      className="flex shrink-0 items-center gap-2.5 rounded-elas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
     >
-      <span className="h-9 w-9 flex items-center justify-center rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25 flex-shrink-0">
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25">
         <KonilAILogoIcon className="h-5 w-5" />
       </span>
       <span className="font-semibold tracking-wide text-fg">KonilAI</span>
@@ -132,10 +129,10 @@ function NavLink({
     <Link
       href={safeHref}
       className={cn(
-        "px-3 py-2 rounded-full text-sm font-medium transition-[background-color,color] duration-150",
+        "rounded-full px-3 py-2 text-sm font-medium transition-[background-color,color] duration-150",
         active
           ? "bg-surface-subtle/80 text-fg"
-          : "text-muted hover:text-fg hover:bg-surface-subtle/60",
+          : "text-muted hover:bg-surface-subtle/60 hover:text-fg",
         className
       )}
     >
@@ -193,11 +190,11 @@ function PublicNavItem({ item }: { item: NavItem }) {
         aria-expanded={open}
         aria-haspopup="true"
         className={cn(
-          "inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors",
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
           open
-            ? "text-fg bg-surface-subtle/80"
-            : "text-muted hover:text-fg hover:bg-surface-subtle/60"
+            ? "bg-surface-subtle/80 text-fg"
+            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
         )}
       >
         {dropdown.label}
@@ -210,7 +207,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
       {open && (
         <div
           className={cn(
-            "absolute left-0 top-full mt-2 z-50 py-2",
+            "absolute left-0 top-full z-50 mt-2 py-2",
             hasCardStyle ? "min-w-[280px]" : "min-w-[200px]",
             DROPDOWN_PANEL
           )}
@@ -239,9 +236,9 @@ function PublicNavItem({ item }: { item: NavItem }) {
                 )}
 
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium text-fg truncate">{child.label}</div>
+                  <div className="truncate font-medium text-fg">{child.label}</div>
                   {child.subtitle && (
-                    <div className="text-xs text-muted truncate mt-0.5">
+                    <div className="mt-0.5 truncate text-xs text-muted">
                       {child.subtitle}
                     </div>
                   )}
@@ -291,7 +288,8 @@ function AppNavItem({
   }, [open]);
 
   if (item.type === "link") {
-    const href = typeof item.href === "string" && item.href.length > 0 ? item.href : "/";
+    const href =
+      typeof item.href === "string" && item.href.length > 0 ? item.href : "/";
     const active =
       !!safePath &&
       (safePath === href ||
@@ -321,10 +319,10 @@ function AppNavItem({
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium transition-colors",
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
           open
-            ? "text-fg bg-surface-subtle/80"
-            : "text-muted hover:text-fg hover:bg-surface-subtle/60"
+            ? "bg-surface-subtle/80 text-fg"
+            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
         )}
       >
         {dropdown.label}
@@ -335,7 +333,12 @@ function AppNavItem({
       </button>
 
       {open && (
-        <div className={cn("absolute left-0 top-full mt-2 min-w-[220px] z-50", DROPDOWN_PANEL)}>
+        <div
+          className={cn(
+            "absolute left-0 top-full z-50 mt-2 min-w-[220px]",
+            DROPDOWN_PANEL
+          )}
+        >
           {children.map((child) => {
             const childHref =
               typeof child.href === "string" && child.href.length > 0
@@ -350,7 +353,7 @@ function AppNavItem({
                 className={cn(
                   "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-white/10",
                   child.accent
-                    ? "bg-primary-muted/50 text-[rgb(var(--primary))] font-medium hover:bg-primary-muted/70"
+                    ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70"
                     : ""
                 )}
               >
@@ -388,7 +391,7 @@ function ThemeToggle({
       onClick={onToggle}
       className={cn(
         "inline-flex h-9 w-9 items-center justify-center rounded-full text-fg",
-        "bg-surface-subtle/80 hover:bg-surface-subtle shadow-soft",
+        "bg-surface-subtle/80 shadow-soft hover:bg-surface-subtle",
         "transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--primary)]/35"
       )}
@@ -403,7 +406,7 @@ export default function TopNav() {
   const pathname = usePathname();
   const safePathname = typeof pathname === "string" ? pathname : "/";
 
-  const { state, setLoggedIn, setConsent } = useUI();
+  const { state, setLoggedIn, setConsent, setRole, setStatus } = useUI();
   const { theme, setTheme } = useTheme();
 
   const [searchOpen, setSearchOpen] = useState(false);
@@ -432,8 +435,7 @@ export default function TopNav() {
     return NAV_APP_BY_ROLE[safeRole] ?? [];
   }, [safeRole]);
 
-  const homeHref = "/"; // логотип всегда ведёт на главную
-
+  const homeHref = "/";
   const consentRequired = Boolean(state.loggedIn && !state.consent);
 
   useEffect(() => {
@@ -472,21 +474,23 @@ export default function TopNav() {
     clearAuth();
     setLoggedIn(false);
     setConsent(false);
+    setRole(null);
+    setStatus(null);
     setProfileOpen(false);
     setMobileOpen(false);
     router.push("/");
-  }, [router, setLoggedIn, setConsent]);
+  }, [router, setLoggedIn, setConsent, setRole, setStatus]);
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 pt-4 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl rounded-2xl backdrop-blur-xl bg-white/80 dark:bg-[rgba(10,10,20,0.65)] border border-[color:var(--border)] dark:border-white/10 shadow-xl px-4 py-3 sm:px-5">
+      <header className="fixed left-0 right-0 top-0 z-50 px-4 pt-4 sm:px-6">
+        <div className="mx-auto max-w-6xl rounded-2xl border border-[color:var(--border)] bg-white/85 px-4 py-3 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(10,10,20,0.68)] sm:px-5">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+            <div className="flex shrink-0 items-center gap-3 sm:gap-4">
               <Logo href={homeHref} />
             </div>
 
-            <nav className="hidden lg:flex items-center gap-0.5 flex-1 justify-center max-w-2xl">
+            <nav className="hidden max-w-2xl flex-1 items-center justify-center gap-0.5 lg:flex">
               {!state.loggedIn &&
                 (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
                   <PublicNavItem
@@ -507,28 +511,29 @@ export default function TopNav() {
             </nav>
 
             {state.loggedIn && (
-              <div className="hidden md:flex flex-1 max-w-md justify-center min-w-0">
+              <div className="hidden min-w-0 max-w-md flex-1 justify-center md:flex">
                 <button
                   type="button"
                   onClick={() => setSearchOpen(true)}
                   aria-label="Открыть поиск (⌘K)"
                   className={cn(
-                    "w-full max-w-sm flex items-center gap-2.5 h-10 pl-4 pr-3 rounded-full",
-                    "bg-surface-subtle/80 hover:bg-surface-subtle text-muted hover:text-fg",
-                    "ring-1 ring-[color:var(--border)]/30 shadow-soft",
-                    "transition-colors duration-150 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                    "h-10 w-full max-w-sm rounded-full pl-4 pr-3 text-left",
+                    "flex items-center gap-2.5",
+                    "bg-surface-subtle/80 text-muted shadow-soft ring-1 ring-[color:var(--border)]/30",
+                    "transition-colors duration-150 hover:bg-surface-subtle hover:text-fg",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                   )}
                 >
                   <Search size={18} className="shrink-0 text-muted" />
                   <span className="flex-1 truncate text-sm">Поиск…</span>
-                  <kbd className="hidden sm:inline-flex h-6 items-center px-1.5 rounded bg-surface text-[10px] font-medium text-muted border border-[color:var(--border)]/40">
+                  <kbd className="hidden h-6 items-center rounded border border-[color:var(--border)]/40 bg-surface px-1.5 text-[10px] font-medium text-muted sm:inline-flex">
                     ⌘K
                   </kbd>
                 </button>
               </div>
             )}
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex shrink-0 items-center gap-2">
               {state.loggedIn && safeRole === "student" && (
                 <Link
                   href="/student/sessions?join=1"
@@ -544,7 +549,7 @@ export default function TopNav() {
               {state.loggedIn && safeRole === "teacher" && liveSession && (
                 <Link
                   href={`/teacher/session/${liveSession.id}`}
-                  className="text-xs font-medium text-[rgb(var(--primary))] bg-primary/10 px-2.5 py-1.5 rounded-full ring-1 ring-[rgb(var(--primary))]/20 hover:bg-primary/15 transition-colors"
+                  className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
                 >
                   LIVE •{" "}
                   {typeof liveSession.title === "string" && liveSession.title.length > 18
@@ -556,7 +561,7 @@ export default function TopNav() {
               <ThemeToggle theme={theme} onToggle={() => setTheme(nextTheme)} />
 
               {state.loggedIn && statusLabel && (
-                <div className="hidden sm:inline-flex items-center max-w-xs">
+                <div className="hidden max-w-xs items-center sm:inline-flex">
                   <span className="truncate rounded-full bg-surface-subtle/80 px-3 py-1 text-xs text-muted ring-1 ring-[color:var(--border)]/40">
                     {statusLabel}
                   </span>
@@ -568,11 +573,11 @@ export default function TopNav() {
                   <Link
                     href="/settings"
                     aria-label="Настройки"
-                    className="md:inline-flex hidden"
+                    className="hidden md:inline-flex"
                   >
                     <button
                       type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg hover:bg-surface-subtle shadow-soft transition-colors"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle"
                     >
                       <Settings size={18} />
                     </button>
@@ -584,14 +589,19 @@ export default function TopNav() {
                       onClick={() => setProfileOpen((o) => !o)}
                       aria-expanded={profileOpen}
                       aria-haspopup="true"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg hover:bg-surface-subtle shadow-soft transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                       aria-label="Меню аккаунта"
                     >
                       <User size={18} />
                     </button>
 
                     {profileOpen && (
-                      <div className={cn("absolute right-0 top-full mt-2 min-w-[200px] p-2 z-50", DROPDOWN_PANEL)}>
+                      <div
+                        className={cn(
+                          "absolute right-0 top-full z-50 mt-2 min-w-[200px] p-2",
+                          DROPDOWN_PANEL
+                        )}
+                      >
                         {statusLabel && (
                           <div className="px-3 pb-2 pt-0.5 text-xs text-muted">
                             {statusLabel}
@@ -601,7 +611,10 @@ export default function TopNav() {
                         <Link
                           href="/profile"
                           onClick={() => setProfileOpen(false)}
-                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all", DROPDOWN_ITEM)}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                            DROPDOWN_ITEM
+                          )}
                         >
                           <User size={16} />
                           Профиль
@@ -610,7 +623,10 @@ export default function TopNav() {
                         <Link
                           href="/settings"
                           onClick={() => setProfileOpen(false)}
-                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all md:hidden", DROPDOWN_ITEM)}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden",
+                            DROPDOWN_ITEM
+                          )}
                         >
                           <Settings size={16} />
                           Настройки
@@ -619,7 +635,10 @@ export default function TopNav() {
                         <Link
                           href="/docs"
                           onClick={() => setProfileOpen(false)}
-                          className={cn("flex items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg transition-all", DROPDOWN_ITEM)}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                            DROPDOWN_ITEM
+                          )}
                         >
                           <HelpCircle size={16} />
                           Помощь
@@ -631,19 +650,25 @@ export default function TopNav() {
                               safePathname || "/"
                             )}`}
                             onClick={() => setProfileOpen(false)}
-                            className={cn("flex items-center gap-2 px-3 py-2 text-sm text-warning rounded-lg transition-all", DROPDOWN_ITEM)}
+                            className={cn(
+                              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all",
+                              DROPDOWN_ITEM
+                            )}
                           >
                             <ShieldCheck size={16} />
                             Нужно согласие
                           </Link>
                         )}
 
-                        <div className="my-1 h-px bg-[color:var(--border)]/60 mx-2" />
+                        <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
 
                         <button
                           type="button"
                           onClick={handleLogout}
-                          className={cn("flex w-full items-center gap-2 px-3 py-2 text-sm text-fg rounded-lg text-left transition-all", DROPDOWN_ITEM)}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all",
+                            DROPDOWN_ITEM
+                          )}
                         >
                           <LogOut size={16} />
                           Выйти
@@ -678,7 +703,7 @@ export default function TopNav() {
                 type="button"
                 aria-label="Открыть меню"
                 onClick={() => setMobileOpen((o) => !o)}
-                className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
               >
                 {mobileOpen ? <X size={18} /> : <Menu size={18} />}
               </button>
@@ -687,8 +712,8 @@ export default function TopNav() {
         </div>
 
         {mobileOpen && (
-          <div className="lg:hidden border-b border-[color:var(--border)] bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl shadow-elevated">
-            <div className="mx-auto max-w-elas-page px-4 py-4 space-y-3">
+          <div className="border-b border-[color:var(--border)] bg-white/[0.97] shadow-elevated backdrop-blur-xl dark:bg-[rgba(16,18,26,0.98)] lg:hidden">
+            <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
               {!state.loggedIn &&
                 (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
                   <div key={item.type === "dropdown" ? item.label : item.href}>
@@ -702,10 +727,10 @@ export default function TopNav() {
                       </Link>
                     ) : (
                       <div className="py-2">
-                        <div className="text-muted font-medium text-sm">
+                        <div className="text-sm font-medium text-muted">
                           {(item as NavDropdownItem).label}
                         </div>
-                        <div className="pl-3 mt-1 space-y-1">
+                        <div className="mt-1 space-y-1 pl-3">
                           {((item as NavDropdownItem).children ?? []).map((c) => (
                             <Link
                               key={c.href}
@@ -733,7 +758,7 @@ export default function TopNav() {
                   />
 
                   <div className="pt-1">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted px-1">
+                    <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
                       Навигация
                     </div>
                     <div className="mt-2 space-y-1">
@@ -749,10 +774,10 @@ export default function TopNav() {
                             </Link>
                           ) : (
                             <div className="py-2">
-                              <div className="text-muted font-medium text-sm">
+                              <div className="text-sm font-medium text-muted">
                                 {(item as NavDropdownItem).label}
                               </div>
-                              <div className="pl-3 mt-1 space-y-1">
+                              <div className="mt-1 space-y-1 pl-3">
                                 {((item as NavDropdownItem).children ?? []).map((c) => (
                                   <Link
                                     key={c.href}
@@ -771,8 +796,8 @@ export default function TopNav() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-border/40">
-                    <div className="text-xs font-medium uppercase tracking-[0.16em] text-muted px-1">
+                  <div className="border-t border-border/40 pt-2">
+                    <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
                       Аккаунт
                     </div>
                     <div className="mt-2 space-y-1">
@@ -794,7 +819,9 @@ export default function TopNav() {
 
                       {consentRequired && (
                         <Link
-                          href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
+                          href={`/consent?next=${encodeURIComponent(
+                            safePathname || "/"
+                          )}`}
                           onClick={() => setMobileOpen(false)}
                           className="block py-2 text-warning"
                         >
@@ -805,7 +832,7 @@ export default function TopNav() {
                       <button
                         type="button"
                         onClick={handleLogout}
-                        className="w-full text-left block py-2 text-fg"
+                        className="block w-full py-2 text-left text-fg"
                       >
                         Выйти
                       </button>
