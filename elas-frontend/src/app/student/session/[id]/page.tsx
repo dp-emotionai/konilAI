@@ -65,17 +65,14 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 function LiveMetricCard({
   label,
   value,
-  hint,
 }: {
   label: string;
   value: string;
-  hint?: string;
 }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
       <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">{label}</div>
       <div className="mt-1 text-sm font-semibold text-white">{value}</div>
-      {hint ? <div className="mt-1 text-[11px] text-white/40">{hint}</div> : null}
     </div>
   );
 }
@@ -83,6 +80,14 @@ function LiveMetricCard({
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
   return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
+}
+
+function TopStatBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <Badge className="border border-white/10 bg-black/45 text-white/85 backdrop-blur">
+      {children}
+    </Badge>
+  );
 }
 
 export default function StudentJoinSessionPage() {
@@ -101,8 +106,10 @@ export default function StudentJoinSessionPage() {
       setJoinInfoLoading(false);
       return;
     }
+
     setJoinInfoError(null);
     setJoinInfoLoading(true);
+
     try {
       const info = await getSessionJoinInfo(sessionId);
       setJoinInfo(info ?? null);
@@ -398,7 +405,7 @@ export default function StudentJoinSessionPage() {
                   <div className="mt-0.5 text-sm text-muted">{joinInfoError}</div>
                 </div>
               </div>
-              <Button variant="outline" onClick={() => void loadJoinInfo()} className="gap-2">
+              <Button variant="outline" onClick={() => void loadJoinInfo()}>
                 Повторить
               </Button>
             </CardContent>
@@ -418,8 +425,7 @@ export default function StudentJoinSessionPage() {
                       Для подключения к сессии нужно дать согласие на анализ эмоций
                     </div>
                     <div className="text-sm text-muted">
-                      Согласие обязательно по этике платформы. Его можно отозвать в любой
-                      момент.
+                      Согласие обязательно по этике платформы. Его можно отозвать в любой момент.
                     </div>
 
                     <Link
@@ -444,7 +450,7 @@ export default function StudentJoinSessionPage() {
                     <div className="text-sm text-muted">
                       {blockReason === "session_ended"
                         ? "Преподаватель завершил эфир. Подключение недоступно."
-                        : "Дождитесь, когда преподаватель запустит сессию (статус «В эфире»)."}
+                        : "Дождитесь, когда преподаватель запустит сессию."}
                     </div>
 
                     <Link href="/student/sessions" className="mt-2 inline-block">
@@ -551,8 +557,7 @@ export default function StudentJoinSessionPage() {
                             Проверка камеры
                           </div>
                           <div className="mt-2 text-sm text-muted">
-                            Проверьте доступ, освещение и положение лица. Затем нажмите
-                            «Начать».
+                            Проверьте доступ, освещение и положение лица. Затем нажмите «Начать».
                           </div>
                         </div>
                       </div>
@@ -601,7 +606,7 @@ export default function StudentJoinSessionPage() {
               )}
 
               <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
-                <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="grid min-h-[720px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
                   <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
                     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
                       <div className="min-w-0">
@@ -620,7 +625,7 @@ export default function StudentJoinSessionPage() {
 
                         {connectionState === "connected" && (
                           <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
-                            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+                            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                             Connected
                           </Badge>
                         )}
@@ -634,12 +639,6 @@ export default function StudentJoinSessionPage() {
                         {shouldRunMl && mlUnavailable && (
                           <Badge className="border border-amber-400/20 bg-amber-500/15 text-amber-300">
                             ML временно недоступен
-                          </Badge>
-                        )}
-
-                        {!state.consent && (
-                          <Badge className="border border-amber-400/20 bg-amber-500/15 text-amber-300">
-                            No consent
                           </Badge>
                         )}
 
@@ -684,8 +683,8 @@ export default function StudentJoinSessionPage() {
                       )}
                     </div>
 
-                    <div className="flex-1 p-5">
-                      <div className="relative mx-auto aspect-[16/10] max-h-[72vh] w-full overflow-hidden rounded-[30px] border border-white/10 bg-black shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <div className="min-h-0 flex-1 p-5">
+                      <div className="relative h-full min-h-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-black">
                         <video
                           ref={remoteVideoRef}
                           className="absolute inset-0 h-full w-full object-cover"
@@ -701,27 +700,28 @@ export default function StudentJoinSessionPage() {
                           </div>
                         )}
 
-                        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.45),transparent_22%,transparent_78%,rgba(0,0,0,0.3))]" />
+                        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.5),transparent_20%,transparent_78%,rgba(0,0,0,0.22))]" />
 
-                        <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white backdrop-blur">
-                          {remoteStream
-                            ? formatParticipantLabel(teacherParticipant)
-                            : "Ожидание преподавателя"}
-                          <span className="ml-2 text-xs text-white/60">
+                        <div className="absolute left-4 top-4 z-10 max-w-[55%] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white backdrop-blur">
+                          <div className="truncate">
+                            {remoteStream
+                              ? formatParticipantLabel(teacherParticipant)
+                              : "Ожидание преподавателя"}
+                          </div>
+                          <div className="mt-0.5 text-xs text-white/60">
                             {remoteStream ? "Teacher stream" : "Live room"}
-                          </span>
+                          </div>
                         </div>
 
-                        <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white/90 backdrop-blur">
+                        <div className="absolute right-4 top-4 z-10 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white/90 backdrop-blur">
                           Room: {roomId ? `${roomId.slice(0, 8)}…` : "—"}
                         </div>
 
                         {mlResult && (
-                          <div className="absolute right-4 top-16 z-10 flex max-w-[60%] flex-wrap justify-end gap-2">
-                            <Badge className="border border-white/10 bg-black/50 text-white/85">
-                              {mlResult.emotion ?? "—"} •{" "}
-                              {Math.round((mlResult.confidence ?? 0) * 100)}%
-                            </Badge>
+                          <div className="absolute left-4 top-20 z-10 flex max-w-[62%] flex-wrap gap-2">
+                            <TopStatBadge>
+                              {mlResult.emotion ?? "—"} • {Math.round((mlResult.confidence ?? 0) * 100)}%
+                            </TopStatBadge>
                             <Badge
                               className={
                                 mlResult.state === "NORMAL"
@@ -731,22 +731,16 @@ export default function StudentJoinSessionPage() {
                             >
                               {mlResult.state ?? "—"}
                             </Badge>
-                            <Badge className="border border-white/10 bg-black/50 text-white/85">
+                            <TopStatBadge>
                               Risk {Math.round((mlResult.risk ?? 0) * 100)}%
-                            </Badge>
+                            </TopStatBadge>
                           </div>
                         )}
 
-                        <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-                          <Badge className="border border-white/10 bg-black/50 text-white/85">
-                            Peers: {participants.length}
-                          </Badge>
-                          <Badge className="border border-white/10 bg-black/50 text-white/85">
-                            ML: {shouldRunMl ? "On" : "Off"}
-                          </Badge>
-                          <Badge className="border border-white/10 bg-black/50 text-white/85">
-                            Remote: {remoteStream ? "Yes" : "No"}
-                          </Badge>
+                        <div className="absolute bottom-4 left-4 z-10 flex flex-wrap gap-2">
+                          <TopStatBadge>Peers: {participants.length}</TopStatBadge>
+                          <TopStatBadge>ML: {shouldRunMl ? "On" : "Off"}</TopStatBadge>
+                          <TopStatBadge>Remote: {remoteStream ? "Yes" : "No"}</TopStatBadge>
                         </div>
 
                         <div className="absolute bottom-4 right-4 z-10 h-28 w-44 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
@@ -820,17 +814,13 @@ export default function StudentJoinSessionPage() {
                         <LiveMetricCard label="Emotion" value={mlResult?.emotion ?? "—"} />
                         <LiveMetricCard
                           label="Risk"
-                          value={
-                            mlResult ? `${Math.round((mlResult.risk ?? 0) * 100)}%` : "—"
-                          }
+                          value={mlResult ? `${Math.round((mlResult.risk ?? 0) * 100)}%` : "—"}
                         />
                         <LiveMetricCard label="State" value={mlResult?.state ?? "—"} />
                         <LiveMetricCard
                           label="Confidence"
                           value={
-                            mlResult
-                              ? `${Math.round((mlResult.confidence ?? 0) * 100)}%`
-                              : "—"
+                            mlResult ? `${Math.round((mlResult.confidence ?? 0) * 100)}%` : "—"
                           }
                         />
                       </div>
@@ -849,9 +839,7 @@ export default function StudentJoinSessionPage() {
 
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
                           ML service:{" "}
-                          <span
-                            className={mlApiAvailable ? "text-emerald-300" : "text-amber-300"}
-                          >
+                          <span className={mlApiAvailable ? "text-emerald-300" : "text-amber-300"}>
                             {mlApiAvailable ? "доступен" : "недоступен"}
                           </span>
                         </div>
@@ -872,11 +860,7 @@ export default function StudentJoinSessionPage() {
                     </div>
 
                     <div className="min-h-0 flex-1 p-4">
-                      <SessionChatPanel
-                        sessionId={roomId}
-                        role="student"
-                        type={sessionType}
-                      />
+                      <SessionChatPanel sessionId={roomId} role="student" type={sessionType} />
                     </div>
 
                     <div className="border-t border-white/10 px-5 py-4 text-xs leading-relaxed text-white/50">
@@ -890,7 +874,7 @@ export default function StudentJoinSessionPage() {
                         className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/90 transition hover:bg-white/10"
                       >
                         <BarChart3 size={16} />
-                        <span>После сессии → отчёт (Моя сводка)</span>
+                        <span>После сессии → отчёт</span>
                       </Link>
                     </div>
                   </aside>
@@ -901,10 +885,7 @@ export default function StudentJoinSessionPage() {
 
           {!live && !getWsBaseUrl()?.startsWith("ws") && (
             <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4">
-              <AlertTriangle
-                className="mt-0.5 text-[rgb(var(--warning))]"
-                size={18}
-              />
+              <AlertTriangle className="mt-0.5 text-[rgb(var(--warning))]" size={18} />
               <div className="text-sm text-muted">
                 WS base URL не настроен. Проверь `NEXT_PUBLIC_WS_BASE_URL`.
               </div>
@@ -915,9 +896,7 @@ export default function StudentJoinSessionPage() {
             <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4">
               <Activity className="mt-0.5 text-[rgb(var(--primary))]" size={18} />
               <div className="text-sm leading-relaxed text-muted">
-                Подключение идёт по WebRTC. Видео не записывается. В backend
-                отправляются только агрегированные метрики (emotion/state/risk) при
-                наличии согласия.
+                Подключение идёт по WebRTC. Видео не записывается. В backend отправляются только агрегированные метрики при наличии согласия.
               </div>
             </div>
           )}

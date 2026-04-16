@@ -1,11 +1,19 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Role } from "@/lib/roles";
 import { useUI } from "@/components/layout/Providers";
 import Badge from "@/components/ui/Badge";
 
 export default function RoleSwitcher() {
   const { state, setRole } = useUI();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
 
   return (
     <div className="flex items-center gap-2">
