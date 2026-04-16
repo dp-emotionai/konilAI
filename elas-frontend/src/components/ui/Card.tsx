@@ -18,27 +18,27 @@ export function Card({
   interactive = false,
 }: CardProps) {
   const base =
-    "rounded-2xl text-fg transition-all duration-200 ease-out";
+    "rounded-2xl text-fg transition-[box-shadow,border-color,background-color] duration-200";
 
   const variants: Record<NonNullable<CardProps["variant"]>, string> = {
     default:
-      "bg-surface ring-1 ring-[color:var(--border)]/30 shadow-soft",
+      "bg-surface border border-[color:var(--border)]/30 shadow-sm",
     outline:
-      "bg-surface ring-1 ring-[color:var(--border)]/40",
+      "bg-transparent border border-[color:var(--border)]/40",
     subtle:
-      "bg-surface-subtle/90 ring-1 ring-[color:var(--border)]/20 backdrop-blur-[2px]",
+      "bg-surface-subtle/70 border border-[color:var(--border)]/20",
     elevated:
-      "bg-surface dark:bg-[rgba(25,25,40,0.7)] backdrop-blur-lg ring-1 ring-[color:var(--border)] dark:ring-white/10 shadow-lg",
+      "bg-surface border border-[color:var(--border)]/28 shadow-md dark:bg-[rgba(24,24,36,0.88)]",
   };
 
   const hover = interactive
     ? cn(
-        "hover:-translate-y-0.5",
+        "cursor-pointer",
         variant === "elevated"
-          ? "hover:shadow-xl hover:ring-[rgb(var(--primary))]/40 dark:hover:border-[rgb(var(--primary))]/40"
+          ? "hover:border-[rgb(var(--primary))]/28 hover:shadow-lg"
           : variant === "outline"
-            ? "hover:ring-[color:var(--border-strong)] hover:shadow-soft"
-            : "hover:shadow-card hover:ring-[color:var(--border)]/35"
+            ? "hover:border-[color:var(--border-strong)] hover:bg-surface-subtle/35"
+            : "hover:border-[color:var(--border)]/45 hover:shadow-md"
       )
     : "";
 
