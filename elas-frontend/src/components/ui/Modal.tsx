@@ -21,9 +21,18 @@ export default function Modal({
   children,
   footer,
   className,
+  description,
 }: ModalProps) {
-  const closeRef = React.useRef<HTMLButtonElement>(null);
+  const dialogRef = React.useRef<HTMLDivElement>(null);
   const previousActiveRef = React.useRef<HTMLElement | null>(null);
+  const onCloseRef = React.useRef(onClose);
+
+  const titleId = React.useId();
+  const descriptionId = React.useId();
+
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -31,56 +40,74 @@ export default function Modal({
     previousActiveRef.current = document.activeElement as HTMLElement | null;
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onCloseRef.current();
+      }
     };
+
     window.addEventListener("keydown", onKey);
 
     const t = requestAnimationFrame(() => {
-      closeRef.current?.focus();
+      dialogRef.current?.focus();
     });
 
     return () => {
       window.removeEventListener("keydown", onKey);
       cancelAnimationFrame(t);
+
       if (previousActiveRef.current?.focus) {
         previousActiveRef.current.focus();
       }
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[100]">
       <div
-        className="absolute inset-0 bg-black/40 dark:bg-black/65 backdrop-blur-sm"
-        onMouseDown={onClose}
+        className="absolute inset-0 bg-black/45 backdrop-blur-sm dark:bg-black/65"
+        onClick={onClose}
         aria-hidden
       />
+
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div
-          className={cn(
-            "w-full max-w-lg rounded-2xl bg-surface text-fg",
-            "shadow-elevated ring-1 ring-[color:var(--border)]/30",
-            "overflow-hidden",
-            className
-          )}
-          onMouseDown={(e) => e.stopPropagation()}
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={title ? "modal-title" : undefined}
+          aria-labelledby={title ? titleId : undefined}
+          aria-describedby={description ? descriptionId : undefined}
+          className={cn(
+            "w-full max-w-lg overflow-hidden rounded-2xl bg-surface text-fg",
+            "border border-[color:var(--border)]/30 shadow-elevated",
+            "outline-none",
+            className
+          )}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border/50">
+          <div className="flex items-start justify-between gap-3 border-b border-border/50 px-5 py-4">
             <div className="min-w-0">
-              {title ? <h2 id="modal-title" className="text-base font-semibold truncate">{title}</h2> : null}
+              {title ? (
+                <h2 id={titleId} className="truncate text-base font-semibold">
+                  {title}
+                </h2>
+              ) : null}
+
+              {description ? (
+                <p id={descriptionId} className="mt-1 text-sm leading-relaxed text-muted">
+                  {description}
+                </p>
+              ) : null}
             </div>
+
             <button
-              ref={closeRef}
               type="button"
               onClick={onClose}
               className={cn(
-                "inline-flex h-9 w-9 items-center justify-center rounded-full",
-                "bg-surface-subtle/80 hover:bg-surface-subtle transition-colors",
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+                "bg-surface-subtle/80 text-fg transition-colors hover:bg-surface-subtle",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
               )}
               aria-label="Закрыть"
@@ -92,7 +119,7 @@ export default function Modal({
           <div className="px-5 py-4">{children}</div>
 
           {footer ? (
-            <div className="px-5 py-4 border-t border-border/50 bg-surface/60">
+            <div className="border-t border-border/50 bg-surface/60 px-5 py-4">
               {footer}
             </div>
           ) : null}

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
 import Section from "@/components/common/Section";
 import Reveal from "@/components/common/Reveal";
 import Button from "@/components/ui/Button";
@@ -50,7 +49,6 @@ import {
 } from "lucide-react";
 
 type Tone = "neutral" | "success" | "info" | "warning" | "purple";
-
 type TabId = "sessions" | "announcements" | "members" | "invitations";
 
 function ToneBadge({
@@ -108,10 +106,10 @@ const ACTION_LABELS: Record<string, string> = {
 
 function nextTeacherAction(
   status: GroupSession["status"]
-): { next: "live" | "ended" | "draft"; label: keyof typeof ACTION_LABELS } {
-  if (status === "upcoming") return { next: "live", label: "Start" };
-  if (status === "live") return { next: "ended", label: "End" };
-  return { next: "draft", label: "Reopen" };
+): { nextBackendStatus: "active" | "finished" | "draft"; label: keyof typeof ACTION_LABELS } {
+  if (status === "upcoming") return { nextBackendStatus: "active", label: "Start" };
+  if (status === "live") return { nextBackendStatus: "finished", label: "End" };
+  return { nextBackendStatus: "draft", label: "Reopen" };
 }
 
 function TabButton({
@@ -217,7 +215,7 @@ function MemberActionsDropdown({
           <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-2xl py-1 shadow-elevated border border-[color:var(--border)] ring-1 ring-black/[0.06] dark:ring-white/[0.08] bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl">
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-fg hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1 transition-colors"
+              className="mx-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-left text-sm text-fg transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
               onClick={() => {
                 setOpen(false);
                 onRemove();
@@ -228,7 +226,7 @@ function MemberActionsDropdown({
             </button>
             <button
               type="button"
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-warning hover:bg-black/[0.04] dark:hover:bg-white/[0.06] rounded-lg mx-1 transition-colors"
+              className="mx-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-left text-sm text-warning transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
               onClick={() => {
                 setOpen(false);
                 onBlock();
@@ -247,12 +245,11 @@ function MemberActionsDropdown({
 export default function TeacherGroupDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id ?? "";
-  const apiAvailable = getApiBaseUrl() && hasAuth();
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
 
   const [apiData, setApiData] = useState<{ group: FullGroup; sessions: GroupSession[] } | null>(null);
-  const [groupLoading, setGroupLoading] = useState(!!apiAvailable);
+  const [groupLoading, setGroupLoading] = useState(apiAvailable);
   const [tick, setTick] = useState(0);
-  const [sessionStatusOverride, setSessionStatusOverride] = useState<Record<string, string>>({});
 
   const [activeTab, setActiveTab] = useState<TabId>("sessions");
 
@@ -276,8 +273,16 @@ export default function TeacherGroupDetailPage() {
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
-  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{ memberId: string; memberName: string } | null>(null);
-  const [confirmBlockMember, setConfirmBlockMember] = useState<{ memberId: string; memberName: string } | null>(null);
+
+  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{
+    memberId: string;
+    memberName: string;
+  } | null>(null);
+
+  const [confirmBlockMember, setConfirmBlockMember] = useState<{
+    memberId: string;
+    memberName: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!apiAvailable || !id) {
@@ -296,14 +301,34 @@ export default function TeacherGroupDetailPage() {
   const group: FullGroup | null = apiData?.group ?? null;
   const sessions: GroupSession[] = apiData?.sessions ?? [];
 
+  const groupDescriptionValue = useMemo(
+    () => ((group as { description?: string } | null)?.description ?? ""),
+    [group]
+  );
+
+  const groupImageUrl = (group as { imageUrl?: string } | null)?.imageUrl;
+  const membersCount = apiAvailable ? groupMembers.length : group?.students.length ?? 0;
+  const pendingCount = groupInvitations.filter((i) => i.status === "pending").length;
+
   const refetchGroup = () => setTick((x) => x + 1);
 
+  const openInviteModal = () => {
+    setInviteOpen(true);
+    setInviteError(null);
+    setInviteSuccess(null);
+  };
+
+  const closeInviteModal = () => {
+    setInviteOpen(false);
+    setInviteError(null);
+    setInviteSuccess(null);
+  };
+
   useEffect(() => {
-    if (group) {
-      setLocalName(group.name);
-      setLocalDescription((group as { description?: string }).description ?? "");
-    }
-  }, [group?.id, group?.name, (group as { description?: string })?.description]);
+    if (!group) return;
+    setLocalName(group.name);
+    setLocalDescription(groupDescriptionValue);
+  }, [group?.id, group?.name, groupDescriptionValue]);
 
   useEffect(() => {
     if (!apiAvailable || !id || activeTab !== "invitations") return;
@@ -337,9 +362,6 @@ export default function TeacherGroupDetailPage() {
       .catch(() => setAnnLoading(false));
   }, [apiAvailable, id, activeTab, tick]);
 
-  const pendingCount = groupInvitations.filter((i) => i.status === "pending").length;
-  const membersCount = apiAvailable ? groupMembers.length : group?.students.length ?? 0;
-
   const handleInviteSubmit = async () => {
     const emails = inviteEmails
       .split(/[\n,;]+/)
@@ -360,9 +382,9 @@ export default function TeacherGroupDetailPage() {
       const n = res?.created?.length ?? 0;
       setInviteSuccess(n > 0 ? `Отправлено приглашений: ${n}` : "Приглашения созданы.");
       setInviteEmails("");
+
       setTimeout(() => {
-        setInviteOpen(false);
-        setInviteSuccess(null);
+        closeInviteModal();
         setTick((x) => x + 1);
       }, 1200);
     } catch (e: unknown) {
@@ -376,7 +398,6 @@ export default function TeacherGroupDetailPage() {
     return (
       <div className="relative space-y-12 pb-20">
         <Glow />
-        <PageHero title="Загрузка…" subtitle="Группа и связанные данные загружаются." />
         <Section>
           <Card variant="elevated">
             <CardContent className="p-7">
@@ -392,7 +413,6 @@ export default function TeacherGroupDetailPage() {
     return (
       <div className="relative space-y-12 pb-20">
         <Glow />
-        <PageHero title="Группа не найдена" subtitle="Такой группы нет в системе." />
         <Section>
           <Card variant="elevated">
             <CardContent className="p-7">
@@ -408,9 +428,6 @@ export default function TeacherGroupDetailPage() {
       </div>
     );
   }
-
-  const groupImageUrl = (group as { imageUrl?: string }).imageUrl;
-  const groupDescription = (group as { description?: string }).description ?? "";
 
   return (
     <div className="relative space-y-10 pb-20">
@@ -436,7 +453,7 @@ export default function TeacherGroupDetailPage() {
       <Section spacing="none">
         <Card variant="elevated" className="overflow-hidden">
           <div
-            className="relative h-36 md:h-44 w-full bg-gradient-to-br from-primary-muted/40 to-primary-muted/10"
+            className="relative h-36 w-full bg-gradient-to-br from-primary-muted/40 to-primary-muted/10 md:h-44"
             style={
               groupImageUrl
                 ? {
@@ -450,18 +467,18 @@ export default function TeacherGroupDetailPage() {
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
           </div>
 
-          <CardContent className="relative -mt-16 md:-mt-20 px-6 pb-6 md:px-8 md:pb-8">
+          <CardContent className="relative -mt-16 px-6 pb-6 md:-mt-20 md:px-8 md:pb-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-              <div className="flex items-end gap-4 min-w-0">
+              <div className="flex min-w-0 items-end gap-4">
                 {groupImageUrl ? (
                   <div className="relative group/avatar">
                     <div
-                      className="h-24 w-24 md:h-28 md:w-28 rounded-3xl ring-4 ring-[var(--surface)] bg-surface-subtle bg-cover bg-center shrink-0 shadow-card"
+                      className="h-24 w-24 shrink-0 rounded-3xl bg-surface-subtle bg-cover bg-center shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28"
                       style={{ backgroundImage: `url(${groupImageUrl})` }}
                     />
                     <button
                       type="button"
-                      className="absolute inset-0 flex items-center justify-center rounded-3xl bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white text-xs gap-1"
+                      className="absolute inset-0 flex items-center justify-center gap-1 rounded-3xl bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
                       title="Сменить фото (скоро)"
                     >
                       <ImagePlus size={14} />
@@ -469,12 +486,12 @@ export default function TeacherGroupDetailPage() {
                   </div>
                 ) : (
                   <div className="relative group/avatar">
-                    <div className="h-24 w-24 md:h-28 md:w-28 rounded-3xl ring-4 ring-[var(--surface)] bg-gradient-to-br from-primary-muted to-primary-muted/60 flex items-center justify-center text-3xl md:text-4xl font-bold text-[rgb(var(--primary))] shrink-0 shadow-card">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-muted to-primary-muted/60 text-3xl font-bold text-[rgb(var(--primary))] shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28 md:text-4xl">
                       {group.name.slice(0, 2).toUpperCase()}
                     </div>
                     <button
                       type="button"
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity text-white text-xs"
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-black/40 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
                       title="Добавить фото группы (скоро)"
                     >
                       <ImagePlus size={18} />
@@ -483,13 +500,13 @@ export default function TeacherGroupDetailPage() {
                   </div>
                 )}
 
-                <div className="pb-1 min-w-0">
+                <div className="min-w-0 pb-1">
                   {editingName ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <Input
                         value={localName}
                         onChange={(e) => setLocalName(e.target.value)}
-                        className="max-w-xs rounded-xl font-semibold text-lg"
+                        className="max-w-xs rounded-xl text-lg font-semibold"
                         autoFocus
                       />
                       <Button size="sm" onClick={() => setEditingName(false)}>
@@ -507,14 +524,14 @@ export default function TeacherGroupDetailPage() {
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 min-w-0">
-                      <h1 className="truncate text-2xl md:text-3xl font-bold text-fg">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h1 className="truncate text-2xl font-bold text-fg md:text-3xl">
                         {localName || group.name}
                       </h1>
                       <button
                         type="button"
                         onClick={() => setEditingName(true)}
-                        className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-subtle transition-colors shrink-0"
+                        className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
                         aria-label="Редактировать название"
                       >
                         <Edit3 size={16} />
@@ -535,11 +552,7 @@ export default function TeacherGroupDetailPage() {
                     size="sm"
                     variant="outline"
                     className="gap-2 rounded-xl"
-                    onClick={() => {
-                      setInviteOpen(true);
-                      setInviteError(null);
-                      setInviteSuccess(null);
-                    }}
+                    onClick={openInviteModal}
                   >
                     <UserPlus size={16} />
                     Пригласить
@@ -593,7 +606,7 @@ export default function TeacherGroupDetailPage() {
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        setLocalDescription(groupDescription);
+                        setLocalDescription(groupDescriptionValue);
                         setEditingDesc(false);
                       }}
                     >
@@ -606,13 +619,15 @@ export default function TeacherGroupDetailPage() {
                   <div className="flex-1">
                     <div className="text-xs uppercase tracking-wide text-muted">Описание</div>
                     <p className="mt-2 text-sm leading-relaxed text-muted">
-                      {localDescription || groupDescription || "Добавьте короткое описание группы, чтобы преподавателю и студентам было проще ориентироваться."}
+                      {localDescription ||
+                        groupDescriptionValue ||
+                        "Добавьте короткое описание группы, чтобы преподавателю и студентам было проще ориентироваться."}
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setEditingDesc(true)}
-                    className="p-1.5 rounded-lg text-muted hover:text-fg hover:bg-surface-subtle transition-colors shrink-0"
+                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
                     aria-label="Редактировать описание"
                   >
                     <Edit3 size={14} />
@@ -631,7 +646,7 @@ export default function TeacherGroupDetailPage() {
       )}
 
       <Section>
-        <div className="flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3 mb-5">
+        <div className="mb-5 flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3">
           <TabButton
             active={activeTab === "sessions"}
             label="Сессии"
@@ -721,24 +736,15 @@ export default function TeacherGroupDetailPage() {
                                   <Button
                                     type="button"
                                     className={cn(
-                                      action.next === "live"
+                                      action.nextBackendStatus === "active"
                                         ? "ring-1 ring-amber-400/25 bg-amber-500/15 hover:bg-amber-500/20 text-amber-100"
-                                        : action.next === "ended"
+                                        : action.nextBackendStatus === "finished"
                                           ? "ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg"
                                           : "ring-1 ring-fuchsia-400/25 bg-fuchsia-500/15 hover:bg-fuchsia-500/20 text-fuchsia-100"
                                     )}
                                     onClick={() => {
                                       if (apiAvailable) {
-                                        const backendStatus =
-                                          action.next === "live"
-                                            ? "active"
-                                            : action.next === "ended"
-                                              ? "finished"
-                                              : "draft";
-                                        updateSessionStatus(s.id, backendStatus).then(refetchGroup);
-                                      } else {
-                                        setSessionStatusOverride((prev) => ({ ...prev, [s.id]: action.next }));
-                                        setTick((x) => x + 1);
+                                        updateSessionStatus(s.id, action.nextBackendStatus).then(refetchGroup);
                                       }
                                     }}
                                   >
@@ -966,11 +972,7 @@ export default function TeacherGroupDetailPage() {
                           size="sm"
                           variant="outline"
                           className="gap-2"
-                          onClick={() => {
-                            setInviteOpen(true);
-                            setInviteError(null);
-                            setInviteSuccess(null);
-                          }}
+                          onClick={openInviteModal}
                         >
                           <UserPlus size={14} />
                           Пригласить
@@ -1060,15 +1062,15 @@ export default function TeacherGroupDetailPage() {
                   <div className="mt-6 space-y-3 rounded-2xl bg-surface-subtle/60 ring-1 ring-[color:var(--border)]/20 p-5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Преподаватель</span>
-                      <span className="text-fg font-medium">{group.teacher.name}</span>
+                      <span className="font-medium text-fg">{group.teacher.name}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Студентов</span>
-                      <span className="text-fg font-medium">{membersCount}</span>
+                      <span className="font-medium text-fg">{membersCount}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Программа</span>
-                      <span className="text-fg font-medium">{group.program}</span>
+                      <span className="font-medium text-fg">{group.program}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Статус</span>
@@ -1078,7 +1080,7 @@ export default function TeacherGroupDetailPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-2xl bg-surface-subtle/40 ring-1 ring-[color:var(--border)]/20 p-4 text-xs text-muted leading-relaxed">
+                  <div className="mt-5 rounded-2xl bg-surface-subtle/40 ring-1 ring-[color:var(--border)]/20 p-4 text-xs leading-relaxed text-muted">
                     Подключение к live-сессии доступно студентам после согласия на обработку
                     агрегированных аналитических сигналов.
                   </div>
@@ -1100,11 +1102,7 @@ export default function TeacherGroupDetailPage() {
                       <Button
                         variant="outline"
                         className="justify-center"
-                        onClick={() => {
-                          setInviteOpen(true);
-                          setInviteError(null);
-                          setInviteSuccess(null);
-                        }}
+                        onClick={openInviteModal}
                       >
                         Пригласить студентов
                       </Button>
@@ -1183,16 +1181,12 @@ export default function TeacherGroupDetailPage() {
 
       <Modal
         open={inviteOpen}
-        onClose={() => {
-          setInviteOpen(false);
-          setInviteError(null);
-          setInviteSuccess(null);
-        }}
+        onClose={closeInviteModal}
         title="Пригласить студентов в группу"
         description="Укажите email через запятую или с новой строки. Если пользователь зарегистрирован, он увидит приглашение в личном кабинете."
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setInviteOpen(false)}>
+            <Button variant="ghost" onClick={closeInviteModal}>
               Отмена
             </Button>
             <Button disabled={inviteLoading} onClick={handleInviteSubmit}>
