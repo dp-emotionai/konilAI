@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/Card";
@@ -71,15 +71,19 @@ function normalizeStatus(value: unknown): UserStatus | null {
   return null;
 }
 
-export default function VerifyEmailPage() {
+function VerifyEmailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { setLoggedIn, setRole, setStatus } = useUI();
 
   const mode = useMemo(
-    () => (searchParams.get("mode")?.trim().toLowerCase() === "register" ? "register" : "generic"),
+    () =>
+      searchParams.get("mode")?.trim().toLowerCase() === "register"
+        ? "register"
+        : "generic",
     [searchParams]
   );
+
   const emailFromQuery = useMemo(
     () => searchParams.get("email")?.trim().toLowerCase() ?? "",
     [searchParams]
@@ -272,7 +276,6 @@ export default function VerifyEmailPage() {
 
         setInfo("Новый код подтверждения отправлен на вашу почту.");
       } else {
-        // Если у вас есть отдельный resend endpoint, потом можно заменить сюда.
         setInfo("Повторная отправка кода для этого режима пока не настроена.");
       }
     } catch (err) {
@@ -343,7 +346,11 @@ export default function VerifyEmailPage() {
           {info && <p className="text-sm text-emerald-400">{info}</p>}
 
           <div className="space-y-3">
-            <Button className="w-full" onClick={handleVerify} disabled={loading || resending}>
+            <Button
+              className="w-full"
+              onClick={handleVerify}
+              disabled={loading || resending}
+            >
               {loading ? "Проверка…" : "Подтвердить email"}
             </Button>
 
@@ -371,5 +378,30 @@ export default function VerifyEmailPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function VerifyEmailFallback() {
+  return (
+    <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
+      <Card className="w-full max-w-md rounded-3xl p-6 sm:p-8">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
+            Подтверждение email
+          </h2>
+          <p className="text-sm text-[color:var(--muted)]">
+            Подготавливаем форму подтверждения…
+          </p>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailFallback />}>
+      <VerifyEmailInner />
+    </Suspense>
   );
 }
