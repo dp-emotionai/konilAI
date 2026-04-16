@@ -1,10 +1,8 @@
 "use client";
 
-import { useUI } from "./Providers";
 import type { Role } from "@/lib/roles";
+import { useUI } from "@/components/layout/Providers";
 import Badge from "@/components/ui/Badge";
-
-const roles: Role[] = ["student", "teacher", "admin"];
 
 export default function RoleSwitcher() {
   const { state, setRole } = useUI();
@@ -12,16 +10,15 @@ export default function RoleSwitcher() {
   return (
     <div className="flex items-center gap-2">
       <Badge>DEMO</Badge>
+
       <select
-        value={state.role}
+        value={state.role ?? "student"}
         onChange={(e) => setRole(e.target.value as Role)}
-        className="h-9 rounded-xl bg-black/30 border border-white/10 px-3 text-sm text-white/80 outline-none"
+        className="h-9 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white/80 outline-none"
       >
-        {roles.map((r) => (
-          <option key={r} value={r}>
-            {r.toUpperCase()}
-          </option>
-        ))}
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+        <option value="admin">Admin</option>
       </select>
     </div>
   );
