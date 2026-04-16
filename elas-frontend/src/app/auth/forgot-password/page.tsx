@@ -6,7 +6,7 @@ import PageTitle from "@/components/common/PageTitle";
 import { Card } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { api } from "@/lib/api/client";
+import { api, isApiAvailable } from "@/lib/api/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -18,18 +18,24 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError(null);
 
-    const trimmed = email.trim();
+    const trimmed = email.trim().toLowerCase();
     if (!trimmed) {
       setError("Введите email.");
       return;
     }
 
+    if (!isApiAvailable()) {
+      setError("Сервер временно недоступен. Попробуйте позже.");
+      return;
+    }
+
     setLoading(true);
+
     try {
       await api.post<unknown>("auth/forgot-password", { email: trimmed });
       setSent(true);
     } catch (err) {
-      // По соображениям безопасности сообщение не раскрывает, существует ли email.
+      // По соображениям безопасности не раскрываем, существует ли email.
       console.error("FORGOT PASSWORD ERROR:", err);
       setSent(true);
     } finally {
@@ -38,11 +44,11 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto space-y-8">
+    <div className="mx-auto max-w-md space-y-8">
       <PageTitle
         overline="Восстановление пароля"
         title="Забыли пароль?"
-        subtitle="Укажите email вашего аккаунта — мы отправим ссылку для сброса пароля."
+        subtitle="Укажите email вашего аккаунта — мы отправим инструкцию для сброса пароля."
       />
 
       <Card className="p-6 md:p-8">
@@ -55,32 +61,41 @@ export default function ForgotPasswordPage() {
               Не пришло письмо? Проверьте папку «Спам» или обратитесь к администратору вашей организации.
             </p>
             <Link href="/auth/login">
-              <Button variant="outline" className="w-full">Вернуться ко входу</Button>
+              <Button variant="outline" className="w-full">
+                Вернуться ко входу
+              </Button>
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <Input
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              required
-              autoComplete="email"
-            />
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Отправка…" : "Отправить ссылку"}
-            </Button>
-          </form>
-        )}
+          <>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <Input
+                placeholder="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={loading}
+                required
+                autoComplete="email"
+              />
 
-        <div className="mt-6 pt-4 border-t border-white/10 text-center">
-          <Link href="/auth/login" className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition">
-            ← Назад ко входу
-          </Link>
-        </div>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Отправка…" : "Отправить ссылку"}
+              </Button>
+            </form>
+
+            <div className="mt-6 border-t border-white/10 pt-4 text-center">
+              <Link
+                href="/auth/login"
+                className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
+              >
+                ← Назад ко входу
+              </Link>
+            </div>
+          </>
+        )}
       </Card>
     </div>
   );

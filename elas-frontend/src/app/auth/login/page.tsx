@@ -9,7 +9,13 @@ import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useUI } from "@/components/layout/Providers";
 import { ROLE_HOME } from "@/lib/nav";
-import { api, setAuth, clearAuth, isApiAvailable } from "@/lib/api/client";
+import {
+  api,
+  setAuth,
+  clearAuth,
+  isApiAvailable,
+  type UserStatus,
+} from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
 
 type LoginRes = {
@@ -28,9 +34,25 @@ type LoginRes = {
   message?: string;
 };
 
+function normalizeRole(value: unknown): Role | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "student" || v === "teacher" || v === "admin") return v;
+  return null;
+}
+
+function normalizeStatus(value: unknown): UserStatus | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "pending" || v === "approved" || v === "limited" || v === "blocked") {
+    return v as UserStatus;
+  }
+  return null;
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  const { setLoggedIn, setRole } = useUI();
+  const { setLoggedIn, setRole, setStatus } = useUI();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +62,46 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+
+  const finishLogin = ({
+    token,
+    email,
+    role,
+    name,
+    status,
+  }: {
+    token: string;
+    email: string;
+    role: Role;
+    name?: string | null;
+    status?: UserStatus | null;
+  }) => {
+    const safeHome =
+      typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
+        ? ROLE_HOME[role]
+        : "/";
+
+    setAuth({
+      token,
+      role,
+      email,
+      name: name ?? undefined,
+      status: status ?? null,
+    });
+
+    setRole(role);
+    setStatus(status ?? null);
+    setLoggedIn(true);
+
+    router.push(safeHome);
+  };
+
+  const resetUiAuthState = () => {
+    clearAuth();
+    setLoggedIn(false);
+    setRole(null);
+    setStatus(null);
+  };
 
   const handleLogin = async () => {
     setError("");
@@ -53,7 +115,9 @@ export default function LoginPage() {
     }
 
     if (!isApiAvailable()) {
-      setError("Сервер недоступен. Проверьте подключение или используйте демо-режим ниже.");
+      setError(
+        "Сервер недоступен. Проверьте подключение или используйте демо-режим ниже."
+      );
       return;
     }
 
@@ -65,20 +129,10 @@ export default function LoginPage() {
         password: p,
       });
 
-      console.log("LOGIN RESPONSE:", data);
-
       const user = data?.user;
-      const rawRole = user?.role;
-      const normalizedRole =
-        typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
-      const role = normalizedRole as Role;
+      const role = normalizeRole(user?.role);
       const token = data?.token ?? data?.accessToken;
-      const rawStatus =
-        typeof user?.status === "string" ? user.status.trim().toLowerCase() : null;
-
-      console.log("RAW ROLE:", rawRole);
-      console.log("NORMALIZED ROLE:", normalizedRole);
-      console.log("ROLE_HOME:", ROLE_HOME);
+      const status = normalizeStatus(user?.status);
 
       if (!user) {
         throw new Error("Сервер не вернул данные пользователя.");
@@ -92,43 +146,25 @@ export default function LoginPage() {
         throw new Error("Сервер не вернул токен авторизации.");
       }
 
-      if (!normalizedRole || !(normalizedRole in ROLE_HOME)) {
-        console.error("UNKNOWN ROLE FROM SERVER:", rawRole);
-        throw new Error(`Сервер вернул неизвестную роль пользователя: ${String(rawRole)}`);
+      if (!role || !(role in ROLE_HOME)) {
+        throw new Error(
+          `Сервер вернул неизвестную роль пользователя: ${String(user?.role)}`
+        );
       }
 
-      const safeHome =
-        typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
-          ? ROLE_HOME[role]
-          : "/";
-
-      setAuth({
+      finishLogin({
         token,
         role,
         email: user.email,
         name: user.name ?? undefined,
-        status:
-          rawStatus === "pending" ||
-          rawStatus === "approved" ||
-          rawStatus === "limited" ||
-          rawStatus === "blocked"
-            ? rawStatus
-            : null,
+        status,
       });
-
-      setRole(role);
-      setLoggedIn(true);
-
-      router.push(safeHome);
     } catch (err) {
       console.error("LOGIN PAGE ERROR:", err);
+
       let message = "Ошибка входа. Проверьте данные.";
       const raw =
-        err instanceof Error
-          ? err.message
-          : err != null
-          ? String(err)
-          : "";
+        err instanceof Error ? err.message : err != null ? String(err) : "";
       const normalized = raw.toLowerCase();
 
       if (
@@ -148,6 +184,7 @@ export default function LoginPage() {
         message = raw;
       }
 
+      resetUiAuthState();
       setError(message);
     } finally {
       setLoading(false);
@@ -162,8 +199,20 @@ export default function LoginPage() {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const anyWindow: any = window;
+    const anyWindow = window as typeof window & {
+      google?: {
+        accounts?: {
+          id?: {
+            initialize: (config: {
+              client_id: string;
+              callback: (response: { credential: string }) => void;
+            }) => void;
+            prompt: () => void;
+          };
+        };
+      };
+    };
+
     const google = anyWindow.google;
     if (!google?.accounts?.id) {
       setError("Google auth недоступен. Обновите страницу и попробуйте снова.");
@@ -185,50 +234,38 @@ export default function LoginPage() {
           });
 
           const user = data?.user;
-          const rawRole = user?.role;
-          const normalizedRole =
-            typeof rawRole === "string" ? rawRole.trim().toLowerCase() : "";
-          const role = normalizedRole as Role;
+          const role = normalizeRole(user?.role);
           const token = data?.token ?? data?.accessToken;
-          const rawStatus =
-            typeof user?.status === "string" ? user.status.trim().toLowerCase() : null;
+          const status = normalizeStatus(user?.status);
 
           if (!user || !user.email) {
             throw new Error("Сервер не вернул данные пользователя.");
           }
+
           if (!token) {
             throw new Error("Сервер не вернул токен авторизации.");
           }
-          if (!normalizedRole || !(normalizedRole in ROLE_HOME)) {
-            throw new Error(`Сервер вернул неизвестную роль пользователя: ${String(rawRole)}`);
+
+          if (!role || !(role in ROLE_HOME)) {
+            throw new Error(
+              `Сервер вернул неизвестную роль пользователя: ${String(user?.role)}`
+            );
           }
 
-          const safeHome =
-            typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
-              ? ROLE_HOME[role]
-              : "/";
-
-          setAuth({
+          finishLogin({
             token,
             role,
             email: user.email,
             name: user.name ?? undefined,
-            status:
-              rawStatus === "pending" ||
-              rawStatus === "approved" ||
-              rawStatus === "limited" ||
-              rawStatus === "blocked"
-                ? rawStatus
-                : null,
+            status,
           });
-
-          setRole(role);
-          setLoggedIn(true);
-          router.push(safeHome);
         } catch (err) {
           console.error("GOOGLE LOGIN ERROR:", err);
+          resetUiAuthState();
           setError(
-            err instanceof Error ? err.message : "Ошибка входа через Google. Попробуйте снова."
+            err instanceof Error
+              ? err.message
+              : "Ошибка входа через Google. Попробуйте снова."
           );
         }
       },
@@ -240,6 +277,7 @@ export default function LoginPage() {
   const handleDemo = (role: Role) => {
     clearAuth();
     setRole(role);
+    setStatus(null);
     setLoggedIn(true);
 
     const safeHome =
@@ -251,10 +289,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-96px)] flex items-center justify-center px-4 py-10">
-      <Script src="https://accounts.google.com/gsi/client" strategy="afterInteractive" />
-      <div className="w-full max-w-5xl grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 text-white px-8 py-9 hidden md:flex flex-col justify-between">
+    <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
+      <Script
+        src="https://accounts.google.com/gsi/client"
+        strategy="afterInteractive"
+      />
+
+      <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="relative hidden flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 px-8 py-9 text-white md:flex">
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -264,15 +306,15 @@ export default function LoginPage() {
               <h1 className="text-3xl font-semibold tracking-tight">
                 Добро пожаловать в Konilai
               </h1>
-              <p className="text-sm text-white/70 max-w-md">
-                Войдите как преподаватель, студент или администратор, чтобы управлять
-                сессиями и смотреть аналитику вовлечённости.
+              <p className="max-w-md text-sm text-white/70">
+                Войдите как преподаватель, студент или администратор, чтобы
+                управлять сессиями и смотреть аналитику вовлечённости.
               </p>
             </div>
           </div>
         </div>
 
-        <Card className="rounded-3xl p-6 sm:p-8 space-y-6">
+        <Card className="space-y-6 rounded-3xl p-6 sm:p-8">
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
               Вход в аккаунт
@@ -283,7 +325,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Button
                 type="button"
                 variant="outline"
@@ -342,41 +384,53 @@ export default function LoginPage() {
             {loading ? "Вход…" : "Войти"}
           </Button>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-2">
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition"
+              className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
             >
               Забыли пароль?
             </Link>
 
             <Link
               href="/auth/register"
-              className="text-sm font-medium text-purple-300 hover:text-purple-200 transition"
+              className="text-sm font-medium text-purple-300 transition hover:text-purple-200"
             >
               Создать аккаунт
             </Link>
           </div>
 
           {mounted && !isApiAvailable() && (
-            <div className="pt-4 border-t border-white/10 space-y-2">
+            <div className="space-y-2 border-t border-white/10 pt-4">
               <button
                 type="button"
                 onClick={() => setShowDemo((s) => !s)}
-                className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition"
+                className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
               >
                 {showDemo ? "Скрыть демо-режим" : "Нет доступа к серверу? Попробовать демо"}
               </button>
 
               {showDemo && (
                 <div className="mt-1 grid grid-cols-3 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => handleDemo("teacher")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDemo("teacher")}
+                  >
                     Преподаватель
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleDemo("student")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDemo("student")}
+                  >
                     Студент
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleDemo("admin")}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDemo("admin")}
+                  >
                     Админ
                   </Button>
                 </div>

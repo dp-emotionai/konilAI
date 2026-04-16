@@ -43,8 +43,12 @@ function Kpi({
   return (
     <Card variant="elevated" className="overflow-hidden">
       <CardContent className="p-6 md:p-8">
-        <div className="text-sm font-medium uppercase tracking-wider text-muted">{title}</div>
-        <div className="mt-2 text-3xl md:text-4xl font-bold text-fg tracking-tight">{loading ? "…" : value}</div>
+        <div className="text-sm font-medium uppercase tracking-wider text-muted">
+          {title}
+        </div>
+        <div className="mt-2 text-3xl font-bold tracking-tight text-fg md:text-4xl">
+          {loading ? "…" : value}
+        </div>
         <div className="mt-2 text-sm text-muted">{hint}</div>
       </CardContent>
     </Card>
@@ -59,45 +63,83 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
     return (
       <Card variant="elevated" className="overflow-hidden">
         <CardContent className="p-6 md:p-8">
-          <div className="text-sm font-medium uppercase tracking-wider text-muted">Engagement over time</div>
-          <div className="mt-4 h-52 rounded-2xl border border-[color:var(--border)] dark:border-white/10 bg-surface-subtle/30 dark:bg-white/5 flex items-center justify-center text-muted text-sm">
+          <div className="text-sm font-medium uppercase tracking-wider text-muted">
+            Engagement over time
+          </div>
+          <div className="mt-4 flex h-52 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle/30 text-sm text-muted dark:border-white/10 dark:bg-white/5">
             Нет точек таймлайна для этой сессии.
           </div>
         </CardContent>
       </Card>
     );
   }
+
   const chartData = data.map((p) => ({
     time: p.timeSec,
     engagement: p.engagement,
     stress: p.stress ?? 0,
+    risk: p.risk ?? 0,
     name: `${Math.floor(p.timeSec / 60)} мин`,
   }));
+
   const hasStress = chartData.some((d) => Number(d.stress) > 0);
+
   return (
     <Card variant="elevated" className="overflow-hidden">
       <CardContent className="p-6 md:p-8">
-        <div className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Вовлечённость и стресс по времени</div>
+        <div className="mb-4 text-sm font-medium uppercase tracking-wider text-muted">
+          Вовлечённость и стресс по времени
+        </div>
         <div className="mt-4 h-52">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <AreaChart
+              data={chartData}
+              margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke="rgba(255,255,255,0.06)"
+              />
               <XAxis dataKey="name" tick={{ fill: "var(--muted)", fontSize: 10 }} />
               <YAxis tick={{ fill: "var(--muted)", fontSize: 10 }} domain={[0, 100]} />
               <Tooltip
-                contentStyle={{ background: "rgba(20,20,35,0.95)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px" }}
+                contentStyle={{
+                  background: "rgba(20,20,35,0.95)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "12px",
+                }}
                 labelStyle={{ color: "rgba(255,255,255,0.85)" }}
                 formatter={(value: unknown, name) => {
                   const key = typeof name === "string" ? name : "";
                   return [
                     `${typeof value === "number" ? value : 0}%`,
-                    key === "engagement" ? "Вовлечённость" : "Стресс",
+                    key === "engagement"
+                      ? "Вовлечённость"
+                      : key === "stress"
+                        ? "Стресс"
+                        : "Риск",
                   ];
                 }}
               />
-              <Area type="monotone" dataKey="engagement" stroke={ENGAGEMENT_COLOR} fill={ENGAGEMENT_COLOR} fillOpacity={0.3} strokeWidth={2} name="engagement" />
+              <Area
+                type="monotone"
+                dataKey="engagement"
+                stroke={ENGAGEMENT_COLOR}
+                fill={ENGAGEMENT_COLOR}
+                fillOpacity={0.3}
+                strokeWidth={2}
+                name="engagement"
+              />
               {hasStress && (
-                <Area type="monotone" dataKey="stress" stroke={STRESS_COLOR} fill={STRESS_COLOR} fillOpacity={0.2} strokeWidth={2} name="stress" />
+                <Area
+                  type="monotone"
+                  dataKey="stress"
+                  stroke={STRESS_COLOR}
+                  fill={STRESS_COLOR}
+                  fillOpacity={0.2}
+                  strokeWidth={2}
+                  name="stress"
+                />
               )}
             </AreaChart>
           </ResponsiveContainer>
@@ -111,10 +153,56 @@ function AiSummaryCard({ text }: { text: string }) {
   return (
     <Card className="overflow-hidden border-[rgb(var(--primary))]/20 bg-primary-muted/10">
       <CardContent className="p-6">
-        <div className="flex items-center gap-2 text-sm font-medium text-[rgb(var(--primary))]">
-          AI Summary
+        <div className="text-sm font-medium text-[rgb(var(--primary))]">AI Summary</div>
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-fg">
+          {text}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ParticipantCard({
+  name,
+  emotion,
+  engagement,
+  stress,
+  fatigue,
+  risk,
+  confidence,
+}: {
+  name: string;
+  emotion?: string;
+  engagement?: number;
+  stress?: number;
+  fatigue?: number;
+  risk?: number;
+  confidence?: number;
+}) {
+  return (
+    <Card variant="elevated" className="overflow-hidden">
+      <CardContent className="space-y-3 p-5">
+        <div className="text-base font-semibold text-fg">{name}</div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary">{emotion ?? "—"}</Badge>
+          {typeof confidence === "number" && (
+            <Badge variant="secondary">Confidence {confidence}%</Badge>
+          )}
         </div>
-        <p className="mt-3 text-sm leading-relaxed text-fg whitespace-pre-wrap">{text}</p>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl bg-surface-subtle px-3 py-2">
+            Engagement: {typeof engagement === "number" ? `${engagement}%` : "—"}
+          </div>
+          <div className="rounded-xl bg-surface-subtle px-3 py-2">
+            Stress: {typeof stress === "number" ? `${stress}%` : "—"}
+          </div>
+          <div className="rounded-xl bg-surface-subtle px-3 py-2">
+            Fatigue: {typeof fatigue === "number" ? `${fatigue}%` : "—"}
+          </div>
+          <div className="rounded-xl bg-surface-subtle px-3 py-2">
+            Risk: {typeof risk === "number" ? `${risk}%` : "—"}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -123,10 +211,17 @@ function AiSummaryCard({ text }: { text: string }) {
 export default function TeacherLectureAnalyticsPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params.id ?? "";
-  const [tab, setTab] = useState<"overview" | "timeline" | "insights">("overview");
+  const [tab, setTab] = useState<"overview" | "timeline" | "insights" | "participants">(
+    "overview"
+  );
   const [exporting, setExporting] = useState<"json" | "csv" | "pdf" | null>(null);
 
-  const { data: analytics, error, isLoading, mutate } = useSWR(
+  const {
+    data: analytics,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(
     sessionId ? sessionAnalyticsKey(sessionId) : null,
     () => fetchSessionAnalytics(sessionId),
     { revalidateOnFocus: false }
@@ -137,8 +232,6 @@ export default function TeacherLectureAnalyticsPage() {
     setExporting(format);
     try {
       await exportSessionReport(sessionId, format);
-    } catch {
-      // Could add toast
     } finally {
       setExporting(null);
     }
@@ -169,6 +262,7 @@ export default function TeacherLectureAnalyticsPage() {
                 Нет данных
               </Badge>
             )}
+
             {sessionId && (
               <div className="flex gap-1">
                 <Button
@@ -213,10 +307,11 @@ export default function TeacherLectureAnalyticsPage() {
       <TeacherSessionTabs sessionId={sessionId} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle dark:bg-white/10 p-1">
+        <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle p-1 dark:bg-white/10">
           {[
             { id: "overview", label: "Обзор" },
             { id: "timeline", label: "Таймлайн" },
+            { id: "participants", label: "Участники" },
             { id: "insights", label: "Инсайты" },
           ].map((t) => (
             <button
@@ -224,9 +319,9 @@ export default function TeacherLectureAnalyticsPage() {
               type="button"
               onClick={() => setTab(t.id as typeof tab)}
               className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-2xl transition",
+                "rounded-2xl px-3 py-1.5 text-xs font-medium transition",
                 tab === t.id
-                  ? "bg-surface dark:bg-white/20 text-fg shadow-soft dark:shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
+                  ? "bg-surface text-fg shadow-soft dark:bg-white/20 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
                   : "text-muted hover:text-fg"
               )}
             >
@@ -248,7 +343,7 @@ export default function TeacherLectureAnalyticsPage() {
         {analytics && (
           <>
             {tab === "overview" && (
-              <div className="grid lg:grid-cols-3 gap-4">
+              <div className="grid gap-4 lg:grid-cols-3">
                 <Reveal>
                   <Kpi
                     title="Средняя вовлечённость"
@@ -276,34 +371,59 @@ export default function TeacherLectureAnalyticsPage() {
               </div>
             )}
 
-            {tab === "timeline" && analytics.timeline?.length > 0 && (
-              <div className="grid lg:grid-cols-2 gap-4">
+            {tab === "timeline" && (
+              <div className="grid gap-4 lg:grid-cols-2">
                 <Reveal>
                   <TimelineChart data={analytics.timeline} />
                 </Reveal>
               </div>
             )}
 
-            {tab === "timeline" && (!analytics.timeline || analytics.timeline.length === 0) && (
-              <Card variant="elevated">
-                <CardContent className="p-6 md:p-8 text-center text-muted">
-                  Нет точек таймлайна для отображения.
-                </CardContent>
-              </Card>
+            {tab === "participants" && (
+              <div className="grid gap-4 md:grid-cols-2">
+                {analytics.participants && analytics.participants.length > 0 ? (
+                  analytics.participants.map((p) => (
+                    <Reveal key={p.userId}>
+                      <ParticipantCard
+                        name={p.name}
+                        emotion={p.dominantEmotion ?? p.emotion}
+                        engagement={p.engagement}
+                        stress={p.stress}
+                        fatigue={p.fatigue}
+                        risk={p.risk}
+                        confidence={p.confidence}
+                      />
+                    </Reveal>
+                  ))
+                ) : (
+                  <Card variant="elevated">
+                    <CardContent className="p-6 text-center text-muted md:p-8">
+                      Поучастниковая аналитика пока недоступна для этой сессии.
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             )}
 
             {tab === "insights" && (
               <Reveal>
                 <Card variant="elevated">
                   <CardContent className="p-6 md:p-8">
-                    <div className="text-sm font-medium uppercase tracking-wider text-muted">Рекомендации</div>
+                    <div className="text-sm font-medium uppercase tracking-wider text-muted">
+                      Рекомендации
+                    </div>
                     <div className="mt-2 text-lg font-semibold text-fg">
                       На основе агрегированных метрик вовлечённости и риска.
                     </div>
                     <div className="mt-2 text-sm text-muted">
-                      Используйте таймлайн и КПИ выше для точечной настройки формата занятий.
+                      Используйте таймлайн и KPI выше для точечной настройки формата занятий.
                     </div>
-                    <Button variant="outline" size="sm" className="mt-4" onClick={() => mutate()}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => mutate()}
+                    >
                       Обновить данные
                     </Button>
                   </CardContent>

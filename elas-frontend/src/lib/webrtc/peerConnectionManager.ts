@@ -1,12 +1,21 @@
 import type { ClientId, Participant, Role } from "./types";
 import { SignalingClient } from "./signalingClient";
 
-const ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+const ICE_SERVERS: RTCIceServer[] = [
+  { urls: "stun:stun.l.google.com:19302" },
+  // Потом обязательно добавь TURN:
+  // {
+  //   urls: "turn:YOUR_TURN_SERVER:3478",
+  //   username: "YOUR_USERNAME",
+  //   credential: "YOUR_PASSWORD",
+  // },
+];
 
 type PeerCallbacks = {
   onRemoteStream?: (peerId: ClientId, stream: MediaStream) => void;
   onPeersChange?: (peers: Participant[]) => void;
   onDisconnect?: () => void;
+  onPeerLeft?: (peerId: ClientId) => void;
 };
 
 export class PeerConnectionManager {
@@ -37,32 +46,44 @@ export class PeerConnectionManager {
 
       if (this.role === "teacher") {
         this.participants.forEach((p) => {
-          if (this.localStream) this.createPeerAndOffer(p.id);
+          if (this.localStream) {
+            void this.createPeerAndOffer(p.id);
+          }
         });
       }
     });
 
     this.signaling.on("user-joined", (p) => {
       if (this.selfId && p.id === this.selfId) return;
+
       this.participants = [...this.participants.filter((x) => x.id !== p.id), p];
       this.callbacks.onPeersChange?.(this.participants);
 
       if (this.role === "teacher" && this.localStream) {
-        this.createPeerAndOffer(p.id);
+        void this.createPeerAndOffer(p.id);
       }
     });
 
     this.signaling.on("user-left", (p) => {
-      this.peers.get(p.id)?.close();
+      const pc = this.peers.get(p.id);
+      if (pc) {
+        pc.ontrack = null;
+        pc.onicecandidate = null;
+        pc.close();
+      }
+
       this.peers.delete(p.id);
       this.participants = this.participants.filter((x) => x.id !== p.id);
       this.callbacks.onPeersChange?.(this.participants);
+      this.callbacks.onPeerLeft?.(p.id);
     });
 
     this.signaling.on("webrtc-offer", async (from, sdp) => {
       if (!this.localStream) return;
+
       const pc = this.getOrCreatePeer(from);
       await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
       this.signaling.sendAnswer(from, answer);
@@ -102,10 +123,16 @@ export class PeerConnectionManager {
 
   leave() {
     this.signaling.leave();
+
     this.localStream?.getTracks().forEach((t) => t.stop());
     this.localStream = null;
 
-    this.peers.forEach((pc) => pc.close());
+    this.peers.forEach((pc) => {
+      pc.ontrack = null;
+      pc.onicecandidate = null;
+      pc.close();
+    });
+
     this.peers.clear();
     this.participants = [];
   }
@@ -160,6 +187,13 @@ export class PeerConnectionManager {
       }
     };
 
+    pc.onconnectionstatechange = () => {
+      const state = pc?.connectionState;
+      if (state === "failed" || state === "closed" || state === "disconnected") {
+        this.callbacks.onPeerLeft?.(peerId);
+      }
+    };
+
     this.peers.set(peerId, pc);
     return pc;
   }
@@ -168,6 +202,9 @@ export class PeerConnectionManager {
     const pc = this.getOrCreatePeer(peerId);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    this.signaling.sendOffer(peerId, pc.localDescription);
+
+    if (pc.localDescription) {
+      this.signaling.sendOffer(peerId, pc.localDescription);
+    }
   }
 }

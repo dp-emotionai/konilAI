@@ -40,7 +40,7 @@ export default function Ethics() {
         </section>
 
         <section id="limits" className="scroll-mt-24">
-          <h2 className="text-lg font-semibold text-white mb-2">What we don't do</h2>
+          <h2 className="text-lg font-semibold text-white mb-2">What we do not do</h2>
           <ul className="list-disc pl-5 space-y-2 text-sm text-white/70">
             <li>Not used for grades, penalties, or disciplinary actions.</li>
             <li>Not used to judge or label individuals.</li>

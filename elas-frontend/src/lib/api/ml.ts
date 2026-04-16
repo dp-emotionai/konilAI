@@ -276,11 +276,18 @@ export function getMlApiBaseUrl(): string {
 }
 
 export type MlAnalyzeResponse = {
-  state: "NORMAL" | "SUSPICIOUS" | "POTENTIAL THREAT";
-  risk: number;
-  emotion: string;
-  confidence: number;
-  dominant_emotion: string;
+  // Variant 2: risk/state
+  state?: "NORMAL" | "SUSPICIOUS" | "POTENTIAL THREAT";
+  risk?: number;
+  dominant_emotion?: string;
+  confidence?: number;
+
+  // Variant 1: per-frame educational metrics
+  emotion?: string;
+  engagement?: number;
+  stress?: number;
+  fatigue?: number;
+  timestamp?: number;
 };
 
 type AnalyzeOptions = {
@@ -333,7 +340,38 @@ export async function mlAnalyzeFrame(
     const data = await res.json().catch(() => null);
     if (!data || (data as any).error) return null;
 
-    return data as MlAnalyzeResponse;
+    const d = data as Record<string, unknown>;
+
+    // Accept both shapes (and future combined shape).
+    const out: MlAnalyzeResponse = {
+      state:
+        d.state === "NORMAL" || d.state === "SUSPICIOUS" || d.state === "POTENTIAL THREAT"
+          ? (d.state as MlAnalyzeResponse["state"])
+          : undefined,
+      risk: typeof d.risk === "number" ? d.risk : undefined,
+      dominant_emotion: typeof d.dominant_emotion === "string" ? d.dominant_emotion : undefined,
+      confidence: typeof d.confidence === "number" ? d.confidence : undefined,
+
+      emotion: typeof d.emotion === "string" ? d.emotion : undefined,
+      engagement: typeof d.engagement === "number" ? d.engagement : undefined,
+      stress: typeof d.stress === "number" ? d.stress : undefined,
+      fatigue: typeof d.fatigue === "number" ? d.fatigue : undefined,
+      timestamp: typeof d.timestamp === "number" ? d.timestamp : undefined,
+    };
+
+    // If it's completely empty, treat as invalid.
+    const hasAny =
+      out.state != null ||
+      out.risk != null ||
+      out.dominant_emotion != null ||
+      out.confidence != null ||
+      out.emotion != null ||
+      out.engagement != null ||
+      out.stress != null ||
+      out.fatigue != null;
+    if (!hasAny) return null;
+
+    return out;
   } catch (err) {
     const e = err as Error & { status?: number };
     if (e?.status === 429 || e?.message === "RATE_LIMIT") throw err;

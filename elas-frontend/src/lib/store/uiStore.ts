@@ -6,7 +6,7 @@ import { getStoredAuth, type UserStatus } from "../api/client";
 
 type UIState = {
   loggedIn: boolean;
-  role: Role;
+  role: Role | null;
   consent: boolean;
   status: UserStatus | null;
 };
@@ -15,62 +15,102 @@ const KEY = "elas_ui_state_v1";
 
 const defaultState: UIState = {
   loggedIn: false,
-  role: "student",
+  role: null,
   consent: false,
   status: null,
 };
 
+function normalizeRole(value: unknown): Role | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "student" || v === "teacher" || v === "admin") return v;
+  return null;
+}
+
+function normalizeStatus(value: unknown): UserStatus | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "pending" || v === "approved" || v === "limited" || v === "blocked") {
+    return v as UserStatus;
+  }
+  return null;
+}
+
 export function useUIStore() {
   const [state, setState] = useState<UIState>(defaultState);
 
-  // load:
-  // - restore from UI state (demo mode etc.)
-  // - BUT if we have a real auth token, it is the source of truth for role/loggedIn
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
       const parsed = raw ? JSON.parse(raw) : null;
       const auth = getStoredAuth();
+
       if (parsed && typeof parsed === "object") {
         let next: UIState = {
           loggedIn: !!parsed.loggedIn,
-          role: parsed.role === "teacher" || parsed.role === "admin" ? parsed.role : "student",
+          role: normalizeRole(parsed.role),
           consent: !!parsed.consent,
-          status: parsed.status ?? null,
+          status: normalizeStatus(parsed.status),
         };
-        if (auth?.token && auth?.role) {
+
+        if (auth?.token) {
           next = {
             ...next,
             loggedIn: true,
-            role: auth.role as Role,
-            status: (auth.status as UserStatus | null) ?? next.status ?? null,
+            role: normalizeRole(auth.role),
+            status: normalizeStatus(auth.status) ?? next.status ?? null,
           };
         }
+
         setState(next);
-      } else if (auth?.token && auth?.role) {
+        return;
+      }
+
+      if (auth?.token) {
         setState({
           ...defaultState,
           loggedIn: true,
-          role: auth.role as Role,
-          status: (auth.status as UserStatus | null) ?? null,
+          role: normalizeRole(auth.role),
+          status: normalizeStatus(auth.status),
         });
       }
-    } catch {}
+    } catch {
+      // ignore corrupted localStorage
+    }
   }, []);
 
-  // persist
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {}
+    } catch {
+      // ignore storage errors
+    }
   }, [state]);
 
   return {
     state,
-    setLoggedIn: (v: boolean) => setState((s) => ({ ...s, loggedIn: v })),
-    setRole: (role: Role) => setState((s) => ({ ...s, role })),
-    setConsent: (consent: boolean) => setState((s) => ({ ...s, consent })),
-    setStatus: (status: UserStatus | null) => setState((s) => ({ ...s, status })),
+    setLoggedIn: (v: boolean) =>
+      setState((s) => ({
+        ...s,
+        loggedIn: v,
+        role: v ? s.role : null,
+        status: v ? s.status : null,
+      })),
+    setRole: (role: Role | null) =>
+      setState((s) => ({
+        ...s,
+        role,
+      })),
+    setConsent: (consent: boolean) =>
+      setState((s) => ({
+        ...s,
+        consent,
+      })),
+    setStatus: (status: UserStatus | null) =>
+      setState((s) => ({
+        ...s,
+        status,
+      })),
     reset: () => setState(defaultState),
   };
 }

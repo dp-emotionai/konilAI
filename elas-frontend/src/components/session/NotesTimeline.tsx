@@ -3,7 +3,7 @@
 import {Card} from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 type Note = { id: string; time: string; label: string; details?: string };
 
@@ -15,15 +15,13 @@ export default function NotesTimeline() {
     { id: "n2", time: "18:40", label: "Drop in engagement", details: "Complex part" },
   ]);
 
-  const nowTime = useMemo(() => {
-    const m = String(Math.floor(Math.random() * 45)).padStart(2, "0");
-    const s = String(Math.floor(Math.random() * 60)).padStart(2, "0");
-    return `${m}:${s}`;
-  }, [notes.length]);
-
   function add() {
     if (!label.trim()) return;
-    setNotes((n) => [{ id: crypto.randomUUID(), time: nowTime, label: label.trim(), details: details.trim() || undefined }, ...n]);
+    const d = new Date();
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    const time = `${mm}:${ss}`;
+    setNotes((n) => [{ id: crypto.randomUUID(), time, label: label.trim(), details: details.trim() || undefined }, ...n]);
     setLabel("");
     setDetails("");
   }

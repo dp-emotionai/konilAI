@@ -31,12 +31,12 @@ export type ServerMessage =
   | {
       type: "webrtc-offer" | "webrtc-answer";
       from: ClientId;
-      sdp: any;
+      sdp: RTCSessionDescriptionInit;
     }
   | {
       type: "webrtc-ice";
       from: ClientId;
-      candidate: any;
+      candidate: RTCIceCandidateInit;
     }
   | {
       type: "pong";
@@ -57,10 +57,10 @@ export type ClientMessage =
   | {
       type: "webrtc-offer" | "webrtc-answer";
       to: ClientId;
-      sdp: any;
+      sdp: RTCSessionDescriptionInit;
     }
   | {
       type: "webrtc-ice";
       to: ClientId;
-      candidate: any;
+      candidate: RTCIceCandidateInit;
     };

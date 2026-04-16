@@ -13,7 +13,6 @@ export default function DonutMini({
   // donut params
   const r = 44;
   const c = 2 * Math.PI * r;
-  let offset = 0;
 
   // мягкие разные “чернила” без ручных цветов:
   // используем opacity ступенями (один акцентный + остальные нейтральнее)
@@ -24,10 +23,17 @@ export default function DonutMini({
               "rgba(15,18,34,0.12)"
   );
 
-  const segments = normalized.map((pct, i) => {
-    const len = (pct / 100) * c;
+  const lens = normalized.map((pct) => (pct / 100) * c);
+  const offsets = lens.reduce<number[]>((acc, len, i) => {
+    if (i === 0) return [0];
+    const prev = acc[i - 1] ?? 0;
+    const prevLen = lens[i - 1] ?? 0;
+    return [...acc, prev + prevLen + 2];
+  }, []);
+
+  const segments = lens.map((len, i) => {
     const dash = `${len} ${c - len}`;
-    const seg = (
+    return (
       <circle
         key={i}
         r={r}
@@ -38,11 +44,9 @@ export default function DonutMini({
         strokeWidth="10"
         strokeLinecap="round"
         strokeDasharray={dash}
-        strokeDashoffset={-offset}
+        strokeDashoffset={-(offsets[i] ?? 0)}
       />
     );
-    offset += len + 2; // небольшой gap
-    return seg;
   });
 
   return (

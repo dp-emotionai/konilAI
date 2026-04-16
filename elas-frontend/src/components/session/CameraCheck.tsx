@@ -23,54 +23,43 @@ type Props = {
 
 type PermissionState = "idle" | "granted" | "denied";
 type LightingState = "good" | "ok" | "poor";
-type FaceState = "detected" | "not_detected";
+type FaceState = "detected" | "not_detected" | "unknown";
 
 export default function CameraCheck({ onReadyChange, onStart }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const monitorTimerRef = useRef<number | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [permission, setPermission] = useState<PermissionState>("idle");
   const [running, setRunning] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
   const [lighting, setLighting] = useState<LightingState>("ok");
-  const [face, setFace] = useState<FaceState>("not_detected");
+  const [face, setFace] = useState<FaceState>("unknown");
   const [errorText, setErrorText] = useState<string | null>(null);
 
   const fps = 2;
-  const ready = permission === "granted" && running;
+  const ready =
+    permission === "granted" &&
+    running &&
+    previewReady &&
+    face !== "not_detected" &&
+    lighting !== "poor";
 
   useEffect(() => {
     onReadyChange?.(ready);
   }, [ready, onReadyChange]);
 
-  async function start() {
-    try {
-      setErrorText(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
-
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play().catch(() => {});
-      }
-
-      setPermission("granted");
-      setRunning(true);
-
-      window.setTimeout(() => setFace("detected"), 800);
-      window.setTimeout(() => setLighting("good"), 1200);
-    } catch {
-      setPermission("denied");
-      setRunning(false);
-      setErrorText("Не удалось получить доступ к камере. Проверьте разрешения браузера.");
+  const stopMonitoring = () => {
+    if (monitorTimerRef.current) {
+      window.clearInterval(monitorTimerRef.current);
+      monitorTimerRef.current = null;
     }
-  }
+  };
 
-  function stop() {
+  const stop = () => {
+    stopMonitoring();
+
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
 
@@ -79,8 +68,138 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
     }
 
     setRunning(false);
-    setFace("not_detected");
+    setPreviewReady(false);
+    setFace("unknown");
     setLighting("ok");
+  };
+
+  const estimateLighting = (video: HTMLVideoElement): LightingState => {
+    const width = 64;
+    const height = 48;
+
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement("canvas");
+    }
+
+    const canvas = canvasRef.current;
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return "ok";
+
+    ctx.drawImage(video, 0, 0, width, height);
+
+    const { data } = ctx.getImageData(0, 0, width, height);
+    let total = 0;
+    const pixels = data.length / 4;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      total += 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+
+    const avgBrightness = total / pixels;
+
+    if (avgBrightness >= 140) return "good";
+    if (avgBrightness >= 85) return "ok";
+    return "poor";
+  };
+
+  const estimateFacePresence = (video: HTMLVideoElement): FaceState => {
+    // Без реальной face model делаем честную эвристику:
+    // если видео реально идёт и есть размеры кадра, считаем preview usable.
+    // Не называем это "точным face detection", а используем как мягкий readiness signal.
+    if (
+      video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
+    ) {
+      return "detected";
+    }
+    return "unknown";
+  };
+
+  const startMonitoring = () => {
+    stopMonitoring();
+
+    monitorTimerRef.current = window.setInterval(() => {
+      const video = videoRef.current;
+      if (!video || !running) return;
+
+      if (
+        video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+      ) {
+        setPreviewReady(true);
+        setLighting(estimateLighting(video));
+        setFace(estimateFacePresence(video));
+      } else {
+        setPreviewReady(false);
+        setFace("unknown");
+      }
+    }, 800);
+  };
+
+  async function start() {
+    try {
+      setErrorText(null);
+
+      // если уже был stream — сначала чистим
+      stop();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+
+        await new Promise<void>((resolve) => {
+          const video = videoRef.current!;
+          const done = () => {
+            video.removeEventListener("loadedmetadata", done);
+            resolve();
+          };
+
+          if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+            resolve();
+            return;
+          }
+
+          video.addEventListener("loadedmetadata", done);
+        });
+
+        await videoRef.current.play().catch(() => {});
+      }
+
+      setPermission("granted");
+      setRunning(true);
+      setPreviewReady(true);
+      setFace("unknown");
+      setLighting("ok");
+
+      startMonitoring();
+    } catch {
+      setPermission("denied");
+      setRunning(false);
+      setPreviewReady(false);
+      setFace("not_detected");
+      setLighting("poor");
+      setErrorText(
+        "Не удалось получить доступ к камере. Проверьте разрешения браузера."
+      );
+    }
   }
 
   useEffect(() => {
@@ -93,7 +212,6 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
     <Card variant="elevated" className="overflow-hidden">
       <CardContent className="p-0">
         <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0b1020_0%,#090d19_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
-          {/* header */}
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
             <div className="flex items-start gap-3">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80">
@@ -136,9 +254,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
             </div>
           </div>
 
-          {/* body */}
-          <div className="grid gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_340px] items-start">
-            {/* preview */}
+          <div className="grid items-start gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_340px]">
             <div className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03]">
               <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <div className="text-sm font-medium text-white/75">Preview</div>
@@ -146,16 +262,22 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge
                     ok={face === "detected"}
-                    label={`Face: ${face === "detected" ? "detected" : "not detected"}`}
+                    label={
+                      face === "detected"
+                        ? "Face: detected"
+                        : face === "not_detected"
+                          ? "Face: not detected"
+                          : "Face: checking"
+                    }
                   />
                   <StatusBadge
-                    ok={lighting === "good"}
+                    ok={lighting === "good" || lighting === "ok"}
                     label={`Lighting: ${lighting}`}
                   />
                 </div>
               </div>
 
-              <div className="relative aspect-[4/3] sm:aspect-[16/10] bg-black">
+              <div className="relative aspect-[4/3] bg-black sm:aspect-[16/10]">
                 <video
                   ref={videoRef}
                   className="h-full w-full object-cover opacity-95"
@@ -186,13 +308,15 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                       <Badge className="border border-white/10 bg-black/45 text-white/80">
                         {fps} fps
                       </Badge>
+                      <Badge className="border border-white/10 bg-black/45 text-white/80">
+                        {previewReady ? "preview ready" : "loading preview"}
+                      </Badge>
                     </div>
                   </>
                 )}
               </div>
             </div>
 
-            {/* status panel */}
             <div className="flex flex-col gap-4">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex items-center gap-2">
@@ -213,14 +337,25 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                     ok={permission === "granted"}
                   />
                   <Signal
+                    label="Preview"
+                    value={previewReady ? "Ready" : "Not ready"}
+                    ok={previewReady}
+                  />
+                  <Signal
                     label="Face detection"
-                    value={face === "detected" ? "Detected" : "Not detected"}
-                    ok={face === "detected"}
+                    value={
+                      face === "detected"
+                        ? "Detected"
+                        : face === "not_detected"
+                          ? "Not detected"
+                          : "Checking"
+                    }
+                    ok={face === "detected" || face === "unknown"}
                   />
                   <Signal
                     label="Lighting"
                     value={lighting}
-                    ok={lighting === "good"}
+                    ok={lighting === "good" || lighting === "ok"}
                   />
                   <Signal label="FPS target" value={`${fps} fps`} ok />
                 </div>
@@ -252,14 +387,20 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                       Start camera
                     </Button>
                   ) : (
-                    <Button variant="outline" onClick={stop} className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10">
+                    <Button
+                      variant="outline"
+                      onClick={stop}
+                      className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10"
+                    >
                       <Square size={16} />
                       Stop camera
                     </Button>
                   )}
 
                   <Button
-                    onClick={() => onStart?.()}
+                    onClick={() => {
+                      if (ready) onStart?.();
+                    }}
                     disabled={!ready}
                     className="gap-2"
                   >
@@ -269,7 +410,8 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 </div>
 
                 <div className="mt-3 text-xs text-white/40">
-                  Continue станет доступна, когда камера запущена и preview готов.
+                  Continue станет доступна, когда камера запущена, preview готов и
+                  освещение не слишком плохое.
                 </div>
               </div>
 

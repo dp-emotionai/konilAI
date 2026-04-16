@@ -1,13 +1,20 @@
 import { getToken } from "@/lib/api/client";
-import type { ClientMessage, ServerMessage, Role, SessionId, ClientId, Participant } from "./types";
+import type {
+  ClientMessage,
+  ServerMessage,
+  Role,
+  SessionId,
+  ClientId,
+  Participant,
+} from "./types";
 
 type EventHandlers = {
   joined: (self: Participant, participants: Participant[]) => void;
   "user-joined": (participant: Participant) => void;
   "user-left": (participant: Participant) => void;
-  "webrtc-offer": (from: ClientId, sdp: any) => void;
-  "webrtc-answer": (from: ClientId, sdp: any) => void;
-  "webrtc-ice": (from: ClientId, candidate: any) => void;
+  "webrtc-offer": (from: ClientId, sdp: RTCSessionDescriptionInit) => void;
+  "webrtc-answer": (from: ClientId, sdp: RTCSessionDescriptionInit) => void;
+  "webrtc-ice": (from: ClientId, candidate: RTCIceCandidateInit) => void;
   error: (message: string) => void;
   close: () => void;
 };
@@ -22,9 +29,20 @@ export class SignalingClient {
   private handlers: PartialHandlers = {};
   private resolveOpen: (() => void) | undefined;
   private rejectOpen: ((reason?: unknown) => void) | undefined;
+  private openTimer: number | null = null;
+  private closedManually = false;
 
   constructor(url: string) {
     this.url = url;
+  }
+
+  private buildUrlWithToken() {
+    const token = getToken();
+    if (!token) return this.url;
+
+    const hasQuery = this.url.includes("?");
+    const separator = hasQuery ? "&" : "?";
+    return `${this.url}${separator}token=${encodeURIComponent(token)}`;
   }
 
   connect() {
@@ -36,14 +54,11 @@ export class SignalingClient {
       return;
     }
 
-    const token = getToken();
+    this.closedManually = false;
 
     try {
-      if (token) {
-        this.socket = new WebSocket(this.url, ["elas", "bearer", token]);
-      } else {
-        this.socket = new WebSocket(this.url);
-      }
+      // Надёжнее передавать token через query string, а не через subprotocol array
+      this.socket = new WebSocket(this.buildUrlWithToken());
     } catch (error) {
       this.rejectOpen?.(error);
       this.rejectOpen = undefined;
@@ -53,6 +68,12 @@ export class SignalingClient {
 
     this.socket.onopen = () => {
       this.isOpen = true;
+
+      if (this.openTimer) {
+        window.clearTimeout(this.openTimer);
+        this.openTimer = null;
+      }
+
       this.flushQueue();
       this.resolveOpen?.();
       this.resolveOpen = undefined;
@@ -68,17 +89,26 @@ export class SignalingClient {
       }
     };
 
+    this.socket.onerror = () => {
+      this.handlers.error?.("Ошибка соединения с signaling server.");
+    };
+
     this.socket.onclose = () => {
       this.isOpen = false;
       this.socket = null;
+
+      if (this.openTimer) {
+        window.clearTimeout(this.openTimer);
+        this.openTimer = null;
+      }
+
       this.rejectOpen?.(new Error("Signaling socket closed"));
       this.rejectOpen = undefined;
       this.resolveOpen = undefined;
-      this.handlers.close?.();
-    };
 
-    this.socket.onerror = () => {
-      // handled by close
+      if (!this.closedManually) {
+        this.handlers.close?.();
+      }
     };
   }
 
@@ -91,18 +121,24 @@ export class SignalingClient {
       this.resolveOpen = resolve;
       this.rejectOpen = reject;
 
-      window.setTimeout(() => {
+      if (this.openTimer) {
+        window.clearTimeout(this.openTimer);
+      }
+
+      this.openTimer = window.setTimeout(() => {
         if (this.resolveOpen === resolve) {
           this.resolveOpen = undefined;
           this.rejectOpen = undefined;
           reject(new Error("Signaling WebSocket timeout"));
         }
       }, timeoutMs);
+
+      this.connect();
     });
   }
 
   on<K extends keyof EventHandlers>(type: K, handler: EventHandlers[K]) {
-    (this.handlers as any)[type] = handler;
+    (this.handlers as Record<string, unknown>)[type] = handler;
   }
 
   join(sessionId: SessionId, role: Role) {
@@ -110,36 +146,49 @@ export class SignalingClient {
   }
 
   leave() {
-    this.send({ type: "leave" });
+    this.closedManually = true;
+
+    if (this.isOpen && this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: "leave" satisfies ClientMessage["type"] }));
+    }
+
     this.socket?.close();
+    this.socket = null;
+    this.isOpen = false;
+    this.queue = [];
   }
 
-  sendOffer(to: ClientId, sdp: any) {
+  sendOffer(to: ClientId, sdp: RTCSessionDescriptionInit) {
     this.send({ type: "webrtc-offer", to, sdp });
   }
 
-  sendAnswer(to: ClientId, sdp: any) {
+  sendAnswer(to: ClientId, sdp: RTCSessionDescriptionInit) {
     this.send({ type: "webrtc-answer", to, sdp });
   }
 
-  sendIceCandidate(to: ClientId, candidate: any) {
+  sendIceCandidate(to: ClientId, candidate: RTCIceCandidateInit) {
     this.send({ type: "webrtc-ice", to, candidate });
   }
 
   private send(msg: ClientMessage) {
-    if (!this.socket || !this.isOpen) {
+    if (!this.socket || !this.isOpen || this.socket.readyState !== WebSocket.OPEN) {
       this.queue.push(msg);
       this.connect();
       return;
     }
+
     this.socket.send(JSON.stringify(msg));
   }
 
   private flushQueue() {
-    if (!this.socket || !this.isOpen) return;
+    if (!this.socket || !this.isOpen || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
     for (const msg of this.queue) {
       this.socket.send(JSON.stringify(msg));
     }
+
     this.queue = [];
   }
 

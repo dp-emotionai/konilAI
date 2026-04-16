@@ -161,6 +161,16 @@ function PublicNavItem({ item }: { item: NavItem }) {
     return () => document.removeEventListener("mousedown", onOutside);
   }, [open]);
 
+  useEffect(() => {
+    if (item.type === "link") return;
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, item.type]);
+
   if (item.type === "link") {
     return (
       <NavLink
@@ -174,15 +184,6 @@ function PublicNavItem({ item }: { item: NavItem }) {
   const dropdown = item as NavDropdownItem;
   const children = Array.isArray(dropdown.children) ? dropdown.children : [];
   const hasCardStyle = children.some((c) => Boolean(c.subtitle ?? c.icon));
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
 
   return (
     <div className="relative" ref={ref}>

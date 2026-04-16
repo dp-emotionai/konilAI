@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -82,7 +82,7 @@ function LiveMetricCard({
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
-  return `${p.role} · ${p.id.slice(0, 6)}`;
+  return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
 }
 
 export default function StudentJoinSessionPage() {
@@ -106,6 +106,7 @@ export default function StudentJoinSessionPage() {
     try {
       const info = await getSessionJoinInfo(sessionId);
       setJoinInfo(info ?? null);
+
       if (info?.reason === "consent_required" && state.consent) {
         try {
           await recordSessionConsent(sessionId);
@@ -117,7 +118,9 @@ export default function StudentJoinSessionPage() {
       }
     } catch (e) {
       setJoinInfo(null);
-      setJoinInfoError(e instanceof Error ? e.message : "Не удалось загрузить данные сессии.");
+      setJoinInfoError(
+        e instanceof Error ? e.message : "Не удалось загрузить данные сессии."
+      );
     } finally {
       setJoinInfoLoading(false);
     }
@@ -146,7 +149,9 @@ export default function StudentJoinSessionPage() {
   const [mlActive, setMlActive] = useState(false);
   const [mlUnavailable, setMlUnavailable] = useState(false);
 
-  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [connectionState, setConnectionState] = useState<
+    "idle" | "connecting" | "connected" | "error"
+  >("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [wsDisconnected, setWsDisconnected] = useState(false);
 
@@ -156,8 +161,12 @@ export default function StudentJoinSessionPage() {
 
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
   const shouldRunMl = live && state.consent && mlApiAvailable;
-
   const roomId = sessionId;
+
+  const teacherParticipant = useMemo(
+    () => participants.find((p) => p.role === "teacher") ?? participants[0] ?? null,
+    [participants]
+  );
 
   useEffect(() => {
     if (!live || !roomId) {
@@ -171,7 +180,9 @@ export default function StudentJoinSessionPage() {
 
     const wsBase = getWsBaseUrl();
     if (!wsBase?.startsWith("ws")) {
-      setConnectionError("Не настроен адрес сервера эфира (WS). Обратитесь к администратору.");
+      setConnectionError(
+        "Не настроен адрес сервера эфира (WS). Обратитесь к администратору."
+      );
       setConnectionState("error");
       setLive(false);
       return;
@@ -179,9 +190,15 @@ export default function StudentJoinSessionPage() {
 
     const signaling = new SignalingClient(`${wsBase}/ws`);
     const manager = new PeerConnectionManager(signaling, roomId, "student", {
-      onRemoteStream: (_peerId, stream) => setRemoteStream(stream),
+      onRemoteStream: (_peerId, stream) => {
+        const hasTracks = stream.getTracks().length > 0;
+        setRemoteStream(hasTracks ? stream : null);
+      },
       onPeersChange: (peers) => setParticipants(peers),
       onDisconnect: () => setWsDisconnected(true),
+      onPeerLeft: () => {
+        setRemoteStream(null);
+      },
     });
 
     signaling.connect();
@@ -209,9 +226,12 @@ export default function StudentJoinSessionPage() {
         const friendly =
           msg.includes("timeout") || msg.includes("WebSocket")
             ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
-            : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
+            : msg.includes("Permission") ||
+                msg.includes("NotAllowed") ||
+                msg.includes("NotFound")
               ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
               : msg;
+
         setConnectionError(friendly);
         setConnectionState("error");
         setLive(false);
@@ -243,6 +263,7 @@ export default function StudentJoinSessionPage() {
   useEffect(() => {
     if (localThumbRef.current && localStream) {
       localThumbRef.current.srcObject = localStream;
+      localThumbRef.current.play().catch(() => {});
     }
   }, [localStream]);
 
@@ -284,11 +305,11 @@ export default function StudentJoinSessionPage() {
 
         if (sessionId && apiAvailable) {
           sendSessionMetrics(sessionId, {
-            emotion: result.emotion,
-            confidence: result.confidence,
-            risk: result.risk,
-            state: result.state,
-            dominant_emotion: result.dominant_emotion,
+            emotion: result.emotion ?? "Neutral",
+            confidence: result.confidence ?? 0,
+            risk: result.risk ?? 0,
+            state: result.state ?? "NORMAL",
+            dominant_emotion: result.dominant_emotion ?? "Neutral",
           }).catch(() => {});
         }
       } catch (err) {
@@ -313,10 +334,8 @@ export default function StudentJoinSessionPage() {
     };
   }, [shouldRunMl, sessionId, apiAvailable]);
 
-  const mainParticipant = participants[0];
-
   return (
-    <div className="pb-12 space-y-6">
+    <div className="space-y-6 pb-12">
       <Breadcrumbs
         items={[
           { label: "Студент", href: "/student/dashboard" },
@@ -368,12 +387,15 @@ export default function StudentJoinSessionPage() {
       {joinInfoError && (
         <Section spacing="none" className="mt-6">
           <Card className="border-amber-400/25 bg-amber-500/10">
-            <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
+            <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
               <div className="flex items-center gap-3">
-                <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                <AlertTriangle
+                  size={20}
+                  className="shrink-0 text-amber-600 dark:text-amber-400"
+                />
                 <div>
                   <div className="font-semibold text-fg">Ошибка загрузки</div>
-                  <div className="text-sm text-muted mt-0.5">{joinInfoError}</div>
+                  <div className="mt-0.5 text-sm text-muted">{joinInfoError}</div>
                 </div>
               </div>
               <Button variant="outline" onClick={() => void loadJoinInfo()} className="gap-2">
@@ -396,7 +418,8 @@ export default function StudentJoinSessionPage() {
                       Для подключения к сессии нужно дать согласие на анализ эмоций
                     </div>
                     <div className="text-sm text-muted">
-                      Согласие обязательно по этике платформы. Его можно отозвать в любой момент.
+                      Согласие обязательно по этике платформы. Его можно отозвать в любой
+                      момент.
                     </div>
 
                     <Link
@@ -443,12 +466,15 @@ export default function StudentJoinSessionPage() {
             <Reveal>
               {connectionError && (
                 <Card className="mb-6 border-amber-400/25 bg-amber-500/10">
-                  <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
+                  <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
                     <div className="flex items-center gap-3">
-                      <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      <AlertTriangle
+                        size={20}
+                        className="shrink-0 text-amber-600 dark:text-amber-400"
+                      />
                       <div>
                         <div className="font-semibold text-fg">Ошибка подключения</div>
-                        <div className="text-sm text-muted mt-0.5">{connectionError}</div>
+                        <div className="mt-0.5 text-sm text-muted">{connectionError}</div>
                       </div>
                     </div>
                     <Button
@@ -525,7 +551,8 @@ export default function StudentJoinSessionPage() {
                             Проверка камеры
                           </div>
                           <div className="mt-2 text-sm text-muted">
-                            Проверьте доступ, освещение и положение лица. Затем нажмите «Начать».
+                            Проверьте доступ, освещение и положение лица. Затем нажмите
+                            «Начать».
                           </div>
                         </div>
                       </div>
@@ -574,7 +601,7 @@ export default function StudentJoinSessionPage() {
               )}
 
               <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
-                <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="grid min-h-[760px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px]">
                   <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
                     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
                       <div className="min-w-0">
@@ -593,7 +620,7 @@ export default function StudentJoinSessionPage() {
 
                         {connectionState === "connected" && (
                           <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
-                            <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                             Connected
                           </Badge>
                         )}
@@ -644,9 +671,9 @@ export default function StudentJoinSessionPage() {
                         </div>
                       </div>
 
-                      {mainParticipant && (
-                        <div className="flex h-20 min-w-[152px] shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white/70">
-                          {formatParticipantLabel(mainParticipant)}
+                      {teacherParticipant && (
+                        <div className="flex h-20 min-w-[180px] shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white/70">
+                          {formatParticipantLabel(teacherParticipant)}
                         </div>
                       )}
 
@@ -677,7 +704,9 @@ export default function StudentJoinSessionPage() {
                         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.45),transparent_22%,transparent_78%,rgba(0,0,0,0.3))]" />
 
                         <div className="absolute left-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white backdrop-blur">
-                          {remoteStream ? formatParticipantLabel(mainParticipant) : "Ожидание преподавателя"}
+                          {remoteStream
+                            ? formatParticipantLabel(teacherParticipant)
+                            : "Ожидание преподавателя"}
                           <span className="ml-2 text-xs text-white/60">
                             {remoteStream ? "Teacher stream" : "Live room"}
                           </span>
@@ -686,6 +715,27 @@ export default function StudentJoinSessionPage() {
                         <div className="absolute right-4 top-4 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white/90 backdrop-blur">
                           Room: {roomId ? `${roomId.slice(0, 8)}…` : "—"}
                         </div>
+
+                        {mlResult && (
+                          <div className="absolute right-4 top-16 z-10 flex max-w-[60%] flex-wrap justify-end gap-2">
+                            <Badge className="border border-white/10 bg-black/50 text-white/85">
+                              {mlResult.emotion ?? "—"} •{" "}
+                              {Math.round((mlResult.confidence ?? 0) * 100)}%
+                            </Badge>
+                            <Badge
+                              className={
+                                mlResult.state === "NORMAL"
+                                  ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
+                                  : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
+                              }
+                            >
+                              {mlResult.state ?? "—"}
+                            </Badge>
+                            <Badge className="border border-white/10 bg-black/50 text-white/85">
+                              Risk {Math.round((mlResult.risk ?? 0) * 100)}%
+                            </Badge>
+                          </div>
+                        )}
 
                         <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
                           <Badge className="border border-white/10 bg-black/50 text-white/85">
@@ -698,26 +748,6 @@ export default function StudentJoinSessionPage() {
                             Remote: {remoteStream ? "Yes" : "No"}
                           </Badge>
                         </div>
-
-                        {mlResult && (
-                          <div className="absolute bottom-4 right-4 flex flex-wrap gap-2">
-                            <Badge className="border border-white/10 bg-black/50 text-white/85">
-                              {mlResult.emotion} • {Math.round(mlResult.confidence * 100)}%
-                            </Badge>
-                            <Badge
-                              className={
-                                mlResult.state === "NORMAL"
-                                  ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
-                                  : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
-                              }
-                            >
-                              {mlResult.state}
-                            </Badge>
-                            <Badge className="border border-white/10 bg-black/50 text-white/85">
-                              Risk {Math.round(mlResult.risk * 100)}%
-                            </Badge>
-                          </div>
-                        )}
 
                         <div className="absolute bottom-4 right-4 z-10 h-28 w-44 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                           <video
@@ -790,12 +820,18 @@ export default function StudentJoinSessionPage() {
                         <LiveMetricCard label="Emotion" value={mlResult?.emotion ?? "—"} />
                         <LiveMetricCard
                           label="Risk"
-                          value={mlResult ? `${Math.round(mlResult.risk * 100)}%` : "—"}
+                          value={
+                            mlResult ? `${Math.round((mlResult.risk ?? 0) * 100)}%` : "—"
+                          }
                         />
                         <LiveMetricCard label="State" value={mlResult?.state ?? "—"} />
                         <LiveMetricCard
                           label="Confidence"
-                          value={mlResult ? `${Math.round(mlResult.confidence * 100)}%` : "—"}
+                          value={
+                            mlResult
+                              ? `${Math.round((mlResult.confidence ?? 0) * 100)}%`
+                              : "—"
+                          }
                         />
                       </div>
                     </div>
@@ -813,7 +849,9 @@ export default function StudentJoinSessionPage() {
 
                         <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
                           ML service:{" "}
-                          <span className={mlApiAvailable ? "text-emerald-300" : "text-amber-300"}>
+                          <span
+                            className={mlApiAvailable ? "text-emerald-300" : "text-amber-300"}
+                          >
                             {mlApiAvailable ? "доступен" : "недоступен"}
                           </span>
                         </div>

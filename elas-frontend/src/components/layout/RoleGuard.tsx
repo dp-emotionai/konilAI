@@ -4,12 +4,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { useUI } from "@/components/layout/Providers";
 import type { Role } from "@/lib/roles";
+import { getStoredAuth, type UserStatus } from "@/lib/api/client";
 
 type Rule = { prefix: string; roles: Role[] };
 
 const rules: Rule[] = [
   { prefix: "/student", roles: ["student"] },
-  { prefix: "/teacher", roles: ["teacher"] },
+  { prefix: "/teacher", roles: ["teacher", "admin"] },
   { prefix: "/admin", roles: ["admin"] },
 ];
 
@@ -23,6 +24,22 @@ const publicPrefixes = [
   "/settings",
   "/403",
 ];
+
+function normalizeRole(value: unknown): Role | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "student" || v === "teacher" || v === "admin") return v;
+  return null;
+}
+
+function normalizeStatus(value: unknown): UserStatus | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim().toLowerCase();
+  if (v === "pending" || v === "approved" || v === "limited" || v === "blocked") {
+    return v as UserStatus;
+  }
+  return null;
+}
 
 export default function RoleGuard({
   children,
@@ -49,32 +66,57 @@ export default function RoleGuard({
     return rules.find((r) => safePathname.startsWith(r.prefix)) ?? null;
   }, [safePathname]);
 
+  const storedAuth = useMemo(() => getStoredAuth(), []);
+  const effectiveLoggedIn = state.loggedIn || Boolean(storedAuth?.token);
+  const effectiveRole = normalizeRole(state.role) ?? normalizeRole(storedAuth?.role);
+  const effectiveStatus =
+    normalizeStatus(state.status) ?? normalizeStatus(storedAuth?.status);
+
+  const isHydratingProtectedRoute =
+    !isPublic &&
+    !!matchedRule &&
+    !state.loggedIn &&
+    Boolean(storedAuth?.token) &&
+    !effectiveRole;
+
   useEffect(() => {
     if (!safePathname) return;
     if (isPublic) return;
     if (!matchedRule) return;
 
-    if (!state.loggedIn) {
+    if (isHydratingProtectedRoute) return;
+
+    if (!effectiveLoggedIn) {
       router.replace("/auth/login");
       return;
     }
 
-    if (state.status === "blocked") {
+    if (effectiveStatus === "blocked") {
       router.replace("/403");
       return;
     }
 
-    if (!state.role || !matchedRule.roles.includes(state.role)) {
+    if (!effectiveRole || !matchedRule.roles.includes(effectiveRole)) {
       router.replace("/403");
     }
-  }, [safePathname, isPublic, matchedRule, state.loggedIn, state.role, router]);
+  }, [
+    safePathname,
+    isPublic,
+    matchedRule,
+    isHydratingProtectedRoute,
+    effectiveLoggedIn,
+    effectiveRole,
+    effectiveStatus,
+    router,
+  ]);
 
   if (!safePathname) return null;
 
   if (!isPublic && matchedRule) {
-    if (!state.loggedIn) return null;
-    if (state.status === "blocked") return null;
-    if (!state.role || !matchedRule.roles.includes(state.role)) return null;
+    if (isHydratingProtectedRoute) return null;
+    if (!effectiveLoggedIn) return null;
+    if (effectiveStatus === "blocked") return null;
+    if (!effectiveRole || !matchedRule.roles.includes(effectiveRole)) return null;
   }
 
   return <>{children}</>;

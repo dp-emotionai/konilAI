@@ -37,18 +37,17 @@ export const NAV_PUBLIC_LEFT: NavItem[] = [
     type: "dropdown",
     label: "Политики",
     children: [
-      { type: "link", label: "Privacy", href: "/privacy", subtitle: "Политика конфиденциальности", icon: "Lock" },
-      { type: "link", label: "Ethics", href: "/ethics", subtitle: "Этичное использование AI", icon: "Heart" },
-      { type: "link", label: "Privacy", href: "/privacy", subtitle: "Privacy policy", icon: "Lock" },
+      { type: "link", label: "Конфиденциальность", href: "/privacy", subtitle: "Политика конфиденциальности", icon: "Lock" },
+      { type: "link", label: "Этика", href: "/ethics", subtitle: "Этичное использование AI", icon: "Heart" },
       { type: "link", label: "FAQ", href: "/faq", subtitle: "Частые вопросы", icon: "HelpCircle" },
     ],
   },
 ];
 
 export const NAV_PUBLIC_RIGHT = {
-  signIn: { label: "Sign in", href: "/auth/login" },
-  getStarted: { label: "Get started", href: "/auth/register" },
-  demo: { label: "Request demo", href: "/demo" },
+  signIn: { label: "Войти", href: "/auth/login" },
+  getStarted: { label: "Начать", href: "/auth/register" },
+  demo: { label: "Демо", href: "/demo" },
 };
 
 /** App TopBar (logged in): role-based. Max 3–6 top-level; rest in dropdowns. */
@@ -56,60 +55,60 @@ export type AppNavItem = NavLinkItem | NavDropdownItem;
 
 export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
   student: [
-    { type: "link", label: "Dashboard", href: "/student/dashboard" },
-    { type: "link", label: "Sessions", href: "/student/sessions" },
-    { type: "link", label: "Groups", href: "/student/groups" },
-    { type: "link", label: "Summary", href: "/student/summary" },
+    { type: "link", label: "Дашборд", href: "/student/dashboard" },
+    { type: "link", label: "Сессии", href: "/student/sessions" },
+    { type: "link", label: "Группы", href: "/student/groups" },
+    { type: "link", label: "Сводка", href: "/student/summary" },
     {
       type: "dropdown",
-      label: "Resources",
+      label: "Ресурсы",
       children: [
-        { type: "link", label: "Docs", href: "/docs" },
-        { type: "link", label: "Consent & privacy", href: "/privacy" },
-        { type: "link", label: "Ethics", href: "/ethics" },
+        { type: "link", label: "Документация", href: "/docs" },
+        { type: "link", label: "Конфиденциальность", href: "/privacy" },
+        { type: "link", label: "Этика", href: "/ethics" },
       ],
     },
   ],
   teacher: [
-    { type: "link", label: "Dashboard", href: "/teacher/dashboard" },
+    { type: "link", label: "Дашборд", href: "/teacher/dashboard" },
     {
       type: "dropdown",
-      label: "Sessions",
+      label: "Сессии",
       children: [
-        { type: "link", label: "Live now", href: "/teacher/sessions?filter=live", badge: "live" },
-        { type: "link", label: "Upcoming", href: "/teacher/sessions?filter=upcoming" },
-        { type: "link", label: "Ended", href: "/teacher/sessions?filter=ended" },
-        { type: "link", label: "Create session", href: "/teacher/sessions/new", accent: true },
+        { type: "link", label: "Сейчас в эфире", href: "/teacher/sessions?filter=live", badge: "live" },
+        { type: "link", label: "Предстоящие", href: "/teacher/sessions?filter=upcoming" },
+        { type: "link", label: "Завершённые", href: "/teacher/sessions?filter=ended" },
+        { type: "link", label: "Создать сессию", href: "/teacher/sessions/new", accent: true },
       ],
     },
-    { type: "link", label: "Groups", href: "/teacher/groups" },
-    { type: "link", label: "Reports", href: "/teacher/reports" },
-    { type: "link", label: "Compare", href: "/teacher/compare" },
+    { type: "link", label: "Группы", href: "/teacher/groups" },
+    { type: "link", label: "Отчёты", href: "/teacher/reports" },
+    { type: "link", label: "Сравнение", href: "/teacher/compare" },
     {
       type: "dropdown",
-      label: "Resources",
+      label: "Ресурсы",
       children: [
-        { type: "link", label: "Docs", href: "/docs" },
-        { type: "link", label: "Consent & privacy", href: "/privacy" },
-        { type: "link", label: "Ethics", href: "/ethics" },
-        { type: "link", label: "Status", href: "/status" },
+        { type: "link", label: "Документация", href: "/docs" },
+        { type: "link", label: "Конфиденциальность", href: "/privacy" },
+        { type: "link", label: "Этика", href: "/ethics" },
+        { type: "link", label: "Статус", href: "/status" },
       ],
     },
   ],
   admin: [
-    { type: "link", label: "Dashboard", href: "/admin/dashboard" },
-    { type: "link", label: "Users", href: "/admin/users" },
-    { type: "link", label: "Groups", href: "/admin/groups" },
-    { type: "link", label: "Audit", href: "/admin/audit" },
-    { type: "link", label: "Model", href: "/admin/model" },
-    { type: "link", label: "Storage", href: "/admin/storage" },
+    { type: "link", label: "Дашборд", href: "/admin/dashboard" },
+    { type: "link", label: "Пользователи", href: "/admin/users" },
+    { type: "link", label: "Группы", href: "/admin/groups" },
+    { type: "link", label: "Аудит", href: "/admin/audit" },
+    { type: "link", label: "Модель", href: "/admin/model" },
+    { type: "link", label: "Хранилище", href: "/admin/storage" },
   ],
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
-  student: "Student",
-  teacher: "Teacher",
-  admin: "Admin",
+  student: "Студент",
+  teacher: "Преподаватель",
+  admin: "Админ",
 };
 
 export const ROLE_HOME: Record<Role, string> = {
