@@ -65,10 +65,20 @@ def analyze_frame(data: FrameRequest):
     emotion_raw, conf = emotion_engine.predict_emotion(frame)
     _last_processed_time = time.time()
 
+    # Temporal risk from internal buffer (backward-compatible extension)
+    state, risk, dominant = emotion_engine.evaluate_risk()
+
     # Per-frame metrics only; no aggregation (aggregation belongs to backend)
     out = compute_per_frame_metrics(emotion_raw, conf, timestamp=_last_processed_time)
 
     return {
+        # Variant 2 (frontend/back-end expected keys)
+        "state": state,
+        "risk": float(round(risk, 6)),
+        "dominant_emotion": dominant,
+        "confidence": float(conf),
+
+        # Variant 1 (educational per-frame metrics)
         "emotion": out["emotion"],
         "engagement": out["engagement"],
         "stress": out["stress"],

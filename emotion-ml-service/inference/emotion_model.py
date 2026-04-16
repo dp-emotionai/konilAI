@@ -37,9 +37,7 @@ class EmotionModel:
 
         self.model = self._load_model()
 
-    # --------------------------------------------------
-    # Model loading
-    # --------------------------------------------------
+   
     def _load_model(self) -> tf.keras.Model:
         try:
             model = tf.keras.models.load_model(
@@ -52,9 +50,7 @@ class EmotionModel:
                 f"Failed to load emotion model: {e}"
             )
 
-    # --------------------------------------------------
-    # Preprocessing
-    # --------------------------------------------------
+
     def preprocess_face(self, face_img: np.ndarray) -> np.ndarray:
         """
         Prepare face image for CNN.
