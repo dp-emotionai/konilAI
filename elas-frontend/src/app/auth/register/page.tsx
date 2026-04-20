@@ -110,18 +110,18 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
       <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative hidden flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 px-8 py-9 text-white md:flex">
+        <div className="relative hidden flex-col justify-between overflow-hidden rounded-elas-xl bg-surface-subtle border border-[color:var(--border)] px-8 py-9 text-fg md:flex">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-purple-200" />
-              Создайте ELAS-аккаунт
+            <div className="inline-flex items-center gap-2 rounded-full bg-surface shadow-sm px-3 py-1 text-xs font-medium border border-[color:var(--border)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--primary))]" />
+              Создайте аккаунт платформы
             </div>
 
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Начните работу с ELAS
+            <div className="space-y-2 mt-4">
+              <h1 className="text-3xl font-bold tracking-tight">
+                Начните работу с системой
               </h1>
-              <p className="max-w-md text-sm text-white/70">
+              <p className="max-w-md text-sm text-muted leading-relaxed">
                 Зарегистрируйтесь как студент или преподаватель, чтобы подключаться
                 к сессиям и просматривать аналитику вовлечённости.
               </p>
@@ -129,12 +129,12 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <Card className="space-y-6 rounded-3xl p-6 sm:p-8">
+        <Card className="space-y-6 rounded-elas-xl p-6 sm:p-8 bg-surface shadow-md">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
+            <h2 className="text-2xl font-bold tracking-tight text-fg">
               Создать аккаунт
             </h2>
-            <p className="text-sm text-[color:var(--muted)]">
+            <p className="text-sm text-muted">
               Заполните форму. После этого мы отправим код подтверждения на вашу почту.
             </p>
           </div>
@@ -144,34 +144,34 @@ export default function RegisterPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-center rounded-2xl border-slate-200/70 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full justify-center bg-surface hover:bg-surface-subtle"
                 onClick={() =>
                   setError(
                     "Регистрация через Google пока не настроена. Используйте email и пароль."
                   )
                 }
               >
-                Регистрация через Google
+                Через Google
               </Button>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-center rounded-2xl border-slate-200/70 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full justify-center bg-surface hover:bg-surface-subtle"
                 onClick={() =>
                   setError(
                     "Регистрация через Apple пока не настроена. Используйте email и пароль."
                   )
                 }
               >
-                Регистрация через Apple
+                Через Apple
               </Button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-[color:var(--muted)]">
-              <span className="h-px flex-1 bg-slate-200/60 dark:bg-white/10" />
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="h-px flex-1 bg-[color:var(--border)]" />
               <span>или по email</span>
-              <span className="h-px flex-1 bg-slate-200/60 dark:bg-white/10" />
+              <span className="h-px flex-1 bg-[color:var(--border)]" />
             </div>
           </div>
 
@@ -202,10 +202,10 @@ export default function RegisterPage() {
               autoComplete="name"
             />
 
-            <div className="flex items-center gap-2">
-              <label className="shrink-0 text-sm text-[var(--muted)]">Роль:</label>
+            <div className="flex items-center gap-3">
+              <label className="shrink-0 text-sm text-muted">Роль:</label>
               <select
-                className="flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+                className="flex-1 rounded-elas border border-[color:var(--border)] bg-surface px-4 py-2 text-sm text-fg focus:outline-none focus:ring-2 focus:ring-[color:var(--ring)] focus:border-transparent transition-all"
                 value={role}
                 onChange={(e) => setRoleInput(e.target.value as "student" | "teacher")}
                 disabled={loading}
@@ -216,18 +216,18 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {info && <p className="text-sm text-emerald-400">{info}</p>}
+          {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
+          {info && <p className="text-sm text-[rgb(var(--success))]">{info}</p>}
 
           <Button className="w-full" onClick={handleRegister} disabled={loading}>
             {loading ? "Отправка кода…" : "Зарегистрироваться"}
           </Button>
 
-          <p className="pt-2 text-center text-sm text-[var(--muted)]">
+          <p className="pt-4 mt-2 border-t border-[color:var(--border)] text-center text-sm text-muted">
             Уже есть аккаунт?{" "}
             <Link
               href="/auth/login"
-              className="font-medium text-purple-300 hover:text-purple-200"
+              className="font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] hover:underline transition-colors"
             >
               Войти
             </Link>

@@ -95,13 +95,13 @@ export default function ResetPasswordClient() {
         subtitle="Придумайте новый пароль для своего аккаунта."
       />
 
-      <Card className="p-6 md:p-8">
+      <Card className="p-6 md:p-8 shadow-md bg-surface">
         {validating ? (
-          <p className="text-[var(--muted)]">Проверяем ссылку для сброса пароля…</p>
+          <p className="text-muted">Проверяем ссылку для сброса пароля…</p>
         ) : success ? (
           <div className="space-y-4 text-center">
-            <p className="text-[var(--text)]">Пароль успешно изменён.</p>
-            <p className="text-sm text-[var(--muted)]">
+            <p className="text-fg">Пароль успешно изменён.</p>
+            <p className="text-sm text-muted">
               Теперь вы можете войти в систему, используя новый пароль.
             </p>
             <Button className="w-full" onClick={() => router.push("/auth/login")}>
@@ -110,14 +110,14 @@ export default function ResetPasswordClient() {
           </div>
         ) : !isValidToken ? (
           <div className="space-y-4 text-center">
-            <p className="text-[var(--text)]">
+            <p className="text-fg">
               Ссылка для сброса пароля недействительна или устарела.
             </p>
-            <p className="text-sm text-[var(--muted)]">
+            <p className="text-sm text-muted">
               Запросите восстановление пароля ещё раз.
             </p>
             <Link href="/auth/forgot-password">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full bg-surface hover:bg-surface-subtle">
                 Запросить новую ссылку
               </Button>
             </Link>
@@ -142,17 +142,17 @@ export default function ResetPasswordClient() {
               disabled={loading}
               required
             />
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Сохраняем…" : "Сохранить новый пароль"}
             </Button>
           </form>
         )}
 
-        <div className="mt-6 pt-4 border-t border-white/10 text-center">
+        <div className="mt-6 pt-4 border-t border-[color:var(--border)] text-center">
           <Link
             href="/auth/login"
-            className="text-sm text-[var(--muted)] hover:text-[var(--text)] transition"
+            className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] transition hover:underline"
           >
             ← Назад ко входу
           </Link>

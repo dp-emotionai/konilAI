@@ -86,10 +86,10 @@ function KPI({
   return (
     <div
       className={cn(
-        "rounded-2xl border p-5 md:p-6 transition-all duration-200",
+        "rounded-elas-xl border p-5 md:p-6 transition-all duration-200",
         accent
-          ? "border-[rgb(var(--primary))]/20 bg-[rgb(var(--primary))]/8 shadow-[0_10px_30px_rgba(124,58,237,0.08)]"
-          : "border-[color:var(--border)]/30 bg-[color:var(--surface)] shadow-sm"
+          ? "border-[rgb(var(--primary))]/20 bg-[rgb(var(--primary))]/5 shadow-md"
+          : "border-[color:var(--border)] bg-surface shadow-sm"
       )}
     >
       <div className="flex items-start justify-between gap-3">
@@ -105,9 +105,9 @@ function KPI({
 
         <div
           className={cn(
-            "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl",
+            "inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-elas-xl",
             accent
-              ? "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary))]"
+              ? "bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))]"
               : "bg-surface-subtle text-[rgb(var(--primary))]"
           )}
         >

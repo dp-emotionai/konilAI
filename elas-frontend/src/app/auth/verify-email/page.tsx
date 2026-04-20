@@ -290,18 +290,18 @@ function VerifyEmailInner() {
   return (
     <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
       <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative hidden flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 px-8 py-9 text-white md:flex">
+        <div className="relative hidden flex-col justify-between overflow-hidden rounded-elas-xl bg-surface-subtle border border-[color:var(--border)] px-8 py-9 text-fg md:flex">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-surface shadow-sm px-3 py-1 text-xs font-medium border border-[color:var(--border)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--primary))]" />
               Подтверждение email
             </div>
 
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight">
+            <div className="space-y-2 mt-4">
+              <h1 className="text-3xl font-bold tracking-tight">
                 Введите код подтверждения
               </h1>
-              <p className="max-w-md text-sm text-white/70">
+              <p className="max-w-md text-sm text-muted leading-relaxed">
                 Мы отправили код на вашу почту. После подтверждения вы сможете
                 завершить вход в систему.
               </p>
@@ -309,12 +309,12 @@ function VerifyEmailInner() {
           </div>
         </div>
 
-        <Card className="space-y-6 rounded-3xl p-6 sm:p-8">
+        <Card className="space-y-6 rounded-elas-xl p-6 sm:p-8 bg-surface shadow-md">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
+            <h2 className="text-2xl font-bold tracking-tight text-fg">
               Подтвердите email
             </h2>
-            <p className="text-sm text-[color:var(--muted)]">
+            <p className="text-sm text-muted">
               Введите код, который пришёл на почту.
             </p>
           </div>
@@ -342,8 +342,8 @@ function VerifyEmailInner() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
-          {info && <p className="text-sm text-emerald-400">{info}</p>}
+          {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
+          {info && <p className="text-sm text-[rgb(var(--success))]">{info}</p>}
 
           <div className="space-y-3">
             <Button
@@ -356,7 +356,7 @@ function VerifyEmailInner() {
 
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full bg-surface hover:bg-surface-subtle"
               onClick={handleResend}
               disabled={loading || resending}
             >
@@ -364,10 +364,10 @@ function VerifyEmailInner() {
             </Button>
           </div>
 
-          <div className="border-t border-white/10 pt-2 text-center">
+          <div className="border-t border-[color:var(--border)] pt-4 mt-2 text-center">
             <Link
               href="/auth/register"
-              className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
+              className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] hover:underline transition-colors"
               onClick={() => {
                 clearAuth();
               }}
@@ -384,12 +384,12 @@ function VerifyEmailInner() {
 function VerifyEmailFallback() {
   return (
     <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-md rounded-3xl p-6 sm:p-8">
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
+      <Card className="w-full max-w-md rounded-elas-xl p-6 sm:p-8 shadow-md">
+        <div className="space-y-2 text-center">
+          <h2 className="text-2xl font-bold tracking-tight text-fg">
             Подтверждение email
           </h2>
-          <p className="text-sm text-[color:var(--muted)]">
+          <p className="text-sm text-muted">
             Подготавливаем форму подтверждения…
           </p>
         </div>

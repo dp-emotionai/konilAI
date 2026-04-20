@@ -211,21 +211,21 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
   return (
     <Card variant="elevated" className="overflow-hidden">
       <CardContent className="p-0">
-        <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#0b1020_0%,#090d19_100%)] shadow-[0_24px_70px_rgba(0,0,0,0.34)]">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-white/10 px-6 py-5">
+        <div className="rounded-elas-xl border border-[color:var(--border)] bg-surface shadow-md">
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border)] px-6 py-5">
             <div className="flex items-start gap-3">
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/80">
+              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle text-muted">
                 <Camera size={18} />
               </div>
 
               <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-white/35">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted">
                   Camera readiness
                 </div>
-                <div className="mt-1 text-lg font-semibold text-white">
+                <div className="mt-1 text-lg font-semibold text-fg">
                   Pre-join check
                 </div>
-                <div className="mt-2 max-w-xl text-sm leading-relaxed text-white/50">
+                <div className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
                   Мы не сохраняем raw-видео. Для аналитики используются только агрегированные
                   сигналы и метаданные после согласия.
                 </div>
@@ -233,16 +233,16 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border border-white/10 bg-white/5 text-white/70">
+              <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
                 FPS {fps}
               </Badge>
               <Badge
                 className={
                   permission === "granted"
-                    ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
+                    ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
                     : permission === "denied"
-                      ? "border border-red-400/20 bg-red-500/15 text-red-300"
-                      : "border border-white/10 bg-white/5 text-white/65"
+                      ? "border border-red-400/20 bg-red-500/10 text-red-700"
+                      : "border border-[color:var(--border)] bg-surface-subtle text-muted"
                 }
               >
                 {permission === "granted"
@@ -255,9 +255,9 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
           </div>
 
           <div className="grid items-start gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_340px]">
-            <div className="overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.03]">
-              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-                <div className="text-sm font-medium text-white/75">Preview</div>
+            <div className="overflow-hidden rounded-[26px] border border-[color:var(--border)] bg-surface-subtle/50">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
+                <div className="text-sm font-medium text-muted">Preview</div>
 
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge
@@ -289,7 +289,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
 
                 {!running && (
                   <div className="absolute inset-0 grid place-items-center">
-                    <div className="rounded-2xl border border-white/10 bg-black/45 px-5 py-3 text-sm text-white/75 backdrop-blur">
+                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/90 px-5 py-3 text-sm text-fg backdrop-blur">
                       Камера остановлена
                     </div>
                   </div>
@@ -297,7 +297,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
 
                 {running && (
                   <>
-                    <div className="absolute left-4 top-4 rounded-xl border border-white/10 bg-black/45 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/80 backdrop-blur">
+                    <div className="absolute left-4 top-4 rounded-xl border border-[color:var(--border)]/10 bg-black/45 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/80 backdrop-blur">
                       Live preview
                     </div>
 
@@ -318,10 +318,10 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
             </div>
 
             <div className="flex flex-col gap-4">
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                 <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-violet-300" />
-                  <div className="text-sm font-semibold text-white">Readiness</div>
+                  <Sparkles size={16} className="text-[rgb(var(--primary))]" />
+                  <div className="text-sm font-semibold text-fg">Readiness</div>
                 </div>
 
                 <div className="mt-4 space-y-3">
@@ -361,13 +361,13 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-emerald-300" />
-                  <div className="text-sm font-semibold text-white">Privacy note</div>
+                  <ShieldCheck size={16} className="text-[rgb(var(--success))]" />
+                  <div className="text-sm font-semibold text-fg">Privacy note</div>
                 </div>
 
-                <div className="mt-3 text-sm leading-relaxed text-white/50">
+                <div className="mt-3 text-sm leading-relaxed text-muted">
                   Передача идёт только после вашего действия. Для live-аналитики не
                   сохраняется исходное видео, а только агрегированные сигналы.
                 </div>

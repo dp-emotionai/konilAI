@@ -51,17 +51,17 @@ export default function ForgotPasswordPage() {
         subtitle="Укажите email вашего аккаунта — мы отправим инструкцию для сброса пароля."
       />
 
-      <Card className="p-6 md:p-8">
+      <Card className="p-6 md:p-8 shadow-md bg-surface">
         {sent ? (
           <div className="space-y-4 text-center">
-            <p className="text-[var(--text)]">
+            <p className="text-fg">
               Если аккаунт с указанным email существует, на него отправлена инструкция по сбросу пароля.
             </p>
-            <p className="text-sm text-[var(--muted)]">
+            <p className="text-sm text-muted">
               Не пришло письмо? Проверьте папку «Спам» или обратитесь к администратору вашей организации.
             </p>
             <Link href="/auth/login">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="w-full mt-4 bg-surface hover:bg-surface-subtle">
                 Вернуться ко входу
               </Button>
             </Link>
@@ -79,17 +79,17 @@ export default function ForgotPasswordPage() {
                 autoComplete="email"
               />
 
-              {error && <p className="text-sm text-red-400">{error}</p>}
+              {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
 
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Отправка…" : "Отправить ссылку"}
               </Button>
             </form>
 
-            <div className="mt-6 border-t border-white/10 pt-4 text-center">
+            <div className="mt-6 border-t border-[color:var(--border)] pt-4 text-center">
               <Link
                 href="/auth/login"
-                className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
+                className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] transition-colors hover:underline"
               >
                 ← Назад ко входу
               </Link>
