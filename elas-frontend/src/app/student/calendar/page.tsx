@@ -10,7 +10,8 @@ import {
   ChevronRight, 
   Clock, 
   MapPin, 
-  VideoIcon 
+  VideoIcon,
+  HelpCircle
 } from "lucide-react";
 
 const MONTHS = [
@@ -54,18 +55,25 @@ export default function StudentCalendarPage() {
     setSelectedDate(t);
   };
 
-  // Associate sessions with specific days (mock parsed date for UX demo)
+  const isSessionInCurrentMonth = (s: StudentSessionRow) => {
+    // If we parse real ISO date:
+    // const d = new Date(s.date);
+    // return d.getMonth() === month && d.getFullYear() === year;
+    return true; // Simplified: assume all returned sessions are for this time or just parse raw strings
+  };
+
   const getSessionsForDay = (day: number) => {
-    // We map arbitrary sessions to days based on their ID length or status for visual purposes
-    // since the real `date` string might be free text.
-    return sessions.filter((s, i) => {
-      // Logic for demonstration: if it has a real date text use it loosely, otherwise mock distribution
+    return sessions.filter((s) => {
       const parsedDay = s.date?.match(/(\d{1,2})\s/);
       if (parsedDay && parseInt(parsedDay[1], 10) === day) return true;
-      if (!parsedDay && (day === 15 + (i % 5)) && (month === new Date().getMonth())) return true;
       return false;
     });
   };
+
+  const unscheduledSessions = sessions.filter((s) => {
+    const parsedDay = s.date?.match(/(\d{1,2})\s/);
+    return !parsedDay;
+  });
 
   const selectedDaySessions = getSessionsForDay(selectedDate.getDate());
 
@@ -80,7 +88,7 @@ export default function StudentCalendarPage() {
               Календарь
             </h1>
             <p className="mt-1.5 text-[15px] text-slate-500">
-              Расписание сессий и дедлайнов
+              Ваше расписание
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -97,7 +105,7 @@ export default function StudentCalendarPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] 2xl:grid-cols-[1fr_400px] gap-8 items-start">
           
           {/* Calendar Grid */}
           <div className="bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col">
@@ -171,51 +179,79 @@ export default function StudentCalendarPage() {
             </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="bg-white border text-sm border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col h-[700px] sticky top-24">
-             <div className="p-6 pb-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                <h3 className="text-lg font-bold text-slate-900">События на {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()].toLowerCase()}</h3>
-                <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-purple-600 shadow-sm">{selectedDaySessions.length}</span>
-             </div>
-
-             <div className="p-6 flex-1 overflow-y-auto no-scrollbar relative min-h-0">
-               {selectedDaySessions.length > 0 ? (
-                 <div className="space-y-4 relative">
-                   <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-100"></div>
-                   {selectedDaySessions.map(s => (
-                     <div key={s.id} className="relative pl-10 group">
-                       <div className={cn("absolute left-0 mt-1 w-8 h-8 rounded-full flex items-center justify-center shadow-sm",
-                         s.status === 'live' ? 'bg-emerald-500 text-white' : s.status === 'upcoming' ? 'bg-amber-400 text-white' : 'bg-slate-200 text-slate-500'
-                       )}>
-                         <VideoIcon size={14} strokeWidth={3} />
-                       </div>
-                       
-                       <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                          <h4 className="font-semibold text-slate-900 mb-1">{s.title}</h4>
-                          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-[12px] text-slate-500 font-medium">
-                            <span className="flex items-center gap-1.5"><Clock size={14} className="text-slate-400"/> {s.date || "12:00 - 13:30"}</span>
-                            <span className="flex items-center gap-1.5"><MapPin size={14} className="text-slate-400"/> Онлайн</span>
-                          </div>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               ) : (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                    <CalendarDays size={48} strokeWidth={1} className="mb-4 text-slate-300" />
-                    <p className="text-[15px] font-medium text-slate-600 mb-2">На этот день ничего не запланировано</p>
-                    <p className="text-xs">Вы можете отдыхать или заняться самостоятельным изучением материалов.</p>
-                 </div>
-               )}
-             </div>
-             
-             {selectedDaySessions.length > 0 && selectedDaySessions.some(s => s.status === 'live' || s.status === 'upcoming') && (
-               <div className="p-4 border-t border-slate-50 bg-slate-50/50">
-                  <button className="w-full py-3 bg-[#7448FF] hover:bg-[#623ce6] text-white rounded-xl text-sm font-medium transition-colors shadow-sm">
-                    Подключиться к ближайшей сессии
-                  </button>
+          <div className="flex flex-col gap-6 sticky top-24 pb-12">
+            {/* Sidebar Selected Day */}
+            <div className="bg-white border text-sm border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col h-[400px]">
+               <div className="p-6 pb-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                  <h3 className="text-lg font-bold text-slate-900">События на {selectedDate.getDate()} {MONTHS[selectedDate.getMonth()].toLowerCase()}</h3>
+                  <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-purple-600 shadow-sm">{selectedDaySessions.length}</span>
                </div>
-             )}
+
+               <div className="p-6 flex-1 overflow-y-auto no-scrollbar relative min-h-0">
+                 {selectedDaySessions.length > 0 ? (
+                   <div className="space-y-4 relative">
+                     <div className="absolute left-[15px] top-4 bottom-4 w-px bg-slate-100"></div>
+                     {selectedDaySessions.map(s => (
+                       <div key={s.id} className="relative pl-10 group">
+                         <div className={cn("absolute left-0 mt-1 w-8 h-8 rounded-full flex items-center justify-center shadow-sm",
+                           s.status === 'live' ? 'bg-emerald-500 text-white' : s.status === 'upcoming' ? 'bg-amber-400 text-white' : 'bg-slate-200 text-slate-500'
+                         )}>
+                           <VideoIcon size={14} strokeWidth={3} />
+                         </div>
+                         
+                         <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm group-hover:shadow-md transition-shadow">
+                            <h4 className="font-semibold text-slate-900 mb-1">{s.title}</h4>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-[12px] text-slate-500 font-medium">
+                              <span className="flex items-center gap-1.5"><Clock size={14} className="text-slate-400"/> {s.date || "Cегодня"}</span>
+                              <span className="flex items-center gap-1.5"><MapPin size={14} className="text-slate-400"/> Онлайн</span>
+                            </div>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 ) : (
+                   <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                      <CalendarDays size={48} strokeWidth={1} className="mb-4 text-slate-300" />
+                      <p className="text-[15px] font-medium text-slate-600 mb-2">Напрямую на этот день расписания нет</p>
+                   </div>
+                 )}
+               </div>
+            </div>
+
+            {/* Unscheduled / TBD sidebar block */}
+            <div className="bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col min-h-[250px] max-h-[400px]">
+                <div className="p-6 pb-4 border-b border-slate-50 flex items-center justify-between bg-purple-50/30">
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <HelpCircle size={18} className="text-purple-500" /> 
+                    Без точной даты
+                  </h3>
+                  <span className="text-xs font-semibold bg-white border border-purple-100 text-purple-700 px-2 py-1 rounded-lg">
+                    {unscheduledSessions.length}
+                  </span>
+                </div>
+
+                <div className="p-6 flex-1 overflow-y-auto no-scrollbar text-sm">
+                  {unscheduledSessions.length > 0 ? (
+                    <div className="space-y-3">
+                      {unscheduledSessions.map(s => (
+                        <div key={s.id} className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+                          <div className="font-medium text-slate-800">{s.title}</div>
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                            <span className={cn("w-2 h-2 rounded-full",
+                              s.status === 'live' ? 'bg-emerald-500' : s.status === 'upcoming' ? 'bg-amber-400' : 'bg-slate-300'
+                            )}></span>
+                            {s.status === 'live' ? 'Сейчас идет' : s.status === 'upcoming' ? 'Предстоит' : 'Завершено'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
+                      <p className="text-sm">Все сессии имеют дату</p>
+                    </div>
+                  )}
+                </div>
+            </div>
           </div>
 
         </div>

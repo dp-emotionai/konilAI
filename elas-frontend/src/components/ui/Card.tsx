@@ -18,27 +18,27 @@ export function Card({
   interactive = false,
 }: CardProps) {
   const base =
-    "rounded-elas-lg text-fg transition-[box-shadow,border-color,background-color] duration-200";
+    "rounded-[28px] text-slate-900 transition-[box-shadow,border-color,background-color,transform] duration-300";
 
   const variants: Record<NonNullable<CardProps["variant"]>, string> = {
     default:
-      "bg-surface border border-[color:var(--border)] shadow-sm",
+      "bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)]",
     outline:
-      "bg-transparent border border-[color:var(--border)]",
+      "bg-transparent border border-slate-200",
     subtle:
-      "bg-surface-subtle border border-transparent",
+      "bg-slate-50 border border-transparent",
     elevated:
-      "bg-surface border border-[color:var(--border)] shadow-elevated",
+      "bg-white border border-slate-100 shadow-xl shadow-slate-200/40",
   };
 
   const hover = interactive
     ? cn(
         "cursor-pointer",
         variant === "elevated"
-          ? "hover:border-[color:var(--primary-muted)] hover:shadow-lg hover:-translate-y-0.5"
+          ? "hover:border-[#7448FF] hover:shadow-2xl hover:-translate-y-1"
           : variant === "outline"
-            ? "hover:border-[color:var(--border-strong)] hover:bg-surface-subtle"
-            : "hover:border-[color:var(--border-strong)] hover:shadow-md hover:-translate-y-0.5"
+            ? "hover:border-slate-300 hover:bg-slate-50"
+            : "hover:border-slate-200 hover:shadow-lg hover:-translate-y-0.5"
       )
     : "";
 
@@ -46,9 +46,9 @@ export function Card({
 }
 
 export function CardHeader({ className, children }: Props) {
-  return <div className={cn("p-6 pb-0 flex flex-col gap-1.5", className)}>{children}</div>;
+  return <div className={cn("p-6 md:p-8 pb-0 flex flex-col gap-1.5", className)}>{children}</div>;
 }
 
 export function CardContent({ className, children }: Props) {
-  return <div className={cn("p-6", className)}>{children}</div>;
+  return <div className={cn("p-6 md:p-8", className)}>{children}</div>;
 }

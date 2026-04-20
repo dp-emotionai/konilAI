@@ -334,7 +334,9 @@ export default function StudentDashboardPage() {
             <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                <div className="flex items-center justify-between mb-4">
                  <button className="text-slate-400 hover:text-slate-900"><ChevronRight size={16} className="rotate-180" /></button>
-                 <span className="text-[13px] font-semibold text-slate-900 uppercase">Сентябрь <span className="font-medium text-slate-500">2026</span></span>
+                 <span className="text-[13px] font-semibold text-slate-900 uppercase">
+                   {today.toLocaleString('ru', { month: 'long' }).replace("ь", "я")} <span className="font-medium text-slate-500">{today.getFullYear()}</span>
+                 </span>
                  <button className="text-slate-400 hover:text-slate-900"><ChevronRight size={16} /></button>
                </div>
                
@@ -356,7 +358,7 @@ export default function StudentDashboardPage() {
                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-purple-600">
                   <div className="flex items-center gap-2">
                     <CalendarDays size={14} />
-                    <span>Сегодня: {today.getDate()} Сентября</span>
+                    <span>Сегодня: {today.getDate()} {today.toLocaleString('ru', { month: 'long' }).replace("ь", "я")}</span>
                   </div>
                   <ChevronRight size={14} />
                </div>
@@ -366,23 +368,12 @@ export default function StudentDashboardPage() {
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                <div className="flex items-center justify-between mb-5">
                  <h3 className="font-semibold text-[14px] text-slate-900">Уведомления</h3>
-                 <span className="text-[10px] text-purple-600 font-medium">Смотреть все</span>
                </div>
 
-               <div className="space-y-4">
-                 {[1,2,3].map((v, i) => (
-                   <div key={i} className="flex gap-3 items-start">
-                     <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
-                       {i === 0 ? <Lock size={12} /> : i === 1 ? <CalendarDays size={12} /> : <CalendarDays size={12} /> }
-                     </div>
-                     <div>
-                       <div className="text-xs font-medium text-slate-900">
-                         {i === 0 ? "Вам открыт доступ к новому курсу" : "Изменение в расписании сессий"}
-                       </div>
-                       <div className="text-[10px] text-slate-400 mt-0.5">{i === 0 ? '5 мин назад' : '1 ч назад'}</div>
-                     </div>
-                   </div>
-                 ))}
+               <div className="py-6 flex flex-col items-center justify-center text-slate-400">
+                 <Bell size={24} className="mb-3 text-slate-300" strokeWidth={1.5} />
+                 <div className="text-xs font-medium text-center">Нет новых уведомлений</div>
+                 <div className="text-[10px] text-slate-300 mt-1">Ожидайте новых сообщений системы</div>
                </div>
             </div>
 

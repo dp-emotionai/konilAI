@@ -14,41 +14,40 @@ export default function Button({
 }: Props) {
   const base =
     "inline-flex items-center justify-center gap-2 select-none whitespace-nowrap " +
-    "rounded-elas font-medium " +
-    "transition-all duration-200 ease-out " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg)] " +
+    "font-medium transition-all duration-200 ease-out " +
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7448FF]/50 focus-visible:ring-offset-2 " +
     "disabled:opacity-50 disabled:pointer-events-none";
 
   const sizes =
     size === "sm"
-      ? "h-9 px-4 text-sm"
+      ? "h-9 px-4 text-xs rounded-xl"
       : size === "lg"
-        ? "h-12 px-7 text-base"
-        : "h-10 px-5 text-sm";
+        ? "h-12 px-7 text-base rounded-[14px]"
+        : "h-10 px-5 text-sm rounded-xl";
 
   const variants =
     variant === "primary"
       ? cn(
-          "bg-[rgb(var(--primary))] text-white shadow-sm",
-          "hover:bg-[rgb(var(--primary-hover))] hover:shadow",
+          "bg-[#7448FF] text-white shadow-sm ring-1 ring-black/5",
+          "hover:bg-[#623ce6] hover:shadow-md",
           "active:scale-[0.98]"
         )
       : variant === "danger"
         ? cn(
-            "bg-danger text-white shadow-sm",
-            "hover:bg-red-700 hover:shadow",
+            "bg-red-500 text-white shadow-sm ring-1 ring-black/5",
+            "hover:bg-red-600 hover:shadow-md",
             "active:scale-[0.98]"
           )
         : variant === "outline"
           ? cn(
-              "bg-surface text-fg border border-[color:var(--border)] shadow-sm",
-              "hover:bg-surface-subtle hover:border-[color:var(--border-strong)]",
+              "bg-white text-slate-700 border border-slate-200 shadow-sm",
+              "hover:bg-slate-50 hover:border-slate-300 hover:text-slate-900",
               "active:scale-[0.98]"
             )
           : cn(
-              "bg-transparent text-muted hover:text-fg",
-              "hover:bg-surface-subtle",
-              "active:bg-surface-hover"
+              "bg-transparent text-slate-500 hover:text-slate-900",
+              "hover:bg-slate-100",
+              "active:bg-slate-200"
             );
 
   return <button className={cn(base, sizes, variants, className)} {...props} />;

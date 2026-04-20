@@ -409,42 +409,42 @@ export default function TeacherReportsPage() {
                     </div>
 
                     <div className="mt-4 border-t border-[color:var(--border)]/20 pt-4">
-                      <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">
-                        Export
+                      <div className="mb-3 flex items-center gap-2">
+                        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                          Экспорт
+                        </div>
+                        <Badge className="bg-amber-100/50 text-amber-700 text-[10px] py-0 border-amber-200">Временно недоступно (Back-end)</Badge>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5"
-                          disabled={!!exportState}
-                          onClick={() => handleExport(r.id, "json")}
+                          className="gap-1.5 opacity-50 pointer-events-none"
+                          disabled={true}
                         >
                           <FileJson size={14} />
-                          {exportState === "json" ? "..." : "JSON"}
+                          JSON
                         </Button>
 
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5"
-                          disabled={!!exportState}
-                          onClick={() => handleExport(r.id, "csv")}
+                          className="gap-1.5 opacity-50 pointer-events-none"
+                          disabled={true}
                         >
                           <FileSpreadsheet size={14} />
-                          {exportState === "csv" ? "..." : "CSV"}
+                          CSV
                         </Button>
 
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5"
-                          disabled={!!exportState}
-                          onClick={() => handleExport(r.id, "pdf")}
+                          className="gap-1.5 opacity-50 pointer-events-none"
+                          disabled={true}
                         >
                           <FileText size={14} />
-                          {exportState === "pdf" ? "..." : "PDF"}
+                          PDF
                         </Button>
                       </div>
                     </div>
