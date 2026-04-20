@@ -379,7 +379,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 </div>
               )}
 
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                 <div className="flex flex-wrap gap-2">
                   {!running ? (
                     <Button onClick={start} className="gap-2">
@@ -390,7 +390,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                     <Button
                       variant="outline"
                       onClick={stop}
-                      className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10"
+                      className="gap-2 border-[color:var(--border)] bg-surface-subtle text-muted hover:bg-surface-subtle/80"
                     >
                       <Square size={16} />
                       Stop camera
@@ -409,19 +409,19 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                   </Button>
                 </div>
 
-                <div className="mt-3 text-xs text-white/40">
+                <div className="mt-3 text-xs text-muted">
                   Continue станет доступна, когда камера запущена, preview готов и
                   освещение не слишком плохое.
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                 <div className="flex items-center gap-2">
-                  <MonitorUp size={16} className="text-sky-300" />
-                  <div className="text-sm font-semibold text-white">Before join</div>
+                  <MonitorUp size={16} className="text-sky-500" />
+                  <div className="text-sm font-semibold text-fg">Before join</div>
                 </div>
 
-                <ul className="mt-3 space-y-2 text-sm text-white/50">
+                <ul className="mt-3 space-y-2 text-sm text-muted">
                   <li>Сядьте напротив источника света.</li>
                   <li>Держите лицо в центре кадра.</li>
                   <li>Проверьте, что браузер не блокирует доступ к камере.</li>
@@ -445,15 +445,15 @@ function Signal({
   ok?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <div className="text-sm text-white/50">{label}</div>
+    <div className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle px-4 py-3">
+      <div className="text-sm text-muted">{label}</div>
       <div className="flex items-center gap-2">
         {ok ? (
-          <CheckCircle2 size={14} className="text-emerald-300" />
+          <CheckCircle2 size={14} className="text-[rgb(var(--success))]" />
         ) : (
-          <AlertTriangle size={14} className="text-amber-300" />
+          <AlertTriangle size={14} className="text-[rgb(var(--warning))]" />
         )}
-        <div className="text-sm font-medium text-white">{value}</div>
+        <div className="text-sm font-medium text-fg">{value}</div>
       </div>
     </div>
   );
@@ -464,8 +464,8 @@ function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
     <Badge
       className={
         ok
-          ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
-          : "border border-white/10 bg-white/5 text-white/65"
+          ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
+          : "border border-[color:var(--border)] bg-surface-subtle text-muted"
       }
     >
       {label}

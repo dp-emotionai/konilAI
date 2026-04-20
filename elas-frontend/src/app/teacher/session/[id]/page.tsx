@@ -80,9 +80,9 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 
 function LiveInfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-white">{value}</div>
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-fg">{value}</div>
     </div>
   );
 }
@@ -110,18 +110,18 @@ function EmotionBadge({ emotion }: { emotion?: string | null }) {
     "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide border backdrop-blur";
   const cls =
     tone === "emerald"
-      ? "border-emerald-400/25 bg-emerald-500/15 text-emerald-200"
+      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
       : tone === "red"
-        ? "border-red-400/25 bg-red-500/15 text-red-200"
+        ? "border-red-400/20 bg-red-500/10 text-red-700"
         : tone === "amber"
-          ? "border-amber-400/25 bg-amber-500/15 text-amber-200"
+          ? "border-amber-400/20 bg-amber-500/10 text-amber-700"
           : tone === "violet"
-            ? "border-violet-400/25 bg-violet-500/15 text-violet-200"
+            ? "border-violet-400/20 bg-violet-500/10 text-violet-700"
             : tone === "sky"
-              ? "border-sky-400/25 bg-sky-500/15 text-sky-200"
+              ? "border-sky-400/20 bg-sky-500/10 text-sky-700"
               : tone === "lime"
-                ? "border-lime-400/25 bg-lime-500/15 text-lime-200"
-                : "border-white/10 bg-white/10 text-white/80";
+                ? "border-lime-400/20 bg-lime-500/10 text-lime-700"
+                : "border-[color:var(--border)] bg-surface-subtle text-muted";
 
   return <span className={`${base} ${cls}`}>{emotion || "—"}</span>;
 }
@@ -145,15 +145,15 @@ function MetricBar({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="w-[78px] text-[10px] uppercase tracking-[0.16em] text-white/45">
+      <div className="w-[78px] text-[10px] uppercase tracking-[0.16em] text-muted">
         {label}
       </div>
       <div className="flex-1">
-        <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-surface-subtle overflow-hidden">
           <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.round((v ?? 0) * 100)}%` }} />
         </div>
       </div>
-      <div className="w-10 text-right text-[10px] font-semibold text-white/80 tabular-nums">
+      <div className="w-10 text-right text-[10px] font-semibold text-fg tabular-nums">
         {v == null ? "—" : `${Math.round(v * 100)}%`}
       </div>
     </div>
@@ -195,19 +195,19 @@ function VideoTile({
       : "neutral";
   const engagementPill =
     tone === "good"
-      ? "border-emerald-400/25 bg-emerald-500/15 text-emerald-200"
+      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
       : tone === "mid"
-        ? "border-amber-400/25 bg-amber-500/15 text-amber-200"
+        ? "border-amber-400/20 bg-amber-500/10 text-amber-700"
         : tone === "bad"
-          ? "border-red-400/25 bg-red-500/15 text-red-200"
-          : "border-white/10 bg-white/10 text-white/80";
+          ? "border-red-400/20 bg-red-500/10 text-red-700"
+          : "border-[color:var(--border)] bg-surface-subtle text-muted";
 
   return (
     <div
       className={
-        "relative overflow-hidden rounded-xl bg-black border border-white/10 " +
+        "relative overflow-hidden rounded-elas-lg bg-surface border border-[color:var(--border)] " +
         (aspect ? "aspect-video " : "") +
-        "cursor-default transition-all duration-300"
+        "cursor-default transition-all duration-300 shadow-sm"
       }
     >
       <video
@@ -217,11 +217,11 @@ function VideoTile({
         muted={isLocal}
         autoPlay
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-2 p-2">
         <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full flex-col gap-1 rounded-lg bg-black/45 px-2 py-1.5 backdrop-blur border border-white/10">
-            <div className="truncate text-xs font-semibold text-white/90">{label}</div>
+          <div className="inline-flex max-w-full flex-col gap-1 rounded-lg bg-surface/90 px-2 py-1.5 backdrop-blur shadow-sm">
+            <div className="truncate text-xs font-semibold text-fg">{label}</div>
 
             {!isLocal && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -239,7 +239,7 @@ function VideoTile({
           </div>
 
           {!compact && !isLocal && metrics && (
-            <div className="mt-2 rounded-lg bg-black/35 border border-white/10 p-2 backdrop-blur">
+            <div className="mt-2 rounded-lg bg-surface/90 border border-[color:var(--border)] p-2 backdrop-blur shadow-sm">
               <div className="grid gap-1.5">
                 <MetricBar label="eng" value01={metrics.engagement ?? null} tone="primary" />
                 <MetricBar label="stress" value01={metrics.stress ?? null} tone="red" />
@@ -249,13 +249,13 @@ function VideoTile({
           )}
         </div>
 
-        <Badge className="shrink-0 border border-white/10 bg-black/50 text-[10px] text-white/80">
+        <Badge className="shrink-0 border border-[color:var(--border)] bg-surface/90 text-[10px] text-muted">
           {status}
         </Badge>
       </div>
       {!stream && (
-        <div className="absolute inset-0 grid place-items-center bg-black/40">
-          <span className="text-xs text-white/60">Ожидание...</span>
+        <div className="absolute inset-0 grid place-items-center bg-surface-subtle/50">
+          <span className="text-xs text-muted">Ожидание...</span>
         </div>
       )}
     </div>
@@ -826,14 +826,14 @@ export default function TeacherLiveMonitorPage() {
           <Reveal>
             <>
               {connectionState === "connecting" && (
-                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
+                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-4 py-3 text-sm text-muted">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
                   Подключение к эфиру…
                 </div>
               )}
 
               {connectionState === "connected" && wsDisconnected && (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-amber-700 px-4 py-3 text-sm text-amber-100">
                   <span className="flex items-center gap-2">
                     <AlertTriangle size={18} />
                     Соединение потеряно. Завершите сессию и перезапустите эфир при необходимости.
@@ -849,43 +849,43 @@ export default function TeacherLiveMonitorPage() {
                 </div>
               )}
 
-              <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
+              <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-surface shadow-lg">
                 <div className="flex min-h-0 flex-1 flex-col items-stretch xl:flex-row">
-                  <div className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+                  <div className="flex min-w-0 flex-1 flex-col bg-surface">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] px-5 py-4">
                       <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-muted">
                           Teacher · Live monitor
                         </div>
-                        <div className="mt-1 truncate text-xl font-semibold text-white">{sessionTitle}</div>
+                        <div className="mt-1 truncate text-xl font-semibold text-fg">{sessionTitle}</div>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="border border-white/10 bg-white/5 text-white/75">
+                        <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
                           {sessionType === "exam" ? "Exam" : "Lecture"}
                         </Badge>
 
                         {connectionState === "connected" && (
-                          <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
+                          <Badge className="border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700">
                             <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
                             LIVE
                           </Badge>
                         )}
 
                         {isScreenSharing && (
-                          <Badge className="border border-sky-400/20 bg-sky-500/15 text-sky-300">
+                          <Badge className="border border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700">
                             Screen sharing
                           </Badge>
                         )}
 
-                        <Badge className="border border-white/10 bg-white/5 font-mono text-white/75">
+                        <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 font-mono text-muted">
                           {timerLabel}
                         </Badge>
 
                         <Button
                           size="sm"
                           variant="outline"
-                          className="gap-1.5 border-white/10 bg-white/5 text-white hover:bg-white/10 xl:hidden"
+                          className="gap-1.5 border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle xl:hidden"
                           onClick={() => setChatOpen(true)}
                           aria-label="Открыть чат"
                         >
@@ -896,7 +896,7 @@ export default function TeacherLiveMonitorPage() {
                     </div>
 
                     <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
-                      <div className="relative h-[60vh] min-h-[320px] w-full overflow-hidden rounded-xl border border-white/10 bg-black">
+                      <div className="relative h-[60vh] min-h-[320px] w-full overflow-hidden rounded-xl border border-[color:var(--border)] bg-surface">
                         {focusedParticipant && focusedParticipant !== "local" ? (
                           <VideoTile
                             stream={remoteStreams[focusedParticipant.id] ?? null}
@@ -926,8 +926,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isMicEnabled
-                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
                           }`}
                           onClick={toggleMic}
                         >
@@ -938,8 +938,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isCameraEnabled && !isScreenSharing
-                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
                           }`}
                           onClick={toggleCamera}
                           disabled={isScreenSharing}
@@ -951,8 +951,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isScreenSharing
-                              ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
-                              : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              ? "border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700 hover:bg-sky-500/20"
+                              : "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
                           }`}
                           onClick={toggleScreenShare}
                         >
@@ -963,8 +963,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isSettingsOpen
-                              ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
-                              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                              ? "border-violet-400/20 bg-violet-500/10 text-violet-700 text-violet-700"
+                              : "border-[color:var(--border)] bg-surface-subtle/50 text-muted hover:bg-surface-subtle"
                           }`}
                           onClick={() => setIsSettingsOpen((v) => !v)}
                         >
@@ -973,7 +973,7 @@ export default function TeacherLiveMonitorPage() {
 
                         <button
                           type="button"
-                          className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
+                          className="rounded-full bg-red-500 p-4 text-fg transition hover:bg-red-600"
                           onClick={() => setConfirmEndOpen(true)}
                         >
                           <PhoneOff size={22} />
@@ -1023,8 +1023,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isMicEnabled
-                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
                           }`}
                           title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
                           onClick={toggleMic}
@@ -1036,8 +1036,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isCameraEnabled && !isScreenSharing
-                              ? "border-white/10 bg-white/5 text-white hover:bg-white/10"
-                              : "border-red-400/20 bg-red-500/15 text-red-300 hover:bg-red-500/20"
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
                           }`}
                           title={
                             isScreenSharing
@@ -1056,8 +1056,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isScreenSharing
-                              ? "border-sky-400/20 bg-sky-500/15 text-sky-300 hover:bg-sky-500/20"
-                              : "border-white/10 bg-white/5 text-white hover:bg-white/10"
+                              ? "border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700 hover:bg-sky-500/20"
+                              : "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
                           }`}
                           title={
                             isScreenSharing
@@ -1073,8 +1073,8 @@ export default function TeacherLiveMonitorPage() {
                           type="button"
                           className={`rounded-full border p-3 transition ${
                             isSettingsOpen
-                              ? "border-violet-400/20 bg-violet-500/15 text-violet-300"
-                              : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                              ? "border-violet-400/20 bg-violet-500/10 text-violet-700 text-violet-700"
+                              : "border-[color:var(--border)] bg-surface-subtle/50 text-muted hover:bg-surface-subtle"
                           }`}
                           title="Показать настройки"
                           onClick={() => setIsSettingsOpen((v) => !v)}
@@ -1084,7 +1084,7 @@ export default function TeacherLiveMonitorPage() {
 
                         <button
                           type="button"
-                          className="rounded-full border border-amber-400/20 bg-amber-500/15 p-3 text-amber-300 transition hover:bg-amber-500/20"
+                          className="rounded-full border border-amber-400/20 bg-amber-500/10 text-amber-700 p-3 text-amber-700 transition hover:bg-amber-500/20"
                           title="Добавить маркер"
                         >
                           <Flag size={20} />
@@ -1092,7 +1092,7 @@ export default function TeacherLiveMonitorPage() {
 
                         <button
                           type="button"
-                          className="rounded-full bg-red-500 p-4 text-white transition hover:bg-red-600"
+                          className="rounded-full bg-red-500 p-4 text-fg transition hover:bg-red-600"
                           title="Завершить сессию"
                           onClick={() => setConfirmEndOpen(true)}
                         >
@@ -1102,16 +1102,16 @@ export default function TeacherLiveMonitorPage() {
 
                       {isSettingsOpen && (
                         <div className="mx-auto mt-4 max-w-xl space-y-3">
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/75">
+                          <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
                             <div className="flex items-start gap-2">
                               <div className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-200">
                                 <Sparkles size={16} />
                               </div>
                               <div>
-                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50">
+                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
                                   Live assistant
                                 </div>
-                                <div className="mt-1 text-sm text-white/85">{liveSuggestion}</div>
+                                <div className="mt-1 text-sm text-muted">{liveSuggestion}</div>
                               </div>
                             </div>
                           </div>
@@ -1127,21 +1127,21 @@ export default function TeacherLiveMonitorPage() {
                   </div>
 
                   <aside
-                    className={`w-full shrink-0 border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)] xl:flex xl:min-h-0 xl:w-[390px] xl:max-w-[390px] ${
+                    className={`w-full shrink-0 border-l border-[color:var(--border)] bg-surface-subtle xl:flex xl:min-h-0 xl:w-[390px] xl:max-w-[390px] ${
                       chatOpen ? "flex min-h-0 flex-col" : "hidden xl:flex xl:flex-col"
                     }`}
                   >
-                    <div className="shrink-0 border-b border-white/10 px-5 py-4">
+                    <div className="shrink-0 border-b border-[color:var(--border)] px-5 py-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-white">Control center</div>
-                          <div className="mt-1 text-xs text-white/45">Live metrics, participants and chat</div>
+                          <div className="text-sm font-semibold text-fg">Control center</div>
+                          <div className="mt-1 text-xs text-muted">Live metrics, participants and chat</div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-white/10 bg-white/5 text-white hover:bg-white/10 xl:hidden"
+                            className="border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle xl:hidden"
                             onClick={() => setChatOpen(false)}
                             aria-label="Закрыть чат"
                           >
@@ -1150,7 +1150,7 @@ export default function TeacherLiveMonitorPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                            className="border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
                             onClick={() => setConfirmEndOpen(true)}
                           >
                             <LogOut size={14} />
@@ -1169,7 +1169,7 @@ export default function TeacherLiveMonitorPage() {
                       </div>
                     </div>
 
-                    <div className="min-h-0 flex-1 border-b border-white/10 p-4">
+                    <div className="min-h-0 flex-1 border-b border-[color:var(--border)] p-4">
                       <SessionChatPanel
                         sessionId={roomId}
                         role="teacher"
@@ -1177,33 +1177,33 @@ export default function TeacherLiveMonitorPage() {
                       />
                     </div>
 
-                    <div className="border-b border-white/10 px-5 py-4">
-                      <div className="text-sm font-semibold text-white">Session integrity</div>
+                    <div className="border-b border-[color:var(--border)] px-5 py-4">
+                      <div className="text-sm font-semibold text-fg">Session integrity</div>
                       <div className="mt-4 grid gap-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
                           Backend:{" "}
-                          <span className={apiAvailable ? "text-emerald-300" : "text-amber-300"}>
+                          <span className={apiAvailable ? "text-emerald-700" : "text-amber-700"}>
                             {apiAvailable ? "connected" : "offline"}
                           </span>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
                           Camera:{" "}
-                          <span className={cameraReady ? "text-emerald-300" : "text-amber-300"}>
+                          <span className={cameraReady ? "text-emerald-700" : "text-amber-700"}>
                             {cameraReady ? "ready" : "check required"}
                           </span>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
-                          Consent model: <span className="text-emerald-300">active</span>
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
+                          Consent model: <span className="text-emerald-700">active</span>
                         </div>
                       </div>
                     </div>
 
                     {apiAvailable && isRealSessionId(roomId) && (
-                      <div className="border-b border-white/10 px-5 py-4">
-                        <div className="text-sm font-semibold text-white">Chat mode</div>
+                      <div className="border-b border-[color:var(--border)] px-5 py-4">
+                        <div className="text-sm font-semibold text-fg">Chat mode</div>
                         <div className="mt-3">
                           <select
-                            className="h-10 w-full rounded-2xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none"
+                            className="h-10 w-full rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 text-sm text-fg outline-none"
                             value={chatPolicy?.mode ?? "lecture_open"}
                             onChange={async (e) => {
                               const mode = e.target.value as SessionChatPolicy["mode"];
@@ -1222,7 +1222,7 @@ export default function TeacherLiveMonitorPage() {
                           </select>
                         </div>
 
-                        <div className="mt-2 text-xs text-white/45">
+                        <div className="mt-2 text-xs text-muted">
                           {chatPolicy?.mode === "locked" && "Студенты не могут писать"}
                           {chatPolicy?.mode === "questions_only" && "Студенты могут отправлять только вопросы"}
                           {chatPolicy?.mode === "lecture_open" && "Стандартный чат лекции"}
@@ -1231,33 +1231,33 @@ export default function TeacherLiveMonitorPage() {
                       </div>
                     )}
 
-                    <div className="border-b border-white/10 px-5 py-4">
+                    <div className="border-b border-[color:var(--border)] px-5 py-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-white">Participants & ML</div>
-                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70">
+                        <div className="text-sm font-semibold text-fg">Participants & ML</div>
+                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
                           <Users size={16} />
                         </div>
                       </div>
 
                       <div className="mt-4 max-h-64 space-y-3 overflow-y-auto pr-1">
                         {!hasMl ? (
-                          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
+                          <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
                             Пока нет ML-метрик. Студенты должны дать consent, включить камеру и открыть урок.
                           </div>
                         ) : (
                           liveMetrics!.participants.map((p) => (
-                            <div key={p.userId} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                            <div key={p.userId} className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-white">
+                                  <div className="truncate text-sm font-semibold text-fg">
                                     {p.name || p.email || p.userId}
                                   </div>
-                                  <div className="mt-1 text-[11px] text-white/40">
+                                  <div className="mt-1 text-[11px] text-muted">
                                     {new Date(p.updatedAt).toLocaleTimeString()}
                                   </div>
                                 </div>
 
-                                <Badge className="border border-white/10 bg-white/10 text-white/85">
+                                <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
                                   {p.emotion} • {(p.confidence * 100).toFixed(0)}%
                                 </Badge>
                               </div>
@@ -1266,14 +1266,14 @@ export default function TeacherLiveMonitorPage() {
                                 <Badge
                                   className={
                                     p.state === "NORMAL"
-                                      ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
-                                      : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
+                                      ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700"
+                                      : "border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700"
                                   }
                                 >
                                   {p.state}
                                 </Badge>
 
-                                <Badge className="border border-white/10 bg-white/10 text-white/85">
+                                <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
                                   Risk {(p.risk * 100).toFixed(0)}%
                                 </Badge>
                               </div>
@@ -1283,13 +1283,13 @@ export default function TeacherLiveMonitorPage() {
                       </div>
                     </div>
 
-                    <div className="border-b border-white/10 px-5 py-4">
+                    <div className="border-b border-[color:var(--border)] px-5 py-4">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-white">Alerts</div>
-                        <AlertTriangle size={16} className="text-amber-300" />
+                        <div className="text-sm font-semibold text-fg">Alerts</div>
+                        <AlertTriangle size={16} className="text-amber-700" />
                       </div>
 
-                      <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
+                      <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
                         Пока нет событий attention drop. После подключения потоковых alerts здесь появятся провалы внимания,
                         пики риска и таймлайн-маркеры.
                       </div>
@@ -1298,7 +1298,7 @@ export default function TeacherLiveMonitorPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="mt-3 w-full border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          className="mt-3 w-full border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
                           onClick={() => {
                             const riskPct = (avgRisk * 100).toFixed(0);
                             const text = `⚠ Средний риск сейчас ${riskPct}% (по текущим ML-метрикам группы).`;
@@ -1315,7 +1315,7 @@ export default function TeacherLiveMonitorPage() {
                       )}
                     </div>
 
-                    <div className="px-5 py-4 text-xs leading-relaxed text-white/45">
+                    <div className="px-5 py-4 text-xs leading-relaxed text-muted">
                       Метрики отображаются только для студентов, которые дали согласие.
                       Raw-video не сохраняется. Система показывает агрегированные emotion/state/risk
                       для live-поддержки преподавателя.
