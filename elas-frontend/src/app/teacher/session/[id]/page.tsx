@@ -7,12 +7,7 @@ import { cn } from "@/lib/cn";
 
 import {
   getSessionLiveMetrics,
-  getSessionChatPolicy,
-  updateSessionChatPolicy,
-  postSessionMessage,
   type SessionLiveMetrics,
-  type SessionChatPolicy,
-  type LiveMetricsParticipant,
 } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, isRealSessionId } from "@/lib/api/client";
 
@@ -20,13 +15,13 @@ import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { getWsBaseUrl } from "@/lib/env";
+import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
 
 import {
-  ArrowLeft, Share2, Square, Clock, Users as UsersIcon, BookOpen, Activity, AlertTriangle, Send
+  ArrowLeft, Share2, Square, Clock, Users as UsersIcon, BookOpen, Activity, AlertTriangle, Send, PhoneOff, Mic, Video, MicOff, VideoOff, MonitorUp, Focus
 } from "lucide-react";
 
 import Modal from "@/components/ui/Modal";
-import Button from "@/components/ui/Button";
 
 type SessionPhase = "preflight" | "live" | "ended";
 
@@ -34,66 +29,6 @@ function clamp01(x: number) {
   const normalized = x > 1 && x <= 100 ? x / 100 : x;
   if (Number.isNaN(x)) return 0;
   return Math.max(0, Math.min(1, normalized));
-}
-
-// Chart stub component that mimics the reference
-function MockSparkline() {
-  return (
-    <div className="relative w-full h-[220px] mt-4 flex items-end justify-between px-2 pt-6 border-l border-b border-slate-100">
-       <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-         {/* Beautiful dummy purple line for the design mockup exact match */}
-         <path 
-           d="M0,180 L10,120 L20,130 L30,60 L40,40 L50,80 L60,110 L70,80 L80,100 L90,50 L100,40" 
-           fill="none" 
-           stroke="#7448FF" 
-           strokeWidth="2"
-           strokeLinejoin="round"
-           strokeLinecap="round"
-           vectorEffect="non-scaling-stroke"
-         />
-         <path 
-           d="M0,180 L10,120 L20,130 L30,60 L40,40 L50,80 L60,110 L70,80 L80,100 L90,50 L100,40 L100,220 L0,220 Z" 
-           fill="url(#fade)" 
-           vectorEffect="non-scaling-stroke"
-         />
-         <defs>
-           <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-             <stop offset="0%" stopColor="#7448FF" stopOpacity="0.15" />
-             <stop offset="100%" stopColor="#7448FF" stopOpacity="0" />
-           </linearGradient>
-         </defs>
-       </svg>
-       {/* Y axis labels */}
-       <div className="absolute left-[-30px] bottom-0 w-[24px] h-[220px] flex flex-col justify-between text-[11px] text-slate-400 font-medium pb-6 text-right">
-          <span>100%</span>
-          <span>75%</span>
-          <span>50%</span>
-          <span>25%</span>
-          <span>0%</span>
-       </div>
-       {/* X axis labels */}
-       <div className="absolute left-0 right-0 bottom-[-24px] flex justify-between text-[11px] text-slate-400 font-medium px-4">
-          <span>10:00</span>
-          <span>10:15</span>
-          <span>10:45</span>
-          <span>11:00</span>
-          <span>11:15</span>
-          <span>11:36</span>
-       </div>
-    </div>
-  );
-}
-
-function ProgressRow({ label, value }: { label: string; value: number }) {
-  return (
-     <div className="flex items-center gap-4 py-2">
-       <span className="w-28 text-[13px] font-bold text-slate-900">{label}</span>
-       <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-         <div className="h-full bg-[#7448FF]" style={{ width: `${value}%` }} />
-       </div>
-       <span className="w-10 text-right text-[13px] font-bold text-slate-900">{value}%</span>
-     </div>
-  );
 }
 
 export default function TeacherLiveMonitorPage() {
@@ -104,20 +39,28 @@ export default function TeacherLiveMonitorPage() {
   const [phase, setPhase] = useState<SessionPhase>("preflight");
   const [liveSeconds, setLiveSeconds] = useState(0);
 
-  // Hidden video arrays to preserve WebRTC connectivity while showing analytical UI
+  // WebRTC State
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCamOn, setIsCamOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  
+  const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
 
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
+  const localMainRef = useRef<HTMLVideoElement | null>(null);
   
   const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
   const [sessionTitle, setSessionTitle] = useState("Загрузка...");
   const [groupName, setGroupName] = useState("Загрузка...");
+  const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
 
-  const activeTab = "participants"; // Force participants tab for now
+  const [activeTab, setActiveTab] = useState<"participants" | "chat">("participants"); 
 
-  // Bootup logic mapping
+  // Bootup
   useEffect(() => {
     import("@/lib/api/teacher").then(({ getTeacherDashboardSessions }) => {
       getTeacherDashboardSessions().then((sessions) => {
@@ -125,6 +68,7 @@ export default function TeacherLiveMonitorPage() {
         if (s) {
           setSessionTitle(s.title);
           setGroupName(s.group || "Свободная сессия");
+          setSessionType(s.type);
         }
       });
     });
@@ -139,13 +83,16 @@ export default function TeacherLiveMonitorPage() {
     return () => window.clearInterval(id);
   }, [phase]);
 
+  // WebRTC Connection
   useEffect(() => {
     if (phase !== "live" || !sessionId) return;
     if (!wsUrl?.startsWith("ws")) return;
 
     const signaling = new SignalingClient(`${wsUrl}/ws`);
     const manager = new PeerConnectionManager(signaling, sessionId, "teacher", {
-      onRemoteStream: (peerId, stream) => setRemoteStreams(prev => ({ ...prev, [peerId]: stream })),
+      onRemoteStream: (peerId, stream) => {
+          setRemoteStreams(prev => ({ ...prev, [peerId]: stream }));
+      },
       onPeersChange: (peers) => {
         setParticipants(peers);
         setRemoteStreams(prev => {
@@ -177,6 +124,7 @@ export default function TeacherLiveMonitorPage() {
     };
   }, [phase, sessionId, wsUrl]);
 
+  // Live Metrics Polling
   useEffect(() => {
     if (phase !== "live" || !sessionId || !apiAvailable || !isRealSessionId(sessionId)) return;
 
@@ -201,10 +149,15 @@ export default function TeacherLiveMonitorPage() {
     return () => { stopped = true; if (timer) window.clearTimeout(timer); };
   }, [phase, sessionId, apiAvailable]);
 
-  // Derive metrics
-  const hasMl = Boolean(liveMetrics?.participants?.length);
-  const avgEngagementRaw = liveMetrics?.avgEngagement ?? (liveMetrics?.participants?.reduce((sum, p) => sum + (p.engagement ?? 0), 0) || 0);
-  const engagementPct = hasMl ? Math.round(clamp01(avgEngagementRaw) * 100) : 65; 
+  // Main stage video sync
+  useEffect(() => {
+      if (!localMainRef.current) return;
+      const targetStream = selectedPeerId && remoteStreams[selectedPeerId] 
+                           ? remoteStreams[selectedPeerId] 
+                           : localStream;
+      localMainRef.current.srcObject = targetStream;
+      localMainRef.current.play().catch(() => {});
+  }, [selectedPeerId, remoteStreams, localStream]);
 
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
 
@@ -214,21 +167,34 @@ export default function TeacherLiveMonitorPage() {
      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
+  const toggleMic = () => {
+      setIsMicOn(!isMicOn);
+      peerManagerRef.current?.setAudioEnabled(!isMicOn);
+  };
+  const toggleCam = () => {
+      setIsCamOn(!isCamOn);
+      peerManagerRef.current?.setVideoEnabled(!isCamOn);
+  };
+  const toggleScreen = async () => {
+      // Screen sharing logic stub (full implementation similar to student)
+      setIsScreenSharing(!isScreenSharing);
+  };
+
   // Preflight state allowing to Start
   if (phase === "preflight") {
      return (
         <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] flex flex-col justify-center items-center py-20 px-4">
            <div className="bg-white p-12 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] max-w-lg w-full text-center">
              <div className="w-20 h-20 bg-purple-50 rounded-[20px] flex items-center justify-center text-[#7448FF] mx-auto mb-6">
-                <Activity size={32} />
+                <Video size={32} />
              </div>
              <h1 className="text-2xl font-bold text-slate-900 mb-2">{sessionTitle}</h1>
-             <p className="text-slate-500 mb-8 font-medium">Группа {groupName}</p>
+             <p className="text-slate-500 mb-8 font-medium">Мониторинг эфира и звонки: Группа {groupName}</p>
              <button 
                onClick={() => setPhase("live")} 
                className="w-full py-4 bg-[#7448FF] text-white rounded-2xl font-bold shadow-md hover:bg-[#623ce6] hover:-translate-y-0.5 transition-all mb-4 text-[16px]"
              >
-               Начать сессию
+               Присоединиться к эфиру
              </button>
              <button onClick={() => router.push("/teacher/sessions")} className="w-full py-3 text-slate-500 font-bold hover:text-slate-900 transition-colors">Отмена</button>
            </div>
@@ -242,195 +208,160 @@ export default function TeacherLiveMonitorPage() {
         <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] flex flex-col justify-center items-center py-20 px-4">
            <div className="bg-white p-12 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] max-w-lg w-full text-center">
              <h1 className="text-2xl font-bold text-slate-900 mb-2">Сессия завершена</h1>
-             <p className="text-slate-500 mb-8 font-medium">Отчет успешно сформирован и доступен в разделе.</p>
+             <p className="text-slate-500 mb-8 font-medium">Эфир окончен. Вы можете посмотреть отчет в аналитике.</p>
              <button onClick={() => router.push(`/teacher/sessions`)} className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all text-[16px]">Вернуться к списку</button>
            </div>
         </div>
      );
   }
 
-  // LIVE Phase Matching Reference Layout Map exactly
+  // RESTORED WEBRTC FUNCTIONAL RENDER WITH PREMIUM DESIGN
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-6 md:pt-8 pb-10">
-      
-      {/* Invisible DOM nodes to retain WebRTC peers without visual clutter */}
-      <div className="hidden">
-         {localStream && <video autoPlay muted playsInline ref={el => { if(el) el.srcObject = localStream; }} />}
-         {Object.entries(remoteStreams).map(([peerId, st]) => (
-            <video key={peerId} autoPlay playsInline ref={el => { if(el) el.srcObject = st; }} />
-         ))}
-      </div>
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-4 md:pt-6 pb-8 flex flex-col h-screen overflow-hidden">
 
-      <div className="mx-auto max-w-[1440px] px-4 md:px-8">
+      <div className="mx-auto max-w-[1600px] px-4 md:px-8 w-full flex-1 flex flex-col h-full min-h-0">
         
         {/* Header */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="shrink-0 mb-4 flex flex-col md:flex-row md:items-start justify-between gap-4">
            <div>
-              <Link href="/teacher/sessions" className="inline-flex items-center gap-2 text-[13px] font-bold text-[#7448FF] hover:text-[#522bbb] transition-colors mb-3">
+              <Link href="/teacher/sessions" className="inline-flex items-center gap-2 text-[13px] font-bold text-[#7448FF] hover:text-[#522bbb] transition-colors mb-2">
                  <ArrowLeft size={16} /> Назад к сессиям
               </Link>
-              <h1 className="text-[28px] font-bold text-slate-900 leading-tight mb-1">{sessionTitle}</h1>
-              <div className="text-[14px] font-medium text-slate-500 flex items-center gap-2">
-                 Группа {groupName} <span className="opacity-50">•</span> <span className="text-emerald-500 font-bold">Активная сессия</span>
+              <h1 className="text-[20px] font-bold text-slate-900 leading-tight mb-1">{sessionTitle}</h1>
+              <div className="text-[13px] font-medium text-slate-500 flex items-center gap-2">
+                 Группа {groupName} <span className="opacity-50">•</span> 
+                 <span className="flex items-center gap-1.5 font-bold text-emerald-500"><div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div> Активный мониторинг ({formatTimer()})</span>
               </div>
            </div>
            
            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e6e2f6] text-[#7448FF] text-[14px] font-bold rounded-xl hover:bg-purple-50 transition-colors shadow-sm">
-                <Share2 size={16} /> Поделиться
-              </button>
               <button 
                 onClick={() => setConfirmEndOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#7448FF] text-white text-[14px] font-bold rounded-xl hover:bg-[#623ce6] transition-colors shadow-sm"
+                className="flex items-center gap-2 px-5 py-2 bg-rose-500 text-white text-[13px] font-bold rounded-xl hover:bg-rose-600 transition-colors shadow-sm"
               >
-                <Square size={14} fill="currentColor" /> Завершить сессию
+                <PhoneOff size={16} fill="currentColor" /> Завершить сессию
               </button>
            </div>
         </div>
 
         {/* Dashboard Grid Map */}
-        <div className="flex flex-col xl:flex-row gap-6">
+        <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 overflow-hidden pb-4">
            
-           {/* Left Big Panel */}
-           <div className="flex-1 space-y-6">
-              
-              {/* Top Row: Chart + Summary */}
-              <div className="flex flex-col lg:flex-row gap-6">
+           {/* MAIN VIDEO STAGE */}
+           <div className="flex-1 flex flex-col gap-4 min-w-0">
+              <div className="w-full flex-1 rounded-[24px] overflow-hidden bg-slate-900 relative shadow-md">
+                 <video 
+                     ref={localMainRef} 
+                     playsInline 
+                     muted={!selectedPeerId} 
+                     autoPlay 
+                     className="w-full h-full object-cover transition-opacity duration-300"
+                 />
                  
-                 {/* Live Monitor Chart */}
-                 <div className="flex-[5] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8 relative">
-                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Live мониторинг</h2>
-                    <div className="pl-6 w-full">
-                      <MockSparkline />
-                    </div>
+                 <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-md border border-white/10 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm z-10">
+                    <Focus size={14} className="text-[#7448FF]"/>
+                    {selectedPeerId ? (participants.find(p => p.id === selectedPeerId)?.name || selectedPeerId) : "Моя камера (Преподаватель)"}
                  </div>
 
-                 {/* Summary Stats */}
-                 <div className="flex-[3] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
-                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Сводка</h2>
-                    <div className="space-y-6">
-                       <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><UsersIcon size={24} /></div>
-                          <div>
-                            <div className="text-[17px] font-bold text-slate-900">{participants.length > 0 ? participants.length : '18'} <span className="font-semibold text-slate-500 text-[14px]">Участника онлайн</span></div>
-                            <div className="text-[13px] text-slate-400 font-medium tracking-wide">из 32</div>
-                          </div>
-                       </div>
-                       <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><Activity size={24} /></div>
-                          <div>
-                             <div className="text-[17px] font-bold text-slate-900">{engagementPct}%</div>
-                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">Средняя активность</div>
-                          </div>
-                       </div>
-                       <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><Clock size={24} /></div>
-                          <div>
-                             <div className="text-[17px] font-bold text-slate-900">{formatTimer()}</div>
-                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">Время сессии</div>
-                          </div>
-                       </div>
-                       <div className="flex items-start gap-4">
-                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><BookOpen size={24} /></div>
-                          <div>
-                             <div className="text-[17px] font-bold text-slate-900">12 <span className="font-semibold text-slate-500 text-[14px]">Материалов</span></div>
-                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">из 16</div>
-                          </div>
-                       </div>
-                    </div>
+                 {/* Bottom Floating Controls */}
+                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/10 shadow-lg z-20">
+                    <button onClick={toggleMic} className={cn("w-12 h-12 rounded-[14px] flex items-center justify-center transition-colors", isMicOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-rose-500 text-white hover:bg-rose-600')}>
+                        {isMicOn ? <Mic size={20}/> : <MicOff size={20}/>}
+                    </button>
+                    <button onClick={toggleCam} className={cn("w-12 h-12 rounded-[14px] flex items-center justify-center transition-colors", isCamOn ? 'bg-white/20 text-white hover:bg-white/30' : 'bg-rose-500 text-white hover:bg-rose-600')}>
+                        {isCamOn ? <Video size={20}/> : <VideoOff size={20}/>}
+                    </button>
+                    <button onClick={toggleScreen} className={cn("w-12 h-12 rounded-[14px] flex items-center justify-center transition-colors", isScreenSharing ? 'bg-[#7448FF] text-white hover:bg-[#623ce6]' : 'bg-white/20 hover:bg-white/30 text-white')}>
+                        <MonitorUp size={20}/>
+                    </button>
                  </div>
-
-              </div>
-              
-              {/* Bottom Row: Categories + Chat */}
-              <div className="flex flex-col lg:flex-row gap-6">
-                 
-                 {/* Activity Categories */}
-                 <div className="flex-[5] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
-                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Активность по категориям</h2>
-                    <div className="space-y-4">
-                       <ProgressRow label="Вовлечённость" value={75} />
-                       <ProgressRow label="Понимание" value={60} />
-                       <ProgressRow label="Взаимодействие" value={70} />
-                       <ProgressRow label="Участие" value={60} />
-                    </div>
-                 </div>
-
-                 {/* Minimal Chat Widget matching screenshot */}
-                 <div className="flex-[3] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8 flex flex-col">
-                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Чат</h2>
-                    <div className="flex-1 space-y-4 overflow-y-auto min-h-[140px]">
-                       
-                       {/* Chat Mocks rendering layout exact matches */}
-                       <div className="flex gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
-                          <div>
-                             <div className="flex items-center gap-2 mb-1"><span className="text-[13px] font-bold text-slate-900">Айдын Б.</span><span className="text-[11px] text-slate-400">11:45</span></div>
-                             <div className="text-[13px] text-slate-600">Можно объяснение по шагу 3?</div>
-                          </div>
-                       </div>
-                       <div className="flex gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
-                          <div>
-                             <div className="flex items-center gap-2 mb-1"><span className="text-[13px] font-bold text-slate-900">Мадина Г.</span><span className="text-[11px] text-slate-400">11:46</span></div>
-                             <div className="text-[13px] text-slate-600">Спасибо, теперь понятно!</div>
-                          </div>
-                       </div>
-                       
-                    </div>
-
-                    <div className="relative mt-4 pt-4 border-t border-slate-50">
-                       <input type="text" placeholder="Напишите сообщение..." className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[13px] outline-none hover:bg-slate-100 transition-colors" />
-                       <button className="absolute right-3 top-[28px] text-[#7448FF] hover:text-[#522bbb] transition-colors"><Send size={18} /></button>
-                    </div>
-
-                 </div>
-
               </div>
 
+              {/* PARTICIPANTS THUMBNAIL CAROUSEL */}
+              <div className="h-32 shrink-0 bg-white border border-slate-100 rounded-[20px] p-3 flex gap-3 overflow-x-auto shadow-sm hide-scrollbar items-center">
+                  {/* Local Stream Thumbnail */}
+                  <div onClick={() => setSelectedPeerId(null)} className={cn("relative h-full aspect-video rounded-xl overflow-hidden cursor-pointer border-[3px] transition-all shrink-0 bg-slate-900 group", !selectedPeerId ? "border-[#7448FF] shadow-md" : "border-transparent opacity-70 hover:opacity-100 object-cover")}>
+                      <video autoPlay playsInline muted ref={el => { if(el && localStream) el.srcObject = localStream; }} className="w-full h-full object-cover" />
+                      <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-lg border border-white/10 group-hover:bg-black/80 transition-colors">Я (Local)</div>
+                  </div>
+
+                  {/* Remote Streams Thumbnails */}
+                  {participants.filter(p => p.role !== 'teacher').map(p => {
+                      const st = remoteStreams[p.id];
+                      return (
+                         <div key={p.id} onClick={() => setSelectedPeerId(p.id)} className={cn("relative h-full aspect-video rounded-xl overflow-hidden cursor-pointer border-[3px] transition-all shrink-0 bg-slate-900 group flex items-center justify-center", selectedPeerId === p.id ? "border-[#7448FF] shadow-md" : "border-transparent opacity-70 hover:opacity-100 object-cover")}>
+                             {st ? (
+                                <video autoPlay playsInline ref={el => { if(el) el.srcObject = st; }} className="w-full h-full object-cover" />
+                             ) : (
+                                <div className="text-xs text-slate-500 font-medium font-bold text-center">Нет видео</div>
+                             )}
+                             <div className="absolute bottom-1.5 left-1.5 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-lg border border-white/10 group-hover:bg-black/80 transition-colors truncate max-w-[90%]">
+                                {p.name || p.id.slice(0,6)}
+                             </div>
+                         </div>
+                      );
+                  })}
+                  {participants.filter(p => p.role !== 'teacher').length === 0 && (
+                      <div className="flex-1 text-center text-sm font-medium text-slate-400">Ожидание подключения студентов...</div>
+                  )}
+              </div>
            </div>
 
-           {/* Right Sidebar: Tabs & List */}
-           <div className="w-full xl:w-[420px] shrink-0 bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col overflow-hidden">
-              <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-slate-100 overflow-x-auto gap-4 hide-scrollbar">
-                 <button className="text-[14px] font-bold text-[#7448FF] pb-4 border-b-[3px] border-[#7448FF] shrink-0">Участники (23)</button>
-                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Вопросы (12)</button>
-                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Файлы (8)</button>
-                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Заметки (2)</button>
+           {/* RIGHT SIDEBAR (Chat + ML Metrics) */}
+           <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 flex flex-col min-h-0 bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+              <div className="flex border-b border-slate-100 shrink-0">
+                 <button onClick={() => setActiveTab('participants')} className={cn("flex-1 text-[13px] font-bold py-4 border-b-2 transition-colors", activeTab === 'participants' ? "border-[#7448FF] text-[#7448FF]" : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50")}>
+                    Участники и ML ({participants.length})
+                 </button>
+                 <button onClick={() => setActiveTab('chat')} className={cn("flex-1 text-[13px] font-bold py-4 border-b-2 transition-colors", activeTab === 'chat' ? "border-[#7448FF] text-[#7448FF]" : "border-transparent text-slate-400 hover:text-slate-600 hover:bg-slate-50/50")}>
+                    Чат эфира
+                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                 
-                 {[
-                    {name: "Айдын Б.", l: "Высокая активность", p: 90, color: "text-emerald-500", iBg:"bg-slate-100"},
-                    {name: "Мадина Г.", l: "Высокая активность", p: 85, color: "text-emerald-500", iBg:"bg-slate-100"},
-                    {name: "Нурлан Т.", l: "Средняя активность", p: 70, color: "text-emerald-500", iBg:"bg-slate-100"},
-                    {name: "Жанерке С.", l: "Средняя активность", p: 65, color: "text-amber-500", iBg:"bg-purple-100 text-purple-700"},
-                    {name: "Ербол А.", l: "Низкая активность", p: 40, color: "text-amber-500", iBg:"bg-indigo-100 text-indigo-700"},
-                    {name: "Аружан К.", l: "Низкая активность", p: 35, color: "text-rose-500", iBg:"bg-rose-100 text-rose-700"},
-                    {name: "Данияр М.", l: "Высокая активность", p: 88, color: "text-emerald-500", iBg:"bg-emerald-100 text-emerald-700"},
-                    {name: "Алия Р.", l: "Средняя активность", p: 60, color: "text-emerald-500", iBg:"bg-slate-100"},
-                 ].map((u, i) => (
-                    <div key={i} className="flex items-center justify-between py-2 group">
-                       <div className="flex items-center gap-3">
-                          <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-[14px] uppercase shrink-0", u.iBg)}>
-                             {u.iBg.includes("bg-slate") ? undefined : u.name[0]}
-                          </div>
-                          <div>
-                            <div className="text-[14px] font-bold text-slate-900 group-hover:text-[#7448FF] transition-colors cursor-pointer">{u.name}</div>
-                            <div className="text-[12px] text-slate-400 font-medium">{u.l}</div>
-                          </div>
-                       </div>
-                       <div className="flex items-center gap-2">
-                          <span className="text-[14px] font-bold text-slate-900">{u.p}%</span>
-                          <span className={cn("w-1.5 h-1.5 rounded-full mt-0.5", u.color)} />
-                       </div>
-                    </div>
-                 ))}
+              <div className="flex-1 min-h-0 relative bg-slate-50/30">
+                 {/* Participants Tab View */}
+                 {activeTab === 'participants' && (
+                     <div className="absolute inset-0 overflow-y-auto px-4 py-4 space-y-3">
+                         {participants.length === 0 && (
+                            <div className="text-center text-xs text-slate-400 pt-6 font-medium">Никто из студентов еще не подключился.</div>
+                         )}
+                         {participants.filter(p => p.role !== 'teacher').map(p => {
+                            const ml = liveMetrics?.participants.find(m => m.userId === p.id || m.name === p.name);
+                            const nameInitial = p.name ? p.name[0].toUpperCase() : '?';
+                            return (
+                               <div key={p.id} onClick={() => setSelectedPeerId(p.id)} className={cn("flex items-center justify-between p-3 rounded-2xl bg-white border cursor-pointer hover:shadow-md transition-all group", selectedPeerId === p.id ? "border-[#7448FF]" : "border-slate-100")}>
+                                  <div className="flex items-center gap-3 min-w-0">
+                                     <div className="w-10 h-10 rounded-full bg-purple-50 text-[#7448FF] shrink-0 flex items-center justify-center font-bold text-sm">
+                                        {nameInitial}
+                                     </div>
+                                     <div className="min-w-0 pr-2">
+                                        <div className="text-[13px] font-bold text-slate-900 group-hover:text-[#7448FF] transition-colors truncate">{p.name || `Студент ${p.id.slice(0,5)}`}</div>
+                                        <div className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                           Эмоция: <span className="text-slate-600 font-bold">{ml?.emotion || "Без анализа"}</span>
+                                        </div>
+                                     </div>
+                                  </div>
+                                  {ml && (
+                                     <div className="text-right shrink-0">
+                                        <div className="text-[12px] font-bold text-slate-900">Вним.: {Math.round((ml?.confidence || 0)*100)}%</div>
+                                        <div className="text-[10px] font-bold uppercase mt-0.5" style={{ color: (ml?.risk || 0) > 0.5 ? '#f43f5e' : '#10b981' }}>
+                                           {ml.state || "Stable"}
+                                        </div>
+                                     </div>
+                                  )}
+                               </div>
+                            )
+                         })}
+                     </div>
+                 )}
 
-              </div>
-              <div className="p-6 border-t border-slate-50">
-                 <button className="text-[13px] font-bold text-[#7448FF] hover:underline">Показать всех участников</button>
+                 {/* Real Session Chat Tab View */}
+                 {activeTab === 'chat' && (
+                     <div className="absolute inset-0 bg-white">
+                         <SessionChatPanel sessionId={sessionId} role="teacher" type={sessionType} />
+                     </div>
+                 )}
+
               </div>
            </div>
 
@@ -440,10 +371,10 @@ export default function TeacherLiveMonitorPage() {
 
       <Modal open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} title="Завершить сессию">
         <div className="p-2">
-          <p className="text-slate-500 text-[14px] font-medium mb-6">Вы уверены, что хотите завершить сессию? Итоговая аналитика будет сохранена и доступна в профилях.</p>
+          <p className="text-slate-500 text-[14px] font-medium mb-6">Завершить текущий эфир? Все видео и веб-сокет соединения участников будут отключены.</p>
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-50">
-             <button onClick={() => setConfirmEndOpen(false)} className="px-5 py-2.5 bg-slate-50 font-bold text-slate-600 rounded-xl hover:bg-slate-100 transition-colors">Отмена</button>
-             <button onClick={() => { setConfirmEndOpen(false); setPhase("ended"); }} className="px-5 py-2.5 bg-rose-500 font-bold text-white rounded-xl hover:bg-rose-600 transition-colors">Завершить</button>
+             <button onClick={() => setConfirmEndOpen(false)} className="px-5 py-2.5 bg-slate-50 font-bold text-slate-600 rounded-xl hover:bg-slate-100 transition-colors shadow-sm">Отмена</button>
+             <button onClick={() => { setConfirmEndOpen(false); setPhase("ended"); }} className="px-5 py-2.5 bg-rose-500 font-bold text-white rounded-xl hover:bg-rose-600 transition-colors shadow-sm flex items-center gap-2"><PhoneOff size={16}/> Завершить эфир</button>
           </div>
         </div>
       </Modal>
