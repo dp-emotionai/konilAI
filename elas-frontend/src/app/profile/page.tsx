@@ -11,30 +11,17 @@ import {
   getStoredAuth,
   hasAuth,
   isApiAvailable,
+  setAuth
 } from "@/lib/api/client";
 
 import {
-  User,
-  ShieldCheck,
-  Bell,
-  Blocks,
-  Globe,
-  CreditCard,
-  Laptop,
-  Camera,
-  LogOut,
-  ChevronRight,
-  Info,
-  CheckCircle2,
-  Trash2,
-  Lock,
-  Smartphone,
-  Mail,
-  ChevronDown
+  User, ShieldCheck, Bell, Blocks, Globe, CreditCard, Laptop, Camera, LogOut,
+  ChevronRight, Info, CheckCircle2, Trash2, Lock, Smartphone, Mail, ChevronDown,
+  Loader2, AlertCircle
 } from "lucide-react";
 
 type Role = "student" | "teacher" | "admin";
-type MeRes = { id: string; email: string; role: Role; name?: string | null; status?: string | null; };
+type MeRes = { id: string; email: string; role: Role; name?: string | null; status?: string | null; bio?: string | null; };
 type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
 
 const TABS = [
@@ -56,6 +43,22 @@ export default function UnifiedProfilePage() {
   const [me, setMe] = useState<MeRes | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Profile Form State
+  const [formName, setFormName] = useState("");
+  const [formSurname, setFormSurname] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+
+  // Security Form State
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+
+  // Notifications State
+  const [notifEmail, setNotifEmail] = useState(true);
+  const [notifPush, setNotifPush] = useState(false);
+  const [notifDigest, setNotifDigest] = useState(true);
+
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
   const [netMs, setNetMs] = useState<number | null>(null);
@@ -75,13 +78,22 @@ export default function UnifiedProfilePage() {
         return;
       }
       if (!isApiAvailable()) {
-        if (mounted && stored) setMe({ id: "local", email: stored.email, role: stored.role as Role, name: stored.name });
+        if (mounted && stored) {
+            setMe({ id: "local", email: stored.email, role: stored.role as Role, name: stored.name });
+            setFormName(stored.name?.split(" ")[0] || "");
+            setFormSurname(stored.name?.split(" ").slice(1).join(" ") || "");
+        }
         setLoading(false);
         return;
       }
       try {
          const data = await api.get<MeRes>("auth/me");
-         if (mounted) setMe(data);
+         if (mounted) {
+             setMe(data);
+             setFormName(data.name?.split(" ")[0] || "");
+             setFormSurname(data.name?.split(" ").slice(1).join(" ") || "");
+             setFormBio(data.bio || "");
+         }
       } catch (e) {
          setMe(null);
       } finally {
@@ -109,6 +121,38 @@ export default function UnifiedProfilePage() {
     queryPerms();
     return () => { cancelled = true; };
   }, []);
+
+  async function handleSaveProfile() {
+      if (!isApiAvailable()) {
+          setProfileMessage({ type: 'error', text: 'Нет подключения к API.' });
+          return;
+      }
+      setIsSavingProfile(true);
+      setProfileMessage(null);
+      try {
+          const fullName = `${formName.trim()} ${formSurname.trim()}`.trim();
+          await api.patch("auth/me", { name: fullName, bio: formBio });
+          setProfileMessage({ type: 'success', text: 'Профиль успешно сохранен.' });
+          // Update local state and auth
+          const newMe = { ...me!, name: fullName, bio: formBio };
+          setMe(newMe);
+          setAuth({ ...stored!, name: fullName }); 
+      } catch (e) {
+          setProfileMessage({ type: 'error', text: `API Endpoint Missing or Error: PATCH /auth/me не реализован на бэкенде. (${e instanceof Error ? e.message : 'Unknown'})` });
+      } finally {
+          setIsSavingProfile(false);
+      }
+  }
+
+  async function handleActionStub(actionName: string, endpoint: string) {
+      if (!isApiAvailable()) return alert('Нет подключения к API.');
+      try {
+          await api.post(endpoint, {});
+          alert('Действие выполнено.');
+      } catch (e) {
+          alert(`API Endpoint Missing: ${endpoint} не реализован на бэкенде.`);
+      }
+  }
 
   async function runNetworkCheck() {
     if (!isApiAvailable()) return;
@@ -155,9 +199,10 @@ export default function UnifiedProfilePage() {
   }
 
   const roleLabel = me?.role === 'teacher' ? 'Преподаватель' : me?.role === 'admin' ? 'Администратор' : 'Студент';
-  const nameParts = me?.name ? me.name.split(" ") : [];
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+  
+  const hasProfileChanges = formName !== (me?.name?.split(" ")[0] || "") 
+                            || formSurname !== (me?.name?.split(" ").slice(1).join(" ") || "") 
+                            || formBio !== (me?.bio || "");
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">
@@ -170,7 +215,6 @@ export default function UnifiedProfilePage() {
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
           
-          {/* Sidebar Navigation */}
           <div className="w-full md:w-[260px] shrink-0 sticky top-24">
             <nav className="space-y-1">
               {TABS.map(tab => {
@@ -195,13 +239,10 @@ export default function UnifiedProfilePage() {
             </nav>
           </div>
 
-          {/* Main Content Area */}
           <div className="flex-1 w-full min-h-[500px]">
              
-             {/* Profile Layout */}
              {activeTab === "profile" && (
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                   {/* Left Col Profile Settings */}
                    <div className="xl:col-span-2 space-y-6">
                      
                      <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
@@ -209,11 +250,11 @@ export default function UnifiedProfilePage() {
                         
                         <div className="flex flex-col sm:flex-row gap-8 items-start">
                            <div className="flex flex-col items-center gap-4 shrink-0">
-                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner">
+                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner overflow-hidden">
                                 <span className="text-4xl font-bold text-slate-300">
                                    {me?.name ? me.name[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}
                                 </span>
-                                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white">
+                                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white z-10" onClick={() => handleActionStub('Upload Avatar', 'auth/me/avatar')}>
                                   <Camera size={14} />
                                 </button>
                               </div>
@@ -224,32 +265,39 @@ export default function UnifiedProfilePage() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                  <div>
                                    <label className="text-xs font-semibold text-slate-500 mb-2 block">Имя</label>
-                                   <input type="text" readOnly value={firstName} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none" />
+                                   <input type="text" value={formName} onChange={e => setFormName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
                                  </div>
                                  <div>
                                    <label className="text-xs font-semibold text-slate-500 mb-2 block">Фамилия</label>
-                                   <input type="text" readOnly value={lastName} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none" />
+                                   <input type="text" value={formSurname} onChange={e => setFormSurname(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
                                  </div>
                               </div>
                               <div>
-                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Email</label>
-                                <input type="text" readOnly value={me?.email || ""} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none disabled:bg-slate-50" />
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Email (Обратитесь в поддержку для изменения)</label>
+                                <input type="text" readOnly value={me?.email || ""} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[14px] text-slate-500 outline-none cursor-not-allowed" />
                               </div>
                               <div>
                                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Роль</label>
                                 <div className="relative">
-                                  <input type="text" readOnly value={roleLabel} className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[14px] text-slate-500 outline-none" />
+                                  <input type="text" readOnly value={roleLabel} className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[14px] text-slate-500 outline-none cursor-not-allowed" />
                                   <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                 </div>
                               </div>
                               <div>
                                 <label className="text-xs font-semibold text-slate-500 mb-2 block">О себе</label>
-                                <textarea rows={3} readOnly value="Студент 3 курса, интересуюсь машинным обучением и анализом данных." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none resize-none"></textarea>
-                                <div className="text-right text-[10px] text-slate-400 font-medium mt-1">0/200</div>
+                                <textarea rows={3} value={formBio} onChange={e => setFormBio(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none resize-none focus:border-[#7448FF] transition-colors"></textarea>
+                                <div className="text-right text-[10px] text-slate-400 font-medium mt-1">{formBio.length}/200</div>
                               </div>
                               
+                              {profileMessage && (
+                                <div className={cn("text-[13px] p-3 rounded-lg flex items-start gap-2", profileMessage.type === 'error' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600")}>
+                                   <AlertCircle size={16} className="shrink-0 mt-0.5" /> {profileMessage.text}
+                                </div>
+                              )}
+
                               <div className="pt-2 flex justify-end">
-                                <button className="px-6 py-2.5 bg-[#7448FF] hover:bg-[#623ce6] text-white font-medium rounded-xl text-[14px] transition-colors cursor-not-allowed opacity-80 shadow-sm">
+                                <button onClick={handleSaveProfile} disabled={!hasProfileChanges || isSavingProfile} className="px-6 py-2.5 bg-[#7448FF] hover:bg-[#623ce6] text-white font-medium rounded-xl text-[14px] transition-colors disabled:opacity-50 shadow-sm flex items-center gap-2">
+                                  {isSavingProfile && <Loader2 size={16} className="animate-spin" />}
                                   Сохранить изменения
                                 </button>
                               </div>
@@ -258,52 +306,35 @@ export default function UnifiedProfilePage() {
                      </div>
 
                      <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Безопасность</h2>
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Двухфакторная аутентификация (2FA)</h2>
                         <div className="space-y-4">
-                           <div className="flex items-center justify-between pb-4 border-b border-slate-50">
-                             <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                                 <Lock size={18} />
-                               </div>
-                               <div>
-                                 <div className="font-semibold text-[14px] text-slate-900">Пароль</div>
-                                 <div className="text-[12px] text-slate-500 flex items-center gap-2 mt-0.5">
-                                   <span className="tracking-widest">••••••••••••••</span>
-                                   <span className="text-slate-300">|</span>
-                                   <span>Обновлен 2 месяца назад</span>
-                                 </div>
-                               </div>
-                             </div>
-                             <button className="text-[13px] font-semibold text-[#7448FF]">Изменить</button>
-                           </div>
-
                            <div className="flex items-center justify-between pb-4 border-b border-slate-50">
                              <div className="flex items-center gap-4">
                                <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
                                  <ShieldCheck size={18} />
                                </div>
                                <div>
-                                 <div className="font-semibold text-[14px] text-slate-900">Двухфакторная аутентификация</div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Защита аккаунта 2FA</div>
                                  <div className="text-[12px] text-slate-500 mt-0.5">Дополнительная защита аккаунта</div>
                                </div>
                              </div>
                              <div className="flex items-center gap-4">
                                <span className="text-[13px] text-slate-400 font-medium">Выключено</span>
-                               <button className="text-[13px] font-semibold text-[#7448FF]">Включить</button>
+                               <button onClick={() => handleActionStub('Enable 2FA', 'auth/2fa/enable')} className="text-[13px] font-semibold text-[#7448FF] hover:underline">Включить</button>
                              </div>
                            </div>
 
                            <div className="flex items-center justify-between">
                              <div className="flex items-center gap-4">
                                <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                                 <ShieldCheck size={18} />
+                                 <Lock size={18} />
                                </div>
                                <div>
                                  <div className="font-semibold text-[14px] text-slate-900">Резервные коды</div>
                                  <div className="text-[12px] text-slate-500 mt-0.5">Используйте для входа при недоступности 2FA</div>
                                </div>
                              </div>
-                             <button className="text-[13px] font-medium px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">Показать коды</button>
+                             <button onClick={() => handleActionStub('Show Codes', 'auth/2fa/recovery-codes')} className="text-[13px] font-medium px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">Показать коды</button>
                            </div>
                         </div>
                      </div>
@@ -313,9 +344,7 @@ export default function UnifiedProfilePage() {
                         <div className="space-y-4">
                            <div className="flex items-center justify-between">
                              <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
-                                 G
-                               </div>
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">G</div>
                                <div>
                                  <div className="font-semibold text-[14px] text-slate-900">Google</div>
                                  <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "Не подключено"}</div>
@@ -323,63 +352,36 @@ export default function UnifiedProfilePage() {
                              </div>
                              <div className="flex items-center gap-4">
                                <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 bg-emerald-50 text-emerald-600 rounded">Подключено</span>
-                               <button className="text-slate-400 hover:text-slate-700"><ChevronRight size={18} className="rotate-90" /></button>
+                               <button onClick={() => handleActionStub('Disconnect Google', 'user/integrations/google/disconnect')} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
                              </div>
                            </div>
 
                            <div className="flex items-center justify-between">
                              <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
-                                 Git
-                               </div>
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">Git</div>
                                <div>
                                  <div className="font-semibold text-[14px] text-slate-900">GitHub</div>
                                  <div className="text-[12px] text-slate-500 mt-0.5">Не подключено</div>
                                </div>
                              </div>
-                             <button className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
+                             <button onClick={() => handleActionStub('Connect GitHub', 'user/integrations/github/connect')} className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
                            </div>
 
-                           <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-4">
-                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
-                                 D
-                               </div>
-                               <div>
-                                 <div className="font-semibold text-[14px] text-slate-900">Dropbox</div>
-                                 <div className="text-[12px] text-slate-500 mt-0.5">Не подключено</div>
-                               </div>
-                             </div>
-                             <button className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
-                           </div>
                         </div>
                      </div>
                    </div>
 
-                   {/* Right Col Stats & Quick Actions */}
                    <div className="space-y-6">
                      <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                         <h2 className="text-[15px] font-bold text-slate-900 mb-6">Статистика активности</h2>
                         <div className="space-y-5">
                           <div className="flex justify-between items-center text-[13px]">
-                            <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> Присоединился</div>
-                            <div className="font-medium text-slate-900">10 марта 2026</div>
+                            <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> С нами с</div>
+                            <div className="font-medium text-slate-900">10 марта 2026</div> {/* In real impl: derive from user.createdAt */}
                           </div>
                           <div className="flex justify-between items-center text-[13px]">
-                            <div className="flex items-center gap-3 text-slate-600"><CheckCircle2 size={14} className="text-[#7448FF]" /> Активность</div>
-                            <div className="font-medium text-emerald-500">Высокая</div>
-                          </div>
-                          <div className="flex justify-between items-center text-[13px]">
-                            <div className="flex items-center gap-3 text-slate-600"><Blocks size={14} className="text-[#7448FF]" /> Завершено сессий</div>
-                            <div className="font-medium text-slate-900">18</div>
-                          </div>
-                          <div className="flex justify-between items-center text-[13px]">
-                            <div className="flex items-center gap-3 text-slate-600"><Laptop size={14} className="text-[#7448FF]" /> Время в системе</div>
-                            <div className="font-medium text-slate-900">48 ч 32 мин</div>
-                          </div>
-                          <div className="flex justify-between items-center text-[13px]">
-                            <div className="flex items-center gap-3 text-slate-600"><Globe size={14} className="text-[#7448FF]" /> Последний вход</div>
-                            <div className="font-medium text-slate-900">Сегодня, 10:24</div>
+                            <div className="flex items-center gap-3 text-slate-600"><Globe size={14} className="text-[#7448FF]" /> Текущий IP статус</div>
+                            <div className="font-medium text-slate-900">Авторизован</div>
                           </div>
                         </div>
                      </div>
@@ -392,7 +394,7 @@ export default function UnifiedProfilePage() {
                                 <ShieldCheck size={16} className="text-[#7448FF]" />
                                 <div>
                                   <div className="text-[13px] font-semibold text-slate-900">Изменить пароль</div>
-                                  <div className="text-[11px] text-slate-500 mt-0.5">Обновите пароль от аккаунта</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Вкладка "Безопасность"</div>
                                 </div>
                               </div>
                               <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
@@ -403,29 +405,18 @@ export default function UnifiedProfilePage() {
                                 <Bell size={16} className="text-[#7448FF]" />
                                 <div>
                                   <div className="text-[13px] font-semibold text-slate-900">Настроить уведомления</div>
-                                  <div className="text-[11px] text-slate-500 mt-0.5">Выберите как получать уведомления</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Вкладка "Уведомления"</div>
                                 </div>
                               </div>
                               <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
                            </button>
 
-                           <button onClick={() => setActiveTab("subscription")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
-                              <div className="flex items-center gap-3">
-                                <CreditCard size={16} className="text-[#7448FF]" />
-                                <div>
-                                  <div className="text-[13px] font-semibold text-slate-900">Управление подпиской</div>
-                                  <div className="text-[11px] text-slate-500 mt-0.5">Просмотр и изменение подписки</div>
-                                </div>
-                              </div>
-                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
-                           </button>
-
-                           <button onClick={signOut} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                           <button onClick={() => handleActionStub('Log Out All', 'auth/sessions/close-all')} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
                               <div className="flex items-center gap-3">
                                 <Laptop size={16} className="text-[#7448FF]" />
                                 <div>
-                                  <div className="text-[13px] font-semibold text-slate-900">Выйти из всех устройств</div>
-                                  <div className="text-[11px] text-slate-500 mt-0.5">Завершить все активные сессии</div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Завершить все сессии</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Разлогинить все устройства</div>
                                 </div>
                               </div>
                               <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
@@ -436,7 +427,6 @@ export default function UnifiedProfilePage() {
                 </div>
              )}
 
-             {/* Security Tab */}
              {activeTab === "security" && (
                 <div className="max-w-4xl space-y-6">
                    <h2 className="text-[20px] font-bold text-slate-900 mb-2">Безопасность</h2>
@@ -446,19 +436,33 @@ export default function UnifiedProfilePage() {
                       <div className="pb-6 border-b border-slate-50">
                         <div className="flex items-center justify-between mb-2">
                            <div className="font-semibold text-[15px] text-slate-900">Пароль</div>
-                           <button className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[#7448FF] font-semibold hover:bg-slate-100 transition-colors">Изменить пароль</button>
+                           <button onClick={async () => {
+                               setIsChangingPassword(true);
+                               setPasswordMessage(null);
+                               try {
+                                   await api.post("auth/change-password", {});
+                               } catch (e) {
+                                   setPasswordMessage({ type: 'error', text: `API Endpoint Missing: POST /auth/change-password не поддержан.` });
+                               } finally {
+                                   setIsChangingPassword(false);
+                               }
+                           }} disabled={isChangingPassword} className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[#7448FF] font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50">Изменить пароль</button>
                         </div>
                         <div className="text-[13px] text-slate-500 mb-4">Используйте надежный пароль для защиты вашего аккаунта.</div>
                         <div className="flex gap-16 text-[13px] text-slate-500 font-medium">
                           <span className="tracking-widest">••••••••••••••••</span>
-                          <span>Обновлен 2 месяца назад</span>
                         </div>
+                        {passwordMessage && (
+                            <div className={cn("text-[13px] p-3 rounded-lg flex items-start gap-2 mt-4", passwordMessage.type === 'error' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600")}>
+                                <AlertCircle size={16} className="shrink-0 mt-0.5" /> {passwordMessage.text}
+                            </div>
+                        )}
                       </div>
 
                       <div className="pb-6 border-b border-slate-50">
                         <div className="flex items-center justify-between mb-2">
                            <div className="font-semibold text-[15px] text-slate-900">Двухфакторная аутентификация (2FA)</div>
-                           <button className="text-[13px] font-medium px-5 py-2.5 bg-[#7448FF] text-white rounded-xl font-semibold hover:bg-[#623ce6] transition-colors shadow-sm">Включить 2FA</button>
+                           <button onClick={() => handleActionStub('Enable 2FA', 'auth/2fa/enable')} className="text-[13px] font-medium px-5 py-2.5 bg-[#7448FF] text-white rounded-xl font-semibold hover:bg-[#623ce6] transition-colors shadow-sm">Включить 2FA</button>
                         </div>
                         <div className="text-[13px] text-slate-500 mb-4">Дополнительный уровень защиты вашего аккаунта.</div>
                         <div className="flex items-center gap-3">
@@ -473,7 +477,7 @@ export default function UnifiedProfilePage() {
                       <div>
                          <div className="flex items-center justify-between mb-2">
                            <div className="font-semibold text-[15px] text-slate-900">Резервные коды</div>
-                           <button className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-100 transition-colors">Показать коды</button>
+                           <button onClick={() => handleActionStub('Show codes', 'auth/2fa/recovery-codes')} className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-100 transition-colors">Показать коды</button>
                         </div>
                         <div className="text-[13px] text-slate-500 mb-4">Используйте резервные коды для входа при недоступности 2FA.</div>
                         <div className="flex items-center gap-3">
@@ -487,39 +491,10 @@ export default function UnifiedProfilePage() {
                    </div>
 
                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Последняя активность</div>
-                      <div className="text-[13px] text-slate-500 mb-6">Устройства и места, с которых был выполнен вход в ваш аккаунт.</div>
-                      
-                      <div className="w-full">
-                        <div className="grid grid-cols-12 gap-4 pb-3 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-widest px-2">
-                           <div className="col-span-5">Устройство</div>
-                           <div className="col-span-4">Местоположение</div>
-                           <div className="col-span-2">Время входа</div>
-                           <div className="col-span-1 text-right">Статус</div>
-                        </div>
-
-                        <div className="py-2">
-                           {/* Current device */}
-                           <div className="grid grid-cols-12 gap-4 items-center py-4 px-2 hover:bg-slate-50 transition-colors rounded-xl">
-                              <div className="col-span-5 flex items-center gap-4">
-                                <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-purple-50 text-[#7448FF]"><Laptop size={20}/></div>
-                                <div>
-                                  <div className="font-medium text-slate-900 text-[14px]">Windows PC</div>
-                                  <div className="text-[12px] text-slate-500">Chrome • Windows</div>
-                                </div>
-                              </div>
-                              <div className="col-span-4">
-                                <div className="font-medium text-slate-900 text-[14px]">Текущий город</div>
-                                <div className="text-[12px] text-slate-500">IP: Ваш текущий</div>
-                              </div>
-                              <div className="col-span-2">
-                                <div className="text-[13px] text-slate-600">Сегодня, Сейчас</div>
-                              </div>
-                              <div className="col-span-1 text-right">
-                                <span className="text-[11px] tracking-wide font-bold uppercase text-emerald-500 px-2.5 py-1 bg-emerald-50 rounded">Текущая</span>
-                              </div>
-                           </div>
-                        </div>
+                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Завершение сессий (безопасность)</div>
+                      <div className="flex items-center justify-between mt-4">
+                         <div className="text-[13px] text-slate-500 max-w-sm">Завершив все сессии, вы автоматически разлогините ваш аккаунт со всех устройств.</div>
+                         <button onClick={() => handleActionStub('Log Out Sessions', 'auth/sessions/close-all')} className="text-[13px] font-medium px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors">Выйти глобально</button>
                       </div>
                    </div>
 
@@ -527,24 +502,30 @@ export default function UnifiedProfilePage() {
                       <div className="flex items-center justify-between">
                          <div>
                             <div className="font-semibold text-[15px] text-slate-900 mb-1">Удаление аккаунта</div>
-                            <div className="text-[13px] text-slate-500">Удалите свой аккаунт и все связанные данные без возможности восстановления.</div>
+                            <div className="text-[13px] text-slate-500 max-w-sm">Удалите свой аккаунт и все связанные данные без возможности восстановления. Осторожно.</div>
                          </div>
-                         <button className="text-[13px] font-semibold px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors">Удалить аккаунт</button>
+                         <button onClick={() => {
+                             if(confirm("Вы уверены? Это необратимо.")) {
+                                 handleActionStub('Delete Account', 'auth/me');
+                             }
+                         }} className="text-[13px] font-semibold px-5 py-2.5 bg-rose-500 text-white rounded-xl shadow-sm hover:bg-rose-600 transition-colors">Удалить аккаунт</button>
                       </div>
                    </div>
 
                 </div>
              )}
 
-             {/* Notifications Tab */}
              {activeTab === "notifications" && (
                 <div className="max-w-4xl space-y-6">
                    <h2 className="text-[20px] font-bold text-slate-900 mb-2">Уведомления</h2>
-                   <p className="text-[14px] text-slate-500 mb-8">Настройте, какие уведомления вы хотите получать и как</p>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройте, какие уведомления вы хотите получать</p>
                    
                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
                       <div className="font-semibold text-[15px] text-slate-900 mb-1">Способы получения уведомлений</div>
-                      <div className="text-[13px] text-slate-500 mb-6">Выберите, куда и как вы хотите получать уведомления</div>
+                      <div className="text-[13px] text-slate-500 mb-6 flex justify-between items-center">
+                         <span>Выберите, куда и как вы хотите получать уведомления</span>
+                         <button onClick={() => handleActionStub('Save Notifications', 'user/notifications/settings')} className="text-[#7448FF] hover:underline font-bold text-[13px]">Сохранить настройки сети</button>
+                      </div>
 
                       <div className="space-y-4">
                         <div className="flex items-center justify-between py-2">
@@ -552,10 +533,12 @@ export default function UnifiedProfilePage() {
                               <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Mail size={18} /></div>
                               <div>
                                 <div className="text-[14px] font-semibold text-slate-900">Email уведомления</div>
-                                <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "alisher.b@mail.ru"}</div>
+                                <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "загружается..."}</div>
                               </div>
                            </div>
-                           <div className="w-12 h-6 rounded-full bg-[#7448FF] p-1 flex justify-end cursor-pointer"><div className="w-4 h-4 bg-white rounded-full"></div></div>
+                           <button onClick={() => setNotifEmail(!notifEmail)} className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifEmail ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
+                              <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                           </button>
                         </div>
 
                         <div className="flex items-center justify-between py-2 border-t border-slate-50 pt-4">
@@ -563,77 +546,19 @@ export default function UnifiedProfilePage() {
                               <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Smartphone size={18} /></div>
                               <div>
                                 <div className="text-[14px] font-semibold text-slate-900">Push уведомления</div>
-                                <div className="text-[12px] text-slate-500 mt-0.5">Уведомления в браузере</div>
+                                <div className="text-[12px] text-slate-500 mt-0.5">Уведомления в браузере. Выключены?</div>
                               </div>
                            </div>
-                           <div className="w-12 h-6 rounded-full bg-[#7448FF] p-1 flex justify-end cursor-pointer"><div className="w-4 h-4 bg-white rounded-full"></div></div>
-                        </div>
-
-                        <div className="flex items-center justify-between py-2 border-t border-slate-50 pt-4">
-                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
-                              <div>
-                                <div className="text-[14px] font-semibold text-slate-900">Ежедневная сводка</div>
-                                <div className="text-[12px] text-slate-500 mt-0.5">Получайте сводку по активности раз в день</div>
-                              </div>
-                           </div>
-                           <div className="flex items-center gap-2">
-                             <span className="px-4 py-2 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-600 bg-slate-50">Включено (09:00) <ChevronDown size={14} className="inline ml-2" /></span>
-                           </div>
+                           <button onClick={() => setNotifPush(!notifPush)} className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifPush ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
+                              <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                           </button>
                         </div>
                       </div>
-                   </div>
-
-                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Типы уведомлений</div>
-                      <div className="text-[13px] text-slate-500 mb-6">Выберите, о каких событиях вы хотите получать уведомления</div>
-
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-100">
-                             <th className="pb-4 font-normal text-[12px] text-slate-400"></th>
-                             <th className="pb-4 font-normal text-[12px] text-slate-500 w-24 text-center">Email</th>
-                             <th className="pb-4 font-normal text-[12px] text-slate-500 w-24 text-center">Push</th>
-                             <th className="pb-4 font-normal text-[12px] text-slate-400 w-10"></th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {[
-                            { title: "Расписание и занятия", subtitle: "Изменения в расписании, напоминания о занятиях", icon: Bell },
-                            { title: "Задания и дедлайны", subtitle: "Новые задания, приближающиеся дедлайны", icon: CheckCircle2 },
-                            { title: "Сообщения", subtitle: "Личные сообщения и ответы в обсуждениях", icon: Mail },
-                            { title: "Группы и сессии", subtitle: "Приглашения, обновления в группах и сессиях", icon: Blocks },
-                          ].map((item, i) => {
-                             const Icon = item.icon;
-                             return (
-                              <tr key={i} className="border-b border-slate-50">
-                                <td className="py-4 font-medium flex items-center gap-3">
-                                   <Icon size={18} className="text-[#7448FF] shrink-0" />
-                                   <div>
-                                     <div className="text-[14px] text-slate-900">{item.title}</div>
-                                     <div className="text-[11px] text-slate-500 font-normal mt-0.5">{item.subtitle}</div>
-                                   </div>
-                                </td>
-                                <td className="py-4 text-center align-middle">
-                                  <div className="w-5 h-5 mx-auto bg-[#7448FF] rounded-md flex items-center justify-center text-white"><CheckCircle2 size={12} strokeWidth={4} /></div>
-                                </td>
-                                <td className="py-4 text-center align-middle">
-                                  <div className="w-5 h-5 mx-auto bg-[#7448FF] rounded-md flex items-center justify-center text-white"><CheckCircle2 size={12} strokeWidth={4} /></div>
-                                </td>
-                                <td className="py-4 text-right">
-                                  <ChevronDown size={14} className="text-slate-300" />
-                                </td>
-                              </tr>
-                             )
-                          })}
-                        </tbody>
-                      </table>
                    </div>
 
                 </div>
              )}
 
-             {/* Devices Tab from before */}
              {activeTab === "devices" && (
                 <div className="p-8 max-w-4xl space-y-6">
                    <h2 className="text-[20px] font-bold text-slate-900 mb-2 flex items-center gap-2">
@@ -700,13 +625,14 @@ export default function UnifiedProfilePage() {
                 </div>
              )}
 
-             {/* Stubs for other tabs */}
              {["integrations", "language", "subscription", "active_sessions"].includes(activeTab) && (
                 <div className="p-8 h-full min-h-[500px] flex flex-col items-center justify-center text-center">
                    <Blocks size={64} className="text-slate-200 mb-6" strokeWidth={1} />
-                   <h2 className="text-xl font-bold text-slate-900 mb-2">В разработке</h2>
+                   <h2 className="text-xl font-bold text-slate-900 mb-2">Отсутствует backend API</h2>
                    <p className="text-[15px] text-slate-500 max-w-sm">
-                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) будут доступны в следующих обновлениях.
+                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) требуют новых endpoint-ов на стороне сервера.
+                     <br/><br/>
+                     <button onClick={() => alert('Смотрите файл backend-requirements.md для деталей')} className="text-[#7448FF] hover:underline font-bold text-[14px]">Узнать подробности для бэкенда</button>
                    </p>
                 </div>
              )}
