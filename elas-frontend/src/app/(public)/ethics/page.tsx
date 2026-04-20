@@ -22,26 +22,26 @@ export default function Ethics() {
           <a
             key={id}
             href={`#${id}`}
-            className="rounded-2xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition"
+            className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-1.5 text-sm text-muted hover:bg-surface-subtle hover:text-white transition"
           >
             {label}
           </a>
         ))}
       </nav>
 
-      <Card className="p-6 md:p-8 space-y-8 text-white/80">
+      <Card className="p-6 md:p-8 space-y-8 text-muted">
         <section id="purpose" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">Purpose</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             ELAS is designed to support teaching and learning. We provide aggregated analytics on engagement and
             emotional signals so that educators can improve lectures and better support students. Results are
-            <strong className="text-white/90"> not</strong> used for automatic grading, ranking, or formal assessment.
+            <strong className="text-muted"> not</strong> used for automatic grading, ranking, or formal assessment.
           </p>
         </section>
 
         <section id="limits" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">What we do not do</h2>
-          <ul className="list-disc pl-5 space-y-2 text-sm text-white/70">
+          <ul className="list-disc pl-5 space-y-2 text-sm text-muted">
             <li>Not used for grades, penalties, or disciplinary actions.</li>
             <li>Not used to judge or label individuals.</li>
             <li>Only aggregated, anonymized analytics for improving teaching and session quality.</li>
@@ -50,7 +50,7 @@ export default function Ethics() {
 
         <section id="model" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">About the model</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             Emotion and engagement models can be wrong. Treat results as supportive signals, not ground truth.
             We log model performance and allow configuration so institutions can align the system with their
             ethical guidelines.

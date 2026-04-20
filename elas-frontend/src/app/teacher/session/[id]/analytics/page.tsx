@@ -66,7 +66,7 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
           <div className="text-sm font-medium uppercase tracking-wider text-muted">
             Engagement over time
           </div>
-          <div className="mt-4 flex h-52 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle/30 text-sm text-muted dark:border-white/10 dark:bg-white/5">
+          <div className="mt-4 flex h-52 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle/30 text-sm text-muted dark:border-[color:var(--border)] dark:bg-surface-subtle">
             Нет точек таймлайна для этой сессии.
           </div>
         </CardContent>
@@ -307,7 +307,7 @@ export default function TeacherLectureAnalyticsPage() {
       <TeacherSessionTabs sessionId={sessionId} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle p-1 dark:bg-white/10">
+        <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle p-1 dark:bg-surface-subtle">
           {[
             { id: "overview", label: "Обзор" },
             { id: "timeline", label: "Таймлайн" },

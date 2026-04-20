@@ -61,38 +61,38 @@ export default function StudentSessionsPage() {
           <div className="overflow-hidden rounded-3xl border border-[color:var(--border-muted)] bg-[radial-gradient(circle_at_top_left,#1b233d_0%,transparent_55%),radial-gradient(circle_at_bottom_right,#15192f_0%,transparent_55%),linear-gradient(135deg,#050814_0%,#05060d_100%)] px-5 py-6 md:px-7 md:py-7">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-white/70">
+                <div className="inline-flex items-center gap-2 rounded-full bg-surface-subtle/50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Student · Sessions
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
                   Ваши учебные сессии
                 </h1>
-                <p className="max-w-xl text-sm text-white/70">
+                <p className="max-w-xl text-sm text-muted">
                   Здесь отображаются все занятия, экзамены и эфиры, к которым вы приглашены.
                   Выберите активную или запланированную сессию, чтобы подключиться.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="grid grid-cols-2 gap-3 text-xs text-white/80 md:w-72">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
+                <div className="grid grid-cols-2 gap-3 text-xs text-muted md:w-72">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted">
                       <RadioTower size={14} /> Live
                     </div>
                     <div className="mt-1 text-lg font-semibold">
                       {sessions.filter((s) => s.status === "live").length || 0}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-white/55">Сеансов «в эфире» сейчас</div>
+                    <div className="mt-0.5 text-[11px] text-muted">Сеансов «в эфире» сейчас</div>
                   </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-white/50">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-2.5">
+                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted">
                       <CalendarDays size={14} /> Upcoming
                     </div>
                     <div className="mt-1 text-lg font-semibold">
                       {sessions.filter((s) => s.status === "upcoming").length || 0}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-white/55">Будущие сессии</div>
+                    <div className="mt-0.5 text-[11px] text-muted">Будущие сессии</div>
                   </div>
                 </div>
                 {apiAvailable && (
@@ -101,7 +101,7 @@ export default function StudentSessionsPage() {
                     size="sm"
                     onClick={() => void load()}
                     disabled={loading}
-                    className="shrink-0 gap-1.5 border-white/20 text-white/90 hover:bg-white/10"
+                    className="shrink-0 gap-1.5 border-white/20 text-muted hover:bg-surface-subtle"
                   >
                     <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
                     Обновить

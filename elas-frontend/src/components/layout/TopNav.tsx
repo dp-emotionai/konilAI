@@ -47,14 +47,14 @@ import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
 
 const DROPDOWN_PANEL =
-  "rounded-xl overflow-hidden shadow-2xl border border-[color:var(--border)] dark:border-white/10 " +
-  "bg-white/[0.98] dark:bg-[rgba(20,20,35,0.95)] backdrop-blur-xl " +
+  "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
+  "bg-surface backdrop-blur-xl " +
   "p-2 animate-dropdown-in " +
-  "ring-1 ring-black/[0.06] dark:ring-white/[0.08]";
+  "ring-1 ring-black/[0.04]";
 
 const DROPDOWN_ITEM =
   "rounded-lg px-3 py-2 transition-all duration-150 text-fg " +
-  "hover:bg-black/[0.04] dark:hover:bg-white/10";
+  "hover:bg-surface-subtle";
 
 const PUBLIC_ICONS: Record<
   string,
@@ -225,7 +225,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                 href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-white/10",
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-surface-subtle",
                   hasCardStyle ? "px-4 py-3" : "px-3 py-2"
                 )}
               >
@@ -351,7 +351,7 @@ function AppNavItem({
                 href={childHref}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-white/10",
+                  "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04] dark:hover:bg-surface-subtle",
                   child.accent
                     ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70"
                     : ""
@@ -483,9 +483,9 @@ export default function TopNav() {
 
   return (
     <>
-      <header className="fixed left-0 right-0 top-0 z-50 px-4 pt-4 sm:px-6">
-        <div className="mx-auto max-w-6xl rounded-2xl border border-[color:var(--border)] bg-white/85 px-4 py-3 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-[rgba(10,10,20,0.68)] sm:px-5">
-          <div className="flex items-center justify-between gap-3">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="flex items-center justify-between gap-3 flex-1 lg:flex-none">
             <div className="flex shrink-0 items-center gap-3 sm:gap-4">
               <Logo href={homeHref} />
             </div>

@@ -38,18 +38,20 @@ import type { Participant } from "@/lib/webrtc/types";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
 
 import {
-  ShieldCheck,
-  Video,
-  Activity,
-  AlertTriangle,
-  LogOut,
   Mic,
-  PhoneOff,
+  Video,
   Share2,
   Settings,
-  Sparkles,
-  MonitorUp,
+  PhoneOff,
+  AlertTriangle,
+  Activity,
+  CheckCircle2,
+  AlertCircle,
+  Search,
   BarChart3,
+  MicOff,
+  VideoOff,
+  MonitorUp,
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 
@@ -70,8 +72,8 @@ function LiveMetricCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-white/40">{label}</div>
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 backdrop-blur-sm">
+      <div className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</div>
       <div className="mt-1 text-sm font-semibold text-white">{value}</div>
     </div>
   );
@@ -84,7 +86,7 @@ function formatParticipantLabel(p?: Participant | null) {
 
 function TopStatBadge({ children }: { children: React.ReactNode }) {
   return (
-    <Badge className="border border-white/10 bg-black/45 text-white/85 backdrop-blur">
+    <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted backdrop-blur">
       {children}
     </Badge>
   );
@@ -166,6 +168,12 @@ export default function StudentJoinSessionPage() {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localThumbRef = useRef<HTMLVideoElement | null>(null);
 
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const peerManagerRef = useRef<PeerConnectionManager | null>(null);
+
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
   const shouldRunMl = live && state.consent && mlApiAvailable;
   const roomId = sessionId;
@@ -207,6 +215,7 @@ export default function StudentJoinSessionPage() {
         setRemoteStream(null);
       },
     });
+    peerManagerRef.current = manager;
 
     signaling.connect();
 
@@ -226,7 +235,12 @@ export default function StudentJoinSessionPage() {
         }
 
         await signaling.waitForOpen(12000);
-        manager.join();
+        
+        // Pass display name via user auth to signaling
+        const { getStoredAuth } = await import("@/lib/api/client");
+        const auth = getStoredAuth();
+        manager.join(auth ? { email: auth.email, name: auth.name } : undefined);
+        
         setConnectionState("connected");
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Ошибка подключения";
@@ -251,6 +265,9 @@ export default function StudentJoinSessionPage() {
     })();
 
     return () => {
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      peerManagerRef.current = null;
       manager.leave();
       setRemoteStream(null);
       setLocalStream(null);
@@ -258,8 +275,53 @@ export default function StudentJoinSessionPage() {
       setConnectionState("idle");
       setConnectionError(null);
       setWsDisconnected(false);
+      setIsScreenSharing(false);
     };
   }, [live, roomId]);
+
+  const toggleMic = () => {
+    const next = !isMicEnabled;
+    peerManagerRef.current?.setAudioEnabled(next);
+    setIsMicEnabled(next);
+  };
+
+  const toggleCamera = () => {
+    if (isScreenSharing) return;
+    const next = !isCameraEnabled;
+    peerManagerRef.current?.setVideoEnabled(next);
+    setIsCameraEnabled(next);
+  };
+
+  const toggleScreenShare = async () => {
+    const manager = peerManagerRef.current;
+    if (!manager || !localStream) return;
+
+    if (isScreenSharing) {
+      const cameraTrack = localStream.getVideoTracks()[0] ?? null;
+      if (cameraTrack) cameraTrack.enabled = isCameraEnabled;
+      await manager.replaceOutgoingVideoTrack(isCameraEnabled ? cameraTrack : null);
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setIsScreenSharing(false);
+      return;
+    }
+
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const displayTrack = displayStream.getVideoTracks()[0];
+      if (!displayTrack) return;
+
+      screenStreamRef.current = displayStream;
+      await manager.replaceOutgoingVideoTrack(displayTrack);
+      setIsScreenSharing(true);
+
+      displayTrack.onended = () => {
+        void toggleScreenShare();
+      };
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   useEffect(() => {
     if (!remoteVideoRef.current || !remoteStream) return;
@@ -578,14 +640,14 @@ export default function StudentJoinSessionPage() {
           {tab === "live" && (
             <Reveal>
               {connectionState === "connecting" && (
-                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/90">
+                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-4 py-3 text-sm text-muted">
                   <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
                   Подключение к эфиру…
                 </div>
               )}
 
               {connectionState === "connected" && wsDisconnected && (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-amber-700 px-4 py-3 text-sm text-amber-100">
                   <span className="flex items-center gap-2">
                     <AlertTriangle size={18} />
                     Соединение потеряно. Выйдите и попробуйте подключиться снова.
@@ -605,12 +667,12 @@ export default function StudentJoinSessionPage() {
                 </div>
               )}
 
-              <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[#070b17] shadow-[0_30px_100px_rgba(0,0,0,0.42)]">
+              <div className="overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-surface shadow-lg">
                 <div className="grid min-h-[720px] grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
-                  <div className="flex min-w-0 flex-col bg-[radial-gradient(circle_at_top,#0f1730,transparent_35%),linear-gradient(180deg,#050914_0%,#050914_100%)]">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
+                  <div className="flex min-w-0 flex-col bg-surface/50">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] px-5 py-4">
                       <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-white/40">
+                        <div className="text-[11px] uppercase tracking-[0.24em] text-muted">
                           Student · Live session
                         </div>
                         <div className="mt-1 truncate text-xl font-semibold text-white">
@@ -619,32 +681,32 @@ export default function StudentJoinSessionPage() {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="border border-white/10 bg-white/5 text-white/80">
+                        <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
                           {joinInfo?.type === "exam" ? "Exam" : "Lecture"}
                         </Badge>
 
                         {connectionState === "connected" && (
-                          <Badge className="border border-emerald-400/20 bg-emerald-500/15 text-emerald-300">
+                          <Badge className="border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700">
                             <span className="mr-2 inline-block h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                             Connected
                           </Badge>
                         )}
 
                         {shouldRunMl && mlActive && !mlUnavailable && (
-                          <Badge className="border border-violet-400/20 bg-violet-500/15 text-violet-300">
+                          <Badge className="border border-violet-400/20 bg-violet-500/10 text-violet-700 text-violet-700">
                             ML analyzing
                           </Badge>
                         )}
 
                         {shouldRunMl && mlUnavailable && (
-                          <Badge className="border border-amber-400/20 bg-amber-500/15 text-amber-300">
+                          <Badge className="border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700">
                             ML временно недоступен
                           </Badge>
                         )}
 
                         <Button
                           variant="outline"
-                          className="border-white/10 bg-white/5 text-white hover:bg-white/10"
+                          className="border-[color:var(--border)] bg-surface-subtle/50 text-white hover:bg-surface-subtle"
                           onClick={() => {
                             setLive(false);
                             setTab("prepare");
@@ -656,35 +718,35 @@ export default function StudentJoinSessionPage() {
                       </div>
                     </div>
 
-                    <div className="flex gap-3 overflow-x-auto border-b border-white/10 px-5 py-4">
-                      <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-2xl border border-violet-400/30 bg-white/5">
+                    <div className="flex gap-3 overflow-x-auto border-b border-[color:var(--border)] px-5 py-4">
+                      <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-2xl border border-violet-400/30 bg-surface-subtle">
                         <video
                           ref={localThumbRef}
                           className="h-full w-full object-cover"
                           playsInline
                           muted
                         />
-                        <div className="absolute inset-x-2 bottom-2 flex items-center justify-between rounded-xl bg-black/50 px-2 py-1 text-[10px] text-white/80 backdrop-blur">
+                        <div className="absolute inset-x-2 bottom-2 flex items-center justify-between rounded-xl bg-surface-subtle/80 px-2 py-1 text-[10px] text-muted backdrop-blur">
                           <span>Вы</span>
                           <span>Student</span>
                         </div>
                       </div>
 
                       {teacherParticipant && (
-                        <div className="flex h-20 min-w-[180px] shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm text-white/70">
+                        <div className="flex h-20 min-w-[180px] shrink-0 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-4 text-sm text-muted">
                           {formatParticipantLabel(teacherParticipant)}
                         </div>
                       )}
 
                       {!remoteStream && (
-                        <div className="flex h-20 w-48 shrink-0 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-white/[0.03] text-sm text-white/40">
+                        <div className="flex h-20 w-48 shrink-0 items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)] bg-surface-subtle/50 text-fg text-sm text-muted">
                           Ожидание преподавателя
                         </div>
                       )}
                     </div>
 
                     <div className="min-h-0 flex-1 p-5">
-                      <div className="relative h-full min-h-[420px] overflow-hidden rounded-[28px] border border-white/10 bg-black">
+                      <div className="relative h-full min-h-[420px] overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-black">
                         <video
                           ref={remoteVideoRef}
                           className="absolute inset-0 h-full w-full object-cover"
@@ -694,7 +756,7 @@ export default function StudentJoinSessionPage() {
 
                         {!remoteStream && (
                           <div className="absolute inset-0 grid place-items-center">
-                            <div className="rounded-2xl border border-white/10 bg-black/45 px-5 py-3 text-sm text-white/80 backdrop-blur">
+                            <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-5 py-3 text-sm text-muted backdrop-blur">
                               Ожидание преподавателя...
                             </div>
                           </div>
@@ -702,18 +764,18 @@ export default function StudentJoinSessionPage() {
 
                         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.5),transparent_20%,transparent_78%,rgba(0,0,0,0.22))]" />
 
-                        <div className="absolute left-4 top-4 z-10 max-w-[55%] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white backdrop-blur">
+                        <div className="absolute left-4 top-4 z-10 max-w-[55%] rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-3 py-2 text-sm text-white backdrop-blur">
                           <div className="truncate">
                             {remoteStream
                               ? formatParticipantLabel(teacherParticipant)
                               : "Ожидание преподавателя"}
                           </div>
-                          <div className="mt-0.5 text-xs text-white/60">
+                          <div className="mt-0.5 text-xs text-muted">
                             {remoteStream ? "Teacher stream" : "Live room"}
                           </div>
                         </div>
 
-                        <div className="absolute right-4 top-4 z-10 rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-sm text-white/90 backdrop-blur">
+                        <div className="absolute right-4 top-4 z-10 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-3 py-2 text-sm text-muted backdrop-blur">
                           Room: {roomId ? `${roomId.slice(0, 8)}…` : "—"}
                         </div>
 
@@ -725,8 +787,8 @@ export default function StudentJoinSessionPage() {
                             <Badge
                               className={
                                 mlResult.state === "NORMAL"
-                                  ? "border border-emerald-400/20 bg-emerald-500/15 text-emerald-300"
-                                  : "border border-amber-400/20 bg-amber-500/15 text-amber-300"
+                                  ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700"
+                                  : "border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700"
                               }
                             >
                               {mlResult.state ?? "—"}
@@ -743,49 +805,65 @@ export default function StudentJoinSessionPage() {
                           <TopStatBadge>Remote: {remoteStream ? "Yes" : "No"}</TopStatBadge>
                         </div>
 
-                        <div className="absolute bottom-4 right-4 z-10 h-28 w-44 overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+                        <div className="absolute bottom-4 right-4 z-10 h-28 w-44 overflow-hidden rounded-2xl border border-[color:var(--border)] bg-black shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
                           <video
                             ref={localVideoRef}
                             className="h-full w-full object-cover"
                             playsInline
                             muted
                           />
-                          <div className="absolute inset-x-2 bottom-2 rounded-xl bg-black/55 px-2 py-1 text-[10px] text-white/80 backdrop-blur">
+                          <div className="absolute inset-x-2 bottom-2 rounded-xl bg-black/55 px-2 py-1 text-[10px] text-muted backdrop-blur">
                             Вы · Student
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="border-t border-white/10 px-5 py-4">
+                    <div className="border-t border-[color:var(--border)] px-5 py-4">
                       <div className="flex flex-wrap items-center justify-center gap-3">
                         <button
                           type="button"
-                          className="rounded-full border border-white/10 bg-white/5 p-3 text-white transition hover:bg-white/10"
-                          title="Микрофон"
+                          className={`rounded-full border p-3 transition ${
+                            isMicEnabled
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-white hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                          }`}
+                          title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
+                          onClick={toggleMic}
                         >
-                          <Mic size={20} />
+                          {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
                         </button>
 
                         <button
                           type="button"
-                          className="rounded-full border border-white/10 bg-white/5 p-3 text-white transition hover:bg-white/10"
-                          title="Камера"
+                          className={`rounded-full border p-3 transition ${
+                            isCameraEnabled && !isScreenSharing
+                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-white hover:bg-surface-subtle"
+                              : "border-red-400/20 bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                          }`}
+                          title={isScreenSharing ? "Камера недоступна" : isCameraEnabled ? "Выключить камеру" : "Включить камеру"}
+                          onClick={toggleCamera}
+                          disabled={isScreenSharing}
                         >
-                          <Video size={20} />
+                          {isCameraEnabled && !isScreenSharing ? <Video size={20} /> : <VideoOff size={20} />}
                         </button>
 
                         <button
                           type="button"
-                          className="rounded-full border border-white/10 bg-white/5 p-3 text-white transition hover:bg-white/10"
-                          title="Поделиться"
+                          className={`rounded-full border p-3 transition ${
+                            isScreenSharing
+                              ? "border-sky-400/20 bg-sky-500/10 text-sky-700 hover:bg-sky-500/20"
+                              : "border-[color:var(--border)] bg-surface-subtle/50 text-white hover:bg-surface-subtle"
+                          }`}
+                          title={isScreenSharing ? "Остановить демонстрацию" : "Демонстрация экрана"}
+                          onClick={toggleScreenShare}
                         >
-                          <Share2 size={20} />
+                          <MonitorUp size={20} />
                         </button>
 
                         <button
                           type="button"
-                          className="rounded-full border border-white/10 bg-white/5 p-3 text-white/70 transition hover:bg-white/10"
+                          className="rounded-full border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-muted transition hover:bg-surface-subtle"
                           title="Настройки"
                         >
                           <Settings size={20} />
@@ -806,8 +884,8 @@ export default function StudentJoinSessionPage() {
                     </div>
                   </div>
 
-                  <aside className="flex min-h-0 flex-col border-l border-white/10 bg-[linear-gradient(180deg,#0a0f1d_0%,#0a0e19_100%)]">
-                    <div className="border-b border-white/10 px-5 py-4">
+                  <aside className="flex min-h-0 flex-col border-l border-[color:var(--border)] bg-surface-subtle">
+                    <div className="border-b border-[color:var(--border)] px-5 py-4">
                       <div className="text-sm font-semibold text-white">Session info</div>
 
                       <div className="mt-4 grid grid-cols-2 gap-3">
@@ -826,31 +904,31 @@ export default function StudentJoinSessionPage() {
                       </div>
                     </div>
 
-                    <div className="border-b border-white/10 px-5 py-4">
+                    <div className="border-b border-[color:var(--border)] px-5 py-4">
                       <div className="text-sm font-semibold text-white">Privacy & status</div>
 
                       <div className="mt-4 space-y-3">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
                           Consent:{" "}
-                          <span className={state.consent ? "text-emerald-300" : "text-amber-300"}>
+                          <span className={state.consent ? "text-emerald-700" : "text-amber-700"}>
                             {state.consent ? "дано" : "не дано"}
                           </span>
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
                           ML service:{" "}
-                          <span className={mlApiAvailable ? "text-emerald-300" : "text-amber-300"}>
+                          <span className={mlApiAvailable ? "text-emerald-700" : "text-amber-700"}>
                             {mlApiAvailable ? "доступен" : "недоступен"}
                           </span>
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-white/75">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
                           WS:{" "}
                           <span
                             className={
                               getWsBaseUrl()?.startsWith("ws")
-                                ? "text-emerald-300"
-                                : "text-amber-300"
+                                ? "text-emerald-700"
+                                : "text-amber-700"
                             }
                           >
                             {getWsBaseUrl()?.startsWith("ws") ? "настроен" : "не настроен"}
@@ -863,15 +941,15 @@ export default function StudentJoinSessionPage() {
                       <SessionChatPanel sessionId={roomId} role="student" type={sessionType} />
                     </div>
 
-                    <div className="border-t border-white/10 px-5 py-4 text-xs leading-relaxed text-white/50">
+                    <div className="border-t border-[color:var(--border)] px-5 py-4 text-xs leading-relaxed text-muted">
                       Подключение идёт по WebRTC. Raw-video не сохраняется. В backend
                       отправляются только агрегированные метрики при наличии consent.
                     </div>
 
-                    <div className="border-t border-white/10 px-5 py-4">
+                    <div className="border-t border-[color:var(--border)] px-5 py-4">
                       <Link
                         href="/student/summary"
-                        className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white/90 transition hover:bg-white/10"
+                        className="flex items-center gap-2 rounded-xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-2.5 text-sm text-muted transition hover:bg-surface-subtle"
                       >
                         <BarChart3 size={16} />
                         <span>После сессии → отчёт</span>

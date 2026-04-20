@@ -25,14 +25,14 @@ function ToneBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
 
   return (
     <Badge
@@ -59,7 +59,7 @@ function Stat({
   tone?: Tone;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur">
+    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 backdrop-blur">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm text-zinc-400">{label}</p>
@@ -201,7 +201,7 @@ export default function AdminStoragePage() {
                     <span>90d</span>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-300">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-zinc-300">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
                         <p className="font-medium">Policy Preview</p>
@@ -221,7 +221,7 @@ export default function AdminStoragePage() {
                 <div className="space-y-3">
                   <p className="text-sm text-zinc-400">Automation</p>
 
-                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium">Auto Cleanup</p>
                       <p className="text-xs text-zinc-500">Nightly retention sweeps</p>
@@ -234,7 +234,7 @@ export default function AdminStoragePage() {
                     />
                   </label>
 
-                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium">Archive Cold Sessions</p>
                       <p className="text-xs text-zinc-500">Move older items to cold tier</p>
@@ -251,7 +251,7 @@ export default function AdminStoragePage() {
                 <div className="space-y-3">
                   <p className="text-sm text-zinc-400">Privacy Enhancements</p>
 
-                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <div className="space-y-1">
                       <p className="text-sm font-medium">Face Redaction</p>
                       <p className="text-xs text-zinc-500">Store redacted frames only</p>
@@ -264,7 +264,7 @@ export default function AdminStoragePage() {
                     />
                   </label>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-zinc-500">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-xs text-zinc-500">
                     Redaction is UI-only for now. Later it will be enforced in backend storage pipeline.
                   </div>
                 </div>
@@ -281,7 +281,7 @@ export default function AdminStoragePage() {
                 <div className="flex gap-2">
                   <Button
                     type="button"
-                    className="bg-white/10 hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
+                    className="bg-surface-subtle hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
                     onClick={runRetentionSweep}
                   >
                     Run Sweep
@@ -312,7 +312,7 @@ export default function AdminStoragePage() {
                 <p className="text-sm text-zinc-400">Target</p>
                 <Input value={manualTarget} onChange={(e) => setManualTarget(e.target.value)} />
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-zinc-500">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-xs text-zinc-500">
                   Tip: Use “Videos”, “Analytics cache”, “Exports”, or “Temp files”.
                 </div>
               </div>
@@ -327,7 +327,7 @@ export default function AdminStoragePage() {
                 </Button>
                 <Button
                   type="button"
-                  className="bg-white/10 hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
+                  className="bg-surface-subtle hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
                   onClick={() => {
                     setManualTarget("Videos");
                     pushLog("Preset selected", "OK · Videos", "info");
@@ -337,7 +337,7 @@ export default function AdminStoragePage() {
                 </Button>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mt-6 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-zinc-400">Risk level</p>
                   <ToneBadge tone={retentionDays >= 60 ? "warning" : "success"}>
@@ -365,7 +365,7 @@ export default function AdminStoragePage() {
 
               <Button
                 type="button"
-                className="bg-white/10 hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
+                className="bg-surface-subtle hover:bg-white/15 text-zinc-100 ring-1 ring-white/10"
                 onClick={() =>
                   setLog((prev) => [
                     { at: "Now", action: "Log cleared", result: "OK", tone: "info" },
@@ -381,7 +381,7 @@ export default function AdminStoragePage() {
               {log.map((row, idx) => (
                 <div
                   key={`${row.at}-${idx}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 p-4"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4"
                 >
                   <div className="min-w-[220px] space-y-1">
                     <p className="text-sm font-medium text-zinc-200">{row.action}</p>
@@ -396,7 +396,7 @@ export default function AdminStoragePage() {
               ))}
 
               {log.length === 0 ? (
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-8 text-center">
                   <p className="text-sm text-zinc-300">No log entries.</p>
                   <p className="mt-1 text-xs text-zinc-500">
                     Run a sweep or manual cleanup to generate activity.

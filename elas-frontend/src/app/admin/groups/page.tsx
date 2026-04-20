@@ -33,14 +33,14 @@ function ToneBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
 
   return (
     <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur", toneClass, className)}>
@@ -103,17 +103,17 @@ export default function AdminGroupsPage() {
               </div>
               <Button
                 type="button"
-                className="ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100"
+                className="ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100"
                 onClick={() => setQ("")}
               >
                 Сбросить
               </Button>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+            <div className="mt-6 overflow-hidden rounded-2xl border border-[color:var(--border)]">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-white/5 text-zinc-400">
+                  <thead className="bg-surface-subtle/50 text-zinc-400">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">Группа</th>
                       <th className="px-4 py-3 text-left font-medium">Программа</th>
@@ -125,7 +125,7 @@ export default function AdminGroupsPage() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {filtered.map((g) => (
-                      <tr key={g.id} className="bg-black/10 hover:bg-white/5 transition">
+                      <tr key={g.id} className="bg-black/10 hover:bg-surface-subtle/50 transition">
                         <td className="px-4 py-3">
                           <div className="space-y-0.5">
                             <p className="font-medium text-zinc-200">{g.name}</p>
@@ -141,7 +141,7 @@ export default function AdminGroupsPage() {
                         <td className="px-4 py-3">
                           <Link
                             href={`/admin/group/${g.id}`}
-                            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100 transition"
+                            className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100 transition"
                           >
                             Открыть
                           </Link>

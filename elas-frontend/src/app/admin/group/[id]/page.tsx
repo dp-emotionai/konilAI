@@ -29,7 +29,7 @@ export default function AdminGroupDetailPage() {
             </p>
             <Link
               href="/teacher/groups"
-              className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100 transition"
+              className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100 transition"
             >
               Перейти к группам преподавателя
             </Link>

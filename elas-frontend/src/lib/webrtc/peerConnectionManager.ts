@@ -174,8 +174,8 @@ export class PeerConnectionManager {
     return this.participants;
   }
 
-  join() {
-    this.signaling.join(this.sessionId, this.role);
+  join(user?: { email?: string; name?: string }) {
+    this.signaling.join(this.sessionId, this.role, user);
   }
 
   leave() {

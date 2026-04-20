@@ -183,8 +183,26 @@ function VideoTile({
   metrics?: LiveMetricsParticipant | null;
   compact?: boolean;
   aspect?: boolean;
+  objectFit?: "cover" | "contain";
 }) {
   const engagement = metrics?.engagement ?? null;
+  const internalRef = useRef<HTMLVideoElement | null>(null);
+
+  const setRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      internalRef.current = el;
+      if (typeof videoRef === "function") videoRef(el);
+      else if (videoRef) (videoRef as any).current = el;
+    },
+    [videoRef]
+  );
+
+  useEffect(() => {
+    if (internalRef.current && stream) {
+      internalRef.current.srcObject = stream;
+      internalRef.current.play().catch(() => {});
+    }
+  }, [stream]);
   const tone =
     typeof engagement === "number"
       ? clamp01(engagement) >= 0.7
@@ -211,8 +229,8 @@ function VideoTile({
       }
     >
       <video
-        ref={videoRef}
-        className="h-full w-full object-cover"
+        ref={setRef}
+        className={`h-full w-full object-${objectFit}`}
         playsInline
         muted={isLocal}
         autoPlay
@@ -301,6 +319,21 @@ export default function TeacherLiveMonitorPage() {
   // По умолчанию фокус на преподавателе, чтобы большой экран не был пустым
   const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>("local");
 
+  const [sessionTitle, setSessionTitle] = useState("Сессия");
+  const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
+
+  useEffect(() => {
+    import("@/lib/api/teacher").then(({ getTeacherDashboardSessions }) => {
+      getTeacherDashboardSessions().then((sessions) => {
+        const s = sessions.find((x) => x.id === roomId);
+        if (s) {
+          setSessionTitle(s.title);
+          setSessionType(s.type);
+        }
+      });
+    });
+  }, [roomId]);
+
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
   const [cameraReady, setCameraReady] = useState(false);
@@ -369,7 +402,12 @@ export default function TeacherLiveMonitorPage() {
         }
 
         await signaling.waitForOpen(12000);
-        manager.join();
+        
+        // Broadcast local display name using auth
+        const { getStoredAuth } = await import("@/lib/api/client");
+        const auth = getStoredAuth();
+        manager.join(auth ? { email: auth.email, name: auth.name } : undefined);
+        
         setConnectionState("connected");
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Ошибка подключения";
@@ -544,9 +582,6 @@ export default function TeacherLiveMonitorPage() {
   const criticalOk = gates.backend && gates.ws && gates.camera;
   const liveLabel = phase === "ended" ? "Ended" : isLive ? "Live" : "Preflight";
   const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
-
-  const sessionTitle = "Сессия";
-  const sessionType = "lecture" as "lecture" | "exam";
 
   const stopScreenShare = async () => {
     const manager = peerManagerRef.current;
@@ -905,6 +940,7 @@ export default function TeacherLiveMonitorPage() {
                             isLocal={false}
                             metrics={metricsForPeer(focusedParticipant)}
                             aspect={false}
+                            objectFit="contain"
                             videoRef={(el) => {
                               (remoteVideoMainRefs.current as Record<string, HTMLVideoElement | null>)[focusedParticipant.id] = el;
                             }}
@@ -916,6 +952,7 @@ export default function TeacherLiveMonitorPage() {
                             status={connectionState === "connected" ? "LIVE" : "—"}
                             isLocal
                             aspect={false}
+                            objectFit="contain"
                             videoRef={localVideoMainRef}
                           />
                         )}

@@ -26,14 +26,14 @@ function StatBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
 
   return (
     <Badge
@@ -276,7 +276,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-[color:var(--border)] dark:border-white/10 flex flex-wrap gap-2">
+            <div className="pt-4 border-t border-[color:var(--border)] dark:border-[color:var(--border)] flex flex-wrap gap-2">
               <Link href="/admin/model">
                 <Button variant="outline" className="rounded-2xl">Модель</Button>
               </Link>
@@ -333,7 +333,7 @@ export default function AdminDashboardPage() {
                           <span className="text-sm font-semibold text-fg">
                             {avg}%
                           </span>
-                          <div className="h-2 w-20 rounded-full bg-surface-subtle dark:bg-white/10 overflow-hidden">
+                          <div className="h-2 w-20 rounded-full bg-surface-subtle dark:bg-surface-subtle overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-[rgb(var(--primary))] to-emerald-500"
                               style={{ width: `${intensity}%` }}
@@ -364,17 +364,17 @@ export default function AdminDashboardPage() {
               </div>
 
             <div className="space-y-4 text-sm text-fg">
-              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-[color:var(--border)] pb-2">
                 <span>Зарегистрирован новый преподаватель</span>
                 <span className="text-muted">2 мин назад</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-[color:var(--border)] pb-2">
                 <span>Создана сессия «Экзамен по ИИ»</span>
                 <span className="text-muted">15 мин назад</span>
               </div>
 
-              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-white/10 pb-2">
+              <div className="flex items-center justify-between border-b border-[color:var(--border)] dark:border-[color:var(--border)] pb-2">
                 <span>Выполнена очистка хранилища</span>
                 <span className="text-muted">1 ч назад</span>
               </div>

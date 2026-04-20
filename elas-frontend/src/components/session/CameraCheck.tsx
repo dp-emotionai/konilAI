@@ -297,18 +297,18 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
 
                 {running && (
                   <>
-                    <div className="absolute left-4 top-4 rounded-xl border border-[color:var(--border)]/10 bg-black/45 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/80 backdrop-blur">
+                    <div className="absolute left-4 top-4 rounded-xl border border-[color:var(--border)]/10 bg-surface-subtle/80 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-muted backdrop-blur">
                       Live preview
                     </div>
 
                     <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-                      <Badge className="border border-white/10 bg-black/45 text-white/80">
+                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
                         camera on
                       </Badge>
-                      <Badge className="border border-white/10 bg-black/45 text-white/80">
+                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
                         {fps} fps
                       </Badge>
-                      <Badge className="border border-white/10 bg-black/45 text-white/80">
+                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
                         {previewReady ? "preview ready" : "loading preview"}
                       </Badge>
                     </div>
@@ -374,7 +374,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
               </div>
 
               {errorText && (
-                <div className="rounded-[20px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-[20px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
                   {errorText}
                 </div>
               )}

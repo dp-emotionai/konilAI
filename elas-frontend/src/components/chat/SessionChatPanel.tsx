@@ -29,6 +29,13 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   const [loading, setLoading] = useState(false);
   const [policy, setPolicy] = useState<SessionChatPolicy | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [auth, setAuth] = useState<{ email?: string; name?: string; role?: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    setAuth(getStoredAuth());
+  }, []);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const realSession = isRealSessionId(sessionId);
@@ -144,13 +151,13 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
         : "Вопросы по теме, быстрые реплики и реакции.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.03] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
       {/* header */}
-      <div className="shrink-0 border-b border-white/10 px-4 py-3">
+      <div className="shrink-0 border-b border-[color:var(--border)] px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/80">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
                 {channel === "help" ? <LifeBuoy size={15} /> : <MessageCircle size={15} />}
               </div>
               <div className="min-w-0">
@@ -164,12 +171,12 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
 
           <div className="flex shrink-0 items-center gap-2">
             {chatLocked && (
-              <Badge className="border border-amber-400/20 bg-amber-500/15 text-amber-300">
+              <Badge className="border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700">
                 <Lock size={12} className="mr-1" />
                 Locked
               </Badge>
             )}
-            <Badge className="border border-white/10 bg-white/5 text-white/65">
+            <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
               {channel === "help" ? "Help" : "Public"}
             </Badge>
           </div>
@@ -180,28 +187,27 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
       <div className="min-h-0 max-h-[40vh] flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-2.5">
         {!realSession && (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-4 text-xs text-white/45">
+          <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-black/20 px-4 py-4 text-xs text-muted">
             Чат доступен для сессий, созданных в системе. Откройте сессию с реальным ID.
           </div>
         )}
 
         {realSession && loading && (
           <div className="space-y-2.5">
-            <div className="h-14 animate-pulse rounded-2xl bg-white/5" />
-            <div className="ml-auto h-14 w-[82%] animate-pulse rounded-2xl bg-white/[0.04]" />
-            <div className="h-14 w-[88%] animate-pulse rounded-2xl bg-white/5" />
+            <div className="h-14 animate-pulse rounded-2xl bg-surface-subtle" />
+            <div className="ml-auto h-14 w-[82%] animate-pulse rounded-2xl bg-surface-subtle" />
+            <div className="h-14 w-[88%] animate-pulse rounded-2xl bg-surface-subtle" />
           </div>
         )}
 
         {realSession && !loading && orderedMessages.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-5 text-center text-xs text-white/45">
+          <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-black/20 px-4 py-5 text-center text-xs text-muted">
             Пока нет сообщений. Начните обсуждение.
           </div>
         )}
 
         {!loading &&
           orderedMessages.map((m) => {
-            const auth = getStoredAuth();
             const isYou = auth?.email && m.senderEmail === auth.email;
             const displayName = isYou
               ? "Вы"
@@ -218,7 +224,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
               >
                 {!isYou && (
                   <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 text-[11px] font-medium text-zinc-200"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--border)] bg-surface-subtle text-[11px] font-medium text-zinc-200"
                     title={m.senderEmail ?? undefined}
                   >
                     {initial}
@@ -228,8 +234,8 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
                 <div
                   className={`max-w-[86%] rounded-2xl px-3.5 py-3 ${
                     isYou
-                      ? "border border-violet-400/20 bg-violet-500/15 text-white"
-                      : "border border-white/10 bg-white/5 text-zinc-100"
+                      ? "border border-violet-400/20 bg-violet-500/10 text-violet-700 text-white"
+                      : "border border-[color:var(--border)] bg-surface-subtle/50 text-zinc-100"
                   }`}
                 >
                   <div className="flex flex-wrap items-center gap-2">
@@ -241,7 +247,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
                       {displayName}
                     </span>
                     <span className="text-[10px] text-white/38">
-                      {new Date(m.createdAt).toLocaleTimeString()}
+                      {mounted ? new Date(m.createdAt).toLocaleTimeString() : ""}
                     </span>
                   </div>
                   <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
@@ -265,13 +271,13 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
       </div>
 
       {/* composer */}
-      <div className="shrink-0 border-t border-white/10 bg-black/10 px-4 py-3">
+      <div className="shrink-0 border-t border-[color:var(--border)] bg-black/10 px-4 py-3">
         {sendError && <p className="mb-2 text-xs text-red-400">{sendError}</p>}
 
         <div className="space-y-3">
           <textarea
             rows={2}
-            className="w-full resize-none rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-400/35"
+            className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-400/35"
             placeholder={placeholder}
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -294,7 +300,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
                   key={emoji}
                   type="button"
                   onClick={() => setInput((v) => (v ? `${v} ${emoji}` : emoji))}
-                  className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-sm text-white/75 transition hover:bg-white/10"
+                  className="rounded-full border border-[color:var(--border)] bg-surface-subtle/50 px-2.5 py-1 text-sm text-muted transition hover:bg-surface-subtle"
                 >
                   {emoji}
                 </button>

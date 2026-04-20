@@ -19,14 +19,14 @@ type Tone = "neutral" | "success" | "info" | "warning" | "purple";
 function ToneBadge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: Tone }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
   return (
     <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium backdrop-blur", toneClass)}>
       {children}
@@ -135,7 +135,7 @@ export default function StudentGroupDetailPage() {
         <PageHero title="Загрузка…" subtitle="Группа загружается." />
         <Section>
           <Card className="p-7">
-            <div className="h-24 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />
+            <div className="h-24 rounded-2xl bg-slate-100 dark:bg-surface-subtle/50 animate-pulse" />
           </Card>
         </Section>
       </div>
@@ -152,7 +152,7 @@ export default function StudentGroupDetailPage() {
         <PageHero title="Группа не найдена" subtitle="У вас нет доступа к этой группе или она не существует." />
         <Section>
           <Card className="p-7">
-            <Link href="/student/groups" className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100 transition">К списку групп</Link>
+            <Link href="/student/groups" className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-sm ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100 transition">К списку групп</Link>
           </Card>
         </Section>
       </div>
@@ -174,11 +174,11 @@ export default function StudentGroupDetailPage() {
         <div className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] items-start">
           <Card className="p-6 md:p-7 space-y-3">
             <div className="flex flex-col gap-2">
-              <div className="text-sm text-slate-500 dark:text-white/60">Группа</div>
+              <div className="text-sm text-slate-500 dark:text-muted">Группа</div>
               <div className="text-lg font-semibold text-slate-900 dark:text-white">
                 {group.name}
               </div>
-              <div className="text-sm text-slate-500 dark:text-white/60">
+              <div className="text-sm text-slate-500 dark:text-muted">
                 Преподаватель:{" "}
                 <span className="text-slate-900 dark:text-zinc-100">
                   {group.teacher.name}
@@ -204,7 +204,7 @@ export default function StudentGroupDetailPage() {
                 ) : (
                   <Link
                     href="/consent"
-                    className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-xs ring-1 ring-amber-400/25 bg-amber-500/15 hover:bg-amber-500/20 text-amber-100 transition"
+                    className="inline-flex items-center justify-center rounded-2xl px-4 py-2 text-xs ring-1 ring-amber-400/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 text-amber-100 transition"
                   >
                     Дать согласие для входа
                   </Link>
@@ -214,7 +214,7 @@ export default function StudentGroupDetailPage() {
           </Card>
 
           <div className="flex flex-col">
-            <div className="flex flex-wrap gap-2 border-b border-slate-200/70 pb-3 mb-4 dark:border-white/10">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200/70 pb-3 mb-4 dark:border-[color:var(--border)]">
           {(["sessions", "members"] as const).map((tab) => (
             <button
               key={tab}
@@ -224,7 +224,7 @@ export default function StudentGroupDetailPage() {
                 "rounded-2xl px-4 py-2 text-sm font-medium transition",
                 activeTab === tab
                   ? "bg-purple-500/15 ring-1 ring-purple-400/20 text-purple-700 dark:text-purple-100"
-                  : "ring-1 ring-slate-200/80 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:ring-white/10 dark:bg-white/5 dark:hover:bg-white/10 dark:text-zinc-300"
+                  : "ring-1 ring-slate-200/80 bg-slate-50 hover:bg-slate-100 text-slate-600 dark:ring-white/10 dark:bg-surface-subtle/50 dark:hover:bg-surface-subtle dark:text-zinc-300"
               )}
             >
               {tab === "sessions" ? "Сессии" : "Участники"}
@@ -247,10 +247,10 @@ export default function StudentGroupDetailPage() {
                   <ToneBadge tone="info">{sessions.length} сессий</ToneBadge>
                 </div>
 
-                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/70 dark:border-white/10">
+                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/70 dark:border-[color:var(--border)]">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px] text-sm">
-                  <thead className="bg-slate-50 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+                  <thead className="bg-slate-50 text-slate-500 dark:bg-surface-subtle/50 dark:text-zinc-400">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">Название</th>
                       <th className="px-4 py-3 text-left font-medium">Тип</th>
@@ -264,7 +264,7 @@ export default function StudentGroupDetailPage() {
                       const canJoin = s.status === "live" && consent;
 
                       return (
-                        <tr key={s.id} className="bg-white hover:bg-slate-50 transition dark:bg-black/10 dark:hover:bg-white/5">
+                        <tr key={s.id} className="bg-white hover:bg-slate-50 transition dark:bg-black/10 dark:hover:bg-surface-subtle">
                           <td className="px-4 py-3">
                             <div className="space-y-0.5">
                               <p className="font-medium text-slate-900 dark:text-zinc-200">{s.title}</p>
@@ -288,7 +288,7 @@ export default function StudentGroupDetailPage() {
                             ) : s.status !== "live" ? (
                                 <span className="text-xs text-slate-400 dark:text-zinc-500">Не в эфире</span>
                             ) : (
-                              <Link href="/consent" className="text-xs text-amber-200 hover:underline">Нужно согласие</Link>
+                              <Link href="/consent" className="text-xs text-amber-700 hover:underline">Нужно согласие</Link>
                             )}
                           </td>
                         </tr>
@@ -314,9 +314,9 @@ export default function StudentGroupDetailPage() {
               <>
                 <h2 className="text-xl font-semibold text-[color:var(--text)]">Участники</h2>
                 <p className="mt-1 text-sm text-[color:var(--muted)]">Список участников группы (только просмотр).</p>
-                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/70 dark:border-white/10">
+                <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200/70 dark:border-[color:var(--border)]">
                   <table className="w-full min-w-[400px] text-sm">
-                    <thead className="bg-slate-50 text-slate-500 dark:bg-white/5 dark:text-zinc-400">
+                    <thead className="bg-slate-50 text-slate-500 dark:bg-surface-subtle/50 dark:text-zinc-400">
                       <tr>
                         <th className="px-4 py-3 text-left font-medium">Имя</th>
                         <th className="px-4 py-3 text-left font-medium">Email</th>

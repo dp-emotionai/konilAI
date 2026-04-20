@@ -27,14 +27,14 @@ function ToneBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "warning"
-      ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+      ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
 
   return (
     <Badge
@@ -152,7 +152,7 @@ export default function AdminAuditPage() {
                   <Button
                     type="button"
                     className={cn(
-                      "ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100",
+                      "ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100",
                       status === "all" && "bg-purple-500/20 ring-purple-400/25"
                     )}
                     onClick={() => setStatus("all")}
@@ -162,7 +162,7 @@ export default function AdminAuditPage() {
                   <Button
                     type="button"
                     className={cn(
-                      "ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100",
+                      "ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100",
                       status === "ok" && "bg-emerald-500/20 ring-emerald-400/25"
                     )}
                     onClick={() => setStatus("ok")}
@@ -172,7 +172,7 @@ export default function AdminAuditPage() {
                   <Button
                     type="button"
                     className={cn(
-                      "ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100",
+                      "ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100",
                       status === "warn" && "bg-amber-500/20 ring-amber-400/25"
                     )}
                     onClick={() => setStatus("warn")}
@@ -182,7 +182,7 @@ export default function AdminAuditPage() {
                   <Button
                     type="button"
                     className={cn(
-                      "ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100",
+                      "ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100",
                       status === "fail" && "bg-rose-500/20 ring-rose-400/25"
                     )}
                     onClick={() => setStatus("fail")}
@@ -192,10 +192,10 @@ export default function AdminAuditPage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+              <div className="mt-6 overflow-hidden rounded-2xl border border-[color:var(--border)]">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[720px] text-sm">
-                    <thead className="bg-white/5 text-zinc-400">
+                    <thead className="bg-surface-subtle/50 text-zinc-400">
                       <tr>
                         <th className="px-4 py-3 text-left font-medium">Time</th>
                         <th className="px-4 py-3 text-left font-medium">Actor</th>
@@ -208,7 +208,7 @@ export default function AdminAuditPage() {
                       {filtered.map((r) => (
                         <tr
                           key={r.id}
-                          className="cursor-pointer bg-black/10 hover:bg-white/5 transition"
+                          className="cursor-pointer bg-black/10 hover:bg-surface-subtle/50 transition"
                           onClick={() => setSelected(r)}
                         >
                           <td className="px-4 py-3 text-zinc-300">
@@ -257,7 +257,7 @@ export default function AdminAuditPage() {
                 <div className="flex gap-2">
                   <Button
                     type="button"
-                    className="ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100"
+                    className="ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100"
                     onClick={() => {
                       setQuery("");
                       setStatus("all");
@@ -293,7 +293,7 @@ export default function AdminAuditPage() {
               </div>
 
               {!selected ? (
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                <div className="mt-6 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-6 text-center">
                   <p className="text-sm text-zinc-300">No event selected.</p>
                   <p className="mt-1 text-xs text-zinc-500">
                     Click a row on the left to view details here.
@@ -301,7 +301,7 @@ export default function AdminAuditPage() {
                 </div>
               ) : (
                 <div className="mt-6 space-y-4">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="space-y-0.5">
                         <p className="text-sm font-medium text-zinc-200">{selected.action}</p>
@@ -316,7 +316,7 @@ export default function AdminAuditPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <p className="text-sm text-zinc-400">Actor</p>
                     <p className="mt-1 text-sm text-zinc-200">{selected.actor}</p>
 
@@ -324,7 +324,7 @@ export default function AdminAuditPage() {
                     <p className="mt-1 text-sm text-zinc-200">{selected.resource}</p>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                     <p className="text-sm text-zinc-400">Metadata</p>
                     <div className="mt-3 space-y-2 text-sm">
                       {Object.entries(selected.meta).map(([k, v]) => (
@@ -339,7 +339,7 @@ export default function AdminAuditPage() {
                   <div className="flex gap-2">
                     <Button
                       type="button"
-                      className="ring-1 ring-white/10 bg-white/10 hover:bg-white/15 text-zinc-100"
+                      className="ring-1 ring-white/10 bg-surface-subtle hover:bg-white/15 text-zinc-100"
                       onClick={() => setSelected(null)}
                     >
                       Clear

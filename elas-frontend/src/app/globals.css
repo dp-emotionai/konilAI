@@ -21,21 +21,19 @@
   --muted: #64748B; /* slate-500 */
   --muted-2: #94A3B8; /* slate-400 */
 
-  /* Primary Accent — Calm Teal */
-  /* Teal-600 */
-  --primary: 13 148 136;
-  /* Teal-700 */
-  --primary-hover: 15 118 110;
-  --primary-muted: rgba(13, 148, 136, 0.1);
-  --primary-glow: rgba(13, 148, 136, 0.2);
+  /* Primary Accent — Soft Purple/Indigo (approved design) */
+  --primary: 116 72 255; /* #7448FF */
+  --primary-hover: 100 50 240; /* darker shade for hover */
+  --primary-muted: rgba(116, 72, 255, 0.1);
+  --primary-glow: rgba(116, 72, 255, 0.15);
 
   --ring: rgb(var(--primary));
 
-  /* Radii — refined, not overly round or sharp */
-  --radius: 8px;
-  --radius-sm: 6px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* Radii — refined, strictly matching the approved pill/card aesthetic */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-pill: 9999px;
 
   /* Spacing rhythm — 8px scale */
@@ -74,47 +72,45 @@
   --error: 220 38 38; /* red-600 */
   --danger: 220 38 38;
 
-  /* Shadows — soft and clean, not glowing */
-  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
-  --shadow-elevated: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
-  --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.1), 0 4px 14px rgba(13, 148, 136, 0.15);
+  /* Shadows — ultra soft and diffused as per reference image */
+  --shadow-soft: 0 2px 8px rgba(20, 20, 40, 0.03);
+  --shadow-card: 0 6px 20px rgba(20, 20, 40, 0.04), 0 2px 4px rgba(20, 20, 40, 0.02);
+  --shadow-elevated: 0 12px 30px rgba(20, 20, 40, 0.06), 0 4px 6px -4px rgba(20, 20, 40, 0.03);
+  --shadow-glow: 0 0 0 1px rgba(116, 72, 255, 0.05), 0 4px 14px rgba(116, 72, 255, 0.15);
 
   /* Transitions */
   --ease-default: 0.2s ease;
 }
 
-/* Dark mode — a soft, neutral dark grey, NO dark navy NO heavy purple glows */
-:root.dark {
-  --bg: #111827; /* gray-900 */
-  --surface: #1F2937; /* gray-800 */
-  --surface-subtle: #374151; /* gray-700 */
-  --surface-soft: #4B5563; /* gray-600 */
-  --surface-hover: rgba(255, 255, 255, 0.05);
+  /* Dark mode strictly disabled in the approved design system.
+     We map all dark variables back to light variables to prevent half-states,
+     although strictly no elements should use `.dark` anywhere anymore. */
+  --bg: #FAFAFB;
+  --surface: #FFFFFF;
+  --surface-subtle: #F4F5F7;
+  --surface-soft: #EDEDF1;
+  --surface-hover: rgba(15, 23, 42, 0.04);
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --text: #1E293B;
+  --muted: #64748B;
+  --muted-2: #94A3B8;
 
-  --border: rgba(255, 255, 255, 0.1);
-  --border-strong: rgba(255, 255, 255, 0.15);
-
-  --text: #F8FAFC; /* slate-50 */
-  --muted: #94A3B8; /* slate-400 */
-  --muted-2: #64748B; /* slate-500 */
-
-  /* Teal accent in dark mode should pop slightly more but remain calm */
-  --primary: 20 184 166; /* teal-500 */
-  --primary-hover: 45 212 191; /* teal-400 */
-  --primary-muted: rgba(20, 184, 166, 0.15);
-  --primary-glow: rgba(20, 184, 166, 0.2);
+  --primary: 116 72 255;
+  --primary-hover: 100 50 240;
+  --primary-muted: rgba(116, 72, 255, 0.1);
+  --primary-glow: rgba(116, 72, 255, 0.15);
   --ring: rgb(var(--primary));
 
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 0 1px rgba(45, 212, 191, 0.2), 0 0 14px rgba(45, 212, 191, 0.15);
+  --shadow-soft: 0 2px 8px rgba(20, 20, 40, 0.03);
+  --shadow-card: 0 6px 20px rgba(20, 20, 40, 0.04);
+  --shadow-elevated: 0 12px 30px rgba(20, 20, 40, 0.06);
+  --shadow-glow: 0 0 0 1px rgba(116, 72, 255, 0.05), 0 4px 14px rgba(116, 72, 255, 0.15);
 
-  --success: 52 211 153; /* emerald-400 */
-  --warning: 251 191 36; /* amber-400 */
-  --error: 248 113 113; /* red-400 */
-  --danger: 248 113 113;
+  --success: 16 185 129;
+  --warning: 245 158 11;
+  --error: 220 38 38;
+  --danger: 220 38 38;
 }
 
 html,
@@ -147,7 +143,7 @@ body {
 }
 
 ::selection {
-  background: rgba(13, 148, 136, 0.2);
+  background: rgba(116, 72, 255, 0.2);
 }
 
 /* Typography — visual hierarchy */

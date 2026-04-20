@@ -135,22 +135,22 @@ export default function TeacherCreateSessionPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Reveal className="lg:col-span-2">
           <Card className="p-6 md:p-7">
-            <div className="text-sm text-white/60">Параметры сессии</div>
+            <div className="text-sm text-muted">Параметры сессии</div>
             <div className="mt-2 text-lg font-semibold">Основное</div>
 
             {!apiAvailable && (
-              <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
+              <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-700">
                 Для создания сессий нужен запущенный backend и вход в аккаунт преподавателя.
               </div>
             )}
 
             {apiAvailable && groupsLoading && (
-              <div className="mt-4 h-10 animate-pulse rounded-2xl bg-white/5" />
+              <div className="mt-4 h-10 animate-pulse rounded-2xl bg-surface-subtle" />
             )}
 
             {apiAvailable && !groupsLoading && groups.length === 0 && (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
-                <p className="text-sm text-white/70">Сначала создайте группу.</p>
+              <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-black/25 p-4">
+                <p className="text-sm text-muted">Сначала создайте группу.</p>
                 <Link
                   href="/teacher/groups"
                   className="mt-2 inline-block text-sm font-medium text-purple-300 hover:text-purple-200"
@@ -164,13 +164,13 @@ export default function TeacherCreateSessionPage() {
               <>
                 <div className="mt-5 grid gap-3 md:grid-cols-2">
                   <div>
-                    <label className="mb-2 block text-sm text-white/60">Тип</label>
+                    <label className="mb-2 block text-sm text-muted">Тип</label>
                     <select
                       value={type}
                       onChange={(e) =>
                         setType(e.target.value as "lecture" | "exam")
                       }
-                      className="h-11 w-full rounded-2xl border border-white/10 bg-black/30 px-4 text-white/80 outline-none focus:ring-2 focus:ring-purple-500/40"
+                      className="h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-4 text-muted outline-none focus:ring-2 focus:ring-purple-500/40"
                     >
                       <option value="lecture">Лекция</option>
                       <option value="exam">Экзамен</option>
@@ -178,11 +178,11 @@ export default function TeacherCreateSessionPage() {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm text-white/60">Группа</label>
+                    <label className="mb-2 block text-sm text-muted">Группа</label>
                     <select
                       value={groupId}
                       onChange={(e) => setGroupId(e.target.value)}
-                      className="h-11 w-full rounded-2xl border border-white/10 bg-black/30 px-4 text-white/80 outline-none focus:ring-2 focus:ring-purple-500/40"
+                      className="h-11 w-full rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-4 text-muted outline-none focus:ring-2 focus:ring-purple-500/40"
                     >
                       {groups.map((g) => (
                         <option key={g.id} value={g.id}>
@@ -193,7 +193,7 @@ export default function TeacherCreateSessionPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="mb-2 block text-sm text-white/60">
+                    <label className="mb-2 block text-sm text-muted">
                       Название
                     </label>
                     <Input
@@ -219,7 +219,7 @@ export default function TeacherCreateSessionPage() {
             )}
 
             {!apiAvailable && (
-              <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/60">
+              <div className="mt-5 rounded-2xl border border-[color:var(--border)] bg-black/25 p-4 text-sm text-muted">
                 В демо-режиме создание сессий недоступно. Запустите backend и войдите
                 в аккаунт преподавателя.
               </div>
@@ -229,20 +229,20 @@ export default function TeacherCreateSessionPage() {
 
         <Reveal>
           <Card className="p-6 md:p-7">
-            <div className="text-sm text-white/60">Поделиться</div>
+            <div className="text-sm text-muted">Поделиться</div>
             <div className="mt-2 text-lg font-semibold">
               Код и ссылка для студентов
             </div>
 
             {!created ? (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/60">
+              <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-black/25 p-4 text-sm text-muted">
                 Создайте сессию — здесь появятся код и ссылка. Студенты увидят
                 сессию в своём списке и смогут войти по ссылке или по коду.
               </div>
             ) : (
               <div className="mt-4 space-y-3">
-                <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                  <div className="text-sm text-white/60">Код сессии</div>
+                <div className="rounded-2xl border border-[color:var(--border)] bg-black/25 p-4">
+                  <div className="text-sm text-muted">Код сессии</div>
                   <div className="mt-2 text-2xl font-semibold tracking-widest">
                     {created.code}
                   </div>
@@ -256,9 +256,9 @@ export default function TeacherCreateSessionPage() {
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                  <div className="text-sm text-white/60">Ссылка для входа</div>
-                  <div className="mt-2 break-all text-sm text-white/80">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-black/25 p-4">
+                  <div className="text-sm text-muted">Ссылка для входа</div>
+                  <div className="mt-2 break-all text-sm text-muted">
                     {joinLink}
                   </div>
                   <Button
@@ -271,9 +271,9 @@ export default function TeacherCreateSessionPage() {
                   </Button>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/15 to-transparent p-4">
-                  <div className="text-sm text-white/60">Запустить сессию</div>
-                  <p className="mt-2 text-sm text-white/70">
+                <div className="rounded-2xl border border-[color:var(--border)] bg-gradient-to-br from-purple-500/15 to-transparent p-4">
+                  <div className="text-sm text-muted">Запустить сессию</div>
+                  <p className="mt-2 text-sm text-muted">
                     Откройте сессию и нажмите «Старт» — тогда студенты смогут нажать
                     «Подключиться».
                   </p>

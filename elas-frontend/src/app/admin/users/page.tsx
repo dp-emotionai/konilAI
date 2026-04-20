@@ -216,16 +216,16 @@ export default function AdminUsersPage() {
 
                     <TCell>
                       {u.status === "blocked" && (
-                        <span className="text-red-300">Заблокирован</span>
+                        <span className="text-red-700">Заблокирован</span>
                       )}
                       {u.status === "approved" && (
-                        <span className="text-emerald-300">Подтверждён</span>
+                        <span className="text-emerald-700">Подтверждён</span>
                       )}
                       {u.status === "pending" && (
                         <span className="text-yellow-300">Ожидает одобрения</span>
                       )}
                       {u.status === "limited" && (
-                        <span className="text-sky-300">Ограничен</span>
+                        <span className="text-sky-700">Ограничен</span>
                       )}
                     </TCell>
 

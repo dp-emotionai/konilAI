@@ -22,7 +22,7 @@ export default function RoleSwitcher() {
       <select
         value={state.role ?? "student"}
         onChange={(e) => setRole(e.target.value as Role)}
-        className="h-9 rounded-xl border border-white/10 bg-black/30 px-3 text-sm text-white/80 outline-none"
+        className="h-9 rounded-xl border border-[color:var(--border)] bg-surface-subtle/80 px-3 text-sm text-muted outline-none"
       >
         <option value="student">Student</option>
         <option value="teacher">Teacher</option>

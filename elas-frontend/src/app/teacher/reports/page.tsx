@@ -61,10 +61,10 @@ function TabButton({
 function StatusBadge({ status }: { status: string }) {
   const cls =
     status === "active"
-      ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : status === "finished"
         ? "bg-surface-subtle text-muted ring-1 ring-[color:var(--border)]/25"
-        : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-400/20";
+        : "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20";
 
   const label =
     status === "active" ? "live" : status === "finished" ? "finished" : "draft";

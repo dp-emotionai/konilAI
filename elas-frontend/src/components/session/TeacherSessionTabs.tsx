@@ -46,7 +46,7 @@ export function TeacherSessionTabs({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="inline-flex items-center gap-1 rounded-2xl bg-slate-100 px-1 py-1 dark:bg-white/5">
+      <div className="inline-flex items-center gap-1 rounded-2xl bg-slate-100 px-1 py-1 dark:bg-surface-subtle">
         {items.map((item) => {
           const active = isActive(item.id, item.href);
 
@@ -58,7 +58,7 @@ export function TeacherSessionTabs({ sessionId }: { sessionId: string }) {
                 "rounded-2xl border px-3 py-1.5 text-xs font-medium transition",
                 active
                   ? "border-slate-900 bg-slate-900 text-white shadow-sm dark:border-white/20 dark:bg-white/20 dark:text-white"
-                  : "border-transparent text-slate-600 hover:bg-white hover:text-slate-900 dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
+                  : "border-transparent text-slate-600 hover:bg-white hover:text-slate-900 dark:text-muted dark:hover:bg-surface-subtle dark:hover:text-white"
               )}
             >
               {item.label}
@@ -67,7 +67,7 @@ export function TeacherSessionTabs({ sessionId }: { sessionId: string }) {
         })}
       </div>
 
-      <span className="text-xs text-slate-500 dark:text-white/45">
+      <span className="text-xs text-slate-500 dark:text-muted">
         Same session • switch between live view, analytics and reports.
       </span>
     </div>

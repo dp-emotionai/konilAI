@@ -2,8 +2,8 @@ import Skeleton from "@/components/ui/Skeleton";
 
 export default function TableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10 bg-black/20">
+    <div className="rounded-3xl border border-[color:var(--border)] bg-surface-subtle/50 overflow-hidden">
+      <div className="px-4 py-3 border-b border-[color:var(--border)] bg-black/20">
         <Skeleton className="h-4 w-56" />
       </div>
       <div className="p-4 space-y-3">

@@ -31,7 +31,7 @@ export default function NotesTimeline() {
       <div className="flex items-end justify-between gap-4">
         <div>
           <div className="text-lg font-semibold">Notes timeline</div>
-          <div className="text-white/60 text-sm mt-1">Add markers during session monitoring.</div>
+          <div className="text-muted text-sm mt-1">Add markers during session monitoring.</div>
         </div>
         <Button size="sm" onClick={add}>Add marker</Button>
       </div>
@@ -43,12 +43,12 @@ export default function NotesTimeline() {
 
       <div className="space-y-3">
         {notes.map((n) => (
-          <div key={n.id} className="rounded-2xl bg-black/30 border border-white/10 p-4">
+          <div key={n.id} className="rounded-2xl bg-surface-subtle/80 border border-[color:var(--border)] p-4">
             <div className="flex items-center justify-between">
               <div className="font-semibold">{n.label}</div>
-              <div className="text-sm text-white/60">{n.time}</div>
+              <div className="text-sm text-muted">{n.time}</div>
             </div>
-            {n.details && <div className="text-white/60 mt-2 text-sm">{n.details}</div>}
+            {n.details && <div className="text-muted mt-2 text-sm">{n.details}</div>}
           </div>
         ))}
       </div>

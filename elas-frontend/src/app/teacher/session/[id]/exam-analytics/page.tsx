@@ -34,14 +34,14 @@ function ToneBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-        ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+        ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
         : tone === "warning"
-          ? "bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/20"
+          ? "bg-amber-500/10 text-amber-700 text-amber-700 ring-1 ring-amber-400/20"
           : tone === "purple"
             ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-            : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+            : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
 
   return (
     <Badge
@@ -59,7 +59,7 @@ function ToneBadge({
 function MiniBar({ pct }: { pct: number }) {
   const width = Math.max(0, Math.min(100, pct));
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-subtle">
       <div
         className="h-full rounded-full bg-purple-400/60"
         style={{ width: `${width}%` }}
@@ -124,16 +124,16 @@ function ParticipantCard({
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
           Engagement: {typeof engagement === "number" ? `${engagement}%` : "—"}
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
           Stress: {typeof stress === "number" ? `${stress}%` : "—"}
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
           Fatigue: {typeof fatigue === "number" ? `${fatigue}%` : "—"}
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
           Risk: {typeof risk === "number" ? `${risk}%` : "—"}
         </div>
       </div>
@@ -331,7 +331,7 @@ export default function ExamAnalyticsPage() {
         <TeacherSessionTabs sessionId={sessionId} />
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex items-center gap-1 rounded-2xl bg-white/5 p-1">
+          <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle/50 p-1">
             {[
               { id: "overview", label: "Overview" },
               { id: "integrity", label: "Integrity insights" },
@@ -346,14 +346,14 @@ export default function ExamAnalyticsPage() {
                   "rounded-2xl px-3 py-1.5 text-xs font-medium transition",
                   tab === t.id
                     ? "bg-white/20 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
-                    : "text-white/60 hover:text-white"
+                    : "text-muted hover:text-white"
                 )}
               >
                 {t.label}
               </button>
             ))}
           </div>
-          <span className="text-xs text-white/45">
+          <span className="text-xs text-muted">
             Реальные KPI, участники и рекомендации по сессии.
           </span>
         </div>
@@ -418,7 +418,7 @@ export default function ExamAnalyticsPage() {
                       </div>
 
                       <div className="mt-6 grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-5">
                           <p className="text-sm font-medium text-zinc-200">Flagged participants</p>
                           <p className="mt-2 text-3xl font-semibold">{flaggedCount}</p>
                           <p className="mt-1 text-xs text-zinc-500">
@@ -426,7 +426,7 @@ export default function ExamAnalyticsPage() {
                           </p>
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-5">
                           <p className="text-sm font-medium text-zinc-200">Top risk participant</p>
                           <p className="mt-2 text-xl font-semibold">
                             {topRiskParticipant?.name ?? "—"}
@@ -438,7 +438,7 @@ export default function ExamAnalyticsPage() {
                           </p>
                         </div>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 md:col-span-2">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-5 md:col-span-2">
                           <p className="text-sm font-medium text-zinc-200">Recommended actions</p>
                           <ul className="mt-3 space-y-2 text-sm text-zinc-300">
                             <li className="flex gap-2">
@@ -485,11 +485,11 @@ export default function ExamAnalyticsPage() {
                       </p>
 
                       {analytics.aiSummary ? (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-relaxed text-zinc-300">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm leading-relaxed text-zinc-300">
                           {analytics.aiSummary}
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-zinc-500">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-zinc-500">
                           AI summary для этой сессии пока отсутствует.
                         </div>
                       )}
@@ -536,7 +536,7 @@ export default function ExamAnalyticsPage() {
                       </div>
 
                       <div className="mt-6 space-y-3">
-                        <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <label className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                           <div className="space-y-1">
                             <p className="text-sm font-medium">Highlight anomalies</p>
                             <p className="text-xs text-zinc-500">
@@ -550,7 +550,7 @@ export default function ExamAnalyticsPage() {
                           />
                         </label>
 
-                        <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
+                        <label className="flex items-center justify-between rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
                           <div className="space-y-1">
                             <p className="text-sm font-medium">Strict scoring</p>
                             <p className="text-xs text-zinc-500">
@@ -563,7 +563,7 @@ export default function ExamAnalyticsPage() {
                           />
                         </label>
 
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-zinc-500">
+                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-xs text-zinc-500">
                           Group: <span className="text-zinc-200">{group}</span>
                         </div>
 
@@ -578,7 +578,7 @@ export default function ExamAnalyticsPage() {
 
                         <Button
                           type="button"
-                          className="w-full bg-white/10 text-zinc-100 ring-1 ring-white/10 hover:bg-white/15"
+                          className="w-full bg-surface-subtle text-zinc-100 ring-1 ring-white/10 hover:bg-white/15"
                           onClick={() => setMinConfidence("60")}
                         >
                           Reset thresholds

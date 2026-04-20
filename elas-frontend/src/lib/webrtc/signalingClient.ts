@@ -140,8 +140,8 @@ export class SignalingClient {
     (this.handlers as Record<string, unknown>)[type] = handler;
   }
 
-  join(sessionId: SessionId, role: Role) {
-    this.send({ type: "join", sessionId, role });
+  join(sessionId: SessionId, role: Role, user?: { email?: string; name?: string }) {
+    this.send({ type: "join", sessionId, role, ...user });
   }
 
   leave() {

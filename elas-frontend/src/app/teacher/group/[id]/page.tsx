@@ -478,7 +478,7 @@ export default function TeacherGroupDetailPage() {
                     />
                     <button
                       type="button"
-                      className="absolute inset-0 flex items-center justify-center gap-1 rounded-3xl bg-black/50 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                      className="absolute inset-0 flex items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
                       title="Сменить фото (скоро)"
                     >
                       <ImagePlus size={14} />
@@ -491,7 +491,7 @@ export default function TeacherGroupDetailPage() {
                     </div>
                     <button
                       type="button"
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-black/40 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
                       title="Добавить фото группы (скоро)"
                     >
                       <ImagePlus size={18} />
@@ -737,7 +737,7 @@ export default function TeacherGroupDetailPage() {
                                     type="button"
                                     className={cn(
                                       action.nextBackendStatus === "active"
-                                        ? "ring-1 ring-amber-400/25 bg-amber-500/15 hover:bg-amber-500/20 text-amber-100"
+                                        ? "ring-1 ring-amber-400/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 text-amber-100"
                                         : action.nextBackendStatus === "finished"
                                           ? "ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg"
                                           : "ring-1 ring-fuchsia-400/25 bg-fuchsia-500/15 hover:bg-fuchsia-500/20 text-fuchsia-100"

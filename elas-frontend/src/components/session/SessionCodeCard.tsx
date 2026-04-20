@@ -21,13 +21,13 @@ export default function SessionCodeCard({ code, link }: { code: string; link: st
   return (
     <Card className="p-6 space-y-4">
       <div>
-        <div className="text-sm text-white/60">Session code</div>
+        <div className="text-sm text-muted">Session code</div>
         <div className="text-2xl font-semibold mt-1 tracking-wider">{code}</div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">
         <div className="space-y-2">
-          <div className="text-sm text-white/60">Join link</div>
+          <div className="text-sm text-muted">Join link</div>
           <Input readOnly value={shortLink} />
         </div>
         <div className="flex items-end gap-2">
@@ -40,7 +40,7 @@ export default function SessionCodeCard({ code, link }: { code: string; link: st
         </div>
       </div>
 
-      <div className="rounded-2xl bg-black/30 border border-white/10 p-4 text-white/60 text-sm">
+      <div className="rounded-2xl bg-surface-subtle/80 border border-[color:var(--border)] p-4 text-muted text-sm">
         QR will be added later (optional). For now use code/link for demo.
       </div>
     </Card>

@@ -25,12 +25,12 @@ function ToneBadge({
 }) {
   const toneClass =
     tone === "success"
-      ? "bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/20"
+      ? "bg-emerald-500/10 text-emerald-700 text-emerald-700 ring-1 ring-emerald-400/20"
       : tone === "info"
-      ? "bg-sky-500/15 text-sky-200 ring-1 ring-sky-400/20"
+      ? "bg-sky-500/10 text-sky-700 text-sky-700 ring-1 ring-sky-400/20"
       : tone === "purple"
       ? "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25"
-      : "bg-white/10 text-zinc-200 ring-1 ring-white/10";
+      : "bg-surface-subtle text-zinc-200 ring-1 ring-white/10";
   return (
     <Badge
       className={cn(
@@ -114,14 +114,14 @@ export default function StudentGroupsPage() {
                 <p className="mt-2 text-xs text-amber-100/80">Обновите страницу или зайдите позже.</p>
               </div>
             ) : loading ? (
-              <div className="mt-6 h-40 rounded-2xl bg-white/5 animate-pulse" />
+              <div className="mt-6 h-40 rounded-2xl bg-surface-subtle/50 animate-pulse" />
             ) : (
               <div className="mt-6 grid gap-4 md:grid-cols-2">
                 {list.map((g) => (
                   <Link
                     key={g.id}
                     href={`/student/group/${g.id}`}
-                    className="rounded-3xl border border-black/5 bg-[color:var(--surface)] p-6 shadow-[0_14px_30px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-elas-soft-light dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
+                    className="rounded-3xl border border-black/5 bg-[color:var(--surface)] p-6 shadow-[0_14px_30px_rgba(15,23,42,0.08)] transition hover:-translate-y-0.5 hover:shadow-elas-soft-light dark:border-[color:var(--border)] dark:bg-surface-subtle/50 dark:shadow-[0_18px_45px_rgba(0,0,0,0.65)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -144,7 +144,7 @@ export default function StudentGroupsPage() {
                 ))}
 
                 {list.length === 0 && !loading ? (
-                  <div className="md:col-span-2 rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
+                  <div className="md:col-span-2 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-10 text-center">
                     <p className="text-sm text-zinc-200">Групп не найдено.</p>
                     <p className="mt-1 text-xs text-zinc-500">
                       {apiAvailable ? "Примите приглашение в группу на дашборде." : "Войдите в аккаунт и примите приглашение на дашборде."}

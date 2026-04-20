@@ -24,17 +24,17 @@ export default function Privacy() {
           <a
             key={id}
             href={`#${id}`}
-            className="rounded-2xl border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 hover:text-white transition"
+            className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-1.5 text-sm text-muted hover:bg-surface-subtle hover:text-white transition"
           >
             {label}
           </a>
         ))}
       </nav>
 
-      <Card className="p-6 md:p-8 space-y-8 text-white/80">
+      <Card className="p-6 md:p-8 space-y-8 text-muted">
         <section id="capture" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">What we capture</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             We capture frames (images) from your webcam at a low rate (1–2 per second), not continuous video.
             These frames are used only for real-time emotion and engagement analysis. No video recording is stored.
           </p>
@@ -42,8 +42,8 @@ export default function Privacy() {
 
         <section id="storage" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">What we store</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
-            We do <strong className="text-white/90">not</strong> store raw video or images. We store only metadata:
+          <p className="text-sm text-muted leading-relaxed">
+            We do <strong className="text-muted">not</strong> store raw video or images. We store only metadata:
             aggregated emotion metrics, engagement scores, and timestamps for analytics and reports. Data is anonymized
             in group-level views.
           </p>
@@ -51,7 +51,7 @@ export default function Privacy() {
 
         <section id="access" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">Who can access</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             Access is role-based. Students see only their own summary (if they opt in). Teachers see aggregated
             analytics for their groups and sessions. Administrators manage users and system settings. We do not share
             data with third parties for marketing or non-educational purposes.
@@ -60,7 +60,7 @@ export default function Privacy() {
 
         <section id="retention" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">Retention</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             Retention policy is configurable by your institution. You can request deletion of your data; we will
             process it in line with applicable regulations (e.g. GDPR).
           </p>
@@ -68,7 +68,7 @@ export default function Privacy() {
 
         <section id="consent" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">Your consent</h2>
-          <p className="text-sm text-white/70 leading-relaxed">
+          <p className="text-sm text-muted leading-relaxed">
             Participation in video-based analytics requires your explicit consent. You can give or withdraw consent
             at any time in the Consent Center. Without consent, no frames are captured or analyzed.
           </p>

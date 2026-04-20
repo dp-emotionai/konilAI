@@ -108,7 +108,7 @@ export default function TeacherComparePage() {
         <Card className="p-6 md:p-7 space-y-5">
           <div className="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <div className="text-sm text-white/60">Select sessions</div>
+              <div className="text-sm text-muted">Select sessions</div>
               <div className="mt-2 text-lg font-semibold">A vs B</div>
             </div>
             <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ export default function TeacherComparePage() {
             <select
               value={a ?? ""}
               onChange={(e) => setA(e.target.value || null)}
-              className="h-11 rounded-2xl bg-black/30 border border-white/10 px-4 text-white/80 outline-none"
+              className="h-11 rounded-2xl bg-surface-subtle/80 border border-[color:var(--border)] px-4 text-muted outline-none"
               disabled={loadingSessions || !sessions.length}
             >
               {!sessions.length && <option>Нет сессий</option>}
@@ -135,7 +135,7 @@ export default function TeacherComparePage() {
             <select
               value={b ?? ""}
               onChange={(e) => setB(e.target.value || null)}
-              className="h-11 rounded-2xl bg-black/30 border border-white/10 px-4 text-white/80 outline-none"
+              className="h-11 rounded-2xl bg-surface-subtle/80 border border-[color:var(--border)] px-4 text-muted outline-none"
               disabled={loadingSessions || !sessions.length}
             >
               {!sessions.length && <option>Нет сессий</option>}
@@ -148,7 +148,7 @@ export default function TeacherComparePage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-1 rounded-2xl bg-white/5 p-1">
+            <div className="inline-flex items-center gap-1 rounded-2xl bg-surface-subtle/50 p-1">
               {[
                 { id: "metrics", label: "Metrics" },
                 { id: "summary", label: "Summary" },
@@ -161,14 +161,14 @@ export default function TeacherComparePage() {
                     "px-3 py-1.5 text-xs font-medium rounded-2xl transition",
                     tab === t.id
                       ? "bg-white/20 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.25)]"
-                      : "text-white/60 hover:text-white"
+                      : "text-muted hover:text-white"
                   )}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
-            <span className="text-xs text-white/45">
+            <span className="text-xs text-muted">
               Switch between numeric comparison and narrative summary.
             </span>
           </div>
@@ -239,11 +239,11 @@ export default function TeacherComparePage() {
           <Card className="p-6 md:p-7">
             <div className="flex items-start justify-between flex-wrap gap-3">
               <div>
-                <div className="text-sm text-white/60">Auto summary</div>
+                <div className="text-sm text-muted">Auto summary</div>
                 <div className="mt-2 text-lg font-semibold">
                   Ключевые отличия (по summary)
                 </div>
-                <div className="mt-2 text-sm text-white/60">
+                <div className="mt-2 text-sm text-muted">
                   Текст формируется из агрегатов по сессиям (без raw-видео).
                 </div>
               </div>
@@ -320,31 +320,31 @@ function MetricCard({
 }) {
   return (
     <Card className="p-6 md:p-7">
-      <div className="text-sm text-white/60">{title}</div>
+      <div className="text-sm text-muted">{title}</div>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-          <div className="text-xs text-white/60">Session A</div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-black/25 p-4">
+          <div className="text-xs text-muted">Session A</div>
           <div className="mt-1 text-2xl font-semibold">
             {loadingA ? "…" : a}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-          <div className="text-xs text-white/60">Session B</div>
+        <div className="rounded-2xl border border-[color:var(--border)] bg-black/25 p-4">
+          <div className="text-xs text-muted">Session B</div>
           <div className="mt-1 text-2xl font-semibold">
             {loadingB ? "…" : b}
           </div>
         </div>
       </div>
-      <div className="mt-3 text-sm text-white/50">{hint}</div>
+      <div className="mt-3 text-sm text-muted">{hint}</div>
     </Card>
   );
 }
 
 function Insight({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/25 p-4 hover:bg-white/5 transition">
+    <div className="rounded-2xl border border-[color:var(--border)] bg-black/25 p-4 hover:bg-surface-subtle/50 transition">
       <div className="font-semibold">{title}</div>
-      <div className="mt-2 text-sm text-white/60">{text}</div>
+      <div className="mt-2 text-sm text-muted">{text}</div>
     </div>
   );
 }

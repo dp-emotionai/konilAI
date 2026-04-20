@@ -71,7 +71,7 @@ export default function QuickSearch({ open, onClose, role }: Props) {
       aria-label="Быстрый поиск"
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-surface-subtle/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
