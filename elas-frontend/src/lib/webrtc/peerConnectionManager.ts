@@ -24,10 +24,6 @@ function normalizeParticipant(p: Participant): Participant {
     userId: p.userId,
     role: p.role,
     sessionId: p.sessionId,
-    displayName:
-      typeof p.displayName === "string" && p.displayName.trim().length > 0
-        ? p.displayName.trim()
-        : undefined,
     email:
       typeof p.email === "string" && p.email.trim().length > 0
         ? p.email.trim().toLowerCase()
@@ -69,7 +65,6 @@ function upsertParticipant(list: Participant[], next: Participant): Participant[
     lastName: safe.lastName ?? current.lastName,
     fullName: safe.fullName ?? current.fullName,
     avatarUrl: safe.avatarUrl ?? current.avatarUrl,
-    displayName: safe.displayName ?? current.displayName,
   };
 
   const copy = [...list];

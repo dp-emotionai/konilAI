@@ -78,7 +78,7 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
-  return p.fullName || p.displayName || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
+  return p.fullName || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
 }
 
 function CallControlButton({ 

@@ -25,7 +25,7 @@ export type User = {
 
 export type Participant = {
   id: string;
-  name: string;
+  fullName: string;
   emotion: "Neutral" | "Focused" | "Bored" | "Anxious" | "Happy" | "Sad";
   stress: number;      // 0..1
   engagement: number;  // 0..1
