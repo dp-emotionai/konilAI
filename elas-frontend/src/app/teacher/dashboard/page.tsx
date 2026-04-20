@@ -1,377 +1,335 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-
-import { Card } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-
-import {
-  getTeacherDashboardSessions,
-  type TeacherDashboardSession,
-} from "@/lib/api/teacher";
-
-import { summarizeTeacherDashboard } from "@/lib/utils/metrics";
-import {
-  Video,
-  Users,
-  ClipboardList,
-  Clock,
-  Plus,
-  ArrowRight,
-  Download,
-  Database,
-  Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  MoreHorizontal
-} from "lucide-react";
 import { cn } from "@/lib/cn";
-import { useUI } from "@/components/layout/Providers";
+import { getTeacherDashboardSessions, type TeacherDashboardSession } from "@/lib/api/teacher";
+import { getStoredAuth, hasAuth, api } from "@/lib/api/client";
+import {
+  Video, Users, ClipboardList, Clock, Plus, BarChart2,
+  Calendar as CalendarIcon, ChevronLeft, ChevronRight,
+  Download, Database
+} from "lucide-react";
+
+type MeRes = { id: string; email: string; role: string; name?: string | null };
 
 function KPI({
-  icon: Icon,
-  title,
-  value,
-  subtitle,
-  iconBg,
-  iconColor,
-  trend,
+  icon: Icon, title, value, subtitle, trend, iconBg, iconColor
 }: {
-  icon: any;
-  title: string;
-  value: string;
-  subtitle: string;
-  iconBg: string;
-  iconColor: string;
-  trend?: { value: string; positive: boolean };
+  icon: any; title: string; value: string; subtitle: string;
+  trend?: string; iconBg: string; iconColor: string;
 }) {
   return (
-    <Card className="p-5" variant="elevated">
-      <div className={cn("inline-flex h-10 w-10 items-center justify-center rounded-2xl mb-4", iconBg, iconColor)}>
-        <Icon size={18} />
+    <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col justify-between">
+      <div>
+        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-4", iconBg, iconColor)}>
+          <Icon size={20} />
+        </div>
+        <div className="text-[13px] text-slate-500 font-medium mb-1">{title}</div>
+        <div className="text-3xl font-bold text-slate-900 mb-2">{value}</div>
       </div>
-      <div className="text-[13px] text-muted font-medium mb-1">{title}</div>
-      <div className="text-3xl font-bold text-fg mb-2">{value}</div>
-      <div className="text-[11px] text-muted font-medium flex items-center gap-1">
-        {trend && (
-          <span className={trend.positive ? "text-emerald-500" : "text-amber-500"}>
-            {trend.value}
-          </span>
-        )}
+      <div className="text-[11px] font-medium text-slate-500">
+        {trend && <span className={trend.startsWith("+") ? "text-emerald-500" : "text-amber-500"}>{trend} </span>}
         {subtitle}
       </div>
-    </Card>
+    </div>
   );
 }
 
 function QuickAccessCard({
-  icon: Icon,
-  title,
-  subtitle,
-  bgClass,
-  textClass,
-  href,
+  icon: Icon, title, subtitle, bgClass, textClass, href
 }: {
-  icon: any;
-  title: string;
-  subtitle: string;
-  bgClass: string;
-  textClass: string;
-  href: string;
+  icon: any; title: string; subtitle: string; bgClass: string; textClass: string; href: string;
 }) {
   return (
-    <Link href={href} className="flex-1 block focus-visible:outline-none">
-      <div className={cn("rounded-2xl p-5 transition-transform hover:-translate-y-0.5 relative group", bgClass, textClass)}>
-        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-white/40 mb-3 shadow-sm">
-          <Icon size={16} />
+    <Link href={href} className={cn("block rounded-2xl p-5 transition-transform hover:-translate-y-0.5", bgClass)}>
+      <div className="flex justify-between items-start mb-3">
+        <div className={cn("w-10 h-10 rounded-xl bg-white/50 flex items-center justify-center", textClass)}>
+          <Icon size={20} />
         </div>
-        <div className="font-semibold">{title}</div>
-        <div className="text-xs opacity-75 mt-1 pr-6">{subtitle}</div>
-        
-        <div className="absolute right-4 bottom-5 h-6 w-6 rounded-full bg-white/40 flex items-center justify-center group-hover:bg-white/60 transition-colors">
-          <ArrowRight size={12} />
+        <div className="w-6 h-6 rounded-full bg-white/40 flex items-center justify-center text-slate-900 cursor-pointer hover:bg-white/60 transition-colors">
+          <Plus size={14} />
         </div>
+      </div>
+      <div>
+        <div className="font-bold text-slate-900 text-[15px]">{title}</div>
+        <div className="text-[12px] text-slate-600 mt-0.5 leading-tight">{subtitle}</div>
       </div>
     </Link>
   );
 }
 
+function StatusBadge({ status }: { status: string }) {
+  if (status === "active") return <span className="bg-emerald-50 text-emerald-600 px-2 py-1 rounded text-[11px] font-bold tracking-wide uppercase">Активная</span>;
+  if (status === "upcoming" || status === "draft") return <span className="bg-orange-50 text-orange-600 px-2 py-1 rounded text-[11px] font-bold tracking-wide uppercase">Запланирована</span>;
+  return <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[11px] font-bold tracking-wide uppercase">Завершена</span>;
+}
+
 export default function TeacherDashboard() {
   const [sessions, setSessions] = useState<TeacherDashboardSession[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const loadSessions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getTeacherDashboardSessions();
-      setSessions(data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [me, setMe] = useState<MeRes | null>(null);
 
   useEffect(() => {
-    void loadSessions();
-  }, [loadSessions]);
+    let mounted = true;
+    async function init() {
+      try {
+        const auth = getStoredAuth();
+        if (auth && mounted) setMe({ id: "local", email: auth.email, role: auth.role, name: auth.name });
+        if (hasAuth()) {
+          api.get<MeRes>("auth/me").then(data => { if (mounted) setMe(data); }).catch(() => {});
+        }
+        const data = await getTeacherDashboardSessions();
+        if (mounted) setSessions(data);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    init();
+    return () => { mounted = false; };
+  }, []);
 
-  const summary = useMemo(() => summarizeTeacherDashboard(sessions), [sessions]);
+  const activeCount = sessions.filter(s => s.status === 'active').length;
+  const scheduledCount = sessions.filter(s => s.status === 'draft').length;
+  
+  const firstName = me?.name ? me.name.split(" ")[0] : "Преподаватель";
 
-  // Dummy Calendar logic for visual match
   const today = new Date();
   const currentMonth = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(today);
   const currentYear = today.getFullYear().toString();
 
   return (
-    <div className="min-h-screen bg-bg relative">
-      {/* Background soft blob */}
-      <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-gradient-to-br from-[rgb(var(--primary))]/20 to-pink-300/20 blur-3xl rounded-full opacity-30 pointer-events-none -translate-y-1/2" />
-
-      <main className="mx-auto max-w-[1440px] px-6 pt-24 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8">
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12 pb-16">
+      <div className="mx-auto max-w-[1440px] px-4 md:px-8">
+        
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8">
           
-          {/* LEFT COLUMN */}
-          <div className="space-y-10 z-10">
-            {/* Header */}
+          {/* Main Left Column */}
+          <div className="space-y-10">
+            {/* Header Greeting */}
             <div>
-              <h1 className="text-4xl font-bold text-fg tracking-tight mb-2">
-                Добрый день, Алия! <span className="opacity-80">👋</span>
+              <h1 className="text-[32px] font-bold text-slate-900 tracking-tight flex items-center gap-3">
+                Добрый день, {firstName}! <span>👋</span>
               </h1>
-              <p className="text-muted">
-                У вас {summary.activeGroups} активные группы и {summary.sessionsToday} запланированных занятия на сегодня.
+              <p className="text-[15px] text-slate-500 mt-2">
+                У вас <span className="font-semibold text-slate-700">{activeCount} активных сессии</span> и <span className="font-semibold text-slate-700">{scheduledCount} запланированных занятия</span> на сегодня.
               </p>
             </div>
 
-            {/* KPIs */}
+            {/* KPI Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <KPI 
-                icon={Video}
-                title="Активные сессии"
-                value={`${summary.activeGroups}`}
-                trend={{ value: "+12%", positive: true }}
-                subtitle="от вчера"
-                iconBg="bg-primary/10"
-                iconColor="text-primary"
+                icon={Video} title="Активные сессии" value={String(activeCount)} subtitle="от вчера" trend="+25%"
+                iconBg="bg-purple-50" iconColor="text-[#7448FF]"
               />
               <KPI 
-                icon={Users}
-                title="Группы"
-                value="8"
-                subtitle="Без изменений"
-                iconBg="bg-blue-500/10"
-                iconColor="text-blue-500"
+                icon={Users} title="Группы" value="8" subtitle="Без изменений"
+                iconBg="bg-blue-50" iconColor="text-blue-500"
               />
               <KPI 
-                icon={ClipboardList}
-                title="Отчёты за неделю"
-                value="12"
-                trend={{ value: "+4%", positive: true }}
-                subtitle="от прошлой недели"
-                iconBg="bg-pink-500/10"
-                iconColor="text-pink-500"
+                icon={ClipboardList} title="Отчёты за неделю" value="12" subtitle="от прошлой недели" trend="+18%"
+                iconBg="bg-pink-50" iconColor="text-pink-500"
               />
               <KPI 
-                icon={Clock}
-                title="Средняя активность"
-                value={`${summary.avgEngagement}%`}
-                subtitle="Хороший показатель"
-                iconBg="bg-orange-500/10"
-                iconColor="text-orange-500"
+                icon={Clock} title="Удовлетворённость" value="78%" subtitle="Хороший показатель"
+                iconBg="bg-orange-50" iconColor="text-orange-500"
               />
             </div>
 
             {/* Quick Access */}
             <div>
-              <h2 className="text-lg font-bold text-fg mb-4">Быстрый доступ</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <h2 className="text-[17px] font-bold text-slate-900 mb-5">Быстрый доступ</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <QuickAccessCard 
-                  icon={Plus}
-                  title="Новая сессия"
-                  subtitle="Создать и запустить новую сессию"
-                  bgClass="bg-[#F4F1FF]"
-                  textClass="text-[#5925DC]"
-                  href="/teacher/sessions/new"
+                  icon={Video} title="Новая сессия" subtitle="Создать новую сессию"
+                  bgClass="bg-[#F0ECFF]" textClass="text-[#7448FF]" href="/teacher/sessions/new"
                 />
                 <QuickAccessCard 
-                  icon={Users}
-                  title="Мои группы"
-                  subtitle="Управление группами и студентами"
-                  bgClass="bg-[#EBF5FF]"
-                  textClass="text-[#1E40AF]"
-                  href="/teacher/groups"
+                  icon={Users} title="Мои группы" subtitle="Управление группами и студентами"
+                  bgClass="bg-[#EBF5FF]" textClass="text-blue-600" href="/teacher/groups"
                 />
                 <QuickAccessCard 
-                  icon={ClipboardList}
-                  title="Создать отчёт"
-                  subtitle="Сгенерировать новый отчёт"
-                  bgClass="bg-[#FFF7ED]"
-                  textClass="text-[#9A3412]"
-                  href="/teacher/reports/new"
+                  icon={BarChart2} title="Создать отчёт" subtitle="Сформировать новый отчёт"
+                  bgClass="bg-[#FFF7ED]" textClass="text-orange-600" href="/teacher/reports"
                 />
               </div>
             </div>
 
-            {/* Recent Sessions */}
+            {/* Recent Sessions Table */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-fg">Недавние сессии</h2>
-                <Link href="/teacher/sessions" className="text-sm font-medium text-[rgb(var(--primary))] hover:underline">
-                  Смотреть все
-                </Link>
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-[17px] font-bold text-slate-900">Недавние сессии</h2>
               </div>
-              <Card variant="elevated" className="overflow-hidden border-none shadow-card">
+              <div className="bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-surface-subtle text-muted">
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Сессия</th>
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Группа</th>
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Время</th>
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Участники</th>
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Статус</th>
-                        <th className="px-6 py-4 font-medium uppercase tracking-wider text-[11px]">Действие</th>
+                      <tr className="border-b border-slate-100">
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400">Сессия</th>
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400">Группа</th>
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400">Время</th>
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400 text-center">Участники</th>
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400">Статус</th>
+                        <th className="px-6 py-4 text-[12px] font-medium text-slate-400 text-right">Действия</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-surface-subtle">
-                      <tr className="hover:bg-surface-subtle/30 transition-colors">
-                        <td className="px-6 py-4 font-medium text-fg flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Алгоритмы и структуры данных
-                        </td>
-                        <td className="px-6 py-4 text-muted">CS-201</td>
-                        <td className="px-6 py-4 text-muted">Сегодня, 10:00</td>
-                        <td className="px-6 py-4 text-muted">32</td>
-                        <td className="px-6 py-4"><span className="text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full text-xs font-semibold">Активная</span></td>
-                        <td className="px-6 py-4 text-[rgb(var(--primary))] font-medium cursor-pointer">Открыть</td>
-                      </tr>
-                      <tr className="hover:bg-surface-subtle/30 transition-colors">
-                        <td className="px-6 py-4 font-medium text-fg flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-blue-500" /> Базы данных
-                        </td>
-                        <td className="px-6 py-4 text-muted">DB-101</td>
-                        <td className="px-6 py-4 text-muted">Вчера, 14:30</td>
-                        <td className="px-6 py-4 text-muted">28</td>
-                        <td className="px-6 py-4"><span className="text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full text-xs font-medium">Завершена</span></td>
-                        <td className="px-6 py-4 text-[rgb(var(--primary))] font-medium cursor-pointer">Открыть</td>
-                      </tr>
-                      <tr className="hover:bg-surface-subtle/30 transition-colors">
-                        <td className="px-6 py-4 font-medium text-fg flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-orange-400" /> Веб-разработка
-                        </td>
-                        <td className="px-6 py-4 text-muted">WEB-301</td>
-                        <td className="px-6 py-4 text-muted">12 марта, 09:00</td>
-                        <td className="px-6 py-4 text-muted">24</td>
-                        <td className="px-6 py-4"><span className="text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full text-xs font-medium">Запланирована</span></td>
-                        <td className="px-6 py-4 text-[rgb(var(--primary))] font-medium cursor-pointer">Открыть</td>
-                      </tr>
+                    <tbody>
+                      {loading ? (
+                        <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500 text-sm">Загрузка сессий...</td></tr>
+                      ) : sessions.length === 0 ? (
+                        <tr><td colSpan={6} className="px-6 py-8 text-center text-slate-500 text-sm">Нет недавних сессий.</td></tr>
+                      ) : (
+                        sessions.slice(0, 5).map((s, i) => (
+                          <tr key={s.id || i} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <span className={cn("w-2 h-2 rounded-full", s.status === 'active' ? "bg-emerald-500" : s.status === 'finished' ? "bg-purple-500" : "bg-orange-500")} />
+                                <span className="font-semibold text-[14px] text-slate-900">{s.title}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-[13px] font-medium text-slate-600">{s.group || "Без группы"}</td>
+                            <td className="px-6 py-4 text-[13px] text-slate-500">
+                               {s.date ? new Date(s.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit' }) : "Неизвестно"}
+                            </td>
+                            <td className="px-6 py-4 text-[13px] font-medium text-slate-900 text-center">{s.participants || 0}</td>
+                            <td className="px-6 py-4"><StatusBadge status={s.status} /></td>
+                            <td className="px-6 py-4 text-right">
+                              <Link href={`/teacher/session/${s.id}`} className="text-[13px] font-semibold text-[#7448FF] hover:text-[#623ce6] transition-colors">
+                                Открыть
+                              </Link>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
-              </Card>
+              </div>
             </div>
+            
           </div>
 
-          {/* RIGHT COLUMN */}
-          <div className="space-y-8 z-10 hidden lg:block">
-            {/* Calendar */}
-            <Card className="p-6" variant="elevated">
-              <div className="flex items-center justify-between mb-4">
-                 <div className="flex gap-2">
-                    <button className="text-muted hover:text-fg"><ChevronLeft size={16} /></button>
-                    <span className="text-sm font-semibold capitalize bg-surface-subtle px-3 py-1.5 rounded-md">{currentMonth}</span>
-                    <button className="text-muted hover:text-fg"><ChevronRight size={16} /></button>
-                 </div>
-                 <div className="flex gap-2">
-                    <span className="text-sm font-semibold bg-surface-subtle px-3 py-1.5 rounded-md">{currentYear}</span>
-                 </div>
+          {/* Right Sidebar Column */}
+          <div className="space-y-8">
+            
+            {/* Calendar Widget */}
+            <div className="bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6">
+              <div className="flex items-center justify-between mb-6">
+                 <button className="text-slate-400 hover:text-slate-700 transition-colors"><ChevronLeft size={18} /></button>
+                 <div className="font-bold text-[15px] text-slate-900 capitalize">{currentMonth} <span className="text-slate-400 font-medium ml-1">{currentYear}</span></div>
+                 <button className="text-slate-400 hover:text-slate-700 transition-colors"><ChevronRight size={18} /></button>
               </div>
-              <div className="grid grid-cols-7 text-center text-xs font-medium text-muted mb-3">
-                 <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+              
+              <div className="grid grid-cols-7 text-center text-[12px] font-semibold text-slate-400 mb-4">
+                 <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div className="text-slate-300">Сб</div><div className="text-slate-300">Вс</div>
               </div>
-              <div className="grid grid-cols-7 text-center text-sm gap-y-3 font-medium">
-                 {/* Dummy calendar dates matching the image */}
-                 <div className="text-muted/40">31</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
+              <div className="grid grid-cols-7 text-center text-[14px] font-medium gap-y-4 text-slate-700">
+                 {/* Visual static mock mapping to reference matching layout */}
+                 <div className="text-slate-300">31</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
                  <div>7</div><div>8</div>
-                 <div className="bg-[rgb(var(--primary))] text-white rounded-lg h-7 w-7 mx-auto flex items-center justify-center shadow-md">9</div>
-                 <div>10</div><div>11</div><div>12</div>
-                 <div className="bg-primary/10 text-[rgb(var(--primary))] rounded-lg h-7 w-7 mx-auto flex items-center justify-center">13</div>
-                 {/* more rows... */}
+                 <div className="relative flex justify-center">
+                   <div className="w-8 h-8 bg-slate-900 text-white rounded-xl flex items-center justify-center font-bold shadow-md">9</div>
+                 </div>
+                 <div>10</div><div>11</div><div>12</div><div>13</div>
                  <div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
                  <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div>
-                 <div>28</div><div>29</div><div>30</div><div className="text-muted/40">1</div><div className="text-muted/40">2</div><div className="text-muted/40">3</div><div className="text-muted/40">4</div>
+                 <div>28</div><div>29</div><div>30</div><div className="text-slate-300">1</div><div className="text-slate-300">2</div><div className="text-slate-300">3</div><div className="text-slate-300">4</div>
               </div>
-              <div className="mt-6 flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/10">
-                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-[rgb(var(--primary))]">
-                       <CalendarIcon size={14} />
+
+              <div className="mt-6 flex items-center justify-between p-4 bg-purple-50 rounded-[14px]">
+                 <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 bg-white rounded-xl shadow-sm text-[#7448FF] flex items-center justify-center shrink-0">
+                      <CalendarIcon size={18} />
                     </div>
                     <div>
-                       <div className="text-xs font-bold text-[rgb(var(--primary))]">Сегодня, 9 сентября</div>
-                       <div className="text-[10px] text-muted font-medium">2 занятия · 1 сессия</div>
+                      <div className="text-[14px] font-bold text-[#7448FF]">Сегодня, 9 сентября</div>
+                      <div className="text-[12px] font-medium text-purple-400 mt-0.5">3 сессии · 1 отчет</div>
                     </div>
                  </div>
-                 <ChevronRight size={14} className="text-[rgb(var(--primary))]" />
+                 <ChevronRight size={18} className="text-purple-300" />
               </div>
-            </Card>
+            </div>
 
             {/* Upcoming Classes */}
             <div>
-              <h3 className="text-base font-bold text-fg mb-4">Ближайшие занятия</h3>
+              <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-[16px] font-bold text-slate-900">Ближайшие занятия</h3>
+                 <span className="text-[12px] font-semibold text-[#7448FF] cursor-pointer">Показать все</span>
+              </div>
+              
               <div className="space-y-3">
-                 <Card className="p-4 flex items-center gap-4" variant="elevated">
-                    <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
-                       <Video size={18} />
+                 {sessions.filter(s => s.status === 'active' || s.status === 'draft').slice(0, 2).map((s, i) => (
+                    <div key={s.id || i} className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-start justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+                       <div className="flex items-start gap-4">
+                          <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", s.status === 'active' ? "bg-emerald-50 text-emerald-600" : "bg-orange-50 text-orange-600")}>
+                             {s.status === 'active' ? <Video size={18} /> : <Database size={18} />}
+                          </div>
+                          <div>
+                            <div className="text-[12px] font-semibold text-slate-500 mb-0.5">Сегодня, {new Date(s.date).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</div>
+                            <div className="text-[14px] font-bold text-slate-900 leading-tight">{s.title}</div>
+                            <div className="text-[12px] text-slate-500 mt-0.5">Группа {s.group || "Без группы"}</div>
+                          </div>
+                       </div>
+                       <StatusBadge status={s.status} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                       <div className="text-xs text-muted font-medium">10:00 - 11:30</div>
-                       <div className="text-sm font-bold text-fg truncate">Алгоритмы и структуры данных</div>
-                       <div className="text-xs text-muted truncate">Группа CS-201</div>
+                 ))}
+                 
+                 {/* Fallback if no real upcoming found */}
+                 {sessions.filter(s => s.status === 'active' || s.status === 'draft').length === 0 && !loading && (
+                    <div className="text-[13px] text-slate-500 p-4 border border-slate-100 rounded-[16px] text-center bg-white">
+                      Нет запланированных занятий
                     </div>
-                    <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md text-[10px] font-bold">Активная</span>
-                 </Card>
-                 <Card className="p-4 flex items-center gap-4" variant="elevated">
-                    <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
-                       <Database size={18} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                       <div className="text-xs text-muted font-medium">14:30 - 16:00</div>
-                       <div className="text-sm font-bold text-fg truncate">Базы данных</div>
-                       <div className="text-xs text-muted truncate">Группа DB-101</div>
-                    </div>
-                    <span className="text-orange-600 bg-orange-50 px-2 py-1 rounded-md text-[10px] font-bold">Запланирована</span>
-                 </Card>
+                 )}
               </div>
             </div>
 
-            {/* Recent Reports */}
+            {/* Recent Reports Widget */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-fg">Недавние отчёты</h3>
-                <Link href="/teacher/reports" className="text-xs font-medium text-[rgb(var(--primary))] hover:underline">
-                  Смотреть все
-                </Link>
+                 <h3 className="text-[16px] font-bold text-slate-900">Недавние отчёты</h3>
+                 <Link href="/teacher/reports" className="text-[12px] font-semibold text-[#7448FF]">Смотреть все</Link>
               </div>
+              
               <div className="space-y-3">
-                 {[
-                    { title: "Еженедельный отчёт", date: "12 марта 2026", color: "bg-emerald-100 text-emerald-600" },
-                    { title: "Отчёт по активности студентов", date: "11 марта 2026", color: "bg-purple-100 text-purple-600" },
-                    { title: "Анализ успеваемости", date: "10 марта 2026", color: "bg-blue-100 text-blue-600" }
-                 ].map((report, i) => (
-                    <Card key={i} className="p-4 flex items-center gap-4 transition-colors hover:border-[color:var(--border-strong)] cursor-pointer" variant="elevated">
-                       <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", report.color)}>
-                          <Download size={18} />
+                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardList size={18} /></div>
+                       <div>
+                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Еженедельный отчёт</div>
+                         <div className="text-[11px] font-medium text-slate-400 mt-1">8 сентября 2026</div>
                        </div>
-                       <div className="flex-1 min-w-0">
-                          <div className="text-sm font-bold text-fg truncate">{report.title}</div>
-                          <div className="text-xs text-muted truncate">{report.date}</div>
+                    </div>
+                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
+                 </div>
+                 
+                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0"><Users size={18} /></div>
+                       <div>
+                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Отчёт по успеваемости</div>
+                         <div className="text-[11px] font-medium text-slate-400 mt-1">7 сентября 2026</div>
                        </div>
-                       <Download size={16} className="text-muted/50" />
-                    </Card>
-                 ))}
+                    </div>
+                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
+                 </div>
+
+                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
+                    <div className="flex items-center gap-4">
+                       <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><BarChart2 size={18} /></div>
+                       <div>
+                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Анализ эффективности</div>
+                         <div className="text-[11px] font-medium text-slate-400 mt-1">6 сентября 2026</div>
+                       </div>
+                    </div>
+                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
+                 </div>
               </div>
             </div>
+
           </div>
+
         </div>
-      </main>
+      </div>
     </div>
   );
 }

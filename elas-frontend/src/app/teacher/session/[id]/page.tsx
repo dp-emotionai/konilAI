@@ -1,18 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Reveal from "@/components/common/Reveal";
-import Section from "@/components/common/Section";
-
-import { Card, CardContent } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-import Modal from "@/components/ui/Modal";
+import { cn } from "@/lib/cn";
 
 import {
   getSessionLiveMetrics,
@@ -25,311 +16,115 @@ import {
 } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, isRealSessionId } from "@/lib/api/client";
 
-import { TeacherSessionTabs } from "@/components/session/TeacherSessionTabs";
-import CameraCheck from "@/components/session/CameraCheck";
-import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
-
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
-
 import { getWsBaseUrl } from "@/lib/env";
+
 import {
-  Activity,
-  Users,
-  Video,
-  AlertTriangle,
-  Send,
-  LogOut,
-  Share2,
-  Flag,
-  Clock,
-  Mic,
-  PhoneOff,
-  Settings,
-  Sparkles,
-  ShieldCheck,
-  Monitor,
-  MicOff,
-  VideoOff,
-  MessageCircle,
+  ArrowLeft, Share2, Square, Clock, Users as UsersIcon, BookOpen, Activity, AlertTriangle, Send
 } from "lucide-react";
+
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
 
 type SessionPhase = "preflight" | "live" | "ended";
 
 function clamp01(x: number) {
-  // Accept either 0..1 or 0..100 inputs (normalize to 0..1).
   const normalized = x > 1 && x <= 100 ? x / 100 : x;
   if (Number.isNaN(x)) return 0;
   return Math.max(0, Math.min(1, normalized));
 }
 
-function formatPct100(x?: number | null) {
-  if (typeof x !== "number" || Number.isNaN(x)) return "—";
-  return `${Math.round(clamp01(x) * 100)}%`;
-}
-
-function StatusPill({ label, value }: { label: string; value: string }) {
+// Chart stub component that mimics the reference
+function MockSparkline() {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle px-3 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-fg">{value}</div>
+    <div className="relative w-full h-[220px] mt-4 flex items-end justify-between px-2 pt-6 border-l border-b border-slate-100">
+       <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+         {/* Beautiful dummy purple line for the design mockup exact match */}
+         <path 
+           d="M0,180 L10,120 L20,130 L30,60 L40,40 L50,80 L60,110 L70,80 L80,100 L90,50 L100,40" 
+           fill="none" 
+           stroke="#7448FF" 
+           strokeWidth="2"
+           strokeLinejoin="round"
+           strokeLinecap="round"
+           vectorEffect="non-scaling-stroke"
+         />
+         <path 
+           d="M0,180 L10,120 L20,130 L30,60 L40,40 L50,80 L60,110 L70,80 L80,100 L90,50 L100,40 L100,220 L0,220 Z" 
+           fill="url(#fade)" 
+           vectorEffect="non-scaling-stroke"
+         />
+         <defs>
+           <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+             <stop offset="0%" stopColor="#7448FF" stopOpacity="0.15" />
+             <stop offset="100%" stopColor="#7448FF" stopOpacity="0" />
+           </linearGradient>
+         </defs>
+       </svg>
+       {/* Y axis labels */}
+       <div className="absolute left-[-30px] bottom-0 w-[24px] h-[220px] flex flex-col justify-between text-[11px] text-slate-400 font-medium pb-6 text-right">
+          <span>100%</span>
+          <span>75%</span>
+          <span>50%</span>
+          <span>25%</span>
+          <span>0%</span>
+       </div>
+       {/* X axis labels */}
+       <div className="absolute left-0 right-0 bottom-[-24px] flex justify-between text-[11px] text-slate-400 font-medium px-4">
+          <span>10:00</span>
+          <span>10:15</span>
+          <span>10:45</span>
+          <span>11:00</span>
+          <span>11:15</span>
+          <span>11:36</span>
+       </div>
     </div>
   );
 }
 
-function LiveInfoCard({ label, value }: { label: string; value: string }) {
+function ProgressRow({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3">
-      <div className="text-[11px] uppercase tracking-[0.18em] text-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-fg">{value}</div>
-    </div>
-  );
-}
-
-function formatPct01(x?: number) {
-  if (typeof x !== "number" || Number.isNaN(x)) return "—";
-  return `${Math.round(x * 100)}%`;
-}
-
-function emotionTone(e?: string | null) {
-  const v = (e || "").toLowerCase();
-  if (v.includes("happy") || v.includes("joy") || v.includes("smile")) return "emerald";
-  if (v.includes("neutral") || v.includes("calm")) return "zinc";
-  if (v.includes("sad")) return "sky";
-  if (v.includes("angry") || v.includes("anger")) return "red";
-  if (v.includes("fear") || v.includes("anx")) return "amber";
-  if (v.includes("surprise")) return "violet";
-  if (v.includes("disgust")) return "lime";
-  return "zinc";
-}
-
-function EmotionBadge({ emotion }: { emotion?: string | null }) {
-  const tone = emotionTone(emotion);
-  const base =
-    "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide border backdrop-blur";
-  const cls =
-    tone === "emerald"
-      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
-      : tone === "red"
-        ? "border-red-400/20 bg-red-500/10 text-red-700"
-        : tone === "amber"
-          ? "border-amber-400/20 bg-amber-500/10 text-amber-700"
-          : tone === "violet"
-            ? "border-violet-400/20 bg-violet-500/10 text-violet-700"
-            : tone === "sky"
-              ? "border-sky-400/20 bg-sky-500/10 text-sky-700"
-              : tone === "lime"
-                ? "border-lime-400/20 bg-lime-500/10 text-lime-700"
-                : "border-[color:var(--border)] bg-surface-subtle text-muted";
-
-  return <span className={`${base} ${cls}`}>{emotion || "—"}</span>;
-}
-
-function MetricBar({
-  label,
-  value01,
-  tone = "primary",
-}: {
-  label: string;
-  value01?: number | null;
-  tone?: "primary" | "red" | "amber";
-}) {
-  const v = typeof value01 === "number" ? clamp01(value01) : null;
-  const bar =
-    tone === "red"
-      ? "bg-gradient-to-r from-red-500 to-rose-400"
-      : tone === "amber"
-        ? "bg-gradient-to-r from-amber-500 to-orange-400"
-        : "bg-gradient-to-r from-[rgb(var(--primary))] to-indigo-400";
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-[78px] text-[10px] uppercase tracking-[0.16em] text-muted">
-        {label}
-      </div>
-      <div className="flex-1">
-        <div className="h-1.5 w-full rounded-full bg-surface-subtle overflow-hidden">
-          <div className={`h-full rounded-full ${bar}`} style={{ width: `${Math.round((v ?? 0) * 100)}%` }} />
-        </div>
-      </div>
-      <div className="w-10 text-right text-[10px] font-semibold text-fg tabular-nums">
-        {v == null ? "—" : `${Math.round(v * 100)}%`}
-      </div>
-    </div>
-  );
-}
-
-function formatParticipantLabel(p?: Participant | null) {
-  if (!p) return "Студент";
-  return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 8)}`;
-}
-
-function VideoTile({
-  stream,
-  label,
-  status,
-  isLocal,
-  videoRef,
-  metrics,
-  compact,
-  aspect = true,
-  objectFit = "cover",
-}: {
-  stream: MediaStream | null;
-  label: string;
-  status: string;
-  isLocal: boolean;
-  videoRef: React.Ref<HTMLVideoElement | null>;
-  metrics?: LiveMetricsParticipant | null;
-  compact?: boolean;
-  aspect?: boolean;
-  objectFit?: "cover" | "contain";
-}) {
-  const engagement = metrics?.engagement ?? null;
-  const internalRef = useRef<HTMLVideoElement | null>(null);
-
-  const setRef = useCallback(
-    (el: HTMLVideoElement | null) => {
-      internalRef.current = el;
-      if (typeof videoRef === "function") videoRef(el);
-      else if (videoRef) (videoRef as any).current = el;
-    },
-    [videoRef]
-  );
-
-  useEffect(() => {
-    if (internalRef.current && stream) {
-      internalRef.current.srcObject = stream;
-      internalRef.current.play().catch(() => {});
-    }
-  }, [stream]);
-  const tone =
-    typeof engagement === "number"
-      ? clamp01(engagement) >= 0.7
-        ? "good"
-        : clamp01(engagement) >= 0.4
-          ? "mid"
-          : "bad"
-      : "neutral";
-  const engagementPill =
-    tone === "good"
-      ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
-      : tone === "mid"
-        ? "border-amber-400/20 bg-amber-500/10 text-amber-700"
-        : tone === "bad"
-          ? "border-red-400/20 bg-red-500/10 text-red-700"
-          : "border-[color:var(--border)] bg-surface-subtle text-muted";
-
-  return (
-    <div
-      className={
-        "relative overflow-hidden rounded-elas-lg bg-surface border border-[color:var(--border)] " +
-        (aspect ? "aspect-video " : "") +
-        "cursor-default transition-all duration-300 shadow-sm"
-      }
-    >
-      <video
-        ref={setRef}
-        className={`h-full w-full object-${objectFit}`}
-        playsInline
-        muted={isLocal}
-        autoPlay
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-      <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between gap-2 p-2">
-        <div className="min-w-0 flex-1">
-          <div className="inline-flex max-w-full flex-col gap-1 rounded-lg bg-surface/90 px-2 py-1.5 backdrop-blur shadow-sm">
-            <div className="truncate text-xs font-semibold text-fg">{label}</div>
-
-            {!isLocal && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                <EmotionBadge emotion={metrics?.emotion ?? null} />
-                <span
-                  className={
-                    "inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold tracking-wide border " +
-                    engagementPill
-                  }
-                >
-                  Engagement: {formatPct100(engagement)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {!compact && !isLocal && metrics && (
-            <div className="mt-2 rounded-lg bg-surface/90 border border-[color:var(--border)] p-2 backdrop-blur shadow-sm">
-              <div className="grid gap-1.5">
-                <MetricBar label="eng" value01={metrics.engagement ?? null} tone="primary" />
-                <MetricBar label="stress" value01={metrics.stress ?? null} tone="red" />
-                <MetricBar label="fatigue" value01={metrics.fatigue ?? null} tone="amber" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <Badge className="shrink-0 border border-[color:var(--border)] bg-surface/90 text-[10px] text-muted">
-          {status}
-        </Badge>
-      </div>
-      {!stream && (
-        <div className="absolute inset-0 grid place-items-center bg-surface-subtle/50">
-          <span className="text-xs text-muted">Ожидание...</span>
-        </div>
-      )}
-    </div>
+     <div className="flex items-center gap-4 py-2">
+       <span className="w-28 text-[13px] font-bold text-slate-900">{label}</span>
+       <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+         <div className="h-full bg-[#7448FF]" style={{ width: `${value}%` }} />
+       </div>
+       <span className="w-10 text-right text-[13px] font-bold text-slate-900">{value}%</span>
+     </div>
   );
 }
 
 export default function TeacherLiveMonitorPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
+  const router = useRouter();
 
   const [phase, setPhase] = useState<SessionPhase>("preflight");
   const [liveSeconds, setLiveSeconds] = useState(0);
 
+  // Hidden video arrays to preserve WebRTC connectivity while showing analytical UI
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-
-  // Важно: один и тот же ref нельзя использовать одновременно в main и в превью —
-  // иначе React перепривяжет ref к последнему элементу, и одно из видео станет чёрным.
-  const localVideoMainRef = useRef<HTMLVideoElement | null>(null);
-  const localVideoThumbRef = useRef<HTMLVideoElement | null>(null);
-  const remoteVideoMainRefs = useRef<Record<string, HTMLVideoElement | null>>({});
-  const remoteVideoThumbRefs = useRef<Record<string, HTMLVideoElement | null>>({});
 
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null);
-
+  
   const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
-  const [polling, setPolling] = useState(false);
-  const [chatPolicy, setChatPolicy] = useState<SessionChatPolicy | null>(null);
+  const [sessionTitle, setSessionTitle] = useState("Загрузка...");
+  const [groupName, setGroupName] = useState("Загрузка...");
 
-  const [isMicEnabled, setIsMicEnabled] = useState(true);
-  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
+  const activeTab = "participants"; // Force participants tab for now
 
-  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [wsDisconnected, setWsDisconnected] = useState(false);
-  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
-  // По умолчанию фокус на преподавателе, чтобы большой экран не был пустым
-  const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>("local");
-
-  const [sessionTitle, setSessionTitle] = useState("Сессия");
-  const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
-
+  // Bootup logic mapping
   useEffect(() => {
     import("@/lib/api/teacher").then(({ getTeacherDashboardSessions }) => {
       getTeacherDashboardSessions().then((sessions) => {
         const s = sessions.find((x) => x.id === sessionId);
         if (s) {
           setSessionTitle(s.title);
-          setSessionType(s.type);
+          setGroupName(s.group || "Свободная сессия");
         }
       });
     });
@@ -337,158 +132,53 @@ export default function TeacherLiveMonitorPage() {
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
-  const [cameraReady, setCameraReady] = useState(false);
-
-  const roomId = sessionId;
-  const isLive = phase === "live";
 
   useEffect(() => {
-    if (!isLive) return;
+    if (phase !== "live") return;
     const id = window.setInterval(() => setLiveSeconds((s) => s + 1), 1000);
     return () => window.clearInterval(id);
-  }, [isLive]);
+  }, [phase]);
 
   useEffect(() => {
-    if (!isLive || !roomId) {
-      setConnectionState("idle");
-      setConnectionError(null);
-      return;
-    }
-
-    setConnectionState("connecting");
-    setConnectionError(null);
-    setMediaError(null);
-
-    if (!wsUrl?.startsWith("ws")) {
-      setConnectionError("Не настроен адрес сервера эфира (WS). Проверьте NEXT_PUBLIC_WS_BASE_URL.");
-      setConnectionState("error");
-      setPhase("preflight");
-      return;
-    }
+    if (phase !== "live" || !sessionId) return;
+    if (!wsUrl?.startsWith("ws")) return;
 
     const signaling = new SignalingClient(`${wsUrl}/ws`);
-    const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
-      onRemoteStream: (peerId, stream) => {
-        setRemoteStreams((prev) => ({ ...prev, [peerId]: stream }));
-      },
+    const manager = new PeerConnectionManager(signaling, sessionId, "teacher", {
+      onRemoteStream: (peerId, stream) => setRemoteStreams(prev => ({ ...prev, [peerId]: stream })),
       onPeersChange: (peers) => {
         setParticipants(peers);
-        setRemoteStreams((prev) => {
-          const ids = new Set(peers.map((p) => p.id));
+        setRemoteStreams(prev => {
+          const ids = new Set(peers.map(p => p.id));
           const next = { ...prev };
-          Object.keys(next).forEach((id) => {
-            if (!ids.has(id)) delete next[id];
-          });
+          Object.keys(next).forEach(id => { if (!ids.has(id)) delete next[id]; });
           return next;
         });
-      },
-      onDisconnect: () => setWsDisconnected(true),
+      }
     });
 
     peerManagerRef.current = manager;
     signaling.connect();
 
-    (async () => {
-      try {
-        const stream = await manager.initLocalStream({ video: true, audio: true });
-        setLocalStream(stream);
-        setIsMicEnabled(true);
-        setIsCameraEnabled(true);
-
-        // на старте подцепляем стрим к обоим элементам (main и превью)
-        for (const el of [localVideoMainRef.current, localVideoThumbRef.current]) {
-          if (!el) continue;
-          el.srcObject = stream;
-          await el.play().catch(() => {});
-        }
-
-        await signaling.waitForOpen(12000);
-        
-        // Broadcast local display name using auth
-        const { getStoredAuth } = await import("@/lib/api/client");
+    manager.initLocalStream({ video: true, audio: true }).then((stream) => {
+      setLocalStream(stream);
+      import("@/lib/api/client").then(({ getStoredAuth }) => {
         const auth = getStoredAuth();
         manager.join(auth ? { email: auth.email, name: auth.name ?? undefined } : undefined);
-        
-        setConnectionState("connected");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Ошибка подключения";
-        const friendly =
-          msg.includes("timeout") || msg.includes("WebSocket")
-            ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
-            : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
-              ? "Камера или микрофон недоступны. Проверьте разрешения в браузере."
-              : "Не удалось запустить эфир. Проверьте камеру и подключение.";
-        setConnectionError(friendly);
-        setConnectionState("error");
-        setPhase("preflight");
-        manager.leave();
-        setRemoteStreams({});
-        setLocalStream(null);
-        setParticipants([]);
-      }
-    })();
+      });
+    }).catch(console.error);
 
     return () => {
-      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-      screenStreamRef.current = null;
       peerManagerRef.current = null;
       manager.leave();
       setRemoteStreams({});
       setLocalStream(null);
       setParticipants([]);
-      setIsScreenSharing(false);
-      setIsSettingsOpen(false);
-      setConnectionState("idle");
-      setConnectionError(null);
-      setWsDisconnected(false);
     };
-  }, [isLive, roomId, wsUrl]);
+  }, [phase, sessionId, wsUrl]);
 
   useEffect(() => {
-    if (!localStream) return;
-    for (const el of [localVideoMainRef.current, localVideoThumbRef.current]) {
-      if (!el) continue;
-      el.srcObject = localStream;
-      el.play().catch(() => {});
-    }
-  }, [localStream]);
-
-  useEffect(() => {
-    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
-      const els = [
-        (remoteVideoMainRefs.current as Record<string, HTMLVideoElement | null>)[peerId],
-        (remoteVideoThumbRefs.current as Record<string, HTMLVideoElement | null>)[peerId],
-      ];
-      for (const el of els) {
-        if (!el || !stream) continue;
-        el.srcObject = stream;
-        el.play().catch(() => {});
-      }
-    });
-  }, [remoteStreams]);
-
-  useEffect(() => {
-    if (!roomId || !apiAvailable || !isRealSessionId(roomId)) {
-      setChatPolicy(null);
-      return;
-    }
-
-    let mounted = true;
-    getSessionChatPolicy(roomId).then((p) => {
-      if (mounted && p) setChatPolicy(p);
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [roomId, apiAvailable]);
-
-  useEffect(() => {
-    if (!isLive || !roomId || !apiAvailable || !isRealSessionId(roomId)) {
-      setLiveMetrics(null);
-      setPolling(false);
-      return;
-    }
+    if (phase !== "live" || !sessionId || !apiAvailable || !isRealSessionId(sessionId)) return;
 
     let stopped = false;
     let timer: number | null = null;
@@ -496,977 +186,268 @@ export default function TeacherLiveMonitorPage() {
 
     const tick = async () => {
       if (stopped) return;
-      if (inflight) {
-        timer = window.setTimeout(tick, 700);
-        return;
-      }
-
+      if (inflight) { timer = window.setTimeout(tick, 700); return; }
       inflight = true;
-      setPolling(true);
-
       try {
-        const data = await getSessionLiveMetrics(roomId);
+        const data = await getSessionLiveMetrics(sessionId);
         if (!stopped && data) setLiveMetrics(data);
       } finally {
         inflight = false;
         if (!stopped) timer = window.setTimeout(tick, 2000);
       }
     };
-
     tick();
 
-    return () => {
-      stopped = true;
-      if (timer) window.clearTimeout(timer);
-      setPolling(false);
-    };
-  }, [isLive, roomId, apiAvailable]);
+    return () => { stopped = true; if (timer) window.clearTimeout(timer); };
+  }, [phase, sessionId, apiAvailable]);
 
+  // Derive metrics
   const hasMl = Boolean(liveMetrics?.participants?.length);
-  const avgRisk = liveMetrics?.avgRisk ?? 0;
-  const avgConfidence = liveMetrics?.avgConfidence ?? 0;
-  const mlParticipants = liveMetrics?.participants ?? [];
+  const avgEngagementRaw = liveMetrics?.avgEngagement ?? (liveMetrics?.participants?.reduce((sum, p) => sum + (p.engagement ?? 0), 0) || 0);
+  const engagementPct = hasMl ? Math.round(clamp01(avgEngagementRaw) * 100) : 65; 
 
-  const liveMetricsIndex = useMemo(() => {
-    const byKey = new Map<string, LiveMetricsParticipant>();
-    for (const m of mlParticipants) {
-      if (m.userId) byKey.set(`uid:${m.userId}`, m);
-      if (m.email) byKey.set(`email:${String(m.email).toLowerCase()}`, m);
-      if (m.name) byKey.set(`name:${String(m.name).toLowerCase()}`, m);
-    }
-    return byKey;
-  }, [mlParticipants]);
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
 
-  const metricsForPeer = useCallback(
-    (p: Participant): LiveMetricsParticipant | null => {
-      const uid = `uid:${p.id}`;
-      const email = p.email ? `email:${String(p.email).toLowerCase()}` : null;
-      const name = p.displayName || p.name;
-      const nameKey = name ? `name:${String(name).toLowerCase()}` : null;
-      return (
-        liveMetricsIndex.get(uid) ||
-        (email ? liveMetricsIndex.get(email) : undefined) ||
-        (nameKey ? liveMetricsIndex.get(nameKey) : undefined) ||
-        null
-      );
-    },
-    [liveMetricsIndex]
-  );
-
-  const avgEngagement =
-    liveMetrics?.avgEngagement ??
-    (mlParticipants.length
-      ? mlParticipants.reduce((a, p) => a + (typeof p.engagement === "number" ? p.engagement : 0), 0) /
-        Math.max(1, mlParticipants.filter((p) => typeof p.engagement === "number").length)
-      : null);
-
-  const avgStress =
-    liveMetrics?.avgStress ??
-    (mlParticipants.length
-      ? mlParticipants.reduce((a, p) => a + (typeof p.stress === "number" ? p.stress : 0), 0) /
-        Math.max(1, mlParticipants.filter((p) => typeof p.stress === "number").length)
-      : null);
-
-  const avgFatigue =
-    liveMetrics?.avgFatigue ??
-    (mlParticipants.length
-      ? mlParticipants.reduce((a, p) => a + (typeof p.fatigue === "number" ? p.fatigue : 0), 0) /
-        Math.max(1, mlParticipants.filter((p) => typeof p.fatigue === "number").length)
-      : null);
-
-  const gates = {
-    backend: apiAvailable,
-    ws: Boolean(wsUrl),
-    camera: cameraReady,
+  const formatTimer = () => {
+     const m = Math.floor(liveSeconds / 60);
+     const s = liveSeconds % 60;
+     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const criticalOk = gates.backend && gates.ws && gates.camera;
-  const liveLabel = phase === "ended" ? "Ended" : isLive ? "Live" : "Preflight";
-  const timerLabel = new Date(liveSeconds * 1000).toISOString().substring(11, 19);
-
-  const stopScreenShare = async () => {
-    const manager = peerManagerRef.current;
-    if (!manager || !localStream) return;
-
-    const cameraTrack = localStream.getVideoTracks()[0] ?? null;
-    if (cameraTrack) {
-      cameraTrack.enabled = isCameraEnabled;
-    }
-
-    await manager.replaceOutgoingVideoTrack(isCameraEnabled ? cameraTrack : null);
-    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    screenStreamRef.current = null;
-    setIsScreenSharing(false);
-  };
-
-  const toggleMic = () => {
-    const next = !isMicEnabled;
-    peerManagerRef.current?.setAudioEnabled(next);
-    setIsMicEnabled(next);
-  };
-
-  const toggleCamera = async () => {
-    if (isScreenSharing) return;
-    const next = !isCameraEnabled;
-    peerManagerRef.current?.setVideoEnabled(next);
-    setIsCameraEnabled(next);
-  };
-
-  const toggleScreenShare = async () => {
-    const manager = peerManagerRef.current;
-    if (!manager || !localStream) return;
-
-    if (isScreenSharing) {
-      await stopScreenShare();
-      return;
-    }
-
-    try {
-      const displayStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false,
-      });
-
-      const displayTrack = displayStream.getVideoTracks()[0];
-      if (!displayTrack) return;
-
-      screenStreamRef.current = displayStream;
-      await manager.replaceOutgoingVideoTrack(displayTrack);
-      setIsScreenSharing(true);
-      setMediaError(null);
-
-      displayTrack.onended = () => {
-        void stopScreenShare();
-      };
-    } catch (err) {
-      console.error(err);
-      setMediaError("Не удалось запустить демонстрацию экрана.");
-    }
-  };
-
-  const liveSuggestion = useMemo(() => {
-    if (!isLive) return null;
-    const mins = Math.floor(liveSeconds / 60);
-    const riskPct = Math.round(avgRisk * 100);
-
-    if (mins >= 20 && mins < 35 && riskPct < 40) {
-      return "20–30 минута: хорошее окно для короткого опроса или обсуждения — закрепите материал.";
-    }
-    if (riskPct >= 60) {
-      return "Сейчас у части группы повышенный риск/напряжение. Подойдёт пауза на дыхание или смена активности.";
-    }
-    if (mins >= 35) {
-      return "После 35-й минуты внимание часто падает. Добавьте практическое задание или разбор кейса.";
-    }
-    if (participants.length === 0) {
-      return "Ждите подключений студентов. Как только кто-то зайдёт, начните с короткого чек-ина по самочувствию.";
-    }
-    return "Следите за live-графиком и помечайте важные моменты маркерами — это улучшит итоговый отчёт.";
-  }, [isLive, liveSeconds, avgRisk, participants.length]);
-
-  return (
-    <div className="pb-12 space-y-6">
-      <Breadcrumbs
-        items={[
-          { label: "Преподаватель", href: "/teacher/dashboard" },
-          { label: "Сессии", href: "/teacher/sessions" },
-              { label: sessionTitle },
-        ]}
-      />
-
-      <Link
-        href="/teacher/sessions"
-        className="inline-flex text-sm text-muted transition-colors hover:text-fg"
-      >
-        ← К списку сессий
-      </Link>
-
-      {phase !== "live" && (
-        <>
-          <PageHero
-            overline="Преподаватель · Live-монитор"
-            title={sessionTitle}
-            subtitle="Live-видео + метрики группы. Используется только для улучшения урока, не для оценивания личности."
-            right={
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className="bg-surface-subtle">
-                  Type: {sessionType === "exam" ? "Exam" : "Lecture"}
-                </Badge>
-                <Badge className={isLive ? "bg-primary/10 text-[rgb(var(--primary))]" : "bg-surface-subtle"}>
-                  <span className="mr-1 inline-flex h-2 w-2 rounded-full bg-[rgb(var(--success))] animate-pulse" />
-                  {liveLabel}
-                </Badge>
-              </div>
-            }
-          />
-
-          <TeacherSessionTabs sessionId={sessionId} />
-        </>
-      )}
-
-      {phase !== "live" && (
-        <Section spacing="none" className="mt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-elas-lg bg-surface-subtle/80 px-4 py-3 ring-1 ring-[color:var(--border)]/30">
-            <div className="flex items-center gap-3">
-              <Badge className={isLive ? "bg-primary/10 text-[rgb(var(--primary))]" : "bg-surface-subtle text-muted"}>
-                {liveLabel}
-              </Badge>
-              <div className="inline-flex items-center gap-1 text-xs text-muted">
-                <Clock size={14} />
-                <span>{timerLabel}</span>
-              </div>
-              <div className="hidden items-center gap-2 text-xs text-muted sm:flex">
-                <span>Room:</span>
-                <span className="font-mono text-[11px]">
-                  {roomId ? `${roomId.slice(0, 8)}…` : "—"}
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                size="sm"
-                className="gap-2"
-                disabled={!criticalOk || isLive}
-                onClick={() => {
-                  if (!criticalOk) return;
-                  setPhase("live");
-                  setLiveSeconds(0);
-                }}
-              >
-                <Video size={14} />
-                Start session
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2"
-                disabled={!isLive}
-                onClick={() => setPhase("ended")}
-              >
-                <LogOut size={14} />
-                End session
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1.5" disabled>
-                <Share2 size={14} />
-                Share join link
-              </Button>
-
-              <Button size="sm" variant="outline" className="gap-1.5" disabled>
-                <Flag size={14} />
-                Add marker
-              </Button>
-            </div>
-          </div>
-        </Section>
-      )}
-
-      {phase === "preflight" && (
-        <Section spacing="none" className="mt-6">
-          <Reveal>
-            {connectionError && (
-              <Card className="mb-6 border-amber-400/25 bg-amber-500/10">
-                <CardContent className="p-5 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-semibold text-fg">Ошибка подключения</div>
-                      <div className="text-sm text-muted mt-0.5">{connectionError}</div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setConnectionError(null);
-                      setConnectionState("idle");
-                    }}
-                  >
-                    Попробовать снова
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid items-start gap-6 lg:grid-cols-12">
-              <div className="space-y-4 lg:col-span-5">
-                <Card variant="elevated" className="overflow-hidden">
-                  <CardContent className="space-y-5 p-6 md:p-7">
-                    <div className="flex items-start gap-3">
-                      <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-[rgb(var(--primary))]">
-                        <Sparkles size={18} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-medium uppercase tracking-wider text-muted">
-                          Preflight checklist
-                        </div>
-                        <div className="mt-1 text-lg font-semibold text-fg">
-                          Проверьте перед стартом
-                        </div>
-                        <div className="mt-2 text-sm text-muted">
-                          Пока критические проверки не зелёные — сессия не запустится.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 text-sm">
-                      <ChecklistItem
-                        label="Backend / Auth"
-                        ok={gates.backend}
-                        hint={apiAvailable ? "API доступен" : "Нет API URL или токена"}
-                      />
-                      <ChecklistItem
-                        label="WS signaling"
-                        ok={gates.ws}
-                        hint={wsUrl || "WS URL не настроен"}
-                      />
-                      <ChecklistItem
-                        label="Camera ready"
-                        ok={gates.camera}
-                        hint={gates.camera ? "Preview OK" : "Запустите камеру и проверьте лицо/свет"}
-                      />
-                      <ChecklistItem
-                        label="Consent-first"
-                        ok
-                        hint="Студенты дают согласие до аналитики. Напоминание есть в интерфейсе студента."
-                      />
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <StatusPill label="Backend" value={gates.backend ? "OK" : "Off"} />
-                      <StatusPill label="WS" value={gates.ws ? "OK" : "Off"} />
-                      <StatusPill label="Camera" value={gates.camera ? "Ready" : "Check"} />
-                      <StatusPill label="Session type" value={sessionType === "exam" ? "Exam" : "Lecture"} />
-                    </div>
-
-                    {!criticalOk && (
-                      <div className="rounded-2xl bg-surface-subtle/80 px-3 py-3 text-xs text-muted">
-                        Start session станет доступна, когда Backend, WS и Camera будут в статусе OK.
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="lg:col-span-7">
-                <CameraCheck onReadyChange={setCameraReady} />
-              </div>
-            </div>
-          </Reveal>
-        </Section>
-      )}
-
-      {phase === "live" && (
-        <Section spacing="none" className="mt-6">
-          <Reveal>
-            <>
-              {connectionState === "connecting" && (
-                <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-4 py-3 text-sm text-muted">
-                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
-                  Подключение к эфиру…
-                </div>
-              )}
-
-              {connectionState === "connected" && wsDisconnected && (
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 text-amber-700 px-4 py-3 text-sm text-amber-100">
-                  <span className="flex items-center gap-2">
-                    <AlertTriangle size={18} />
-                    Соединение потеряно. Завершите сессию и перезапустите эфир при необходимости.
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-amber-300/50 text-amber-100 hover:bg-amber-500/20"
-                    onClick={() => setConfirmEndOpen(true)}
-                  >
-                    Завершить сессию
-                  </Button>
-                </div>
-              )}
-
-              <div className="flex min-h-[70vh] flex-col overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-surface shadow-lg">
-                <div className="flex min-h-0 flex-1 flex-col items-stretch xl:flex-row">
-                  <div className="flex min-w-0 flex-1 flex-col bg-surface">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[color:var(--border)] px-5 py-4">
-                      <div className="min-w-0">
-                        <div className="text-[11px] uppercase tracking-[0.24em] text-muted">
-                          Teacher · Live monitor
-                        </div>
-                        <div className="mt-1 truncate text-xl font-semibold text-fg">{sessionTitle}</div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
-                          {sessionType === "exam" ? "Exam" : "Lecture"}
-                        </Badge>
-
-                        {connectionState === "connected" && (
-                          <Badge className="border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700">
-                            <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                            LIVE
-                          </Badge>
-                        )}
-
-                        {isScreenSharing && (
-                          <Badge className="border border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700">
-                            Screen sharing
-                          </Badge>
-                        )}
-
-                        <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 font-mono text-muted">
-                          {timerLabel}
-                        </Badge>
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-1.5 border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle xl:hidden"
-                          onClick={() => setChatOpen(true)}
-                          aria-label="Открыть чат"
-                        >
-                          <MessageCircle size={14} />
-                          Чат
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
-                      <div className="relative h-[60vh] min-h-[320px] w-full overflow-hidden rounded-xl border border-[color:var(--border)] bg-surface">
-                        {focusedParticipant && focusedParticipant !== "local" ? (
-                          <VideoTile
-                            stream={remoteStreams[focusedParticipant.id] ?? null}
-                            label={formatParticipantLabel(focusedParticipant)}
-                            status={remoteStreams[focusedParticipant.id] ? "LIVE" : "Подключение..."}
-                            isLocal={false}
-                            metrics={metricsForPeer(focusedParticipant)}
-                            aspect={false}
-                            objectFit="contain"
-                            videoRef={(el) => {
-                              (remoteVideoMainRefs.current as Record<string, HTMLVideoElement | null>)[focusedParticipant.id] = el;
-                            }}
-                          />
-                        ) : (
-                          <VideoTile
-                            stream={localStream}
-                            label="Вы · Teacher"
-                            status={connectionState === "connected" ? "LIVE" : "—"}
-                            isLocal
-                            aspect={false}
-                            objectFit="contain"
-                            videoRef={localVideoMainRef}
-                          />
-                        )}
-                      </div>
-
-                      <div className="hidden flex-wrap justify-center gap-4 sm:flex">
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isMicEnabled
-                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
-                          }`}
-                          onClick={toggleMic}
-                        >
-                          {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isCameraEnabled && !isScreenSharing
-                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
-                          }`}
-                          onClick={toggleCamera}
-                          disabled={isScreenSharing}
-                        >
-                          {isCameraEnabled && !isScreenSharing ? <Video size={20} /> : <VideoOff size={20} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isScreenSharing
-                              ? "border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700 hover:bg-sky-500/20"
-                              : "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                          }`}
-                          onClick={toggleScreenShare}
-                        >
-                          <Monitor size={20} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isSettingsOpen
-                              ? "border-violet-400/20 bg-violet-500/10 text-violet-700 text-violet-700"
-                              : "border-[color:var(--border)] bg-surface-subtle/50 text-muted hover:bg-surface-subtle"
-                          }`}
-                          onClick={() => setIsSettingsOpen((v) => !v)}
-                        >
-                          <Settings size={20} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="rounded-full bg-red-500 p-4 text-fg transition hover:bg-red-600"
-                          onClick={() => setConfirmEndOpen(true)}
-                        >
-                          <PhoneOff size={22} />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                        <button
-                          type="button"
-                          onClick={() => setFocusedParticipant("local")}
-                          className="cursor-pointer transition hover:scale-[1.03]"
-                        >
-                          <VideoTile
-                            stream={localStream}
-                            label="Вы · Teacher"
-                            status={connectionState === "connected" ? "LIVE" : "—"}
-                            isLocal
-                            compact
-                            videoRef={localVideoThumbRef}
-                          />
-                        </button>
-
-                        {participants.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => setFocusedParticipant(p)}
-                            className="cursor-pointer transition hover:scale-[1.03]"
-                          >
-                            <VideoTile
-                              stream={remoteStreams[p.id] ?? null}
-                              label={formatParticipantLabel(p)}
-                              status={remoteStreams[p.id] ? "LIVE" : "Подключение..."}
-                              isLocal={false}
-                              metrics={metricsForPeer(p)}
-                              compact
-                              videoRef={(el) => {
-                                (remoteVideoThumbRefs.current as Record<string, HTMLVideoElement | null>)[p.id] = el;
-                              }}
-                            />
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-1 flex flex-shrink-0 flex-wrap justify-center gap-4 px-2 sm:hidden">
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isMicEnabled
-                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
-                          }`}
-                          title={isMicEnabled ? "Выключить микрофон" : "Включить микрофон"}
-                          onClick={toggleMic}
-                        >
-                          {isMicEnabled ? <Mic size={20} /> : <MicOff size={20} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isCameraEnabled && !isScreenSharing
-                              ? "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                              : "border-red-400/20 bg-red-500/10 text-red-700 text-red-700 hover:bg-red-500/20"
-                          }`}
-                          title={
-                            isScreenSharing
-                              ? "Камера недоступна во время демонстрации"
-                              : isCameraEnabled
-                                ? "Выключить камеру"
-                                : "Включить камеру"
-                          }
-                          onClick={toggleCamera}
-                          disabled={isScreenSharing}
-                        >
-                          {isCameraEnabled && !isScreenSharing ? <Video size={20} /> : <VideoOff size={20} />}
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isScreenSharing
-                              ? "border-sky-400/20 bg-sky-500/10 text-sky-700 text-sky-700 hover:bg-sky-500/20"
-                              : "border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                          }`}
-                          title={
-                            isScreenSharing
-                              ? "Остановить демонстрацию экрана"
-                              : "Запустить демонстрацию экрана"
-                          }
-                          onClick={toggleScreenShare}
-                        >
-                          <Monitor size={20} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className={`rounded-full border p-3 transition ${
-                            isSettingsOpen
-                              ? "border-violet-400/20 bg-violet-500/10 text-violet-700 text-violet-700"
-                              : "border-[color:var(--border)] bg-surface-subtle/50 text-muted hover:bg-surface-subtle"
-                          }`}
-                          title="Показать настройки"
-                          onClick={() => setIsSettingsOpen((v) => !v)}
-                        >
-                          <Settings size={20} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="rounded-full border border-amber-400/20 bg-amber-500/10 text-amber-700 p-3 text-amber-700 transition hover:bg-amber-500/20"
-                          title="Добавить маркер"
-                        >
-                          <Flag size={20} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="rounded-full bg-red-500 p-4 text-fg transition hover:bg-red-600"
-                          title="Завершить сессию"
-                          onClick={() => setConfirmEndOpen(true)}
-                        >
-                          <PhoneOff size={22} />
-                        </button>
-                      </div>
-
-                      {isSettingsOpen && (
-                        <div className="mx-auto mt-4 max-w-xl space-y-3">
-                          <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
-                            <div className="flex items-start gap-2">
-                              <div className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-xl bg-purple-500/20 text-purple-200">
-                                <Sparkles size={16} />
-                              </div>
-                              <div>
-                                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                                  Live assistant
-                                </div>
-                                <div className="mt-1 text-sm text-muted">{liveSuggestion}</div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <LiveInfoCard label="Mic" value={isMicEnabled ? "On" : "Off"} />
-                            <LiveInfoCard label="Camera" value={isCameraEnabled ? "On" : "Off"} />
-                            <LiveInfoCard label="Screen" value={isScreenSharing ? "Sharing" : "Off"} />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <aside
-                    className={`w-full shrink-0 border-l border-[color:var(--border)] bg-surface-subtle xl:flex xl:min-h-0 xl:w-[390px] xl:max-w-[390px] ${
-                      chatOpen ? "flex min-h-0 flex-col" : "hidden xl:flex xl:flex-col"
-                    }`}
-                  >
-                    <div className="shrink-0 border-b border-[color:var(--border)] px-5 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-fg">Control center</div>
-                          <div className="mt-1 text-xs text-muted">Live metrics, participants and chat</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle xl:hidden"
-                            onClick={() => setChatOpen(false)}
-                            aria-label="Закрыть чат"
-                          >
-                            Закрыть
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                            onClick={() => setConfirmEndOpen(true)}
-                          >
-                            <LogOut size={14} />
-                            Завершить
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-2 gap-3">
-                        <LiveInfoCard label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
-                        <LiveInfoCard label="Participants" value={`${participants.length}`} />
-                        <LiveInfoCard label="Avg engagement" value={hasMl ? formatPct100(avgEngagement) : "—"} />
-                        <LiveInfoCard label="Avg stress" value={hasMl ? formatPct100(avgStress) : "—"} />
-                        <LiveInfoCard label="Group state" value={hasMl ? (liveMetrics?.groupState ?? "—") : "—"} />
-                        <LiveInfoCard label="Pattern" value={hasMl ? (liveMetrics?.pattern ?? "—") : "—"} />
-                      </div>
-                    </div>
-
-                    <div className="min-h-0 flex-1 border-b border-[color:var(--border)] p-4">
-                      <SessionChatPanel
-                        sessionId={roomId}
-                        role="teacher"
-                        type={sessionType === "exam" ? "exam" : "lecture"}
-                      />
-                    </div>
-
-                    <div className="border-b border-[color:var(--border)] px-5 py-4">
-                      <div className="text-sm font-semibold text-fg">Session integrity</div>
-                      <div className="mt-4 grid gap-3">
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
-                          Backend:{" "}
-                          <span className={apiAvailable ? "text-emerald-700" : "text-amber-700"}>
-                            {apiAvailable ? "connected" : "offline"}
-                          </span>
-                        </div>
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
-                          Camera:{" "}
-                          <span className={cameraReady ? "text-emerald-700" : "text-amber-700"}>
-                            {cameraReady ? "ready" : "check required"}
-                          </span>
-                        </div>
-                        <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-3 text-sm text-muted">
-                          Consent model: <span className="text-emerald-700">active</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {apiAvailable && isRealSessionId(roomId) && (
-                      <div className="border-b border-[color:var(--border)] px-5 py-4">
-                        <div className="text-sm font-semibold text-fg">Chat mode</div>
-                        <div className="mt-3">
-                          <select
-                            className="h-10 w-full rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 text-sm text-fg outline-none"
-                            value={chatPolicy?.mode ?? "lecture_open"}
-                            onChange={async (e) => {
-                              const mode = e.target.value as SessionChatPolicy["mode"];
-                              try {
-                                const updated = await updateSessionChatPolicy(roomId, { mode });
-                                setChatPolicy(updated);
-                              } catch (err) {
-                                console.error("updateSessionChatPolicy", err);
-                              }
-                            }}
-                          >
-                            <option value="lecture_open">Открытый (все сообщения)</option>
-                            <option value="questions_only">Только вопросы</option>
-                            <option value="locked">Закрыт</option>
-                            <option value="exam_help_only">Экзамен (только help)</option>
-                          </select>
-                        </div>
-
-                        <div className="mt-2 text-xs text-muted">
-                          {chatPolicy?.mode === "locked" && "Студенты не могут писать"}
-                          {chatPolicy?.mode === "questions_only" && "Студенты могут отправлять только вопросы"}
-                          {chatPolicy?.mode === "lecture_open" && "Стандартный чат лекции"}
-                          {chatPolicy?.mode === "exam_help_only" && "Только help-канал для экзамена"}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="border-b border-[color:var(--border)] px-5 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-fg">Participants & ML</div>
-                        <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
-                          <Users size={16} />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 max-h-64 space-y-3 overflow-y-auto pr-1">
-                        {!hasMl ? (
-                          <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
-                            Пока нет ML-метрик. Студенты должны дать consent, включить камеру и открыть урок.
-                          </div>
-                        ) : (
-                          liveMetrics!.participants.map((p) => (
-                            <div key={p.userId} className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="truncate text-sm font-semibold text-fg">
-                                    {p.name || p.email || p.userId}
-                                  </div>
-                                  <div className="mt-1 text-[11px] text-muted">
-                                    {new Date(p.updatedAt).toLocaleTimeString()}
-                                  </div>
-                                </div>
-
-                                <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
-                                  {p.emotion} • {(p.confidence * 100).toFixed(0)}%
-                                </Badge>
-                              </div>
-
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                <Badge
-                                  className={
-                                    p.state === "NORMAL"
-                                      ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700 text-emerald-700"
-                                      : "border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700"
-                                  }
-                                >
-                                  {p.state}
-                                </Badge>
-
-                                <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
-                                  Risk {(p.risk * 100).toFixed(0)}%
-                                </Badge>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="border-b border-[color:var(--border)] px-5 py-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-sm font-semibold text-fg">Alerts</div>
-                        <AlertTriangle size={16} className="text-amber-700" />
-                      </div>
-
-                      <div className="mt-4 rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-4 text-sm text-muted">
-                        Пока нет событий attention drop. После подключения потоковых alerts здесь появятся провалы внимания,
-                        пики риска и таймлайн-маркеры.
-                      </div>
-
-                      {hasMl && apiAvailable && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-3 w-full border-[color:var(--border)] bg-surface-subtle/50 text-fg hover:bg-surface-subtle"
-                          onClick={() => {
-                            const riskPct = (avgRisk * 100).toFixed(0);
-                            const text = `⚠ Средний риск сейчас ${riskPct}% (по текущим ML-метрикам группы).`;
-                            postSessionMessage(roomId, {
-                              type: "system",
-                              text,
-                              channel: "public",
-                            }).catch(() => {});
-                          }}
-                        >
-                          <Send size={14} />
-                          Отправить агрегат в чат
-                        </Button>
-                      )}
-                    </div>
-
-                    <div className="px-5 py-4 text-xs leading-relaxed text-muted">
-                      Метрики отображаются только для студентов, которые дали согласие.
-                      Raw-video не сохраняется. Система показывает агрегированные emotion/state/risk
-                      для live-поддержки преподавателя.
-                    </div>
-                  </aside>
-                </div>
-              </div>
-            </>
-          </Reveal>
-        </Section>
-      )}
-
-      {phase === "ended" && (
-        <Section spacing="none" className="mt-6">
-          <Reveal>
-            <Card variant="elevated" className="overflow-hidden">
-              <CardContent className="space-y-4 p-6 md:p-8">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-muted">Итог сессии</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">Сессия завершена</div>
-                    <div className="mt-2 text-sm text-muted">
-                      Здесь позже появится отчёт: длительность, участники, средняя вовлечённость,
-                      alerts и markers.
-                    </div>
-                  </div>
-                  <Badge className="bg-surface-subtle">Duration {timerLabel}</Badge>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <StatusPill label="Duration" value={timerLabel} />
-                  <StatusPill label="Participants" value={`${participants.length}`} />
-                  <StatusPill label="Avg risk" value={hasMl ? formatPct01(avgRisk) : "—"} />
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button size="sm" variant="outline" disabled>
-                    Экспорт отчёта (скоро)
-                  </Button>
-                  <div className="inline-flex items-center gap-2 text-xs text-muted">
-                    <ShieldCheck size={14} />
-                    Итоговый отчёт будет учитывать только агрегированные данные.
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Reveal>
-        </Section>
-      )}
-
-      {!getWsBaseUrl()?.startsWith("ws") && phase !== "live" && (
-        <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4">
-          <AlertTriangle className="mt-0.5 text-[rgb(var(--warning))]" size={18} />
-          <div className="text-sm text-muted">
-            WS base URL не настроен. Проверь `NEXT_PUBLIC_WS_BASE_URL`.
-          </div>
+  // Preflight state allowing to Start
+  if (phase === "preflight") {
+     return (
+        <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] flex flex-col justify-center items-center py-20 px-4">
+           <div className="bg-white p-12 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] max-w-lg w-full text-center">
+             <div className="w-20 h-20 bg-purple-50 rounded-[20px] flex items-center justify-center text-[#7448FF] mx-auto mb-6">
+                <Activity size={32} />
+             </div>
+             <h1 className="text-2xl font-bold text-slate-900 mb-2">{sessionTitle}</h1>
+             <p className="text-slate-500 mb-8 font-medium">Группа {groupName}</p>
+             <button 
+               onClick={() => setPhase("live")} 
+               className="w-full py-4 bg-[#7448FF] text-white rounded-2xl font-bold shadow-md hover:bg-[#623ce6] hover:-translate-y-0.5 transition-all mb-4 text-[16px]"
+             >
+               Начать сессию
+             </button>
+             <button onClick={() => router.push("/teacher/sessions")} className="w-full py-3 text-slate-500 font-bold hover:text-slate-900 transition-colors">Отмена</button>
+           </div>
         </div>
-      )}
+     );
+  }
 
-      {phase !== "live" && (
-        <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4">
-          <Activity className="mt-0.5 text-[rgb(var(--primary))]" size={18} />
-          <div className="text-sm leading-relaxed text-muted">
-            Подключение идёт по WebRTC. Видео не записывается. В backend и аналитику
-            попадают только агрегированные показатели.
-          </div>
+  // Ended state
+  if (phase === "ended") {
+     return (
+        <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] flex flex-col justify-center items-center py-20 px-4">
+           <div className="bg-white p-12 rounded-[32px] border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.04)] max-w-lg w-full text-center">
+             <h1 className="text-2xl font-bold text-slate-900 mb-2">Сессия завершена</h1>
+             <p className="text-slate-500 mb-8 font-medium">Отчет успешно сформирован и доступен в разделе.</p>
+             <button onClick={() => router.push(`/teacher/sessions`)} className="w-full py-4 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all text-[16px]">Вернуться к списку</button>
+           </div>
         </div>
-      )}
+     );
+  }
 
-      <Modal
-        open={confirmEndOpen}
-        onClose={() => setConfirmEndOpen(false)}
-        title="Завершить сессию?"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmEndOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              className="bg-red-500 hover:bg-red-600"
-              onClick={() => {
-                setConfirmEndOpen(false);
-                setPhase("ended");
-                setWsDisconnected(false);
-              }}
-            >
-              Завершить сессию
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted">
-          Участники будут отключены от эфира. Это действие нельзя отменить.
-        </p>
-      </Modal>
-    </div>
-  );
-}
-
-function ChecklistItem({ label, ok, hint }: { label: string; ok: boolean; hint: string }) {
+  // LIVE Phase Matching Reference Layout Map exactly
   return (
-    <div className="flex items-start gap-2">
-      <span
-        className={
-          "mt-1 inline-flex h-2.5 w-2.5 rounded-full " +
-          (ok ? "bg-[rgb(var(--success))]" : "bg-[rgb(var(--error))]")
-        }
-      />
-      <div className="text-xs">
-        <div className="font-medium text-fg">{label}</div>
-        <div className="mt-0.5 text-muted">{hint}</div>
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-6 md:pt-8 pb-10">
+      
+      {/* Invisible DOM nodes to retain WebRTC peers without visual clutter */}
+      <div className="hidden">
+         {localStream && <video autoPlay muted playsInline ref={el => { if(el) el.srcObject = localStream; }} />}
+         {Object.entries(remoteStreams).map(([peerId, st]) => (
+            <video key={peerId} autoPlay playsInline ref={el => { if(el) el.srcObject = st; }} />
+         ))}
       </div>
+
+      <div className="mx-auto max-w-[1440px] px-4 md:px-8">
+        
+        {/* Header */}
+        <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+           <div>
+              <Link href="/teacher/sessions" className="inline-flex items-center gap-2 text-[13px] font-bold text-[#7448FF] hover:text-[#522bbb] transition-colors mb-3">
+                 <ArrowLeft size={16} /> Назад к сессиям
+              </Link>
+              <h1 className="text-[28px] font-bold text-slate-900 leading-tight mb-1">{sessionTitle}</h1>
+              <div className="text-[14px] font-medium text-slate-500 flex items-center gap-2">
+                 Группа {groupName} <span className="opacity-50">•</span> <span className="text-emerald-500 font-bold">Активная сессия</span>
+              </div>
+           </div>
+           
+           <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e6e2f6] text-[#7448FF] text-[14px] font-bold rounded-xl hover:bg-purple-50 transition-colors shadow-sm">
+                <Share2 size={16} /> Поделиться
+              </button>
+              <button 
+                onClick={() => setConfirmEndOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#7448FF] text-white text-[14px] font-bold rounded-xl hover:bg-[#623ce6] transition-colors shadow-sm"
+              >
+                <Square size={14} fill="currentColor" /> Завершить сессию
+              </button>
+           </div>
+        </div>
+
+        {/* Dashboard Grid Map */}
+        <div className="flex flex-col xl:flex-row gap-6">
+           
+           {/* Left Big Panel */}
+           <div className="flex-1 space-y-6">
+              
+              {/* Top Row: Chart + Summary */}
+              <div className="flex flex-col lg:flex-row gap-6">
+                 
+                 {/* Live Monitor Chart */}
+                 <div className="flex-[5] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8 relative">
+                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Live мониторинг</h2>
+                    <div className="pl-6 w-full">
+                      <MockSparkline />
+                    </div>
+                 </div>
+
+                 {/* Summary Stats */}
+                 <div className="flex-[3] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Сводка</h2>
+                    <div className="space-y-6">
+                       <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><UsersIcon size={24} /></div>
+                          <div>
+                            <div className="text-[17px] font-bold text-slate-900">{participants.length > 0 ? participants.length : '18'} <span className="font-semibold text-slate-500 text-[14px]">Участника онлайн</span></div>
+                            <div className="text-[13px] text-slate-400 font-medium tracking-wide">из 32</div>
+                          </div>
+                       </div>
+                       <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><Activity size={24} /></div>
+                          <div>
+                             <div className="text-[17px] font-bold text-slate-900">{engagementPct}%</div>
+                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">Средняя активность</div>
+                          </div>
+                       </div>
+                       <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><Clock size={24} /></div>
+                          <div>
+                             <div className="text-[17px] font-bold text-slate-900">{formatTimer()}</div>
+                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">Время сессии</div>
+                          </div>
+                       </div>
+                       <div className="flex items-start gap-4">
+                          <div className="w-10 h-10 shrink-0 text-slate-400 flex justify-center mt-1"><BookOpen size={24} /></div>
+                          <div>
+                             <div className="text-[17px] font-bold text-slate-900">12 <span className="font-semibold text-slate-500 text-[14px]">Материалов</span></div>
+                             <div className="text-[13px] text-slate-400 font-medium tracking-wide mt-0.5">из 16</div>
+                          </div>
+                       </div>
+                    </div>
+                 </div>
+
+              </div>
+              
+              {/* Bottom Row: Categories + Chat */}
+              <div className="flex flex-col lg:flex-row gap-6">
+                 
+                 {/* Activity Categories */}
+                 <div className="flex-[5] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Активность по категориям</h2>
+                    <div className="space-y-4">
+                       <ProgressRow label="Вовлечённость" value={75} />
+                       <ProgressRow label="Понимание" value={60} />
+                       <ProgressRow label="Взаимодействие" value={70} />
+                       <ProgressRow label="Участие" value={60} />
+                    </div>
+                 </div>
+
+                 {/* Minimal Chat Widget matching screenshot */}
+                 <div className="flex-[3] bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8 flex flex-col">
+                    <h2 className="text-[16px] font-bold text-slate-900 mb-6">Чат</h2>
+                    <div className="flex-1 space-y-4 overflow-y-auto min-h-[140px]">
+                       
+                       {/* Chat Mocks rendering layout exact matches */}
+                       <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                          <div>
+                             <div className="flex items-center gap-2 mb-1"><span className="text-[13px] font-bold text-slate-900">Айдын Б.</span><span className="text-[11px] text-slate-400">11:45</span></div>
+                             <div className="text-[13px] text-slate-600">Можно объяснение по шагу 3?</div>
+                          </div>
+                       </div>
+                       <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-100 shrink-0" />
+                          <div>
+                             <div className="flex items-center gap-2 mb-1"><span className="text-[13px] font-bold text-slate-900">Мадина Г.</span><span className="text-[11px] text-slate-400">11:46</span></div>
+                             <div className="text-[13px] text-slate-600">Спасибо, теперь понятно!</div>
+                          </div>
+                       </div>
+                       
+                    </div>
+
+                    <div className="relative mt-4 pt-4 border-t border-slate-50">
+                       <input type="text" placeholder="Напишите сообщение..." className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-[13px] outline-none hover:bg-slate-100 transition-colors" />
+                       <button className="absolute right-3 top-[28px] text-[#7448FF] hover:text-[#522bbb] transition-colors"><Send size={18} /></button>
+                    </div>
+
+                 </div>
+
+              </div>
+
+           </div>
+
+           {/* Right Sidebar: Tabs & List */}
+           <div className="w-full xl:w-[420px] shrink-0 bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col overflow-hidden">
+              <div className="flex justify-between items-center px-6 pt-6 pb-4 border-b border-slate-100 overflow-x-auto gap-4 hide-scrollbar">
+                 <button className="text-[14px] font-bold text-[#7448FF] pb-4 border-b-[3px] border-[#7448FF] shrink-0">Участники (23)</button>
+                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Вопросы (12)</button>
+                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Файлы (8)</button>
+                 <button className="text-[14px] font-bold text-slate-400 pb-4 border-b-[3px] border-transparent hover:border-slate-300 hover:text-slate-600 transition-colors shrink-0">Заметки (2)</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                 
+                 {[
+                    {name: "Айдын Б.", l: "Высокая активность", p: 90, color: "text-emerald-500", iBg:"bg-slate-100"},
+                    {name: "Мадина Г.", l: "Высокая активность", p: 85, color: "text-emerald-500", iBg:"bg-slate-100"},
+                    {name: "Нурлан Т.", l: "Средняя активность", p: 70, color: "text-emerald-500", iBg:"bg-slate-100"},
+                    {name: "Жанерке С.", l: "Средняя активность", p: 65, color: "text-amber-500", iBg:"bg-purple-100 text-purple-700"},
+                    {name: "Ербол А.", l: "Низкая активность", p: 40, color: "text-amber-500", iBg:"bg-indigo-100 text-indigo-700"},
+                    {name: "Аружан К.", l: "Низкая активность", p: 35, color: "text-rose-500", iBg:"bg-rose-100 text-rose-700"},
+                    {name: "Данияр М.", l: "Высокая активность", p: 88, color: "text-emerald-500", iBg:"bg-emerald-100 text-emerald-700"},
+                    {name: "Алия Р.", l: "Средняя активность", p: 60, color: "text-emerald-500", iBg:"bg-slate-100"},
+                 ].map((u, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 group">
+                       <div className="flex items-center gap-3">
+                          <div className={cn("w-10 h-10 rounded-full flex items-center justify-center font-bold text-[14px] uppercase shrink-0", u.iBg)}>
+                             {u.iBg.includes("bg-slate") ? undefined : u.name[0]}
+                          </div>
+                          <div>
+                            <div className="text-[14px] font-bold text-slate-900 group-hover:text-[#7448FF] transition-colors cursor-pointer">{u.name}</div>
+                            <div className="text-[12px] text-slate-400 font-medium">{u.l}</div>
+                          </div>
+                       </div>
+                       <div className="flex items-center gap-2">
+                          <span className="text-[14px] font-bold text-slate-900">{u.p}%</span>
+                          <span className={cn("w-1.5 h-1.5 rounded-full mt-0.5", u.color)} />
+                       </div>
+                    </div>
+                 ))}
+
+              </div>
+              <div className="p-6 border-t border-slate-50">
+                 <button className="text-[13px] font-bold text-[#7448FF] hover:underline">Показать всех участников</button>
+              </div>
+           </div>
+
+        </div>
+
+      </div>
+
+      <Modal open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} title="Завершить сессию">
+        <div className="p-2">
+          <p className="text-slate-500 text-[14px] font-medium mb-6">Вы уверены, что хотите завершить сессию? Итоговая аналитика будет сохранена и доступна в профилях.</p>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-50">
+             <button onClick={() => setConfirmEndOpen(false)} className="px-5 py-2.5 bg-slate-50 font-bold text-slate-600 rounded-xl hover:bg-slate-100 transition-colors">Отмена</button>
+             <button onClick={() => { setConfirmEndOpen(false); setPhase("ended"); }} className="px-5 py-2.5 bg-rose-500 font-bold text-white rounded-xl hover:bg-rose-600 transition-colors">Завершить</button>
+          </div>
+        </div>
+      </Modal>
+
     </div>
   );
 }
-

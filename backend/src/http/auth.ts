@@ -69,6 +69,10 @@ export function registerAuthRoutes(app: Express) {
         res.status(401).json({ error: "Invalid credentials" });
         return;
       }
+      if (!user.passwordHash) {
+        res.status(401).json({ error: "This account uses Google sign-in. Use Google login." });
+        return;
+      }
       const ok = await bcrypt.compare(String(password), user.passwordHash);
       if (!ok) {
         console.warn("[auth/login] 401: password mismatch");
@@ -124,6 +128,7 @@ export function registerAuthRoutes(app: Express) {
             email,
             name,
             role: r,
+            passwordHash: null,
           },
         });
       }

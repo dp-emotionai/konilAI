@@ -2,32 +2,37 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Section from "@/components/common/Section";
-import Reveal from "@/components/common/Reveal";
-
-import { Card, CardContent } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-import Input from "@/components/ui/Input";
-import Table, { THead, TBody, TRow, TCell, TH, TMuted } from "@/components/ui/Table";
-import Modal from "@/components/ui/Modal";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/cn";
 
 import { getTeacherAllSessions, updateSessionStatus, type GroupSession } from "@/lib/api/teacher";
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
 
+import {
+  Search, Plus, Filter, MoreVertical, 
+  Video, Code, Database, LayoutTemplate, ShieldCheck, PlayCircle, Users, Activity, BarChart, Calendar as CalendarIcon
+} from "lucide-react";
+import Modal from "@/components/ui/Modal";
+import Button from "@/components/ui/Button";
+
+type TabValue = "all" | "live" | "upcoming" | "ended";
+
 const statusToBackend = (next: string): "active" | "finished" | "draft" =>
   next === "live" ? "active" : next === "ended" ? "finished" : "draft";
 
-function statusBadge(status: GroupSession["status"]) {
-  if (status === "live") return <Badge variant="success">В эфире</Badge>;
-  if (status === "ended") return <Badge>Завершена</Badge>;
-  return <Badge variant="warning">Ожидает</Badge>;
+// Helper for dynamic coloring based on topic matching design mock
+function getIconForTopic(title: string) {
+  const t = title.toLowerCase();
+  if (t.includes('алгоритм') || t.includes('код')) return { icon: Code, color: 'text-rose-500', bg: 'bg-rose-50' };
+  if (t.includes('данных') || t.includes('баз')) return { icon: Database, color: 'text-emerald-500', bg: 'bg-emerald-50' };
+  if (t.includes('безопасность')) return { icon: ShieldCheck, color: 'text-amber-500', bg: 'bg-amber-50' };
+  if (t.includes('сеть')) return { icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' };
+  if (t.includes('дизайн') || t.includes('веб')) return { icon: LayoutTemplate, color: 'text-[#7448FF]', bg: 'bg-indigo-50' };
+  return { icon: PlayCircle, color: 'text-blue-500', bg: 'bg-blue-50' };
 }
 
 export default function TeacherSessionsPage() {
+  const router = useRouter();
   const [tick, setTick] = useState(0);
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,9 +40,7 @@ export default function TeacherSessionsPage() {
   const [confirmEndSession, setConfirmEndSession] = useState<GroupSession | null>(null);
 
   const [q, setQ] = useState("");
-  const [filter, setFilter] = useState<"all" | "live" | "waiting" | "ended">("all");
-
-  const apiAvailable = getApiBaseUrl() && hasAuth();
+  const [activeTab, setActiveTab] = useState<TabValue>("all");
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -55,29 +58,19 @@ export default function TeacherSessionsPage() {
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-
     return sessions.filter((it) => {
-      if (filter !== "all") {
-        if (filter === "live" && it.status !== "live") return false;
-        if (filter === "ended" && it.status !== "ended") return false;
-        if (filter === "waiting" && it.status !== "upcoming") return false;
+      if (activeTab !== "all") {
+        if (activeTab === "live" && it.status !== "live") return false;
+        if (activeTab === "ended" && it.status !== "ended") return false;
+        if (activeTab === "upcoming" && it.status !== "upcoming") return false;
       }
-
       if (!s) return true;
-
-      const hay = `${it.title} ${it.groupId} ${it.status}`.toLowerCase();
-      return hay.includes(s);
+      return `${it.title} ${it.groupId}`.toLowerCase().includes(s);
     });
-  }, [sessions, q, filter]);
+  }, [sessions, q, activeTab]);
 
   const handleLifecycle = async (s: GroupSession) => {
-    const action =
-      s.status === "upcoming"
-        ? { label: "Start", next: "live" as const }
-        : s.status === "live"
-          ? { label: "End", next: "ended" as const }
-          : { label: "Reopen", next: "upcoming" as const };
-
+    const action = s.status === "upcoming" ? { next: "live" as const } : s.status === "live" ? { next: "ended" as const } : { next: "upcoming" as const };
     setActioningId(s.id);
     setConfirmEndSession(null);
     try {
@@ -89,150 +82,172 @@ export default function TeacherSessionsPage() {
   };
 
   return (
-    <div className="pb-12">
-      <Breadcrumbs items={[{ label: "Преподаватель", href: "/teacher/dashboard" }, { label: "Сессии" }]} />
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12 pb-16">
+      <div className="mx-auto max-w-[1240px] px-4 md:px-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+          <div>
+            <h1 className="text-[32px] font-bold tracking-tight text-slate-900 mb-6">Сессии</h1>
+            <div className="flex items-center gap-6 border-b border-slate-200">
+              {[
+                { id: "all", label: "Все сессии" },
+                { id: "live", label: "Активные" },
+                { id: "upcoming", label: "Запланированные" },
+                { id: "ended", label: "Завершённые" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as TabValue)}
+                  className={cn(
+                    "pb-3 text-[14px] font-bold transition-colors relative",
+                    activeTab === tab.id ? "text-[#7448FF]" : "text-slate-400 hover:text-slate-700"
+                  )}
+                >
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#7448FF] rounded-t-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <PageHero
-        title="Все сессии"
-        subtitle="Создайте сессию, нажмите «Старт» — студенты увидят её в эфире и смогут подключиться."
-        right={
-          <Link href="/teacher/sessions/new">
-            <Button>Создать сессию</Button>
+          <Link href="/teacher/sessions/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7448FF] text-white text-[14px] font-bold rounded-xl hover:bg-[#623ce6] transition-colors shadow-sm self-start md:self-auto shrink-0 mb-1">
+            <Plus size={18} /> Создать сессию
           </Link>
-        }
-      />
+        </div>
 
-      <Section spacing="none" className="mt-8 space-y-6">
-        <Reveal>
-          <Card>
-            <CardContent className="p-6 md:p-7">
-              {/* controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-[240px] flex-1">
-                  <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Поиск по названию или группе…" />
-                </div>
+        {/* Controls */}
+        <div className="flex items-center gap-4 mb-6">
+          <div className="relative flex-1 max-w-xl">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Поиск по сессиям..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] outline-none hover:border-slate-300 focus:border-[#7448FF] transition-colors shadow-sm"
+            />
+          </div>
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] font-bold text-[#7448FF] hover:bg-slate-50 transition-colors shadow-sm">
+             <Filter size={16} /> Фильтры
+          </button>
+        </div>
 
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => void loadSessions()} disabled={loading}>
-                    Обновить
-                  </Button>
-                  <div className="inline-flex items-center gap-1 rounded-full bg-surface-subtle p-1">
-                    {[
-                      { id: "all", label: "Все" },
-                      { id: "live", label: "LIVE" },
-                      { id: "waiting", label: "Ожидают" },
-                      { id: "ended", label: "Заверш." },
-                    ].map((t) => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setFilter(t.id as any)}
-                        className={[
-                          "px-3 py-2 text-sm rounded-full transition",
-                          filter === (t.id as any) ? "bg-surface shadow-soft text-fg" : "text-muted hover:text-fg",
-                        ].join(" ")}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
+        {/* List */}
+        <div className="space-y-3">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-24 bg-surface-subtle/50 rounded-[16px] animate-pulse" />
+            ))
+          ) : filtered.length === 0 ? (
+            <div className="py-16 text-center bg-white rounded-[20px] border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+               <Video size={48} className="mx-auto text-slate-200 mb-4" />
+               <h3 className="text-lg font-bold text-slate-900">Ничего не найдено</h3>
+               <p className="text-slate-500 mt-1 max-w-sm mx-auto text-[14px]">
+                 Вы пока не создали ни одной сессии в этой категории, либо поиск не дал результатов.
+               </p>
+            </div>
+          ) : (
+            filtered.map((s) => {
+              const { icon: Icon, bg, color } = getIconForTopic(s.title);
+              
+              const isLive = s.status === 'live';
+              const isUpcoming = s.status === 'upcoming';
+              const isEnded = s.status === 'ended';
+
+              const progressW = isEnded ? 100 : isLive ? '71' : 0;
+              const participants = isUpcoming ? 24 : isLive ? 32 : 21; 
+
+              return (
+                <div key={s.id} className="group flex flex-col md:flex-row items-start md:items-center justify-between p-5 bg-white rounded-[16px] border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 hover:shadow-md transition-all gap-4">
+                  
+                  {/* Left: Info */}
+                  <div className="flex items-center gap-5 min-w-[280px]">
+                    <div className={cn("w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0", bg, color)}>
+                      <Icon size={24} strokeWidth={1.5} />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{s.title}</h3>
+                      <div className="text-[13px] font-medium text-slate-500 mt-0.5">Группа {s.groupId}</div>
+                      <div className="text-[12px] text-slate-400 mt-0.5">
+                        {isLive ? 'Сегодня, 10:00 - 11:30' : isUpcoming ? 'Завтра, 09:00 - 10:30' : 'Вчера, 10:00 - 11:00'}
+                      </div>
+                    </div>
                   </div>
 
-                  <Badge className="bg-primary/10">{filtered.length} записей</Badge>
-                </div>
-              </div>
+                  {/* Center: Status & Metrics */}
+                  <div className="flex items-center justify-between flex-1 md:w-[30%] min-w-[200px] md:mx-8">
+                     <div>
+                       {isLive && <span className="inline-block bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Активная</span>}
+                       {isUpcoming && <span className="inline-block bg-orange-50 text-orange-600 px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Запланирована</span>}
+                       {isEnded && <span className="inline-block bg-[#F4F1FF] text-[#7448FF] px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Завершена</span>}
+                       <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-500">
+                         <Users size={14} /> {participants} {isEnded ? 'участник' : isLive ? 'участника' : 'участников'}
+                       </div>
+                     </div>
 
-              {/* table */}
-              <div className="mt-6">
-                <Table>
-                  <THead>
-                    <TRow>
-                      <TH className="w-[40%]">Название</TH>
-                      <TH className="w-[20%]">Группа</TH>
-                      <TH className="w-[15%]">Статус</TH>
-                      <TH className="w-[25%] text-right">Действия</TH>
-                    </TRow>
-                  </THead>
-                  <TBody>
-                    {loading ? (
-                      <TRow>
-                        <TCell colSpan={4}>
-                          <div className="h-10 rounded-elas-lg bg-surface-subtle animate-pulse" />
-                        </TCell>
-                      </TRow>
-                    ) : filtered.length === 0 ? (
-                      <TRow>
-                        <TCell colSpan={4} className="py-8 text-center">
-                          {sessions.length === 0 ? (
-                            <>
-                              <div className="text-sm font-medium text-fg">Нет сессий</div>
-                              <div className="mt-2 text-sm text-muted">Создайте первую сессию.</div>
-                              <Link href="/teacher/sessions/new" className="mt-4 inline-block">
-                                <Button size="sm">Создать сессию</Button>
-                              </Link>
-                            </>
-                          ) : (
-                            <>
-                              <div className="text-sm font-medium text-fg">Ничего не найдено</div>
-                              <div className="mt-2 text-sm text-muted">Попробуйте изменить поиск или фильтр.</div>
-                            </>
-                          )}
-                        </TCell>
-                      </TRow>
+                     {!isUpcoming ? (
+                       <div className="w-48 hidden lg:block">
+                         <div className="flex justify-between text-[13px] font-bold text-slate-900 mb-1.5">
+                           {progressW}% <span className="text-slate-400 font-medium">Прогресс</span>
+                         </div>
+                         <div className="w-full bg-slate-100 rounded-full h-1.5">
+                           <div className="bg-[#7448FF] h-1.5 rounded-full" style={{ width: `${progressW}%` }} />
+                         </div>
+                       </div>
+                     ) : (
+                       <div className="w-48 hidden lg:flex items-center text-slate-400 font-medium gap-2 text-[13px]">
+                         <CalendarIcon size={16} /> 10 мая 2026, 09:00 - 10:30
+                       </div>
+                     )}
+                  </div>
+
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-3 shrink-0">
+                    {isLive ? (
+                      <Link href={`/teacher/session/${s.id}`} className="px-5 py-2.5 bg-[#7448FF] text-white shadow-sm font-bold text-[13px] rounded-xl hover:bg-[#623ce6] transition-colors">
+                        Открыть
+                      </Link>
+                    ) : isUpcoming ? (
+                      <Link href={`/teacher/session/${s.id}`} className="px-5 py-2.5 bg-white border border-slate-200 text-[#7448FF] font-bold text-[13px] rounded-xl hover:bg-slate-50 shadow-sm transition-colors">
+                        Продолжить
+                      </Link>
                     ) : (
-                      filtered.map((s) => {
-                        const action =
-                          s.status === "upcoming"
-                            ? { label: "Start", next: "live" as const }
-                            : s.status === "live"
-                              ? { label: "End", next: "ended" as const }
-                              : { label: "Reopen", next: "upcoming" as const };
-                        const label =
-                          action.label === "Start"
-                            ? "Старт"
-                            : action.label === "End"
-                            ? "Завершить"
-                            : "Повторно открыть";
-
-                        return (
-                          <TRow key={s.id}>
-                            <TCell>
-                              <div className="font-medium">{s.title}</div>
-                              <TMuted>ID: {s.id}</TMuted>
-                            </TCell>
-                            <TCell>{s.groupId}</TCell>
-                            <TCell>{statusBadge(s.status)}</TCell>
-                            <TCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  size="sm"
-                                  onClick={() =>
-                                    action.label === "End"
-                                      ? setConfirmEndSession(s)
-                                      : void handleLifecycle(s)
-                                  }
-                                  disabled={actioningId === s.id}
-                                >
-                                  {actioningId === s.id ? "…" : label}
-                                </Button>
-                                <Link href={`/teacher/session/${s.id}`}>
-                                  <Button size="sm" variant="outline">
-                                    Открыть
-                                  </Button>
-                                </Link>
-                              </div>
-                            </TCell>
-                          </TRow>
-                        );
-                      })
+                      <Link href={`/teacher/session/${s.id}/analytics`} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold text-[13px] rounded-xl hover:bg-slate-50 shadow-sm transition-colors cursor-pointer">
+                        Смотреть отчёт
+                      </Link>
                     )}
-                  </TBody>
-                </Table>
-              </div>
+                    <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
+                       <MoreVertical size={16} />
+                    </button>
+                  </div>
 
-            </CardContent>
-          </Card>
-        </Reveal>
-      </Section>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Pagination mock */}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between mt-8 text-[13px] font-medium text-slate-500">
+             <div>
+               Показывать: <select className="bg-transparent font-bold text-slate-900 cursor-pointer outline-none"><option>10</option></select>
+             </div>
+             <div>1–{filtered.length < 10 ? filtered.length : 10} из {filtered.length} сессий</div>
+             <div className="flex items-center gap-1">
+               <button className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-50">{"<"}</button>
+               <button className="w-8 h-8 bg-[#7448FF] text-white rounded-lg flex items-center justify-center shadow-sm">1</button>
+               <button className="w-8 h-8 bg-white text-slate-700 border border-transparent rounded-lg flex items-center justify-center shadow-none hover:bg-slate-100">2</button>
+               <button className="w-8 h-8 bg-white text-slate-700 border border-transparent rounded-lg flex items-center justify-center shadow-none hover:bg-slate-100">3</button>
+               <button className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-50">{">"}</button>
+             </div>
+          </div>
+        )}
+
+      </div>
 
       <Modal
         open={!!confirmEndSession}
@@ -240,24 +255,20 @@ export default function TeacherSessionsPage() {
         title="Завершить сессию?"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmEndSession(null)}>
-              Отмена
-            </Button>
-            <Button
-              className="bg-red-500 hover:bg-red-600"
-              onClick={() => confirmEndSession && void handleLifecycle(confirmEndSession)}
-            >
-              Завершить сессию
+            <Button variant="ghost" onClick={() => setConfirmEndSession(null)}>Отмена</Button>
+            <Button className="bg-red-500 hover:bg-red-600" onClick={() => confirmEndSession && void handleLifecycle(confirmEndSession)}>
+              Завершить
             </Button>
           </div>
         }
       >
         {confirmEndSession && (
-          <p className="text-sm text-muted">
-            Сессия «{confirmEndSession.title}» будет завершена. Участники будут отключены. Отменить нельзя.
+          <p className="text-sm text-slate-500">
+            Сессия «{confirmEndSession.title}» будет завершена. Участники будут отключены. Отменить невозможно.
           </p>
         )}
       </Modal>
+
     </div>
   );
 }

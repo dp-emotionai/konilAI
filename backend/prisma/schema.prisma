@@ -11,7 +11,7 @@ datasource db {
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
-  passwordHash String
+  passwordHash String?
   role         String   // "student" | "teacher" | "admin"
   name         String?
   status       String   @default("active") // "active" | "blocked"
