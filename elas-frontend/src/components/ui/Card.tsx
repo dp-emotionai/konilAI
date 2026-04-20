@@ -45,6 +45,8 @@ export function Card({
   return <div className={cn(base, variants[variant], hover, className)}>{children}</div>;
 }
 
+export default Card;
+
 export function CardHeader({ className, children }: Props) {
   return <div className={cn("p-6 md:p-8 pb-0 flex flex-col gap-1.5", className)}>{children}</div>;
 }

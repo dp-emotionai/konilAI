@@ -4,7 +4,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
 import Section from "@/components/common/Section";
-import Card from "@/components/ui/Card";
+import {Card} from "@/components/ui/Card";
 import Glow from "@/components/common/Glow";
 import { ServerOff, Settings } from "lucide-react";
 
