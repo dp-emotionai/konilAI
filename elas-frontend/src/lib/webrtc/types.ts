@@ -2,9 +2,13 @@ export type Role = "teacher" | "student";
 
 export type ClientId = string;
 export type SessionId = string;
+export type UserId = string;
 
 export type Participant = {
+  /** WebRTC / signaling client id */
   id: ClientId;
+  /** Real backend user id if server sends it */
+  userId?: UserId;
   role: Role;
   sessionId: SessionId;
   displayName?: string;

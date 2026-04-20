@@ -296,17 +296,17 @@ export default function LoginPage() {
       />
 
       <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative hidden flex-col justify-between overflow-hidden rounded-3xl bg-gradient-to-b from-purple-500 via-purple-700 to-slate-950 px-8 py-9 text-white md:flex">
+        <div className="relative hidden flex-col justify-between overflow-hidden rounded-elas-xl bg-surface-subtle border border-[color:var(--border)] px-8 py-9 text-fg md:flex">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-black/30 px-3 py-1 text-xs font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              Konilai · Emotion-Aware Learning
+            <div className="inline-flex items-center gap-2 rounded-full bg-surface shadow-sm px-3 py-1 text-xs font-medium border border-[color:var(--border)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--primary))]" />
+              Konilai · Live Analytics
             </div>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight">
+            <div className="space-y-2 mt-4">
+              <h1 className="text-3xl font-bold tracking-tight">
                 Добро пожаловать в Konilai
               </h1>
-              <p className="max-w-md text-sm text-white/70">
+              <p className="max-w-md text-sm text-muted leading-relaxed">
                 Войдите как преподаватель, студент или администратор, чтобы
                 управлять сессиями и смотреть аналитику вовлечённости.
               </p>
@@ -314,12 +314,12 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Card className="space-y-6 rounded-3xl p-6 sm:p-8">
+        <Card className="space-y-6 rounded-elas-xl p-6 sm:p-8 bg-surface shadow-md">
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold tracking-tight text-[color:var(--text)]">
+            <h2 className="text-2xl font-bold tracking-tight text-fg">
               Вход в аккаунт
             </h2>
-            <p className="text-sm text-[color:var(--muted)]">
+            <p className="text-sm text-muted">
               Используйте email и пароль, выданные вашей организацией.
             </p>
           </div>
@@ -329,7 +329,7 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-center rounded-2xl border-slate-200/70 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full justify-center bg-surface hover:bg-surface-subtle"
                 onClick={() => void handleGoogleLogin()}
               >
                 Войти через Google
@@ -338,7 +338,7 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full justify-center rounded-2xl border-slate-200/70 bg-slate-50 text-slate-800 hover:bg-slate-100 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full justify-center bg-surface hover:bg-surface-subtle"
                 onClick={() =>
                   setError("Вход через Apple пока не настроен. Используйте email и пароль.")
                 }
@@ -347,10 +347,10 @@ export default function LoginPage() {
               </Button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-[color:var(--muted)]">
-              <span className="h-px flex-1 bg-slate-200/60 dark:bg-white/10" />
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span className="h-px flex-1 bg-[color:var(--border)]" />
               <span>или войдите по email</span>
-              <span className="h-px flex-1 bg-slate-200/60 dark:bg-white/10" />
+              <span className="h-px flex-1 bg-[color:var(--border)]" />
             </div>
           </div>
 
@@ -378,34 +378,34 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
 
           <Button className="w-full" onClick={handleLogin} disabled={loading}>
             {loading ? "Вход…" : "Войти"}
           </Button>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border)] pt-4 mt-2">
             <Link
               href="/auth/forgot-password"
-              className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
+              className="text-sm text-muted hover:text-fg hover:underline transition-colors block"
             >
               Забыли пароль?
             </Link>
 
             <Link
               href="/auth/register"
-              className="text-sm font-medium text-purple-300 transition hover:text-purple-200"
+              className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] transition hover:underline"
             >
               Создать аккаунт
             </Link>
           </div>
 
           {mounted && !isApiAvailable() && (
-            <div className="space-y-2 border-t border-white/10 pt-4">
+            <div className="space-y-2 border-t border-[color:var(--border)] pt-4 mt-2">
               <button
                 type="button"
                 onClick={() => setShowDemo((s) => !s)}
-                className="text-sm text-[var(--muted)] transition hover:text-[var(--text)]"
+                className="text-sm text-muted hover:text-fg transition-colors"
               >
                 {showDemo ? "Скрыть демо-режим" : "Нет доступа к серверу? Попробовать демо"}
               </button>

@@ -2,41 +2,43 @@
 
 /* =========================
    KonilAI Design Tokens
-   Premium SaaS — Stripe / Vercel / Linear quality
+   Premium SaaS — Educational Platform
    ========================= */
 :root {
-  /* Backgrounds — layered depth */
-  --bg: #f8f9fc;
-  --surface: #ffffff;
-  --surface-subtle: #f1f3f9;
-  --surface-soft: #e8ecf4;
-  --surface-hover: rgba(15, 18, 34, 0.04);
+  /* Backgrounds — clean, bright, and breathable */
+  --bg: #FAFAFB;
+  --surface: #FFFFFF;
+  --surface-subtle: #F4F5F7;
+  --surface-soft: #EDEDF1;
+  --surface-hover: rgba(15, 23, 42, 0.04);
 
-  /* Borders */
-  --border: rgba(15, 18, 34, 0.08);
-  --border-strong: rgba(15, 18, 34, 0.14);
+  /* Borders — soft structure */
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
 
-  /* Text — clear hierarchy */
-  --text: #0d0f1a;
-  --muted: rgba(15, 18, 34, 0.6);
-  --muted-2: rgba(15, 18, 34, 0.42);
+  /* Text — readable, calm hierarchy */
+  --text: #1E293B; /* slate-800 */
+  --muted: #64748B; /* slate-500 */
+  --muted-2: #94A3B8; /* slate-400 */
 
-  /* Primary — KonilAI purple, refined */
-  --primary: 124 58 237;
-  --primary-hover: 139 92 246;
-  --primary-muted: rgba(124, 58, 237, 0.1);
-  --primary-glow: rgba(124, 58, 237, 0.35);
+  /* Primary Accent — Calm Teal */
+  /* Teal-600 */
+  --primary: 13 148 136;
+  /* Teal-700 */
+  --primary-hover: 15 118 110;
+  --primary-muted: rgba(13, 148, 136, 0.1);
+  --primary-glow: rgba(13, 148, 136, 0.2);
 
   --ring: rgb(var(--primary));
 
-  /* Radii */
-  --radius: 10px;
+  /* Radii — refined, not overly round or sharp */
+  --radius: 8px;
   --radius-sm: 6px;
-  --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-pill: 9999px;
 
-  /* Spacing — 8/12/16/24/32/48/64 rhythm */
+  /* Spacing rhythm — 8px scale */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -48,8 +50,8 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Typography — strong hierarchy */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -66,44 +68,53 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
-  /* Semantic states */
-  --success: 34 197 94;
-  --warning: 245 158 11;
-  --error: 239 68 68;
-  --danger: 239 68 68;
+  /* Semantic colors */
+  --success: 16 185 129; /* emerald-500 */
+  --warning: 245 158 11; /* amber-500 */
+  --error: 220 38 38; /* red-600 */
+  --danger: 220 38 38;
 
-  /* Shadows — layered elevation */
-  --shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-card: 0 4px 16px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
-  --shadow-elevated: 0 12px 40px rgba(15, 23, 42, 0.1), 0 4px 12px rgba(15, 23, 42, 0.06);
-  --shadow-glow: 0 0 0 1px rgba(124, 58, 237, 0.1), 0 4px 20px rgba(124, 58, 237, 0.15);
+  /* Shadows — soft and clean, not glowing */
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-elevated: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.1), 0 4px 14px rgba(13, 148, 136, 0.15);
 
   /* Transitions */
   --ease-default: 0.2s ease;
 }
 
+/* Dark mode — a soft, neutral dark grey, NO dark navy NO heavy purple glows */
 :root.dark {
-  --bg: #0a0b0f;
-  --surface: #12141c;
-  --surface-subtle: #181b26;
-  --surface-soft: #1e2230;
+  --bg: #111827; /* gray-900 */
+  --surface: #1F2937; /* gray-800 */
+  --surface-subtle: #374151; /* gray-700 */
+  --surface-soft: #4B5563; /* gray-600 */
   --surface-hover: rgba(255, 255, 255, 0.05);
 
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.15);
 
-  --text: rgba(255, 255, 255, 0.94);
-  --muted: rgba(255, 255, 255, 0.62);
-  --muted-2: rgba(255, 255, 255, 0.44);
+  --text: #F8FAFC; /* slate-50 */
+  --muted: #94A3B8; /* slate-400 */
+  --muted-2: #64748B; /* slate-500 */
 
-  --primary-muted: rgba(124, 58, 237, 0.2);
-  --primary-glow: rgba(124, 58, 237, 0.25);
+  /* Teal accent in dark mode should pop slightly more but remain calm */
+  --primary: 20 184 166; /* teal-500 */
+  --primary-hover: 45 212 191; /* teal-400 */
+  --primary-muted: rgba(20, 184, 166, 0.15);
+  --primary-glow: rgba(20, 184, 166, 0.2);
   --ring: rgb(var(--primary));
 
-  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
-  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-elevated: 0 20px 56px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 0 1px rgba(124, 58, 237, 0.2), 0 0 32px rgba(124, 58, 237, 0.15);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 0 1px rgba(45, 212, 191, 0.2), 0 0 14px rgba(45, 212, 191, 0.15);
+
+  --success: 52 211 153; /* emerald-400 */
+  --warning: 251 191 36; /* amber-400 */
+  --error: 248 113 113; /* red-400 */
+  --danger: 248 113 113;
 }
 
 html,
@@ -130,32 +141,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Premium SaaS global background — depth and gradient glows */
-body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(120, 80, 255, 0.06), transparent 40%),
-    radial-gradient(circle at 80% 10%, rgba(80, 120, 255, 0.05), transparent 40%),
-    radial-gradient(circle at 50% 80%, rgba(120, 60, 200, 0.04), transparent 50%);
-}
-
+/* Background layers stripped out down to simple plain backings */
 :root.dark body {
-  background: #0b0b12;
-}
-
-:root.dark body::after {
-  background:
-    radial-gradient(circle at 20% 20%, rgba(120, 80, 255, 0.15), transparent 40%),
-    radial-gradient(circle at 80% 10%, rgba(80, 120, 255, 0.15), transparent 40%),
-    radial-gradient(circle at 50% 80%, rgba(120, 60, 200, 0.1), transparent 50%);
+  background: var(--bg);
 }
 
 ::selection {
-  background: rgba(124, 58, 237, 0.2);
+  background: rgba(13, 148, 136, 0.2);
 }
 
 /* Typography — visual hierarchy */
@@ -180,9 +172,9 @@ h4 {
 }
 
 .heading-page {
-  font-size: var(--text-4xl);
+  font-size: var(--text-3xl);
   font-weight: var(--font-bold);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .subtitle {
@@ -201,7 +193,7 @@ h4 {
 @keyframes dropdown-in {
   from {
     opacity: 0;
-    transform: scale(0.96) translateY(-4px);
+    transform: scale(0.98) translateY(-4px);
   }
   to {
     opacity: 1;
@@ -210,7 +202,7 @@ h4 {
 }
 
 .animate-dropdown-in {
-  animation: dropdown-in 0.2s ease-out forwards;
+  animation: dropdown-in 0.15s ease-out forwards;
 }
 
 :focus-visible {
@@ -227,6 +219,7 @@ input,
 textarea,
 select {
   font: inherit;
+  transition: all 0.2s ease;
 }
 
 #__next,
@@ -235,32 +228,15 @@ body > div:first-child {
   z-index: 1;
 }
 
-/* Light noise / anti-banding */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  opacity: 0.012;
-  mix-blend-mode: soft-light;
-}
-
-:root.dark body::before {
-  opacity: 0.028;
-}
-
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: rgba(15, 18, 34, 0.15);
+  background: rgba(15, 23, 42, 0.15);
   border-radius: 999px;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 
@@ -270,6 +246,6 @@ body::before {
 
 .dark *::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
 }

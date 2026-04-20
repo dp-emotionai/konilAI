@@ -11,7 +11,7 @@ type TCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
 type THeadCellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
 
 const tableWrapClass =
-  "w-full overflow-x-auto rounded-elas-lg ring-1 ring-[color:var(--border)]/25 bg-surface shadow-soft";
+  "w-full overflow-x-auto rounded-elas-lg border border-[color:var(--border)] bg-surface shadow-sm";
 
 const cellBaseClass =
   "px-4 py-3 text-sm align-middle border-b border-[color:var(--border)] last:border-b-0";
@@ -30,7 +30,7 @@ export function THead({ className, children, ...props }: SectionProps) {
   return (
     <thead
       className={cn(
-        "bg-surface-subtle/70 text-xs uppercase tracking-[0.12em] text-muted",
+        "bg-surface-subtle text-xs uppercase tracking-wider text-muted font-medium",
         className
       )}
       {...props}
@@ -42,7 +42,7 @@ export function THead({ className, children, ...props }: SectionProps) {
 
 export function TBody({ className, children, ...props }: SectionProps) {
   return (
-    <tbody className={cn("text-[color:var(--text)]", className)} {...props}>
+    <tbody className={cn("text-fg", className)} {...props}>
       {children}
     </tbody>
   );
@@ -52,7 +52,7 @@ export function TRow({ className, children, ...props }: SectionProps) {
   return (
     <tr
       className={cn(
-        "transition-colors hover:bg-surface-subtle/55",
+        "transition-colors hover:bg-surface-subtle/50",
         "[&:last-child_td]:border-b-0 [&:last-child_th]:border-b-0",
         className
       )}
@@ -83,7 +83,7 @@ export function TCell({ className, children, ...props }: TCellProps) {
     <td
       className={cn(
         cellBaseClass,
-        "text-[color:var(--text)] first:pl-5 last:pr-5",
+        "text-fg first:pl-5 last:pr-5",
         className
       )}
       {...props}

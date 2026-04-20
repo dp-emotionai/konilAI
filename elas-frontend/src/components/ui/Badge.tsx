@@ -13,17 +13,16 @@ export default function Badge({
   children: React.ReactNode;
 }) {
   const base =
-    "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium " +
-    "ring-1 ring-inset";
+    "inline-flex items-center gap-1.5 rounded-elas-sm px-2 py-0.5 text-xs font-medium border";
 
   const styles: Record<Variant, string> = {
-    default: "bg-surface-subtle/80 text-fg ring-[color:var(--border)]/35",
-    outline: "bg-transparent text-fg ring-[color:var(--border)]/45",
-    secondary: "bg-surface-subtle text-muted ring-[color:var(--border)]/35",
-    primary: "bg-primary/10 text-[rgb(var(--primary))] ring-[rgb(var(--primary))]/18",
-    success: "bg-[rgb(var(--success))]/10 text-[rgb(var(--success))] ring-[rgb(var(--success))]/18",
-    warning: "bg-[rgb(var(--warning))]/12 text-[rgb(var(--warning))] ring-[rgb(var(--warning))]/20",
-    danger: "bg-[rgb(var(--error))]/10 text-[rgb(var(--error))] ring-[rgb(var(--error))]/18",
+    default: "bg-surface text-fg border-[color:var(--border-strong)]",
+    outline: "bg-transparent text-fg border-[color:var(--border-strong)]",
+    secondary: "bg-surface-subtle text-muted border-transparent",
+    primary: "bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))] border-transparent",
+    success: "bg-success/10 text-success border-transparent",
+    warning: "bg-warning/10 text-[rgb(var(--warning))] border-transparent",
+    danger: "bg-[rgb(var(--error))]/10 text-error border-transparent",
   };
 
   return <span className={cn(base, styles[variant], className)}>{children}</span>;

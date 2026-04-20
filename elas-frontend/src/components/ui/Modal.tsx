@@ -66,7 +66,7 @@ export default function Modal({
   return (
     <div className="fixed inset-0 z-[100]">
       <div
-        className="absolute inset-0 bg-black/45 backdrop-blur-sm dark:bg-black/65"
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
@@ -80,17 +80,17 @@ export default function Modal({
           aria-labelledby={title ? titleId : undefined}
           aria-describedby={description ? descriptionId : undefined}
           className={cn(
-            "w-full max-w-lg overflow-hidden rounded-2xl bg-surface text-fg",
-            "border border-[color:var(--border)]/30 shadow-elevated",
+            "w-full max-w-lg overflow-hidden rounded-elas-xl bg-surface text-fg",
+            "border border-[color:var(--border)] shadow-xl",
             "outline-none",
             className
           )}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-border/50 px-5 py-4">
+          <div className="flex items-start justify-between gap-3 border-b border-[color:var(--border)] px-5 py-4 bg-surface-subtle/30">
             <div className="min-w-0">
               {title ? (
-                <h2 id={titleId} className="truncate text-base font-semibold">
+                <h2 id={titleId} className="truncate text-lg font-semibold">
                   {title}
                 </h2>
               ) : null}
@@ -106,20 +106,20 @@ export default function Modal({
               type="button"
               onClick={onClose}
               className={cn(
-                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-                "bg-surface-subtle/80 text-fg transition-colors hover:bg-surface-subtle",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/35"
+                "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-elas-sm",
+                "text-muted transition-colors hover:bg-surface hover:text-fg",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]"
               )}
               aria-label="Закрыть"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
 
           <div className="px-5 py-4">{children}</div>
 
           {footer ? (
-            <div className="border-t border-border/50 bg-surface/60 px-5 py-4">
+            <div className="border-t border-[color:var(--border)] bg-surface-subtle/50 px-5 py-4">
               {footer}
             </div>
           ) : null}

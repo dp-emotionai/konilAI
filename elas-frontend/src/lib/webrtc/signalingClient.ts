@@ -57,7 +57,6 @@ export class SignalingClient {
     this.closedManually = false;
 
     try {
-      // Надёжнее передавать token через query string, а не через subprotocol array
       this.socket = new WebSocket(this.buildUrlWithToken());
     } catch (error) {
       this.rejectOpen?.(error);

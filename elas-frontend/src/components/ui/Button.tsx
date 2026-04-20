@@ -16,40 +16,39 @@ export default function Button({
     "inline-flex items-center justify-center gap-2 select-none whitespace-nowrap " +
     "rounded-elas font-medium " +
     "transition-all duration-200 ease-out " +
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] " +
-    "disabled:opacity-50 disabled:pointer-events-none disabled:transform-none";
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[color:var(--bg)] " +
+    "disabled:opacity-50 disabled:pointer-events-none";
 
   const sizes =
     size === "sm"
       ? "h-9 px-4 text-sm"
       : size === "lg"
         ? "h-12 px-7 text-base"
-        : "h-11 px-6 text-sm";
+        : "h-10 px-5 text-sm";
 
   const variants =
     variant === "primary"
       ? cn(
-          "bg-gradient-to-r from-[rgb(var(--primary))] to-indigo-500 text-white",
-          "shadow-soft shadow-[0_1px_0_0_rgba(255,255,255,0.08)_inset]",
-          "hover:scale-[1.03] hover:shadow-lg hover:brightness-105",
-          "active:scale-[0.99] active:shadow-soft"
+          "bg-[rgb(var(--primary))] text-white shadow-sm",
+          "hover:bg-[rgb(var(--primary-hover))] hover:shadow",
+          "active:scale-[0.98]"
         )
       : variant === "danger"
         ? cn(
-            "bg-[rgb(var(--error))] text-white shadow-soft",
-            "hover:brightness-105 hover:shadow-card hover:-translate-y-0.5",
-            "active:translate-y-0"
+            "bg-danger text-white shadow-sm",
+            "hover:bg-red-700 hover:shadow",
+            "active:scale-[0.98]"
           )
         : variant === "outline"
           ? cn(
-              "bg-surface text-fg ring-1 ring-[color:var(--border)] dark:ring-white/10",
-              "hover:bg-surface-subtle hover:ring-[color:var(--border-strong)] dark:hover:bg-white/5 hover:-translate-y-0.5 hover:shadow-soft",
-              "active:translate-y-0"
+              "bg-surface text-fg border border-[color:var(--border)] shadow-sm",
+              "hover:bg-surface-subtle hover:border-[color:var(--border-strong)]",
+              "active:scale-[0.98]"
             )
           : cn(
-              "bg-transparent text-fg/90",
-              "hover:bg-surface-subtle dark:hover:bg-white/10 hover:text-fg",
-              "active:bg-[color:var(--surface-hover)]"
+              "bg-transparent text-muted hover:text-fg",
+              "hover:bg-surface-subtle",
+              "active:bg-surface-hover"
             );
 
   return <button className={cn(base, sizes, variants, className)} {...props} />;

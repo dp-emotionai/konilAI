@@ -11,13 +11,11 @@ export default function GlassCard({
     <div
       className={cn(
         "rounded-elas-lg",
-        "border border-border",
-        "bg-[rgba(255,255,255,0.72)] shadow-card",
+        "border border-[color:var(--border)]",
+        "bg-surface/80 shadow-sm",
         "backdrop-blur-xl",
         "transition-shadow transition-colors",
-        "hover:shadow-elevated hover:border-[color:var(--border-strong)]",
-        // dark mode glass
-        "dark:bg-[rgba(20,24,41,0.72)]",
+        "hover:shadow-md hover:border-[color:var(--border-strong)]",
         className
       )}
     >

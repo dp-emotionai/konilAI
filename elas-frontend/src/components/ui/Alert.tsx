@@ -36,21 +36,21 @@ export default function Alert({
     <div
       role="alert"
       className={cn(
-        "rounded-elas-lg ring-1 px-4 py-3 flex items-start gap-3",
-        variant === "info" && "bg-primary-muted/50 ring-[color:var(--border)]/30",
-        variant === "success" && "bg-[rgb(var(--success))]/10 ring-[rgb(var(--success))]/20",
-        variant === "warning" && "bg-[rgb(var(--warning))]/10 ring-[rgb(var(--warning))]/20",
-        variant === "error" && "bg-[rgb(var(--error))]/10 ring-[rgb(var(--error))]/20",
+        "rounded-elas border px-4 py-3 flex items-start gap-3 shadow-sm",
+        variant === "info" && "bg-surface-subtle border-[color:var(--border)]",
+        variant === "success" && "bg-success/5 border-success/20",
+        variant === "warning" && "bg-warning/5 border-warning/20",
+        variant === "error" && "bg-error/5 border-error/20",
         className
       )}
     >
       <span
         className={cn(
-          "shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-elas",
-          variant === "info" && "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary))]",
-          variant === "success" && "bg-[rgb(var(--success))]/15 text-[rgb(var(--success))]",
-          variant === "warning" && "bg-[rgb(var(--warning))]/15 text-[rgb(var(--warning))]",
-          variant === "error" && "bg-[rgb(var(--error))]/15 text-[rgb(var(--error))]"
+          "shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-elas scale-90",
+          variant === "info" && "bg-surface text-[color:var(--text)] border border-[color:var(--border)]",
+          variant === "success" && "bg-success/10 text-success",
+          variant === "warning" && "bg-warning/10 text-warning",
+          variant === "error" && "bg-error/10 text-error"
         )}
       >
         <Icon size={18} aria-hidden />
@@ -68,7 +68,7 @@ export default function Alert({
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 rounded-elas p-1.5 text-muted hover:text-fg hover:bg-surface-subtle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/30"
+          className="shrink-0 rounded-elas p-1.5 text-muted hover:text-fg hover:bg-surface transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/30"
           aria-label="Закрыть"
         >
           <X size={16} />

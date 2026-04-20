@@ -18,6 +18,50 @@ type PeerCallbacks = {
   onPeerLeft?: (peerId: ClientId) => void;
 };
 
+function normalizeParticipant(p: Participant): Participant {
+  return {
+    id: p.id,
+    userId: p.userId,
+    role: p.role,
+    sessionId: p.sessionId,
+    displayName:
+      typeof p.displayName === "string" && p.displayName.trim().length > 0
+        ? p.displayName.trim()
+        : undefined,
+    email:
+      typeof p.email === "string" && p.email.trim().length > 0
+        ? p.email.trim().toLowerCase()
+        : undefined,
+    name:
+      typeof p.name === "string" && p.name.trim().length > 0
+        ? p.name.trim()
+        : undefined,
+  };
+}
+
+function upsertParticipant(list: Participant[], next: Participant): Participant[] {
+  const safe = normalizeParticipant(next);
+  const idx = list.findIndex((p) => p.id === safe.id);
+
+  if (idx === -1) {
+    return [...list, safe];
+  }
+
+  const current = list[idx];
+  const merged: Participant = {
+    ...current,
+    ...safe,
+    userId: safe.userId ?? current.userId,
+    email: safe.email ?? current.email,
+    name: safe.name ?? current.name,
+    displayName: safe.displayName ?? current.displayName,
+  };
+
+  const copy = [...list];
+  copy[idx] = merged;
+  return copy;
+}
+
 export class PeerConnectionManager {
   private signaling: SignalingClient;
   private localStream: MediaStream | null = null;
@@ -41,7 +85,12 @@ export class PeerConnectionManager {
 
     this.signaling.on("joined", (self, participants) => {
       this.selfId = self.id;
-      this.participants = participants.filter((p) => p.id !== self.id);
+
+      const normalized = participants
+        .map(normalizeParticipant)
+        .filter((p) => p.id !== self.id);
+
+      this.participants = normalized;
       this.callbacks.onPeersChange?.(this.participants);
 
       if (this.role === "teacher") {
@@ -54,28 +103,32 @@ export class PeerConnectionManager {
     });
 
     this.signaling.on("user-joined", (p) => {
-      if (this.selfId && p.id === this.selfId) return;
+      const safe = normalizeParticipant(p);
+      if (this.selfId && safe.id === this.selfId) return;
 
-      this.participants = [...this.participants.filter((x) => x.id !== p.id), p];
+      this.participants = upsertParticipant(this.participants, safe);
       this.callbacks.onPeersChange?.(this.participants);
 
       if (this.role === "teacher" && this.localStream) {
-        void this.createPeerAndOffer(p.id);
+        void this.createPeerAndOffer(safe.id);
       }
     });
 
     this.signaling.on("user-left", (p) => {
-      const pc = this.peers.get(p.id);
+      const peerId = p.id;
+      const pc = this.peers.get(peerId);
+
       if (pc) {
         pc.ontrack = null;
         pc.onicecandidate = null;
+        pc.onconnectionstatechange = null;
         pc.close();
       }
 
-      this.peers.delete(p.id);
-      this.participants = this.participants.filter((x) => x.id !== p.id);
+      this.peers.delete(peerId);
+      this.participants = this.participants.filter((x) => x.id !== peerId);
       this.callbacks.onPeersChange?.(this.participants);
-      this.callbacks.onPeerLeft?.(p.id);
+      this.callbacks.onPeerLeft?.(peerId);
     });
 
     this.signaling.on("webrtc-offer", async (from, sdp) => {
@@ -98,7 +151,7 @@ export class PeerConnectionManager {
     this.signaling.on("webrtc-ice", (from, candidate) => {
       const pc = this.peers.get(from);
       if (!pc) return;
-      pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+      void pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
     });
 
     this.signaling.on("close", () => {
@@ -117,6 +170,10 @@ export class PeerConnectionManager {
     return this.localStream;
   }
 
+  getParticipants() {
+    return this.participants;
+  }
+
   join() {
     this.signaling.join(this.sessionId, this.role);
   }
@@ -130,11 +187,13 @@ export class PeerConnectionManager {
     this.peers.forEach((pc) => {
       pc.ontrack = null;
       pc.onicecandidate = null;
+      pc.onconnectionstatechange = null;
       pc.close();
     });
 
     this.peers.clear();
     this.participants = [];
+    this.selfId = null;
   }
 
   setAudioEnabled(enabled: boolean) {
@@ -176,7 +235,7 @@ export class PeerConnectionManager {
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        this.signaling.sendIceCandidate(peerId, event.candidate);
+        this.signaling.sendIceCandidate(peerId, event.candidate.toJSON());
       }
     };
 
@@ -199,6 +258,8 @@ export class PeerConnectionManager {
   }
 
   private async createPeerAndOffer(peerId: ClientId) {
+    if (this.peers.has(peerId)) return;
+
     const pc = this.getOrCreatePeer(peerId);
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
