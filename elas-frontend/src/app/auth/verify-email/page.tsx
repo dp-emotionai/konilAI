@@ -1,12 +1,22 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
+import { 
+  ChevronLeft, 
+  AlertCircle,
+  RefreshCw,
+  Mail,
+  ArrowRight
+} from "lucide-react";
+
+import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useUI } from "@/components/layout/Providers";
+import StepHeading from "@/components/auth/StepHeading";
 import { ROLE_HOME } from "@/lib/nav";
 import {
   api,
@@ -16,6 +26,7 @@ import {
   type UserStatus,
 } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
+import { cn } from "@/lib/cn";
 
 type VerifyEmailRes = {
   user?: {
@@ -91,16 +102,19 @@ function VerifyEmailInner() {
 
   const [email, setEmail] = useState(emailFromQuery);
   const [code, setCode] = useState("");
-  const [info, setInfo] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+  const [timer, setTimer] = useState(45);
+
+  const codeInputs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    if (!email && emailFromQuery) {
-      setEmail(emailFromQuery);
+    if (timer > 0) {
+      const t = setTimeout(() => setTimer(timer - 1), 1000);
+      return () => clearTimeout(t);
     }
-  }, [email, emailFromQuery]);
+  }, [timer]);
 
   const finishLogin = ({
     token,
@@ -115,10 +129,7 @@ function VerifyEmailInner() {
     name?: string | null;
     status?: UserStatus | null;
   }) => {
-    const safeHome =
-      typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
-        ? ROLE_HOME[role]
-        : "/";
+    const safeHome = ROLE_HOME[role] || "/";
 
     setAuth({
       token,
@@ -133,48 +144,28 @@ function VerifyEmailInner() {
     setLoggedIn(true);
 
     clearPendingRegister();
-    router.push(safeHome);
+
+    if (mode === "register") {
+      router.push("/auth/register/success");
+    } else {
+      router.push(safeHome);
+    }
   };
+
 
   const handleVerify = async () => {
     setError("");
-    setInfo("");
-
-    const safeEmail = email.trim().toLowerCase();
-    const safeCode = code.trim();
-
-    if (!safeEmail) {
-      setError("Введите email.");
-      return;
-    }
-
-    if (!safeCode) {
-      setError("Введите код подтверждения.");
-      return;
-    }
-
-    if (!isApiAvailable()) {
-      setError("Сервер временно недоступен. Попробуйте позже.");
-      return;
-    }
-
     setLoading(true);
 
     try {
       const body: Record<string, unknown> = {
-        email: safeEmail,
-        code: safeCode,
+        email: email.trim().toLowerCase(),
+        code: code.trim(),
       };
 
       if (mode === "register") {
         const pending = getPendingRegister();
-
-        if (!pending) {
-          throw new Error(
-            "Не найдены данные регистрации. Вернитесь к шагу регистрации и попробуйте снова."
-          );
-        }
-
+        if (!pending) throw new Error("Данные регистрации не найдены. Попробуйте снова.");
         body.password = pending.password;
         body.name = pending.name ?? "";
         body.role = pending.role;
@@ -187,18 +178,8 @@ function VerifyEmailInner() {
       const role = normalizeRole(user?.role);
       const status = normalizeStatus(user?.status);
 
-      if (!user || !user.email) {
-        throw new Error("Сервер не вернул данные пользователя.");
-      }
-
-      if (!token) {
-        throw new Error("Сервер не вернул токен авторизации.");
-      }
-
-      if (!role || !(role in ROLE_HOME)) {
-        throw new Error(
-          `Сервер вернул неизвестную роль пользователя: ${String(user?.role)}`
-        );
+      if (!user || !user.email || !token || !role || !(role in ROLE_HOME)) {
+        throw new Error("Ошибка подтверждения. Повторите попытку.");
       }
 
       finishLogin({
@@ -209,64 +190,22 @@ function VerifyEmailInner() {
         status,
       });
     } catch (err) {
-      console.error("VERIFY EMAIL ERROR:", err);
-      const raw =
-        err instanceof Error ? err.message : err != null ? String(err) : "";
-      const normalized = raw.toLowerCase();
-
-      if (
-        normalized.includes("invalid") ||
-        normalized.includes("невер") ||
-        normalized.includes("incorrect")
-      ) {
-        setError("Неверный код подтверждения.");
-      } else if (
-        normalized.includes("expired") ||
-        normalized.includes("истек")
-      ) {
-        setError("Срок действия кода истёк. Запросите новый код.");
-      } else if (
-        normalized.includes("имя обязательно") ||
-        normalized.includes("name")
-      ) {
-        setError(
-          "Не удалось завершить регистрацию: отсутствуют данные профиля. Вернитесь на страницу регистрации и попробуйте снова."
-        );
-      } else {
-        setError(raw || "Не удалось подтвердить email.");
-      }
+      setError(err instanceof Error ? err.message : "Неверный код.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleResend = async () => {
+    if (timer > 0) return;
     setError("");
-    setInfo("");
-
-    const safeEmail = email.trim().toLowerCase();
-    if (!safeEmail) {
-      setError("Сначала укажите email.");
-      return;
-    }
-
-    if (!isApiAvailable()) {
-      setError("Сервер временно недоступен. Попробуйте позже.");
-      return;
-    }
-
     setResending(true);
 
     try {
       if (mode === "register") {
         const pending = getPendingRegister();
-
-        if (!pending) {
-          throw new Error(
-            "Не найдены данные регистрации. Вернитесь к шагу регистрации и попробуйте снова."
-          );
-        }
-
+        if (!pending) throw new Error("Данные не найдены.");
+        
         await api.post("auth/register", {
           email: pending.email,
           password: pending.password,
@@ -274,125 +213,124 @@ function VerifyEmailInner() {
           role: pending.role,
         });
 
-        setInfo("Новый код подтверждения отправлен на вашу почту.");
+        setTimer(60);
       } else {
-        setInfo("Повторная отправка кода для этого режима пока не настроена.");
+        throw new Error("Повторная отправка пока не поддерживается для этого режима.");
       }
     } catch (err) {
-      const raw =
-        err instanceof Error ? err.message : err != null ? String(err) : "";
-      setError(raw || "Не удалось отправить код повторно.");
+      setError(err instanceof Error ? err.message : "Не удалось отправить код.");
     } finally {
       setResending(false);
     }
   };
 
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const val = e.target.value.replace(/[^0-9]/g, "");
+    if (!val) return;
+
+    const newCode = code.split("");
+    newCode[index] = val[val.length - 1]; // Use last digit if pasted
+    const finalCode = newCode.join("");
+    setCode(finalCode);
+
+    // Focus next
+    if (index < 5 && val) {
+      codeInputs.current[index + 1]?.focus();
+    }
+
+    if (finalCode.length === 6) {
+       // auto-verify? 
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      codeInputs.current[index - 1]?.focus();
+    }
+  };
+
   return (
-    <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
-      <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative hidden flex-col justify-between overflow-hidden rounded-elas-xl bg-surface-subtle border border-[color:var(--border)] px-8 py-9 text-fg md:flex">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-surface shadow-sm px-3 py-1 text-xs font-medium border border-[color:var(--border)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--primary))]" />
-              Подтверждение email
+    <div className="min-h-screen bg-slate-50/30 flex items-center justify-center py-12 px-4">
+      <Card className="w-full max-w-[600px] border-white/50 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden">
+        <CardContent className="p-8 md:p-12">
+          <div className="flex flex-col items-center">
+            
+            <button onClick={() => router.back()} className="self-start flex items-center gap-1.5 text-sm text-slate-400 font-medium mb-12 hover:text-slate-600 transition-colors">
+              <ChevronLeft size={16} /> Назад
+            </button>
+
+            <div className="mb-8 p-6 bg-slate-50 rounded-[40px] border border-slate-100 flex items-center justify-center relative w-24 h-24">
+               <Image 
+                  src="/auth_verify_illustration_1776719333175.png" 
+                  alt="Verify Illustration" 
+                  width={140} 
+                  height={140} 
+                  className="absolute -top-10 scale-125"
+               />
             </div>
 
-            <div className="space-y-2 mt-4">
-              <h1 className="text-3xl font-bold tracking-tight">
-                Введите код подтверждения
-              </h1>
-              <p className="max-w-md text-sm text-muted leading-relaxed">
-                Мы отправили код на вашу почту. После подтверждения вы сможете
-                завершить вход в систему.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <Card className="space-y-6 rounded-elas-xl p-6 sm:p-8 bg-surface shadow-md">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight text-fg">
-              Подтвердите email
-            </h2>
-            <p className="text-sm text-muted">
-              Введите код, который пришёл на почту.
+            <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-3 text-center">Проверьте вашу почту</h2>
+            <p className="text-slate-500 text-[15px] font-medium mb-10 text-center max-w-sm">
+              Мы отправили код подтверждения на<br />
+              <span className="text-slate-900 font-bold">{email || "ваш email"}</span>
             </p>
-          </div>
 
-          <div className="space-y-4">
-            <Input
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading || resending}
-              autoComplete="email"
-            />
+            {/* Digit Inputs */}
+            <div className="flex gap-3 mb-8">
+              {[...Array(6)].map((_, i) => (
+                <input
+                  key={i}
+                  ref={el => { codeInputs.current[i] = el; }}
+                  className={cn(
+                    "w-12 h-14 md:w-14 md:h-16 text-center text-xl font-bold rounded-2xl border-2 transition-all outline-none",
+                    code[i] ? "border-[#7448FF] bg-purple-50/50 text-[#7448FF]" : "border-slate-100 bg-slate-50 focus:border-slate-300"
+                  )}
+                  type="text"
+                  maxLength={1}
+                  value={code[i] || ""}
+                  onChange={e => handleCodeChange(e, i)}
+                  onKeyDown={e => handleKeyDown(e, i)}
+                  disabled={loading}
+                />
+              ))}
+            </div>
 
-            <Input
-              placeholder="Код подтверждения"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              disabled={loading || resending}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  void handleVerify();
-                }
-              }}
-            />
-          </div>
+            <div className="text-center mb-10 space-y-4">
+              {timer > 0 ? (
+                <div className="text-[13px] text-slate-400 font-semibold tracking-wide">
+                  Код отправлен повторно через <span className="text-slate-900 tabular-nums">00:{timer.toString().padStart(2, '0')}</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={handleResend}
+                  disabled={resending}
+                  className="text-sm font-bold text-[#7448FF] flex items-center gap-2 mx-auto hover:underline"
+                >
+                  {resending ? <RefreshCw size={16} className="animate-spin" /> : "Отправить код повторно"}
+                </button>
+              )}
+            </div>
 
-          {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
-          {info && <p className="text-sm text-[rgb(var(--success))]">{info}</p>}
+            {error && (
+              <div className="w-full mb-8 p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-[13px] font-medium flex items-center gap-2.5">
+                <AlertCircle size={18} /> {error}
+              </div>
+            )}
 
-          <div className="space-y-3">
-            <Button
-              className="w-full"
-              onClick={handleVerify}
-              disabled={loading || resending}
-            >
-              {loading ? "Проверка…" : "Подтвердить email"}
+            <Button 
+                onClick={handleVerify} 
+                disabled={loading || code.length < 6} 
+                className="w-full h-14 text-[15px] font-bold flex items-center justify-center gap-2"
+              >
+                {loading ? "Обработка..." : "Подтвердить"}
+                {!loading && <ArrowRight size={18} />}
             </Button>
 
-            <Button
-              variant="outline"
-              className="w-full bg-surface hover:bg-surface-subtle"
-              onClick={handleResend}
-              disabled={loading || resending}
-            >
-              {resending ? "Отправка…" : "Отправить код ещё раз"}
-            </Button>
-          </div>
-
-          <div className="border-t border-[color:var(--border)] pt-4 mt-2 text-center">
-            <Link
-              href="/auth/register"
-              className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] hover:underline transition-colors"
-              onClick={() => {
-                clearAuth();
-              }}
-            >
-              ← Вернуться к регистрации
+            <Link href="/auth/register" className="mt-8 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors">
+              Зарегистрироваться на другой Email
             </Link>
           </div>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function VerifyEmailFallback() {
-  return (
-    <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
-      <Card className="w-full max-w-md rounded-elas-xl p-6 sm:p-8 shadow-md">
-        <div className="space-y-2 text-center">
-          <h2 className="text-2xl font-bold tracking-tight text-fg">
-            Подтверждение email
-          </h2>
-          <p className="text-sm text-muted">
-            Подготавливаем форму подтверждения…
-          </p>
-        </div>
+        </CardContent>
       </Card>
     </div>
   );
@@ -400,7 +338,7 @@ function VerifyEmailFallback() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<VerifyEmailFallback />}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50/30 flex items-center justify-center">Загрузка...</div>}>
       <VerifyEmailInner />
     </Suspense>
   );

@@ -3,8 +3,18 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Script from "next/script";
-import { Card } from "@/components/ui/Card";
+import Image from "next/image";
+import { 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  Mail, 
+  ChevronRight, 
+  AlertCircle,
+  ArrowLeft
+} from "lucide-react";
+
+import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useUI } from "@/components/layout/Providers";
@@ -17,6 +27,7 @@ import {
   type UserStatus,
 } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
+import { cn } from "@/lib/cn";
 
 type LoginRes = {
   user?: {
@@ -28,9 +39,6 @@ type LoginRes = {
   };
   token?: string;
   accessToken?: string;
-  device?: string;
-  location?: string;
-  isNewDevice?: boolean;
   message?: string;
 };
 
@@ -56,9 +64,9 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showDemo, setShowDemo] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
@@ -76,10 +84,7 @@ export default function LoginPage() {
     name?: string | null;
     status?: UserStatus | null;
   }) => {
-    const safeHome =
-      typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
-        ? ROLE_HOME[role]
-        : "/";
+    const safeHome = ROLE_HOME[role] || "/";
 
     setAuth({
       token,
@@ -96,37 +101,14 @@ export default function LoginPage() {
     router.push(safeHome);
   };
 
-  const resetUiAuthState = () => {
-    clearAuth();
-    setLoggedIn(false);
-    setRole(null);
-    setStatus(null);
-  };
-
   const handleLogin = async () => {
     setError("");
-
-    const e = email.trim().toLowerCase();
-    const p = password;
-
-    if (!e || !p) {
-      setError("Введите email и пароль.");
-      return;
-    }
-
-    if (!isApiAvailable()) {
-      setError(
-        "Сервер недоступен. Проверьте подключение или используйте демо-режим ниже."
-      );
-      return;
-    }
-
     setLoading(true);
 
     try {
       const data = await api.post<LoginRes>("auth/login", {
-        email: e,
-        password: p,
+        email: email.trim().toLowerCase(),
+        password: password,
       });
 
       const user = data?.user;
@@ -134,22 +116,8 @@ export default function LoginPage() {
       const token = data?.token ?? data?.accessToken;
       const status = normalizeStatus(user?.status);
 
-      if (!user) {
-        throw new Error("Сервер не вернул данные пользователя.");
-      }
-
-      if (!user.email) {
-        throw new Error("Сервер не вернул email пользователя.");
-      }
-
-      if (!token) {
-        throw new Error("Сервер не вернул токен авторизации.");
-      }
-
-      if (!role || !(role in ROLE_HOME)) {
-        throw new Error(
-          `Сервер вернул неизвестную роль пользователя: ${String(user?.role)}`
-        );
+      if (!user || !user.email || !token || !role || !(role in ROLE_HOME)) {
+        throw new Error("Некорректный ответ сервера. Попробуйте позже.");
       }
 
       finishLogin({
@@ -160,285 +128,119 @@ export default function LoginPage() {
         status,
       });
     } catch (err) {
-      console.error("LOGIN PAGE ERROR:", err);
-
-      let message = "Ошибка входа. Проверьте данные.";
-      const raw =
-        err instanceof Error ? err.message : err != null ? String(err) : "";
-      const normalized = raw.toLowerCase();
-
-      if (
-        normalized.includes("awaiting admin approval") ||
-        normalized.includes("pending approval") ||
-        normalized.includes("ожидает одобрения")
-      ) {
-        message =
-          "Ваш аккаунт ожидает одобрения администратором. После подтверждения вы получите письмо и сможете войти в систему.";
-      } else if (
-        normalized.includes("blocked") ||
-        normalized.includes("заблокирован")
-      ) {
-        message =
-          "Ваш аккаунт заблокирован. Обратитесь к администратору вашей организации.";
-      } else if (raw) {
-        message = raw;
-      }
-
-      resetUiAuthState();
-      setError(message);
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Ошибка входа.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError("");
-
-    if (!isApiAvailable()) {
-      setError("Сервер недоступен. Попробуйте позже или используйте вход по email.");
-      return;
-    }
-
-    const anyWindow = window as typeof window & {
-      google?: {
-        accounts?: {
-          id?: {
-            initialize: (config: {
-              client_id: string;
-              callback: (response: { credential: string }) => void;
-            }) => void;
-            prompt: () => void;
-          };
-        };
-      };
-    };
-
-    const google = anyWindow.google;
-    if (!google?.accounts?.id) {
-      setError("Google auth недоступен. Обновите страницу и попробуйте снова.");
-      return;
-    }
-
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      setError("Google client id не настроен на фронтенде.");
-      return;
-    }
-
-    google.accounts.id.initialize({
-      client_id: clientId,
-      callback: async (response: { credential: string }) => {
-        try {
-          const data = await api.post<LoginRes>("auth/google", {
-            idToken: response.credential,
-          });
-
-          const user = data?.user;
-          const role = normalizeRole(user?.role);
-          const token = data?.token ?? data?.accessToken;
-          const status = normalizeStatus(user?.status);
-
-          if (!user || !user.email) {
-            throw new Error("Сервер не вернул данные пользователя.");
-          }
-
-          if (!token) {
-            throw new Error("Сервер не вернул токен авторизации.");
-          }
-
-          if (!role || !(role in ROLE_HOME)) {
-            throw new Error(
-              `Сервер вернул неизвестную роль пользователя: ${String(user?.role)}`
-            );
-          }
-
-          finishLogin({
-            token,
-            role,
-            email: user.email,
-            name: user.name ?? undefined,
-            status,
-          });
-        } catch (err) {
-          console.error("GOOGLE LOGIN ERROR:", err);
-          resetUiAuthState();
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Ошибка входа через Google. Попробуйте снова."
-          );
-        }
-      },
-    });
-
-    google.accounts.id.prompt();
-  };
-
-  const handleDemo = (role: Role) => {
-    clearAuth();
-    setRole(role);
-    setStatus(null);
-    setLoggedIn(true);
-
-    const safeHome =
-      typeof ROLE_HOME[role] === "string" && ROLE_HOME[role].length > 0
-        ? ROLE_HOME[role]
-        : "/";
-
-    router.push(safeHome);
-  };
-
   return (
-    <div className="flex min-h-[calc(100vh-96px)] items-center justify-center px-4 py-10">
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="afterInteractive"
-      />
+    <div className="min-h-screen bg-slate-50/30 flex items-center justify-center py-12 px-4 font-sans">
+      <Card className="w-full max-w-[1000px] border-white/50 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden">
+        <CardContent className="p-0">
+          <div className="grid lg:grid-cols-[1.1fr_0.9fr] gap-0">
+            {/* Left Column: Form */}
+            <div className="p-8 md:p-12 flex flex-col">
+              <div className="mb-10 flex items-center gap-2">
+                <Link href="/" className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-[#7448FF] rounded-lg flex items-center justify-center text-white font-bold text-sm">K</div>
+                  <span className="text-lg font-bold text-slate-900">KoniAI</span>
+                </Link>
+              </div>
 
-      <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="relative hidden flex-col justify-between overflow-hidden rounded-elas-xl bg-surface-subtle border border-[color:var(--border)] px-8 py-9 text-fg md:flex">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-surface shadow-sm px-3 py-1 text-xs font-medium border border-[color:var(--border)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--primary))]" />
-              Konilai · Live Analytics
-            </div>
-            <div className="space-y-2 mt-4">
-              <h1 className="text-3xl font-bold tracking-tight">
-                Добро пожаловать в Konilai
-              </h1>
-              <p className="max-w-md text-sm text-muted leading-relaxed">
-                Войдите как преподаватель, студент или администратор, чтобы
-                управлять сессиями и смотреть аналитику вовлечённости.
-              </p>
-            </div>
-          </div>
-        </div>
+              <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto lg:mx-0">
+                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Вход в аккаунт</h2>
+                <p className="text-slate-500 text-sm font-medium mb-10">Используйте свои учетные данные для доступа к платформе</p>
 
-        <Card className="space-y-6 rounded-elas-xl p-6 sm:p-8 bg-surface shadow-md">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight text-fg">
-              Вход в аккаунт
-            </h2>
-            <p className="text-sm text-muted">
-              Используйте email и пароль, выданные вашей организацией.
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-center bg-surface hover:bg-surface-subtle"
-                onClick={() => void handleGoogleLogin()}
-              >
-                Войти через Google
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full justify-center bg-surface hover:bg-surface-subtle"
-                onClick={() =>
-                  setError("Вход через Apple пока не настроен. Используйте email и пароль.")
-                }
-              >
-                Войти через Apple
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <span className="h-px flex-1 bg-[color:var(--border)]" />
-              <span>или войдите по email</span>
-              <span className="h-px flex-1 bg-[color:var(--border)]" />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <Input
-              placeholder="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={loading}
-              autoComplete="email"
-            />
-            <Input
-              placeholder="Пароль"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              autoComplete="current-password"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  void handleLogin();
-                }
-              }}
-            />
-          </div>
-
-          {error && <p className="text-sm text-[rgb(var(--error))]">{error}</p>}
-
-          <Button className="w-full" onClick={handleLogin} disabled={loading}>
-            {loading ? "Вход…" : "Войти"}
-          </Button>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--border)] pt-4 mt-2">
-            <Link
-              href="/auth/forgot-password"
-              className="text-sm text-muted hover:text-fg hover:underline transition-colors block"
-            >
-              Забыли пароль?
-            </Link>
-
-            <Link
-              href="/auth/register"
-              className="text-sm font-semibold text-[rgb(var(--primary))] hover:text-[rgb(var(--primary-hover))] transition hover:underline"
-            >
-              Создать аккаунт
-            </Link>
-          </div>
-
-          {mounted && !isApiAvailable() && (
-            <div className="space-y-2 border-t border-[color:var(--border)] pt-4 mt-2">
-              <button
-                type="button"
-                onClick={() => setShowDemo((s) => !s)}
-                className="text-sm text-muted hover:text-fg transition-colors"
-              >
-                {showDemo ? "Скрыть демо-режим" : "Нет доступа к серверу? Попробовать демо"}
-              </button>
-
-              {showDemo && (
-                <div className="mt-1 grid grid-cols-3 gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDemo("teacher")}
-                  >
-                    Преподаватель
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDemo("student")}
-                  >
-                    Студент
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDemo("admin")}
-                  >
-                    Админ
-                  </Button>
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-[13px] font-bold text-slate-500 mb-2.5 ml-1">Email</label>
+                    <Input 
+                      placeholder="example@mail.ru" 
+                      type="email"
+                      value={email} 
+                      onChange={e => setEmail(e.target.value)}
+                      className="h-12 bg-white"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-bold text-slate-500 mb-2.5 ml-1 flex justify-between items-center">
+                      Пароль
+                      <Link href="/auth/forgot-password" className="text-[#7448FF] hover:underline font-semibold text-[12px]">Забыли?</Link>
+                    </label>
+                    <Input 
+                      placeholder="••••••••••" 
+                      type={showPassword ? "text" : "password"}
+                      value={password} 
+                      onChange={e => setPassword(e.target.value)}
+                      className="h-12 bg-white"
+                      disabled={loading}
+                      suffix={
+                        <button 
+                          type="button" 
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="hover:text-slate-600 transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleLogin();
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
+
+                {error && (
+                  <div className="mt-6 p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 text-[13px] font-medium flex items-center gap-2.5">
+                    <AlertCircle size={18} /> {error}
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleLogin} 
+                  disabled={loading || !email || !password} 
+                  className="w-full h-14 mt-10 text-[15px] font-bold flex items-center justify-center gap-2"
+                >
+                  {loading ? "Вход..." : "Войти"}
+                  {!loading && <ChevronRight size={18} />}
+                </Button>
+
+                <div className="mt-10 pt-8 border-t border-slate-100 text-center lg:text-left">
+                  <p className="text-[13px] text-slate-500 font-medium">
+                    Нет аккаунта?{" "}
+                    <Link href="/auth/register" className="text-[#7448FF] font-bold hover:underline">Зарегистрироваться</Link>
+                  </p>
+                </div>
+              </div>
             </div>
-          )}
-        </Card>
-      </div>
+
+            {/* Right Column: Illustration */}
+            <div className="relative hidden lg:flex items-center justify-center bg-slate-50/50 p-12 border-l border-slate-100">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative w-full aspect-square max-w-[320px] mb-8 animate-in zoom-in duration-700">
+                  <Image 
+                    src="/auth_login_illustration_1776719102544.png" 
+                    alt="Login Illustration" 
+                    fill 
+                    className="object-contain"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-3">Безопасный доступ</h3>
+                <p className="text-sm text-slate-500 max-w-xs font-medium leading-relaxed">
+                  Мы используем сквозное шифрование и современные стандарты безопасности для защиты ваших данных.
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <Link href="/" className="fixed bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-sm font-semibold">
+        <ArrowLeft size={16} /> Вернуться на главную
+      </Link>
     </div>
   );
-} 
+}
