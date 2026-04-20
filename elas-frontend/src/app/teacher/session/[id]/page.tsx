@@ -174,6 +174,7 @@ function VideoTile({
   metrics,
   compact,
   aspect = true,
+  objectFit = "cover",
 }: {
   stream: MediaStream | null;
   label: string;
@@ -325,14 +326,14 @@ export default function TeacherLiveMonitorPage() {
   useEffect(() => {
     import("@/lib/api/teacher").then(({ getTeacherDashboardSessions }) => {
       getTeacherDashboardSessions().then((sessions) => {
-        const s = sessions.find((x) => x.id === roomId);
+        const s = sessions.find((x) => x.id === sessionId);
         if (s) {
           setSessionTitle(s.title);
           setSessionType(s.type);
         }
       });
     });
-  }, [roomId]);
+  }, [sessionId]);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
@@ -406,7 +407,7 @@ export default function TeacherLiveMonitorPage() {
         // Broadcast local display name using auth
         const { getStoredAuth } = await import("@/lib/api/client");
         const auth = getStoredAuth();
-        manager.join(auth ? { email: auth.email, name: auth.name } : undefined);
+        manager.join(auth ? { email: auth.email, name: auth.name ?? undefined } : undefined);
         
         setConnectionState("connected");
       } catch (err) {

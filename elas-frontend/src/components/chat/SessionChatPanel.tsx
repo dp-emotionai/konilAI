@@ -29,7 +29,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   const [loading, setLoading] = useState(false);
   const [policy, setPolicy] = useState<SessionChatPolicy | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [auth, setAuth] = useState<{ email?: string; name?: string; role?: string } | null>(null);
+  const [auth, setAuth] = useState<{ email?: string; name?: string | null; role?: string } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

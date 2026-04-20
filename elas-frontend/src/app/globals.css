@@ -82,6 +82,7 @@
   --ease-default: 0.2s ease;
 }
 
+:root.dark {
   /* Dark mode strictly disabled in the approved design system.
      We map all dark variables back to light variables to prevent half-states,
      although strictly no elements should use `.dark` anywhere anymore. */

@@ -52,6 +52,9 @@ import {
   MicOff,
   VideoOff,
   MonitorUp,
+  Sparkles,
+  ShieldCheck,
+  LogOut,
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 
@@ -239,7 +242,7 @@ export default function StudentJoinSessionPage() {
         // Pass display name via user auth to signaling
         const { getStoredAuth } = await import("@/lib/api/client");
         const auth = getStoredAuth();
-        manager.join(auth ? { email: auth.email, name: auth.name } : undefined);
+        manager.join(auth ? { email: auth.email, name: auth.name ?? undefined } : undefined);
         
         setConnectionState("connected");
       } catch (e) {
