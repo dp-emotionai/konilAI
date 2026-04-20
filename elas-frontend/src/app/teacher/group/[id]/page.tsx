@@ -568,7 +568,7 @@ export default function TeacherGroupDetailPage() {
             <div className="mt-5 grid gap-3 md:grid-cols-4">
               <StatTile
                 label="Преподаватель"
-                value={group.teacher.name}
+                value={group.teacher.fullName}
                 icon={<Users size={15} className="text-muted" />}
               />
               <StatTile
@@ -885,13 +885,13 @@ export default function TeacherGroupDetailPage() {
                     ) : (
                       <div className="mt-6 space-y-3">
                         {!apiAvailable &&
-                          group?.students?.map((s: { id: string; name: string; email?: string | null }) => (
+                          group?.students?.map((s: { id: string; fullName: string; email?: string | null }) => (
                             <div
                               key={s.id}
                               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
                             >
                               <div>
-                                <div className="font-medium text-fg">{s.name}</div>
+                                <div className="font-medium text-fg">{s.fullName}</div>
                                 {s.email && <div className="text-sm text-muted">{s.email}</div>}
                               </div>
                               <ToneBadge tone="success">В группе</ToneBadge>
@@ -912,7 +912,7 @@ export default function TeacherGroupDetailPage() {
                               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
                             >
                               <div>
-                                <div className="font-medium text-fg">{m.name ?? m.email}</div>
+                                <div className="font-medium text-fg">{m.fullName ?? m.email}</div>
                                 <div className="text-sm text-muted">{m.email}</div>
                               </div>
 
@@ -938,13 +938,13 @@ export default function TeacherGroupDetailPage() {
                                     onRemove={() =>
                                       setConfirmRemoveMember({
                                         memberId: m.id,
-                                        memberName: m.name ?? m.email ?? "Участник",
+                                        memberName: m.fullName ?? m.email ?? "Участник",
                                       })
                                     }
                                     onBlock={() =>
                                       setConfirmBlockMember({
                                         memberId: m.id,
-                                        memberName: m.name ?? m.email ?? "Участник",
+                                        memberName: m.fullName ?? m.email ?? "Участник",
                                       })
                                     }
                                   />
@@ -1062,7 +1062,7 @@ export default function TeacherGroupDetailPage() {
                   <div className="mt-6 space-y-3 rounded-2xl bg-surface-subtle/60 ring-1 ring-[color:var(--border)]/20 p-5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Преподаватель</span>
-                      <span className="font-medium text-fg">{group.teacher.name}</span>
+                      <span className="font-medium text-fg">{group.teacher.fullName}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted">Студентов</span>

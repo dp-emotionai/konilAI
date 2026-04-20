@@ -38,7 +38,8 @@ const PENDING_REGISTER_KEY = "elas_pending_register_v1";
 function savePendingRegister(data: {
   email: string;
   password: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   role: "student" | "teacher";
 }) {
   if (typeof window === "undefined") return;
@@ -105,14 +106,16 @@ export default function RegisterWizardPage() {
       const data = await api.post<RegisterRes>("auth/register", {
         email: e,
         password: p,
-        name: n || undefined,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         role: role || "student",
       });
 
       savePendingRegister({
         email: e,
         password: p,
-        name: n || undefined,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         role: role || "student",
       });
 
@@ -130,7 +133,7 @@ export default function RegisterWizardPage() {
       <div className="flex flex-col justify-center py-8">
         <div className="mb-10 flex items-center gap-2">
           <div className="w-9 h-9 bg-[#7448FF] rounded-xl flex items-center justify-center text-white font-bold">K</div>
-          <span className="text-xl font-bold text-slate-900">KoniAI</span>
+          <span className="text-xl font-bold text-slate-900">KonilAI</span>
         </div>
 
         <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">

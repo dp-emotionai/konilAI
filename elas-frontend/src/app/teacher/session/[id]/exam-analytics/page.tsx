@@ -429,7 +429,7 @@ export default function ExamAnalyticsPage() {
                         <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 p-5">
                           <p className="text-sm font-medium text-zinc-200">Top risk participant</p>
                           <p className="mt-2 text-xl font-semibold">
-                            {topRiskParticipant?.name ?? "—"}
+                            {topRiskParticipant?.fullName ?? "—"}
                           </p>
                           <p className="mt-1 text-xs text-zinc-500">
                             {topRiskParticipant && typeof topRiskParticipant.risk === "number"
@@ -504,7 +504,7 @@ export default function ExamAnalyticsPage() {
                     filteredParticipants.map((p) => (
                       <Reveal key={p.userId}>
                         <ParticipantCard
-                          name={p.name}
+                          name={p.fullName}
                           emotion={p.dominantEmotion ?? p.emotion}
                           engagement={p.engagement}
                           stress={p.stress}

@@ -40,7 +40,9 @@ export type SessionAnalyticsTimelinePoint = {
 export type SessionAnalyticsParticipantResponse = {
   user_id?: string;
   userId?: string;
-  name?: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
   email?: string | null;
   emotion?: string;
   dominant_emotion?: string;
@@ -78,7 +80,9 @@ export type TeacherAnalyticsResponse = {
 
 export type SessionAnalyticsParticipant = {
   userId: string;
-  name: string;
+  fullName: string;
+  firstName?: string;
+  lastName?: string;
   email?: string | null;
   emotion?: string;
   dominantEmotion?: string;
@@ -153,7 +157,9 @@ function normSessionAnalytics(
   const participants = Array.isArray(raw.participants)
     ? raw.participants.map((p, index) => ({
         userId: String(p.user_id ?? p.userId ?? `participant-${index + 1}`),
-        name: String(p.name ?? p.email ?? `Участник ${index + 1}`),
+        fullName: String(p.fullName ?? p.email ?? `Участник ${index + 1}`),
+        firstName: p.firstName,
+        lastName: p.lastName,
         email: p.email ?? null,
         emotion: p.emotion,
         dominantEmotion: p.dominant_emotion ?? p.dominantEmotion,

@@ -10,8 +10,9 @@ import {
 } from "@/lib/nav";
 import type { NavItem, NavDropdownItem } from "@/lib/nav";
 import type { Role } from "@/lib/roles";
-import { clearAuth } from "@/lib/api/client";
+import { clearAuth, resolveAvatarUrl } from "@/lib/api/client";
 import Button from "@/components/ui/Button";
+import Image from "next/image";
 import {
   Settings,
   Sun,
@@ -591,10 +592,20 @@ export default function TopNav() {
                       onClick={() => setProfileOpen((o) => !o)}
                       aria-expanded={profileOpen}
                       aria-haspopup="true"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] overflow-hidden border border-[color:var(--border)]/10"
                       aria-label="Меню аккаунта"
                     >
-                      <User size={18} />
+                      {state.avatarUrl ? (
+                         <Image 
+                           src={resolveAvatarUrl(state.avatarUrl)!} 
+                           alt={state.fullName || "User"} 
+                           width={36} 
+                           height={36} 
+                           className="h-full w-full object-cover"
+                         />
+                      ) : (
+                         <User size={18} />
+                      )}
                     </button>
 
                     {profileOpen && (
@@ -605,8 +616,13 @@ export default function TopNav() {
                         )}
                       >
                         {statusLabel && (
-                          <div className="px-3 pb-2 pt-0.5 text-xs text-muted">
+                          <div className="px-3 pb-1 pt-0.5 text-[10px] uppercase font-bold tracking-wider text-muted/60">
                             {statusLabel}
+                          </div>
+                        )}
+                        {state.fullName && (
+                          <div className="px-3 py-1 text-[13px] font-bold text-fg truncate">
+                            {state.fullName}
                           </div>
                         )}
 

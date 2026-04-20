@@ -1,4 +1,4 @@
-﻿import { api } from "@/lib/api/client";
+import { api } from "@/lib/api/client";
 
 export type SessionStatus = "draft" | "active" | "finished";
 export type SessionType = "lecture" | "exam";
@@ -23,7 +23,7 @@ export type ReportRow = {
 export type LiveMetrics = {
   participants: Array<{
     userId: string;
-    name: string;
+    fullName: string;
     email?: string;
     emotion: string;
     confidence: number;

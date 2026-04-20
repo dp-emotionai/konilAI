@@ -95,7 +95,7 @@ export default function StudentGroupDetailPage() {
         status: "active" as const,
         teacher: {
           id: "",
-          name: apiDetail.teacherName,
+          fullName: apiDetail.teacherFullName,
           email: apiDetail.teacher,
         },
       }
@@ -114,7 +114,7 @@ export default function StudentGroupDetailPage() {
   const members =
     apiDetail?.members?.map((m) => ({
       id: m.id,
-      name: m.name ?? m.email ?? "",
+      fullName: m.fullName ?? m.email ?? "",
       email: m.email ?? null,
     })) ?? [];
 
@@ -167,7 +167,7 @@ export default function StudentGroupDetailPage() {
       </div>
       <PageHero
         title={`${group.name}`}
-        subtitle={`Преподаватель: ${group.teacher.name}`}
+        subtitle={`Преподаватель: ${group.teacher.fullName}`}
       />
 
       <Section>
@@ -181,7 +181,7 @@ export default function StudentGroupDetailPage() {
               <div className="text-sm text-slate-500 dark:text-muted">
                 Преподаватель:{" "}
                 <span className="text-slate-900 dark:text-zinc-100">
-                  {group.teacher.name}
+                  {group.teacher.fullName}
                 </span>
               </div>
             </div>
@@ -325,7 +325,7 @@ export default function StudentGroupDetailPage() {
                     <tbody className="divide-y divide-slate-200/70 dark:divide-white/5">
                       {members.map((m) => (
                         <tr key={m.id} className="bg-white dark:bg-black/10">
-                          <td className="px-4 py-3 text-slate-800 dark:text-zinc-200">{m.name ?? m.email ?? "—"}</td>
+                          <td className="px-4 py-3 text-slate-800 dark:text-zinc-200">{m.fullName ?? m.email ?? "—"}</td>
                           <td className="px-4 py-3 text-slate-500 dark:text-zinc-400">{m.email ?? "—"}</td>
                         </tr>
                       ))}

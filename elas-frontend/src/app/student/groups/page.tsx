@@ -55,7 +55,7 @@ export default function StudentGroupsPage() {
 
   const list = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return apiGroups.filter((g) => !s || g.name.toLowerCase().includes(s) || (g.teacherName ?? g.teacher).toLowerCase().includes(s));
+    return apiGroups.filter((g) => !s || g.name.toLowerCase().includes(s) || (g.teacherFullName ?? g.teacher).toLowerCase().includes(s));
   }, [apiGroups, q]);
 
   return (
@@ -130,7 +130,7 @@ export default function StudentGroupsPage() {
                             </div>
                             <div className="flex items-center gap-1.5 truncate">
                               <UserCircle2 size={14} className="text-slate-400" />
-                              <span className="truncate">{g.teacherName || g.teacher || "Преподаватель"}</span>
+                              <span className="truncate">{g.teacherFullName || g.teacher || "Преподаватель"}</span>
                             </div>
                          </div>
 

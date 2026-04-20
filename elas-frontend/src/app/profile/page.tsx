@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/cn";
+import Image from "next/image";
 import { useUI } from "@/components/layout/Providers";
 import {
   api,
@@ -11,17 +12,30 @@ import {
   getStoredAuth,
   hasAuth,
   isApiAvailable,
-  setAuth
+  setAuth,
+  resolveAvatarUrl
 } from "@/lib/api/client";
 
 import {
   User, ShieldCheck, Bell, Blocks, Globe, CreditCard, Laptop, Camera, LogOut,
   ChevronRight, Info, CheckCircle2, Trash2, Lock, Smartphone, Mail, ChevronDown,
-  Loader2, AlertCircle
+  Loader2, AlertCircle, Briefcase
 } from "lucide-react";
 
 type Role = "student" | "teacher" | "admin";
-type MeRes = { id: string; email: string; role: Role; name?: string | null; status?: string | null; bio?: string | null; };
+type MeRes = { 
+  id: string; 
+  email: string; 
+  role: Role; 
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+  status?: string | null; 
+  bio?: string | null; 
+  phone?: string | null;
+  organization?: string | null;
+};
 type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
 
 const TABS = [
@@ -44,10 +58,13 @@ export default function UnifiedProfilePage() {
   const [loading, setLoading] = useState(true);
 
   // Profile Form State
-  const [formName, setFormName] = useState("");
-  const [formSurname, setFormSurname] = useState("");
+  const [formFirstName, setFormFirstName] = useState("");
+  const [formLastName, setFormLastName] = useState("");
   const [formBio, setFormBio] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formOrganization, setFormOrganization] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [profileMessage, setProfileMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
 
   // Security Form State
@@ -55,9 +72,16 @@ export default function UnifiedProfilePage() {
   const [passwordMessage, setPasswordMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
 
   // Notifications State
-  const [notifEmail, setNotifEmail] = useState(true);
-  const [notifPush, setNotifPush] = useState(false);
-  const [notifDigest, setNotifDigest] = useState(true);
+  const [notifSettings, setNotifSettings] = useState<any>(null);
+  const [isSavingNotif, setIsSavingNotif] = useState(false);
+
+  // Preferences State
+  const [preferences, setPreferences] = useState<any>(null);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
+  // Integrations State
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
 
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
@@ -79,9 +103,17 @@ export default function UnifiedProfilePage() {
       }
       if (!isApiAvailable()) {
         if (mounted && stored) {
-            setMe({ id: "local", email: stored.email, role: stored.role as Role, name: stored.name });
-            setFormName(stored.name?.split(" ")[0] || "");
-            setFormSurname(stored.name?.split(" ").slice(1).join(" ") || "");
+            setMe({ 
+              id: "local", 
+              email: stored.email, 
+              role: stored.role as Role, 
+              firstName: stored.firstName,
+              lastName: stored.lastName,
+              fullName: stored.fullName,
+              avatarUrl: stored.avatarUrl
+            });
+            setFormFirstName(stored.firstName || "");
+            setFormLastName(stored.lastName || "");
         }
         setLoading(false);
         return;
@@ -90,9 +122,11 @@ export default function UnifiedProfilePage() {
          const data = await api.get<MeRes>("auth/me");
          if (mounted) {
              setMe(data);
-             setFormName(data.name?.split(" ")[0] || "");
-             setFormSurname(data.name?.split(" ").slice(1).join(" ") || "");
+             setFormFirstName(data.firstName || "");
+             setFormLastName(data.lastName || "");
              setFormBio(data.bio || "");
+             setFormPhone(data.phone || "");
+             setFormOrganization(data.organization || "");
          }
       } catch (e) {
          setMe(null);
@@ -122,6 +156,31 @@ export default function UnifiedProfilePage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Fetch Notifications
+  useEffect(() => {
+    if (activeTab === "notifications" && !notifSettings && isApiAvailable()) {
+      api.get("user/notifications/settings").then(setNotifSettings).catch(console.error);
+    }
+  }, [activeTab, notifSettings]);
+
+  // Fetch Preferences
+  useEffect(() => {
+    if (activeTab === "language" && !preferences && isApiAvailable()) {
+      api.get("user/preferences").then(setPreferences).catch(console.error);
+    }
+  }, [activeTab, preferences]);
+
+  // Fetch Integrations
+  useEffect(() => {
+    if (activeTab === "integrations" && !integrations.length && isApiAvailable()) {
+      setLoadingIntegrations(true);
+      api.get<any[]>("user/integrations")
+        .then(setIntegrations)
+        .catch(console.error)
+        .finally(() => setLoadingIntegrations(false));
+    }
+  }, [activeTab, integrations.length]);
+
   async function handleSaveProfile() {
       if (!isApiAvailable()) {
           setProfileMessage({ type: 'error', text: 'Нет подключения к API.' });
@@ -130,18 +189,69 @@ export default function UnifiedProfilePage() {
       setIsSavingProfile(true);
       setProfileMessage(null);
       try {
-          const fullName = `${formName.trim()} ${formSurname.trim()}`.trim();
-          await api.patch("auth/me", { name: fullName, bio: formBio });
+          const payload = { 
+            firstName: formFirstName.trim(), 
+            lastName: formLastName.trim(), 
+            bio: formBio.trim(),
+            phone: formPhone.trim(),
+            organization: formOrganization.trim()
+          };
+          const updated = await api.put<MeRes>("auth/me", payload);
           setProfileMessage({ type: 'success', text: 'Профиль успешно сохранен.' });
-          // Update local state and auth
-          const newMe = { ...me!, name: fullName, bio: formBio };
-          setMe(newMe);
-          setAuth({ ...stored!, name: fullName }); 
+          
+          setMe(updated);
+          // Sync auth storage
+          if (stored) {
+            setAuth({ 
+              ...stored, 
+              firstName: updated.firstName, 
+              lastName: updated.lastName, 
+              fullName: updated.fullName,
+              avatarUrl: updated.avatarUrl
+            });
+          }
       } catch (e) {
-          setProfileMessage({ type: 'error', text: `API Endpoint Missing or Error: PATCH /auth/me не реализован на бэкенде. (${e instanceof Error ? e.message : 'Unknown'})` });
+          setProfileMessage({ type: 'error', text: `Ошибка сохранения: ${e instanceof Error ? e.message : 'Unknown'}` });
       } finally {
           setIsSavingProfile(false);
       }
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !isApiAvailable()) return;
+
+    setIsUploadingAvatar(true);
+    setProfileMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      // We need a helper for multipart since shared api.post uses JSON.stringify
+      const token = (await import("@/lib/api/client")).getToken();
+      const res = await fetch(`${(await import("@/lib/api/client")).getApiBaseUrl()}/auth/avatar`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error("Ошибка загрузки аватара");
+      const data = await res.json();
+      
+      const newMe = { ...me!, avatarUrl: data.avatarUrl };
+      setMe(newMe);
+      if (stored) {
+        setAuth({ ...stored, avatarUrl: data.avatarUrl });
+      }
+      setProfileMessage({ type: 'success', text: 'Аватар успешно обновлен.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : "Ошибка загрузки" });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   }
 
   async function handleActionStub(actionName: string, endpoint: string) {
@@ -200,9 +310,13 @@ export default function UnifiedProfilePage() {
 
   const roleLabel = me?.role === 'teacher' ? 'Преподаватель' : me?.role === 'admin' ? 'Администратор' : 'Студент';
   
-  const hasProfileChanges = formName !== (me?.name?.split(" ")[0] || "") 
-                            || formSurname !== (me?.name?.split(" ").slice(1).join(" ") || "") 
-                            || formBio !== (me?.bio || "");
+  const hasProfileChanges = formFirstName !== (me?.firstName || "") 
+                            || formLastName !== (me?.lastName || "") 
+                            || formBio !== (me?.bio || "")
+                            || formPhone !== (me?.phone || "")
+                            || formOrganization !== (me?.organization || "");
+
+  const displayAvatar = resolveAvatarUrl(me?.avatarUrl);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">
@@ -249,32 +363,47 @@ export default function UnifiedProfilePage() {
                         <h2 className="text-[17px] font-bold text-slate-900 mb-6">Профильная информация</h2>
                         
                         <div className="flex flex-col sm:flex-row gap-8 items-start">
-                           <div className="flex flex-col items-center gap-4 shrink-0">
-                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner overflow-hidden">
-                                <span className="text-4xl font-bold text-slate-300">
-                                   {me?.name ? me.name[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}
-                                </span>
-                                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white z-10" onClick={() => handleActionStub('Upload Avatar', 'auth/me/avatar')}>
-                                  <Camera size={14} />
-                                </button>
+                            <div className="flex flex-col items-center gap-4 shrink-0">
+                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner overflow-hidden border border-slate-200">
+                                {displayAvatar ? (
+                                  <Image src={displayAvatar} alt={me?.fullName || "Avatar"} fill className="object-cover" />
+                                ) : (
+                                  <span className="text-4xl font-bold text-slate-300">
+                                     {me?.fullName ? me.fullName[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}
+                                  </span>
+                                )}
+                                <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white z-10 cursor-pointer shadow-sm">
+                                  <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploadingAvatar} />
+                                  {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                                </label>
                               </div>
                               <span className="text-xs text-slate-400 font-medium tracking-wide">JPG, PNG не более 5 МБ</span>
-                           </div>
+                            </div>
 
                            <div className="flex-1 space-y-5 w-full">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                  <div>
                                    <label className="text-xs font-semibold text-slate-500 mb-2 block">Имя</label>
-                                   <input type="text" value={formName} onChange={e => setFormName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                   <input type="text" value={formFirstName} onChange={e => setFormFirstName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
                                  </div>
                                  <div>
                                    <label className="text-xs font-semibold text-slate-500 mb-2 block">Фамилия</label>
-                                   <input type="text" value={formSurname} onChange={e => setFormSurname(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                   <input type="text" value={formLastName} onChange={e => setFormLastName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
                                  </div>
                               </div>
                               <div>
                                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Email (Обратитесь в поддержку для изменения)</label>
                                 <input type="text" readOnly value={me?.email || ""} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[14px] text-slate-500 outline-none cursor-not-allowed" />
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div>
+                                  <label className="text-xs font-semibold text-slate-500 mb-2 block">Телефон</label>
+                                  <input type="text" value={formPhone} onChange={e => setFormPhone(e.target.value)} disabled={isSavingProfile} placeholder="+7 ..." className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold text-slate-500 mb-2 block">Организация</label>
+                                  <input type="text" value={formOrganization} onChange={e => setFormOrganization(e.target.value)} disabled={isSavingProfile} placeholder="Название вуза или компании" className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                </div>
                               </div>
                               <div>
                                 <label className="text-xs font-semibold text-slate-500 mb-2 block">Роль</label>
@@ -520,119 +649,170 @@ export default function UnifiedProfilePage() {
                    <h2 className="text-[20px] font-bold text-slate-900 mb-2">Уведомления</h2>
                    <p className="text-[14px] text-slate-500 mb-8">Настройте, какие уведомления вы хотите получать</p>
                    
-                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
-                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Способы получения уведомлений</div>
-                      <div className="text-[13px] text-slate-500 mb-6 flex justify-between items-center">
-                         <span>Выберите, куда и как вы хотите получать уведомления</span>
-                         <button onClick={() => handleActionStub('Save Notifications', 'user/notifications/settings')} className="text-[#7448FF] hover:underline font-bold text-[13px]">Сохранить настройки сети</button>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between py-2">
-                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Mail size={18} /></div>
-                              <div>
-                                <div className="text-[14px] font-semibold text-slate-900">Email уведомления</div>
-                                <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "загружается..."}</div>
-                              </div>
-                           </div>
-                           <button onClick={() => setNotifEmail(!notifEmail)} className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifEmail ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
-                              <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                           </button>
-                        </div>
-
-                        <div className="flex items-center justify-between py-2 border-t border-slate-50 pt-4">
-                           <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Smartphone size={18} /></div>
-                              <div>
-                                <div className="text-[14px] font-semibold text-slate-900">Push уведомления</div>
-                                <div className="text-[12px] text-slate-500 mt-0.5">Уведомления в браузере. Выключены?</div>
-                              </div>
-                           </div>
-                           <button onClick={() => setNotifPush(!notifPush)} className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifPush ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
-                              <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
-                           </button>
-                        </div>
-                      </div>
-                   </div>
-
+                   {!notifSettings ? (
+                     <div className="p-12 text-center bg-white border border-slate-100 rounded-[20px] shadow-sm">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#7448FF] mb-4" />
+                        <p className="text-slate-500">Загрузка настроек...</p>
+                     </div>
+                   ) : (
+                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-8">
+                       <div className="grid gap-6">
+                          {[
+                            { id: 'emailNotifications', label: 'Email уведомления', icon: Mail, desc: me?.email },
+                            { id: 'pushNotifications', label: 'Push уведомления', icon: Smartphone, desc: 'Браузерные уведомления' },
+                            { id: 'dailyDigestEnabled', label: 'Дневной дайджест', icon: Bell, desc: 'Краткое содержание за день' },
+                            { id: 'assignmentNotifications', label: 'Задания', icon: Briefcase, desc: 'Новые задания и сроки' },
+                            { id: 'messageNotifications', label: 'Сообщения', icon: Mail, desc: 'Личные сообщения и чаты' },
+                            { id: 'groupNotifications', label: 'Группы', icon: ShieldCheck, desc: 'Активность в ваших группах' },
+                            { id: 'systemNotifications', label: 'Системные', icon: ShieldCheck, desc: 'Важные обновления платформы' },
+                          ].map(item => (
+                            <div key={item.id} className="flex items-center justify-between py-2">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><item.icon size={18} /></div>
+                                  <div>
+                                    <div className="text-[14px] font-semibold text-slate-900">{item.label}</div>
+                                    <div className="text-[12px] text-slate-500 mt-0.5">{item.desc}</div>
+                                  </div>
+                               </div>
+                               <button 
+                                onClick={async () => {
+                                  const newVal = !notifSettings[item.id];
+                                  setNotifSettings({ ...notifSettings, [item.id]: newVal });
+                                  try {
+                                    await api.patch("user/notifications/settings", { [item.id]: newVal });
+                                  } catch (e) {
+                                    console.error(e);
+                                    setNotifSettings(notifSettings); // Rollback
+                                  }
+                                }} 
+                                className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifSettings[item.id] ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
+                                  <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                               </button>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                   )}
                 </div>
              )}
 
-             {activeTab === "devices" && (
-                <div className="p-8 max-w-4xl space-y-6">
-                   <h2 className="text-[20px] font-bold text-slate-900 mb-2 flex items-center gap-2">
-                      Устройства и Сеть <Info size={18} className="text-slate-400" />
-                   </h2>
+             {activeTab === "language" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Язык и регион</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройте локализацию интерфейса и часовой пояс</p>
                    
-                   <p className="text-[14px] text-slate-500 mb-8 w-full max-w-2xl">
-                     Перед подключением к сессиям вы можете проверить работоспособность вашей камеры и качество интернет-соединения прямо здесь.
-                   </p>
-
-                   <div className="border border-slate-100 rounded-[20px] p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                         <div>
-                            <h3 className="font-semibold text-slate-900 text-[15px]">Камера и микрофон</h3>
-                            <p className="text-[13px] text-slate-500 mt-1">Тест устройств работает полностью локально</p>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            {camPerm === 'granted' ? <span className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-bold uppercase tracking-wide">Доступ разрешен</span> : <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-[11px] font-bold uppercase tracking-wide">Тест не начат</span>}
-                         </div>
-                      </div>
-
-                      <div className={cn("rounded-2xl overflow-hidden bg-slate-900 aspect-video max-w-xl relative mx-auto my-6 shadow-lg border border-slate-200", !previewOn && "flex items-center justify-center")}>
-                         {previewOn ? (
-                           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                         ) : (
-                           <Camera size={48} className="text-slate-700" />
-                         )}
-                      </div>
-
-                      <div className="flex justify-center mt-4 pt-4 border-t border-slate-200/50">
-                        {!previewOn ? (
-                          <button onClick={startPreview} className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm text-slate-700 font-medium rounded-xl text-[14px] transition-colors">
-                            Запустить предварительный просмотр
-                          </button>
-                        ) : (
-                          <button onClick={stopPreview} className="px-6 py-2.5 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 shadow-sm font-medium rounded-xl text-[14px] transition-colors">
-                            Остановить тест
-                          </button>
-                        )}
-                      </div>
-                   </div>
-
-                   <div className="border border-slate-100 rounded-[20px] p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                         <div>
-                            <h3 className="font-semibold text-slate-900 text-[15px]">Проверка соединения</h3>
-                            <p className="text-[13px] text-slate-500 mt-1">Текущая задержка (ping) до серверов KonilAI</p>
-                         </div>
-                         <div className="flex items-center gap-4">
-                            {netStatus === 'ok' && <span className="text-[15px] font-bold text-emerald-600 drop-shadow-sm">{netMs} ms</span>}
-                            {netStatus === 'fail' && <span className="text-[15px] font-bold text-rose-600">Ошибка соединения</span>}
-                            {netStatus === 'checking' && <span className="text-[15px] font-medium text-slate-500 animate-pulse">Идет проверка...</span>}
-
-                            <button 
-                              onClick={runNetworkCheck} 
-                              disabled={netStatus === 'checking'}
-                              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm text-slate-700 font-medium rounded-xl text-[14px] transition-colors disabled:opacity-50"
+                   {!preferences ? (
+                     <div className="p-12 text-center bg-white border border-slate-100 rounded-[20px] shadow-sm">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#7448FF] mb-4" />
+                        <p className="text-slate-500">Загрузка предпочтений...</p>
+                     </div>
+                   ) : (
+                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="text-xs font-semibold text-slate-500 mb-2 block uppercase tracking-wider">Язык интерфейса</label>
+                            <select 
+                              value={preferences.language} 
+                              onChange={async (e) => {
+                                const v = e.target.value;
+                                setPreferences({...preferences, language: v});
+                                try { await api.patch("user/preferences", { language: v }); } catch {}
+                              }}
+                              className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors"
                             >
-                              Проверить сеть
-                            </button>
-                         </div>
-                      </div>
+                              <option value="ru">Русский</option>
+                              <option value="en">English</option>
+                              <option value="de">Deutsch</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-slate-500 mb-2 block uppercase tracking-wider">Часовой пояс</label>
+                            <select 
+                              value={preferences.timezone} 
+                              onChange={async (e) => {
+                                const v = e.target.value;
+                                setPreferences({...preferences, timezone: v});
+                                try { await api.patch("user/preferences", { timezone: v }); } catch {}
+                              }}
+                              className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors"
+                            >
+                              <option value="UTC+5">Астана / Ташкент (UTC+5)</option>
+                              <option value="UTC+3">Москва / Стамбул (UTC+3)</option>
+                              <option value="UTC+0">London / Lisbon (UTC+0)</option>
+                            </select>
+                          </div>
+                       </div>
+                    </div>
+                   )}
+                </div>
+             )}
+
+             {activeTab === "integrations" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Интеграции</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Свяжите ваш аккаунт с внешними сервисами</p>
+                   
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                      {loadingIntegrations ? (
+                        <div className="flex items-center justify-center py-4"><Loader2 className="animate-spin text-slate-300" /></div>
+                      ) : (
+                        <div className="space-y-4">
+                          {[
+                            { id: 'google', name: 'Google', icon: 'G' },
+                            { id: 'github', name: 'GitHub', icon: 'Git' }
+                          ].map(provider => {
+                            const isConnected = integrations.some(i => i.provider === provider.id);
+                            return (
+                              <div key={provider.id} className="flex items-center justify-between p-4 border border-slate-50 rounded-2xl hover:bg-slate-50/50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700 shadow-sm">{provider.icon}</div>
+                                  <div>
+                                    <div className="font-semibold text-[15px] text-slate-900">{provider.name}</div>
+                                    <div className="text-[12px] text-slate-500 mt-0.5">{isConnected ? "Подключено" : "Не подключено"}</div>
+                                  </div>
+                                </div>
+                                {isConnected ? (
+                                  <button 
+                                    onClick={async () => {
+                                      if(!confirm(`Отключить ${provider.name}?`)) return;
+                                      try {
+                                        await api.delete(`user/integrations/${provider.id}`);
+                                        setIntegrations(integrations.filter(i => i.provider !== provider.id));
+                                      } catch(e) { alert(e); }
+                                    }}
+                                    className="px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-sm font-bold"
+                                  >
+                                    Отключить
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={async () => {
+                                      try {
+                                        const res = await api.post<any>(`user/integrations/${provider.id}/connect`);
+                                        if(res?.url) window.location.href = res.url;
+                                        else alert("OAuth URL не предоставлен бэкендом.");
+                                      } catch(e) { alert(e); }
+                                    }}
+                                    className="px-4 py-2 bg-purple-50 text-[#7448FF] hover:bg-purple-100 rounded-lg transition-colors text-sm font-bold"
+                                  >
+                                    Подключить
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                    </div>
                 </div>
              )}
 
-             {["integrations", "language", "subscription", "active_sessions"].includes(activeTab) && (
+             {["subscription", "active_sessions"].includes(activeTab) && (
                 <div className="p-8 h-full min-h-[500px] flex flex-col items-center justify-center text-center">
                    <Blocks size={64} className="text-slate-200 mb-6" strokeWidth={1} />
-                   <h2 className="text-xl font-bold text-slate-900 mb-2">Отсутствует backend API</h2>
+                   <h2 className="text-xl font-bold text-slate-900 mb-2">Раздел в разработке</h2>
                    <p className="text-[15px] text-slate-500 max-w-sm">
-                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) требуют новых endpoint-ов на стороне сервера.
-                     <br/><br/>
-                     <button onClick={() => alert('Смотрите файл backend-requirements.md для деталей')} className="text-[#7448FF] hover:underline font-bold text-[14px]">Узнать подробности для бэкенда</button>
+                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) будут доступны в ближайшем обновлении KonilAI.
                    </p>
                 </div>
              )}

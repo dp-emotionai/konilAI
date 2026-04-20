@@ -33,7 +33,10 @@ type VerifyEmailRes = {
     id?: string;
     email?: string;
     role?: string;
-    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    avatarUrl?: string | null;
     status?: string | null;
   };
   token?: string;
@@ -44,7 +47,8 @@ type VerifyEmailRes = {
 type PendingRegister = {
   email: string;
   password: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
   role: "student" | "teacher";
 };
 
@@ -120,13 +124,19 @@ function VerifyEmailInner() {
     token,
     role,
     email,
-    name,
+    firstName,
+    lastName,
+    fullName,
+    avatarUrl,
     status,
   }: {
     token: string;
     role: Role;
     email: string;
-    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    avatarUrl?: string | null;
     status?: UserStatus | null;
   }) => {
     const safeHome = ROLE_HOME[role] || "/";
@@ -135,7 +145,10 @@ function VerifyEmailInner() {
       token,
       role,
       email,
-      name: name ?? undefined,
+      firstName: firstName ?? undefined,
+      lastName: lastName ?? undefined,
+      fullName: fullName ?? undefined,
+      avatarUrl: avatarUrl ?? undefined,
       status: status ?? null,
     });
 
@@ -167,7 +180,8 @@ function VerifyEmailInner() {
         const pending = getPendingRegister();
         if (!pending) throw new Error("Данные регистрации не найдены. Попробуйте снова.");
         body.password = pending.password;
-        body.name = pending.name ?? "";
+        body.firstName = pending.firstName ?? "";
+        body.lastName = pending.lastName ?? "";
         body.role = pending.role;
       }
 
@@ -186,7 +200,10 @@ function VerifyEmailInner() {
         token,
         role,
         email: user.email,
-        name: user.name ?? undefined,
+        firstName: (user as any).firstName,
+        lastName: (user as any).lastName,
+        fullName: (user as any).fullName,
+        avatarUrl: (user as any).avatarUrl,
         status,
       });
     } catch (err) {
@@ -209,7 +226,8 @@ function VerifyEmailInner() {
         await api.post("auth/register", {
           email: pending.email,
           password: pending.password,
-          name: pending.name ?? undefined,
+          firstName: pending.firstName,
+          lastName: pending.lastName,
           role: pending.role,
         });
 

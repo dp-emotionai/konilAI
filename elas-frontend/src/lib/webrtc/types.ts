@@ -11,9 +11,11 @@ export type Participant = {
   userId?: UserId;
   role: Role;
   sessionId: SessionId;
-  displayName?: string;
   email?: string;
-  name?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  avatarUrl?: string;
 };
 
 // Messages mirrored from backend (subset needed on frontend)
@@ -55,6 +57,11 @@ export type ClientMessage =
       type: "join";
       sessionId: SessionId;
       role: Role;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+      fullName?: string;
+      avatarUrl?: string;
     }
   | { type: "leave" }
   | { type: "ping" }

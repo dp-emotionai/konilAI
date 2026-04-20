@@ -15,7 +15,10 @@ type MeRes = {
   id: string;
   email: string;
   role: Role | string;
-  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
   status?: UserStatus | string | null;
 };
 
@@ -36,7 +39,7 @@ function normalizeStatus(value: unknown): UserStatus | null {
 }
 
 export function AuthRestore() {
-  const { setLoggedIn, setRole, setStatus } = useUI();
+  const { setLoggedIn, setRole, setStatus, setUserInfo } = useUI();
   const done = useRef(false);
 
   useEffect(() => {
@@ -56,6 +59,13 @@ export function AuthRestore() {
     setLoggedIn(true);
     if (storedRole) setRole(storedRole);
     if (storedStatus) setStatus(storedStatus);
+    
+    setUserInfo({
+      firstName: stored.firstName ?? undefined,
+      lastName: stored.lastName ?? undefined,
+      fullName: stored.fullName ?? undefined,
+      avatarUrl: stored.avatarUrl ?? undefined,
+    });
 
     if (!isApiAvailable()) {
       return;
@@ -70,6 +80,12 @@ export function AuthRestore() {
         if (role) setRole(role);
         setStatus(status);
         setLoggedIn(true);
+        setUserInfo({
+          firstName: me.firstName ?? undefined,
+          lastName: me.lastName ?? undefined,
+          fullName: me.fullName ?? undefined,
+          avatarUrl: me.avatarUrl ?? undefined,
+        });
       })
       .catch(() => {
   clearAuth();

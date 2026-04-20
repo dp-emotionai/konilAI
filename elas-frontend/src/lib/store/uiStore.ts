@@ -9,6 +9,10 @@ type UIState = {
   role: Role | null;
   consent: boolean;
   status: UserStatus | null;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+  avatarUrl: string | null;
 };
 
 const KEY = "elas_ui_state_v1";
@@ -18,6 +22,10 @@ const defaultState: UIState = {
   role: null,
   consent: false,
   status: null,
+  firstName: null,
+  lastName: null,
+  fullName: null,
+  avatarUrl: null,
 };
 
 function normalizeRole(value: unknown): Role | null {
@@ -51,6 +59,10 @@ export function useUIStore() {
           role: normalizeRole(parsed.role),
           consent: !!parsed.consent,
           status: normalizeStatus(parsed.status),
+          firstName: typeof parsed.firstName === "string" ? parsed.firstName : null,
+          lastName: typeof parsed.lastName === "string" ? parsed.lastName : null,
+          fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
+          avatarUrl: typeof parsed.avatarUrl === "string" ? parsed.avatarUrl : null,
         };
 
         if (auth?.token) {
@@ -59,6 +71,10 @@ export function useUIStore() {
             loggedIn: true,
             role: normalizeRole(auth.role),
             status: normalizeStatus(auth.status) ?? next.status ?? null,
+            firstName: auth.firstName ?? next.firstName,
+            lastName: auth.lastName ?? next.lastName,
+            fullName: auth.fullName ?? next.fullName,
+            avatarUrl: auth.avatarUrl ?? next.avatarUrl,
           };
         }
 
@@ -72,6 +88,10 @@ export function useUIStore() {
           loggedIn: true,
           role: normalizeRole(auth.role),
           status: normalizeStatus(auth.status),
+          firstName: auth.firstName ?? null,
+          lastName: auth.lastName ?? null,
+          fullName: auth.fullName ?? null,
+          avatarUrl: auth.avatarUrl ?? null,
         });
       }
     } catch {
@@ -110,6 +130,11 @@ export function useUIStore() {
       setState((s) => ({
         ...s,
         status,
+      })),
+    setUserInfo: (info: { firstName?: string; lastName?: string; fullName?: string; avatarUrl?: string }) =>
+      setState((s) => ({
+        ...s,
+        ...info
       })),
     reset: () => setState(defaultState),
   };

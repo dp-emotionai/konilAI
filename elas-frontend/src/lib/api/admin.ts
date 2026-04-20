@@ -53,6 +53,9 @@ export type RawAdminUser = {
   id: string;
   email: string;
   name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
   role: string;   // "STUDENT" | "TEACHER" | "ADMIN" ...
   status: string; // "PENDING" | "APPROVED" | "LIMITED" | "BLOCKED"
   createdAt: string;
@@ -63,6 +66,9 @@ export type AdminUser = {
   id: string;
   email: string;
   name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
   role: "student" | "teacher" | "admin";
   status: "pending" | "approved" | "limited" | "blocked";
   createdAt: string;
@@ -91,7 +97,10 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     return arr.map((u) => ({
       id: u.id,
       email: u.email,
-      name: u.name ?? null,
+      name: u.fullName || u.name || null,
+      firstName: u.firstName || null,
+      lastName: u.lastName || null,
+      fullName: u.fullName || null,
       role: mapRawRole(u.role),
       status: mapRawStatus(u.status),
       createdAt: u.createdAt,
@@ -107,7 +116,10 @@ export async function approveAdminUser(userId: string): Promise<AdminUser | null
     return {
       id: res.id,
       email: res.email,
-      name: res.name ?? null,
+      name: res.fullName || res.name || null,
+      firstName: res.firstName || null,
+      lastName: res.lastName || null,
+      fullName: res.fullName || null,
       role: mapRawRole(res.role),
       status: mapRawStatus(res.status),
       createdAt: res.createdAt,
@@ -130,7 +142,10 @@ export async function updateAdminUser(
     return {
       id: res.id,
       email: res.email,
-      name: res.name ?? null,
+      name: res.fullName || res.name || null,
+      firstName: res.firstName || null,
+      lastName: res.lastName || null,
+      fullName: res.fullName || null,
       role: mapRawRole(res.role),
       status: mapRawStatus(res.status),
       createdAt: res.createdAt,
@@ -146,7 +161,10 @@ export async function blockAdminUser(userId: string): Promise<AdminUser | null> 
     return {
       id: res.id,
       email: res.email,
-      name: res.name ?? null,
+      name: res.fullName || res.name || null,
+      firstName: res.firstName || null,
+      lastName: res.lastName || null,
+      fullName: res.fullName || null,
       role: mapRawRole(res.role),
       status: mapRawStatus(res.status),
       createdAt: res.createdAt,

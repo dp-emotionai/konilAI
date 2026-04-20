@@ -27,8 +27,8 @@ export type FullGroup = {
   name: string;
   program: string;
   status: "active" | "archived";
-  teacher: { id: string; name: string; email: string };
-  students: { id: string; name: string; email?: string | null }[];
+  teacher: { id: string; fullName: string; email: string };
+  students: { id: string; fullName: string; email?: string | null }[];
   createdAt: string;
   description?: string;
   imageUrl?: string;
@@ -131,7 +131,7 @@ export type GroupDetailResponse = {
   teacher: string;
   teacherName: string;
   sessions: { id: string; title: string; type: string; status: string; code?: string; startedAt?: string | null; endedAt?: string | null }[];
-  members: { id: string; name: string | null; email: string }[];
+  members: { id: string; fullName: string | null; email: string }[];
   createdAt: string;
 };
 
@@ -154,8 +154,8 @@ export async function getGroupById(groupId: string): Promise<GroupWithSessions |
       name: raw.name,
       program: raw.name,
       status: "active",
-      teacher: { id: raw.teacherId, name: raw.teacherName ?? raw.teacher, email: raw.teacher },
-      students: (raw.members ?? []).map((m) => ({ id: m.id, name: m.name ?? m.email, email: m.email })),
+      teacher: { id: raw.teacherId, fullName: raw.teacherName ?? raw.teacher, email: raw.teacher },
+      students: (raw.members ?? []).map((m) => ({ id: m.id, fullName: m.fullName ?? m.email, email: m.email })),
       createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date(raw.createdAt).toISOString(),
     };
     return { group, sessions };
@@ -173,7 +173,7 @@ export async function getTeacherGroups(): Promise<TeacherGroup[]> {
 /** Участник с ML-метриками для live-монитора. */
 export type LiveMetricsParticipant = {
   userId: string;
-  name: string;
+  fullName: string;
   email?: string | null;
   emotion: string;
   confidence: number;
@@ -322,13 +322,13 @@ export async function revokeInvitation(invitationId: string): Promise<void> {
 export type GroupMemberRow = {
   id: string;
   email: string;
-  name: string | null;
+  fullName: string | null;
   addedAt: string;
   status?: string;
   removedAt?: string | null;
 };
 
-export type GroupMembersResponse = { teacher: { id: string; email: string; name: string | null }; students: GroupMemberRow[] };
+export type GroupMembersResponse = { teacher: { id: string; email: string; fullName: string | null }; students: GroupMemberRow[] };
 
 export async function getGroupMembers(groupId: string, includeRemoved = false): Promise<GroupMembersResponse> {
   const url = includeRemoved ? `groups/${groupId}/members?includeRemoved=true` : `groups/${groupId}/members`;

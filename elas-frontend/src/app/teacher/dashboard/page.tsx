@@ -11,7 +11,7 @@ import {
   Download, Database
 } from "lucide-react";
 
-type MeRes = { id: string; email: string; role: string; name?: string | null };
+type MeRes = { id: string; email: string; role: string; fullName?: string | null; firstName?: string | null; lastName?: string | null; name?: string | null };
 
 function KPI({
   icon: Icon, title, value, subtitle, trend, iconBg, iconColor
@@ -75,7 +75,14 @@ export default function TeacherDashboard() {
     async function init() {
       try {
         const auth = getStoredAuth();
-        if (auth && mounted) setMe({ id: "local", email: auth.email, role: auth.role, name: auth.name });
+        if (auth && mounted) setMe({ 
+          id: "local", 
+          email: auth.email, 
+          role: auth.role, 
+          fullName: auth.fullName,
+          firstName: auth.firstName,
+          lastName: auth.lastName
+        });
         if (hasAuth()) {
           api.get<MeRes>("auth/me").then(data => { if (mounted) setMe(data); }).catch(() => {});
         }
@@ -92,7 +99,7 @@ export default function TeacherDashboard() {
   const activeCount = sessions.filter(s => s.status === 'active').length;
   const scheduledCount = sessions.filter(s => s.status === 'draft').length;
   
-  const firstName = me?.name ? me.name.split(" ")[0] : "Преподаватель";
+  const firstName = me?.firstName || (me?.fullName ? me.fullName.split(" ")[0] : (me?.name ? me.name.split(" ")[0] : "Преподаватель"));
 
   const today = new Date();
   const currentMonth = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(today);

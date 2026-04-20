@@ -12,7 +12,10 @@ export type AuthPayload = {
   token: string;
   role: UserRole;
   email: string;
-  name?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
   status?: UserStatus | null;
 };
 
@@ -37,7 +40,10 @@ function normalizeAuthPayload(payload: Partial<AuthPayload> & { token: string; e
     token: String(payload.token),
     email: String(payload.email).trim().toLowerCase(),
     role: normalizeRole(payload.role) ?? "student",
-    name: payload.name != null ? String(payload.name) : null,
+    firstName: payload.firstName != null ? String(payload.firstName) : null,
+    lastName: payload.lastName != null ? String(payload.lastName) : null,
+    fullName: payload.fullName != null ? String(payload.fullName) : null,
+    avatarUrl: payload.avatarUrl != null ? String(payload.avatarUrl) : null,
     status: normalizeStatus(payload.status) ?? null,
   };
 }
@@ -88,7 +94,10 @@ export function getStoredAuth(): AuthPayload | null {
       token: parsed.token,
       email: parsed.email,
       role: parsed.role,
-      name: parsed.name,
+      firstName: parsed.firstName,
+      lastName: parsed.lastName,
+      fullName: parsed.fullName,
+      avatarUrl: parsed.avatarUrl,
       status: parsed.status,
     });
   } catch {
@@ -110,6 +119,15 @@ export function isRealSessionId(id: string | undefined): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     id
   );
+}
+/**
+ * Resolves an avatar URL against the API base if it's relative.
+ */
+export function resolveAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const base = getApiBaseUrl();
+  return `${base}${url.startsWith("/") ? url : "/" + url}`;
 }
 
 async function request<T>(

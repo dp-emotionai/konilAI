@@ -367,7 +367,7 @@ export default function TeacherReportsPage() {
                               key={p.userId}
                               className="flex items-center justify-between rounded-xl bg-surface px-3 py-2 text-sm"
                             >
-                              <span className="truncate text-fg">{p.name}</span>
+                              <span className="truncate text-fg">{p.fullName}</span>
                               <span className="ml-3 shrink-0 text-muted">
                                 {p.dominant_emotion} · risk {p.risk.toFixed(2)}
                               </span>

@@ -78,7 +78,7 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
-  return p.displayName || p.name || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
+  return p.fullName || p.displayName || p.email || `${p.role} · ${p.id.slice(0, 6)}`;
 }
 
 function CallControlButton({ 
@@ -279,7 +279,12 @@ export default function StudentJoinSessionPage() {
         
         const { getStoredAuth } = await import("@/lib/api/client");
         const auth = getStoredAuth();
-        manager.join(auth ? { email: auth.email, name: auth.name ?? undefined } : undefined);
+        manager.join(auth ? { 
+          email: auth.email, 
+          fullName: auth.fullName || undefined,
+          firstName: auth.firstName || undefined,
+          lastName: auth.lastName || undefined
+        } : undefined);
         
         setConnectionState("connected");
       } catch (e) {

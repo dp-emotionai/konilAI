@@ -32,9 +32,21 @@ function normalizeParticipant(p: Participant): Participant {
       typeof p.email === "string" && p.email.trim().length > 0
         ? p.email.trim().toLowerCase()
         : undefined,
-    name:
-      typeof p.name === "string" && p.name.trim().length > 0
-        ? p.name.trim()
+    firstName:
+      typeof p.firstName === "string" && p.firstName.trim().length > 0
+        ? p.firstName.trim()
+        : undefined,
+    lastName:
+      typeof p.lastName === "string" && p.lastName.trim().length > 0
+        ? p.lastName.trim()
+        : undefined,
+    fullName:
+      typeof p.fullName === "string" && p.fullName.trim().length > 0
+        ? p.fullName.trim()
+        : undefined,
+    avatarUrl:
+      typeof p.avatarUrl === "string" && p.avatarUrl.trim().length > 0
+        ? p.avatarUrl.trim()
         : undefined,
   };
 }
@@ -53,7 +65,10 @@ function upsertParticipant(list: Participant[], next: Participant): Participant[
     ...safe,
     userId: safe.userId ?? current.userId,
     email: safe.email ?? current.email,
-    name: safe.name ?? current.name,
+    firstName: safe.firstName ?? current.firstName,
+    lastName: safe.lastName ?? current.lastName,
+    fullName: safe.fullName ?? current.fullName,
+    avatarUrl: safe.avatarUrl ?? current.avatarUrl,
     displayName: safe.displayName ?? current.displayName,
   };
 
@@ -174,7 +189,13 @@ export class PeerConnectionManager {
     return this.participants;
   }
 
-  join(user?: { email?: string; name?: string }) {
+  join(user?: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    avatarUrl?: string;
+  }) {
     this.signaling.join(this.sessionId, this.role, user);
   }
 

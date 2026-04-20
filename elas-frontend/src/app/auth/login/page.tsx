@@ -34,7 +34,10 @@ type LoginRes = {
     id?: string;
     email?: string;
     role?: string;
-    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    avatarUrl?: string | null;
     status?: string | null;
   };
   token?: string;
@@ -75,13 +78,19 @@ export default function LoginPage() {
     token,
     email,
     role,
-    name,
-    status,
+    firstName,
+    lastName,
+    fullName,
+    avatarUrl,
+    status
   }: {
     token: string;
     email: string;
     role: Role;
-    name?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    fullName?: string | null;
+    avatarUrl?: string | null;
     status?: UserStatus | null;
   }) => {
     const safeHome = ROLE_HOME[role] || "/";
@@ -90,7 +99,10 @@ export default function LoginPage() {
       token,
       role,
       email,
-      name: name ?? undefined,
+      firstName: firstName ?? undefined,
+      lastName: lastName ?? undefined,
+      fullName: fullName ?? undefined,
+      avatarUrl: avatarUrl ?? undefined,
       status: status ?? null,
     });
 
@@ -124,7 +136,10 @@ export default function LoginPage() {
         token,
         role,
         email: user.email,
-        name: user.name ?? undefined,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        fullName: user.fullName,
+        avatarUrl: user.avatarUrl,
         status,
       });
     } catch (err) {
@@ -145,12 +160,12 @@ export default function LoginPage() {
               <div className="mb-10 flex items-center gap-2">
                 <Link href="/" className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-[#7448FF] rounded-lg flex items-center justify-center text-white font-bold text-sm">K</div>
-                  <span className="text-lg font-bold text-slate-900">KoniAI</span>
+                  <span className="text-lg font-bold text-slate-900">KonilAI</span>
                 </Link>
               </div>
 
               <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto lg:mx-0">
-                <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">Вход в аккаунт</h2>
+                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Добро пожаловать в KonilAI</h2>
                 <p className="text-slate-500 text-sm font-medium mb-10">Используйте свои учетные данные для доступа к платформе</p>
 
                 <div className="space-y-6">

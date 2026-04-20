@@ -54,6 +54,19 @@ export async function recordSessionConsent(sessionId: string): Promise<void> {
   await api.post(`sessions/${sessionId}/consent`, {});
 }
 
+export type RawAdminUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  role: string;   // "STUDENT" | "TEACHER" | "ADMIN" ...
+  status: string; // "PENDING" | "APPROVED" | "LIMITED" | "BLOCKED"
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type InvitationRow = {
   id: string;
   groupId: string;
@@ -94,12 +107,24 @@ export async function sendSessionMetrics(
   }
 }
 
+export type AdminUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  role: "student" | "teacher" | "admin";
+  status: "pending" | "approved" | "limited" | "blocked";
+  createdAt: string;
+};
+
 export type StudentGroupRow = {
   id: string;
   name: string;
   teacherId: string;
   teacher: string;
-  teacherName: string;
+  teacherFullName: string;
   sessionCount: number;
   createdAt: string;
 };
@@ -117,10 +142,10 @@ export async function getStudentGroups(): Promise<StudentGroupRow[]> {
 export type StudentGroupDetail = {
   id: string;
   name: string;
-  teacherName: string;
+  teacherFullName: string;
   teacher: string;
   sessions: { id: string; title: string; type: string; status: string; code?: string; startedAt?: string | null; endedAt?: string | null }[];
-  members: { id: string; name: string | null; email: string }[];
+  members: { id: string; fullName: string | null; email: string }[];
   createdAt: string;
 };
 

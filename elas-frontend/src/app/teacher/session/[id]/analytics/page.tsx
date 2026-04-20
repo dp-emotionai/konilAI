@@ -385,7 +385,7 @@ export default function TeacherLectureAnalyticsPage() {
                   analytics.participants.map((p) => (
                     <Reveal key={p.userId}>
                       <ParticipantCard
-                        name={p.name}
+                        name={p.fullName}
                         emotion={p.dominantEmotion ?? p.emotion}
                         engagement={p.engagement}
                         stress={p.stress}

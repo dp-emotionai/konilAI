@@ -71,7 +71,8 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     const auth = getStoredAuth();
-    if (auth?.name) setDisplayName(auth.name);
+    if (auth?.fullName) setDisplayName(auth.fullName);
+    else if (auth?.firstName) setDisplayName(auth.firstName);
     else if (auth?.email) setDisplayName(auth.email.split("@")[0] || auth.email);
   }, []);
 

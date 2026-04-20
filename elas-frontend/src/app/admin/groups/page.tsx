@@ -17,7 +17,7 @@ type Group = {
   name: string;
   program: string;
   status: string;
-  teacher: { name: string };
+  teacher: { fullName: string };
   students: { id: string }[];
 };
 
@@ -66,7 +66,7 @@ export default function AdminGroupsPage() {
         g.id.toLowerCase().includes(s) ||
         g.name.toLowerCase().includes(s) ||
         g.program.toLowerCase().includes(s) ||
-        g.teacher.name.toLowerCase().includes(s) ||
+        g.teacher.fullName.toLowerCase().includes(s) ||
         g.status.toLowerCase().includes(s)
       );
     });
@@ -133,7 +133,7 @@ export default function AdminGroupsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-zinc-300">{g.program}</td>
-                        <td className="px-4 py-3 text-zinc-300">{g.teacher.name}</td>
+                        <td className="px-4 py-3 text-zinc-300">{g.teacher.fullName}</td>
                         <td className="px-4 py-3 text-zinc-300">{g.students.length}</td>
                         <td className="px-4 py-3">
                           <ToneBadge tone={statusTone(g.status)}>{g.status === "active" ? "Активна" : "В архиве"}</ToneBadge>
