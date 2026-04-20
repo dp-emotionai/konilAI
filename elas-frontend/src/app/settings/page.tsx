@@ -1,14 +1,18 @@
-export default function SettingsPage() {
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function SettingsRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/profile");
+  }, [router]);
+
   return (
-    <div className="pb-12 px-4 md:px-6">
-      <div className="mx-auto max-w-3xl">
-        <h1 className="mt-6 text-2xl font-semibold text-fg">Settings</h1>
-        <p className="mt-2 text-sm text-muted">
-          Страница настроек профиля находится в разработке. Основные параметры аккаунта,
-          согласия и устройства сейчас доступны в разделе &quot;Профиль&quot;.
-        </p>
-      </div>
+    <div className="flex h-[50vh] items-center justify-center bg-[#FAFAFB]">
+      <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-[#7448FF] animate-spin"></div>
     </div>
   );
 }
-

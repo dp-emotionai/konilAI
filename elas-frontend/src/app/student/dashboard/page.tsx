@@ -2,107 +2,72 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Section from "@/components/common/Section";
-import Reveal from "@/components/common/Reveal";
-
-import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import Alert from "@/components/ui/Alert";
-
 import { useUI } from "@/components/layout/Providers";
+import { cn } from "@/lib/cn";
 import {
   getStudentSessionsList,
   getInvitations,
   acceptInvitation,
   declineInvitation,
+  getStudentGroups,
   type StudentSessionRow,
   type InvitationRow,
+  type StudentGroupRow,
 } from "@/lib/api/student";
 import { getApiBaseUrl, getStoredAuth, hasAuth } from "@/lib/api/client";
-import { readConsent } from "@/lib/consent";
-
-import { Video, ShieldCheck, Calendar, Sparkles, ArrowRight } from "lucide-react";
-
-function StatMini({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl bg-surface-subtle/80 dark:bg-[rgba(25,25,40,0.6)] ring-1 ring-[color:var(--border)]/20 dark:ring-white/10 p-5 md:p-6">
-      <div className="text-xs font-medium uppercase tracking-wider text-muted">{label}</div>
-      <div className="mt-2 text-2xl md:text-3xl font-bold text-fg tracking-tight">{value}</div>
-    </div>
-  );
-}
-
-function SessionRow({
-  s,
-  right,
-}: {
-  s: StudentSessionRow;
-  right?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-elas-lg bg-surface-subtle p-4 flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <div className="font-semibold text-fg truncate">{s.title}</div>
-        <div className="mt-1 text-sm text-muted">
-          {s.teacher} • {s.date}
-        </div>
-      </div>
-      <div className="shrink-0 flex items-center gap-2">
-        <Badge>{s.type === "lecture" ? "Лекция" : "Экзамен"}</Badge>
-        {right}
-      </div>
-    </div>
-  );
-}
+import {
+  VideoIcon,
+  Users2,
+  CalendarDays,
+  MenuSquare,
+  MessageSquare,
+  ArrowRight,
+  Lock,
+  ChevronRight,
+  Bell,
+  Clock,
+  LogOut
+} from "lucide-react";
 
 export default function StudentDashboardPage() {
   const { state } = useUI();
-
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
-
+  const [groups, setGroups] = useState<StudentGroupRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
-  const [invitationsLoading, setInvitationsLoading] = useState(false);
-
+  const [loading, setLoading] = useState(true);
+  
   const apiAvailable = getApiBaseUrl() && hasAuth();
-
   const [displayName, setDisplayName] = useState<string | null>(null);
 
-  const fetchSessions = useCallback(() => {
-    setSessionsError(null);
+  const fetchAll = useCallback(async () => {
     setLoading(true);
-    getStudentSessionsList()
-      .then((data) => {
-        setSessions(data);
-      })
-      .catch((e) => {
-        setSessionsError(e instanceof Error ? e.message : "Не удалось загрузить список сессий.");
-        setSessions([]);
-      })
-      .finally(() => setLoading(false));
+    try {
+      const [sData, gData, iData] = await Promise.all([
+        getStudentSessionsList(),
+        getStudentGroups(),
+        getInvitations()
+      ]);
+      setSessions(sData);
+      setGroups(gData);
+      setInvitations(iData);
+    } catch {
+      // Keep empty logic if err
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const fetchInvitations = useCallback(() => {
-    if (!apiAvailable) return;
-    setInvitationsLoading(true);
-    getInvitations()
-      .then((data) => setInvitations(data))
-      .finally(() => setInvitationsLoading(false));
-  }, [apiAvailable]);
-
   useEffect(() => {
-    fetchSessions();
-  }, [fetchSessions]);
-
-  useEffect(() => {
-    fetchInvitations();
-  }, [fetchInvitations]);
+    if (apiAvailable) {
+      fetchAll();
+    } else {
+      setLoading(false);
+    }
+  }, [apiAvailable, fetchAll]);
 
   useEffect(() => {
     const auth = getStoredAuth();
@@ -110,435 +75,328 @@ export default function StudentDashboardPage() {
     else if (auth?.email) setDisplayName(auth.email.split("@")[0] || auth.email);
   }, []);
 
-  const consent = state.consent || readConsent();
-
-  const upcoming = useMemo(
-    () => sessions.filter((s) => s.status === "upcoming").slice(0, 5),
-    [sessions]
-  );
+  const upcoming = useMemo(() => sessions.filter((s) => s.status === "upcoming").slice(0, 3), [sessions]);
   const live = useMemo(() => sessions.filter((s) => s.status === "live"), [sessions]);
-  const firstLive = live[0];
-  const ended = useMemo(() => sessions.filter((s) => s.status === "ended").slice(0, 5), [sessions]);
+  const ended = useMemo(() => sessions.filter((s) => s.status === "ended").slice(0, 4), [sessions]);
 
-  const totalSessions = sessions.length;
-  const upcomingCount = sessions.filter((s) => s.status === "upcoming").length;
-  const endedCount = sessions.filter((s) => s.status === "ended").length;
+  // Calendar simplified mock for layout
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const firstDayIndex = new Date(today.getFullYear(), today.getMonth(), 1).getDay();
+  const dayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Mon to Sun
 
   return (
-    <div className="pb-12">
-      <Breadcrumbs items={[{ label: "Студент", href: "/student/dashboard" }, { label: "Дашборд" }]} />
-
-      <PageHero
-        overline="Студент"
-        title={displayName ? `С возвращением, ${displayName}` : "С возвращением в Konilai"}
-        subtitle="Сессии, приглашения и управление согласием — в одном месте."
-        right={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={consent ? "success" : "warning"} className="rounded-full px-3 py-1 text-xs">
-              {consent ? "Согласие: дано" : "Согласие: нужно"}
-            </Badge>
-
-            <Link href="/student/sessions">
-              <Button className="gap-2 rounded-full shadow-soft px-5">
-                Мои сессии <ArrowRight size={16} />
-              </Button>
-            </Link>
-
-            <Link href="/consent">
-              <Button variant="outline" className="rounded-full px-5">
-                Центр согласия
-              </Button>
-            </Link>
-
-            <Link href="/student/sessions?join=1">
-              <Button variant="outline" className="rounded-full px-4 text-sm">
-                Войти по коду
-              </Button>
-            </Link>
-          </div>
-        }
-      />
-
-      {sessionsError && (
-        <Section spacing="none" className="mt-4">
-          <Alert
-            variant="error"
-            title="Ошибка загрузки"
-            action={
-              <Button variant="outline" size="sm" onClick={() => fetchSessions()}>
-                Повторить
-              </Button>
-            }
-          >
-            {sessionsError}
-          </Alert>
-        </Section>
-      )}
-
-      {!consent && (
-        <Section spacing="none" className="mt-4">
-          <Alert variant="warning" title="Согласие ещё не дано">
-            Перед подключением к эфиру пройдите центр согласия. Камера используется только для аналитики вовлечённости, без записи видео.
-          </Alert>
-        </Section>
-      )}
-
-      {/* Overview */}
-      <Section spacing="none" className="mt-8 space-y-12">
-        <div>
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Обзор</h2>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <StatMini label="Всего сессий" value={loading ? "…" : String(totalSessions)} />
-            <StatMini label="Предстоят" value={loading ? "…" : String(upcomingCount)} />
-            <StatMini label="Завершено" value={loading ? "…" : String(endedCount)} />
+    <div className="min-h-screen bg-[#FAFAFB]">
+      <div className="mx-auto max-w-[1440px] px-4 md:px-8 py-8 space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              Привет, {displayName ?? "Алишер"}! <span className="animate-[wave_2.5s_ease-in-out_2]">👋</span>
+            </h1>
+            <p className="mt-1.5 text-[15px] text-slate-500">
+              Продолжай учиться и достигай новых целей!
+            </p>
           </div>
         </div>
 
-      <div className="space-y-12">
-        {/* LIVE SESSION */}
-        {firstLive && (
-          <Reveal>
-            <Card variant="elevated">
-              <CardContent className="p-6 md:p-7">
-                <div className="flex flex-wrap items-start justify-between gap-6">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(255,77,109,0.10)] px-3 py-1 text-xs font-semibold text-fg">
-                      <span className="inline-flex h-2 w-2 rounded-full bg-[rgb(var(--error))] animate-pulse" />
-                      LIVE сейчас
-                    </div>
-
-                    <div className="text-2xl font-semibold text-fg">{firstLive.title}</div>
-
-                    <div className="text-sm text-muted">
-                      {firstLive.teacher} • {firstLive.date} •{" "}
-                      {firstLive.type === "lecture" ? "Лекция" : "Экзамен"}
-                    </div>
-
-                    {!consent && (
-                      <div className="text-sm text-muted">
-                        Чтобы подключиться, нужно дать согласие на аналитику.
-                      </div>
-                    )}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-8 items-start">
+          
+          {/* Main Column */}
+          <div className="space-y-8 min-w-0">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between h-[120px]">
+                <div className="flex items-start gap-3 text-slate-600">
+                  <div className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                    <VideoIcon size={20} strokeWidth={2.5} />
                   </div>
-
-                  <div className="min-w-[220px] space-y-2">
-                    {consent ? (
-                      <Link href={`/student/session/${firstLive.id}`} className="block">
-                        <Button size="lg" className="w-full gap-2 rounded-full shadow-soft">
-                          Присоединиться <Video size={18} />
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Link href="/consent" className="block">
-                        <Button size="lg" variant="outline" className="w-full gap-2 rounded-full">
-                          Дать согласие <ShieldCheck size={18} />
-                        </Button>
-                      </Link>
-                    )}
-                    <div className="text-xs text-muted">
-                      Камера используется только для аналитики вовлечённости, без записи видео.
-                    </div>
-                  </div>
+                  <span className="font-medium text-[13px] my-auto">Мои сессии</span>
                 </div>
-
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <StatMini label="Ближайшие" value={`${upcoming.length}`} />
-                  <StatMini label="Live сейчас" value={`${live.length}`} />
-                  <StatMini label="Согласие" value={consent ? "Да" : "Нет"} />
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-slate-900">{sessions.length}</span>
+                  <span className="text-xs font-medium text-purple-600 px-2 py-0.5 rounded-full bg-purple-50">
+                    {live.length} активные
+                  </span>
                 </div>
-              </CardContent>
-            </Card>
-          </Reveal>
-        )}
+              </div>
 
-        {/* Sessions */}
-        <div>
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Сессии</h2>
-        <div className="grid gap-6 lg:grid-cols-12">
-          {/* Upcoming */}
-          <Reveal className="lg:col-span-8">
-            <Card variant="elevated">
-              <CardContent className="p-6 md:p-7">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-muted">Ближайшие</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">Следующие сессии</div>
-                    <div className="mt-2 text-sm text-muted leading-relaxed">
-                      Подключение доступно только к сессии в эфире и при данном согласии.
-                    </div>
+              <div className="bg-white rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between h-[120px]">
+                <div className="flex items-start gap-3 text-slate-600">
+                  <div className="p-2 rounded-xl bg-blue-50 text-blue-600">
+                    <Users2 size={20} strokeWidth={2.5} />
                   </div>
+                  <span className="font-medium text-[13px] my-auto">Мои группы</span>
+                </div>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-bold text-slate-900">{groups.length}</span>
+                </div>
+              </div>
 
-                  <Link href="/student/sessions">
-                    <Button variant="outline" className="rounded-full px-4">
-                      Весь список
-                    </Button>
+              {/* Graceful empty placeholders matching design */}
+              <div className="bg-white rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between h-[120px] opacity-70">
+                <div className="flex items-start gap-3 text-slate-400">
+                  <div className="p-2 rounded-xl bg-slate-50 text-slate-500">
+                    <MenuSquare size={20} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-medium text-[13px] my-auto">Задания</span>
+                </div>
+                <div className="text-xs text-slate-400 mb-1">
+                  Нет данных API
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-100 flex flex-col justify-between h-[120px] opacity-70">
+                <div className="flex items-start gap-3 text-slate-400">
+                  <div className="p-2 rounded-xl bg-slate-50 text-slate-500">
+                    <CalendarDays size={20} strokeWidth={2.5} />
+                  </div>
+                  <span className="font-medium text-[13px] my-auto">Расписание</span>
+                </div>
+                <div className="text-xs text-slate-400 mb-1">
+                  В разработке
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Access Grids */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-[15px] text-slate-900">Ближайшие занятия</h3>
+                  <Link href="/student/sessions" className="text-xs font-medium text-purple-600 hover:opacity-80">
+                    Смотреть все
                   </Link>
                 </div>
-
-                <div className="mt-6 space-y-3">
-                  {loading ? (
-                    <div className="h-24 rounded-elas-lg bg-surface-subtle animate-pulse" />
-                  ) : upcoming.length === 0 ? (
-                    <div className="rounded-elas-lg bg-surface-subtle p-6 text-center">
-                      <div className="text-sm font-medium text-fg">Нет предстоящих сессий</div>
-                      <div className="mt-2 text-sm text-muted">
-                        Список обновляется автоматически после принятия приглашений в группы.
+                <div className="bg-white border text-sm border-slate-100 rounded-3xl p-2 space-y-1 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                  {upcoming.length > 0 || live.length > 0 ? (
+                    [...live, ...upcoming].slice(0, 2).map((s, idx) => (
+                      <div key={s.id} className={cn("flex items-center justify-between p-3 rounded-2xl", idx === 0 && "bg-slate-50/50")}>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-2 rounded-xl", s.status === 'live' ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-500')}>
+                            <VideoIcon size={16} />
+                          </div>
+                          <div>
+                            <div className="font-medium text-slate-900 truncate max-w-[150px]">{s.title}</div>
+                            <div className="text-xs text-slate-400 truncate max-w-[150px]">{s.teacher}</div>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                          <span className="text-xs text-slate-500">{s.date || 'Сегодня'}</span>
+                          {s.status === 'live' ? <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wide mt-0.5">Сейчас</span> : <span className="text-[10px] font-medium text-amber-500 mt-0.5">Запланировано</span>}
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    upcoming.map((s) => (
-                      <SessionRow
-                        key={s.id}
-                        s={s}
-                        right={
-                          <Link href={`/student/session/${s.id}`}>
-                            <Button size="sm" variant="outline">
-                              Открыть
-                            </Button>
-                          </Link>
-                        }
-                      />
                     ))
+                  ) : (
+                    <div className="p-4 py-8 text-center text-slate-400 text-xs">Нет предстоящих занятий</div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </Reveal>
-
-          {/* Actions / Preparation */}
-          <Reveal className="lg:col-span-4">
-            <Card variant="elevated">
-              <CardContent className="p-6 md:p-7 space-y-4">
-                <div>
-                  <div className="text-sm text-muted">Действия</div>
-                  <div className="mt-2 text-lg font-semibold text-fg">Приватность и подготовка</div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-[15px] text-slate-900">Приглашения <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px]">{invitations.length}</span></h3>
                 </div>
-
-                <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
-                  <div className="font-semibold text-fg">Мои группы</div>
-                  <div className="mt-1 text-sm text-muted leading-relaxed">
-                    Группы, в которые вас пригласили. После принятия приглашения здесь появятся сессии группы.
-                  </div>
-                  <div className="mt-3">
-                    <Link href="/student/groups">
-                      <Button variant="outline" className="w-full rounded-full">Открыть группы</Button>
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
-                  <div className="font-semibold text-fg">Центр согласия</div>
-                  <div className="mt-1 text-sm text-muted leading-relaxed">
-                    Согласие нужно до начала аналитики по видео.
-                  </div>
-                  <div className="mt-3">
-                    <Link href="/consent">
-                      <Button className="w-full rounded-full">Управление согласием</Button>
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
-                  <div className="font-semibold text-fg">Проверка камеры</div>
-                  <div className="mt-1 text-sm text-muted leading-relaxed">
-                    Проверьте доступ, освещение и положение лица перед входом в LIVE.
-                  </div>
-                  <div className="mt-3">
-                    <Link href="/student/sessions">
-                      <Button variant="outline" className="w-full rounded-full">
-                        Перейти к сессиям
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="rounded-elas-lg bg-surface-subtle/80 p-4">
-                  <div className="font-semibold text-fg">Моя сводка</div>
-                  <div className="mt-1 text-sm text-muted leading-relaxed">
-                    Личная статистика вовлечённости (опционально).
-                  </div>
-                  <div className="mt-3">
-                    <Link href="/student/summary">
-                      <Button variant="ghost" className="w-full rounded-full">
-                        Открыть сводку
-                      </Button>
-                    </Link>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Reveal>
-        </div>
-        </div>
-
-        {/* Invitations & activity */}
-        <div>
-          <h2 className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Приглашения и активность</h2>
-        <div className="grid gap-6 lg:grid-cols-12">
-          {apiAvailable && (invitations.length > 0 || invitationsLoading) && (
-            <Reveal className="lg:col-span-6">
-              <Card variant="elevated">
-                <CardContent className="p-6 md:p-7">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm text-muted">Приглашения</div>
-                      <div className="mt-2 text-lg font-semibold text-fg">
-                        Приглашения в группы ({invitations.length})
+                <div className="bg-white border text-sm border-slate-100 rounded-3xl p-2 space-y-1 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                  {invitations.length > 0 ? (
+                    invitations.slice(0, 2).map((inv, idx) => (
+                      <div key={inv.id} className={cn("flex items-center justify-between p-3 rounded-2xl", idx === 0 && "bg-slate-50/50")}>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-xl bg-blue-50 text-blue-500">
+                            <Users2 size={16} />
+                          </div>
+                          <div>
+                            <div className="font-medium text-slate-900 truncate max-w-[120px]">{inv.groupName || 'Группа'}</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">Требуется реакция</div>
+                          </div>
+                        </div>
+                        <div className="flex gap-1.5">
+                           <button onClick={() => declineInvitation(inv.id).then(fetchAll)} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition">Отклонить</button>
+                           <button onClick={() => acceptInvitation(inv.id).then(fetchAll)} className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-medium transition">Принять</button>
+                        </div>
                       </div>
-                      <div className="mt-2 text-sm text-muted leading-relaxed">
-                        Примите приглашение, чтобы видеть сессии группы и подключаться к ним.
-                      </div>
-                    </div>
+                    ))
+                  ) : (
+                    <div className="p-4 py-8 text-center text-slate-400 text-xs">Нет активных приглашений</div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                    <Badge className="bg-primary/10">
-                      {invitationsLoading ? "Loading…" : "Action required"}
-                    </Badge>
-                  </div>
+            {/* Quick Access Buttons */}
+            <div>
+              <h3 className="font-semibold text-[15px] text-slate-900 mb-4">Быстрый доступ</h3>
+              <div className="grid grid-cols-3 gap-3">
+                 <Link href="/student/resources" className="bg-gradient-to-br from-[#7448FF] to-[#8c67fd] text-white p-4 rounded-3xl flex flex-col justify-between h-[90px] hover:shadow-lg transition-shadow relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                      <MenuSquare size={40} />
+                   </div>
+                   <div className="flex items-center gap-2 font-medium text-sm">
+                     <span className="p-1.5 bg-white/20 rounded-lg"><MenuSquare size={14} /></span>
+                     Мои материалы
+                   </div>
+                   <div className="flex items-center justify-between text-xs text-white/80">
+                     Перейти к материалам
+                     <ArrowRight size={14} />
+                   </div>
+                 </Link>
+                 
+                 <Link href="/student/calendar" className="bg-[#EBF2FF] text-[#1D4ED8] p-4 rounded-3xl flex flex-col justify-between h-[90px] border border-blue-50 hover:shadow-md transition-shadow relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                      <CalendarDays size={40} />
+                   </div>
+                   <div className="flex items-center gap-2 font-medium text-sm text-slate-900">
+                     <span className="p-1.5 bg-blue-500 text-white rounded-lg"><CalendarDays size={14} /></span>
+                     Календарь
+                   </div>
+                   <div className="flex items-center justify-between text-xs text-slate-500">
+                     Посмотреть расписание
+                     <ArrowRight size={14} />
+                   </div>
+                 </Link>
 
-                  {invitationsLoading ? (
-                    <div className="mt-6 h-20 rounded-elas-lg bg-surface-subtle animate-pulse" />
-                  ) : invitations.length > 0 ? (
-                    <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                      {invitations.map((inv) => (
-                        <InvitationCard
-                          key={inv.id}
-                          inv={inv}
-                          onAccept={() =>
-                            acceptInvitation(inv.id)
-                              .then(() => {
-                                fetchInvitations();
-                                fetchSessions();
-                              })
-                              .catch(() => {
-                                fetchInvitations();
-                              })
-                          }
-                          onDecline={() =>
-                            declineInvitation(inv.id).then(fetchInvitations).catch(fetchInvitations)
-                          }
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </Reveal>
-          )}
+                 <Link href="/student/messages" className="bg-[#FFF4ED] text-[#C2410C] p-4 rounded-3xl flex flex-col justify-between h-[90px] border border-orange-50 hover:shadow-md transition-shadow relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:scale-110 transition-transform">
+                      <MessageSquare size={40} />
+                   </div>
+                   <div className="flex items-center gap-2 font-medium text-sm text-slate-900">
+                     <span className="p-1.5 bg-orange-500 text-white rounded-lg"><MessageSquare size={14} /></span>
+                     Сообщения
+                   </div>
+                   <div className="flex items-center justify-between text-xs text-slate-500">
+                     Написать преподавателю
+                     <ArrowRight size={14} />
+                   </div>
+                 </Link>
+              </div>
+            </div>
 
-          <Reveal className="lg:col-span-6">
-            <Card variant="elevated">
-              <CardContent className="p-6 md:p-7 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-muted">Недавние сессии</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">История активности</div>
-                    <div className="mt-2 text-sm text-muted leading-relaxed">
-                      Последние несколько сессий, в которых вы участвовали или которые уже завершены.
-                    </div>
-                  </div>
-                  <Badge className="bg-surface-subtle text-xs text-muted">
-                    {ended.length} из {Math.max(ended.length, 5)} показаны
-                  </Badge>
+            {/* Sessions Table block */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-[15px] text-slate-900">Мои сессии</h3>
+                <Link href="/student/sessions" className="text-xs font-medium text-purple-600 hover:opacity-80">
+                  Смотреть все
+                </Link>
+              </div>
+
+              <div className="bg-white border text-sm border-slate-100 rounded-3xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden">
+                <div className="grid grid-cols-12 gap-4 px-6 py-4 border-b border-slate-50 text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                  <div className="col-span-4">Сессия</div>
+                  <div className="col-span-2">Тип</div>
+                  <div className="col-span-3">Время</div>
+                  <div className="col-span-2">Статус</div>
+                  <div className="col-span-1 min-w-[50px] text-right"></div>
                 </div>
 
-                <div className="space-y-3">
-                  {loading && <div className="h-20 rounded-elas-lg bg-surface-subtle animate-pulse" />}
-                  {!loading && ended.length === 0 && (
-                    <div className="rounded-elas-lg bg-surface-subtle/80 p-6 text-sm text-muted text-center">
-                      История появится после участия хотя бы в одной сессии.
+                <div className="divide-y divide-slate-50">
+                  {sessions.length > 0 ? (
+                    sessions.slice(0, 5).map(s => (
+                      <div key={s.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center group hover:bg-slate-50/50 transition-colors">
+                        <div className="col-span-4 flex items-center gap-3">
+                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", s.status === 'live' ? 'bg-emerald-500' : s.status === 'upcoming' ? 'bg-amber-400' : 'bg-slate-300')} />
+                          <div className="font-medium text-slate-900 truncate">{s.title}</div>
+                        </div>
+                        <div className="col-span-2 text-slate-500 text-xs truncate">
+                          {s.type === 'exam' ? 'Экзамен' : 'Лекция'}
+                        </div>
+                        <div className="col-span-3 text-slate-500 text-xs">
+                          {s.date || "Не указано"}
+                        </div>
+                        <div className="col-span-2">
+                           <span className={cn("px-2.5 py-1 text-[10px] font-medium rounded-full", s.status === 'live' ? 'bg-emerald-50 text-emerald-600' : s.status === 'upcoming' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-500')}>
+                             {s.status === 'live' ? 'Активная' : s.status === 'upcoming' ? 'Предстоит' : 'Завершена'}
+                           </span>
+                        </div>
+                        <div className="col-span-1 text-right flex justify-end">
+                           <Link href={`/student/session/${s.id}`} className="text-xs font-medium text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                             Перейти
+                           </Link>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center text-slate-400 text-sm">
+                      Вы пока не прикреплены к активным сессиям
                     </div>
                   )}
-                  {!loading &&
-                    ended.map((s) => (
-                      <SessionRow
-                        key={s.id}
-                        s={s}
-                        right={
-                          <Badge className="bg-surface-subtle text-xs">
-                            Завершена
-                          </Badge>
-                        }
-                      />
-                    ))}
                 </div>
-              </CardContent>
-            </Card>
-          </Reveal>
-        </div>
-        </div>
+              </div>
+            </div>
 
-        {/* Small info */}
-        <Reveal>
-          <div className="text-xs text-muted flex items-center gap-2">
-            <Sparkles size={14} className="text-[rgb(var(--primary))]" />
-            Советы и инсайты формируются из live-событий и агрегированных метрик (без хранения raw-видео).
           </div>
-        </Reveal>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            
+            {/* Calendar Widget */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+               <div className="flex items-center justify-between mb-4">
+                 <button className="text-slate-400 hover:text-slate-900"><ChevronRight size={16} className="rotate-180" /></button>
+                 <span className="text-[13px] font-semibold text-slate-900 uppercase">Сентябрь <span className="font-medium text-slate-500">2026</span></span>
+                 <button className="text-slate-400 hover:text-slate-900"><ChevronRight size={16} /></button>
+               </div>
+               
+               <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase font-medium text-slate-400 mb-2">
+                 <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+               </div>
+               
+               <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-600">
+                 {Array.from({ length: dayOffset }).map((_, i) => (
+                   <span key={`prev-${i}`} className="p-1.5 opacity-30"></span>
+                 ))}
+                 {Array.from({ length: daysInMonth }).map((_, i) => (
+                   <span key={i} className={cn("p-1.5 rounded-lg flex items-center justify-center cursor-default hover:bg-slate-100", (i+1) === today.getDate() && "bg-[#7448FF] text-white")}>
+                     {i + 1}
+                   </span>
+                 ))}
+               </div>
+               
+               <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-purple-600">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays size={14} />
+                    <span>Сегодня: {today.getDate()} Сентября</span>
+                  </div>
+                  <ChevronRight size={14} />
+               </div>
+            </div>
+
+            {/* Notifications / Activity */}
+            <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+               <div className="flex items-center justify-between mb-5">
+                 <h3 className="font-semibold text-[14px] text-slate-900">Уведомления</h3>
+                 <span className="text-[10px] text-purple-600 font-medium">Смотреть все</span>
+               </div>
+
+               <div className="space-y-4">
+                 {[1,2,3].map((v, i) => (
+                   <div key={i} className="flex gap-3 items-start">
+                     <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                       {i === 0 ? <Lock size={12} /> : i === 1 ? <CalendarDays size={12} /> : <CalendarDays size={12} /> }
+                     </div>
+                     <div>
+                       <div className="text-xs font-medium text-slate-900">
+                         {i === 0 ? "Вам открыт доступ к новому курсу" : "Изменение в расписании сессий"}
+                       </div>
+                       <div className="text-[10px] text-slate-400 mt-0.5">{i === 0 ? '5 мин назад' : '1 ч назад'}</div>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+            </div>
+
+            <div className="text-[11px] text-slate-400 px-2 flex flex-col gap-1.5 items-center text-center">
+              <div>© 2026 KonilAI. Все права защищены.</div>
+              <div className="flex items-center justify-center gap-4">
+                <Link href="#" className="hover:text-slate-600">Поддержка</Link>
+                <Link href="#" className="hover:text-slate-600">Документация</Link>
+                <Link href="#" className="hover:text-slate-600">Политика</Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      </Section>
     </div>
-  );
-}
-
-function InvitationCard({
-  inv,
-  onAccept,
-  onDecline,
-}: {
-  inv: InvitationRow;
-  onAccept: () => Promise<void>;
-  onDecline: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [confirmDeclineOpen, setConfirmDeclineOpen] = useState(false);
-
-  const handleAccept = () => {
-    setBusy(true);
-    onAccept().finally(() => setBusy(false));
-  };
-  const handleDecline = () => {
-    setConfirmDeclineOpen(false);
-    setBusy(true);
-    onDecline().finally(() => setBusy(false));
-  };
-
-  return (
-    <>
-      <div className="rounded-elas-lg bg-surface-subtle/80 ring-1 ring-[color:var(--border)]/20 p-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="font-semibold text-fg truncate">{inv.groupName ?? "Группа"}</div>
-          <div className="mt-1 text-sm text-muted">Приглашение в группу</div>
-        </div>
-
-        <div className="flex gap-2 shrink-0">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDeclineOpen(true)} className="rounded-full">
-            Отклонить
-          </Button>
-          <Button size="sm" disabled={busy} onClick={handleAccept} className="rounded-full">
-            Принять
-          </Button>
-        </div>
-      </div>
-
-      <Modal
-        open={confirmDeclineOpen}
-        onClose={() => setConfirmDeclineOpen(false)}
-        title="Отклонить приглашение?"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmDeclineOpen(false)}>
-              Отмена
-            </Button>
-            <Button variant="outline" className="border-red-400/50 text-red-400 hover:bg-red-500/10" onClick={handleDecline}>
-              Отклонить
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted">
-          Вы уверены? Приглашение в группу «{inv.groupName ?? "Группа"}» будет отклонено. Повторно пригласить сможет только преподаватель.
-        </p>
-      </Modal>
-    </>
   );
 }

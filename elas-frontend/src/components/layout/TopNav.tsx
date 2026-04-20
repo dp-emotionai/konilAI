@@ -39,6 +39,7 @@ import {
   Lock,
   Heart,
   Activity,
+  Bell,
 } from "lucide-react";
 import { useUI } from "./Providers";
 import { useTheme } from "./ThemeProvider";
@@ -572,14 +573,15 @@ export default function TopNav() {
                 <>
                   <Link
                     href="/settings"
-                    aria-label="Настройки"
-                    className="hidden md:inline-flex"
+                    aria-label="Уведомления"
+                    className="hidden md:inline-flex relative"
                   >
                     <button
                       type="button"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle"
                     >
-                      <Settings size={18} />
+                      <Bell size={18} />
+                      <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-red-400"></span>
                     </button>
                   </Link>
 

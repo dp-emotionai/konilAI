@@ -1,267 +1,198 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import Section from "@/components/common/Section";
-import Reveal from "@/components/common/Reveal";
-import { Card, CardContent } from "@/components/ui/Card";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
 import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
-import { CalendarDays, Clock, RadioTower, RefreshCw, AlertCircle, BarChart3 } from "lucide-react";
+import { 
+  VideoIcon, 
+  Search, 
+  ListFilter,
+  MoreVertical,
+  CalendarDays,
+  ShieldCheck,
+  Code2,
+  Database
+} from "lucide-react";
 
-function statusLabel(status: StudentSessionRow["status"]) {
-  if (status === "live") return "В эфире";
-  if (status === "upcoming") return "Запланирована";
-  return "Завершена";
-}
+type TabOption = "all" | "live" | "upcoming" | "ended";
+
+const getIconForTitle = (title: string) => {
+  const t = title.toLowerCase();
+  if (t.includes("разработ") || t.includes("web") || t.includes("программир")) {
+    return { icon: Code2, bg: "bg-rose-50", text: "text-rose-500" };
+  }
+  if (t.includes("баз") || t.includes("данн") || t.includes("sql") || t.includes("db")) {
+    return { icon: Database, bg: "bg-sky-50", text: "text-sky-500" };
+  }
+  if (t.includes("безопасно") || t.includes("sec")) {
+    return { icon: ShieldCheck, bg: "bg-emerald-50", text: "text-emerald-500" };
+  }
+  return { icon: VideoIcon, bg: "bg-purple-50", text: "text-purple-600" };
+};
 
 export default function StudentSessionsPage() {
   const router = useRouter();
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TabOption>("all");
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
 
   const load = useCallback(async () => {
-    setError(null);
     setLoading(true);
     try {
       const list = await getStudentSessionsList();
       setSessions(list);
     } catch (e) {
       setSessions([]);
-      setError(e instanceof Error ? e.message : "Не удалось загрузить список сессий.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (apiAvailable) {
+      void load();
+    } else {
+      setLoading(false);
+    }
+  }, [apiAvailable, load]);
 
-  const hasSessions = sessions.length > 0;
+  const filteredSessions = useMemo(() => {
+    let filtered = sessions;
+    if (activeTab !== "all") {
+      filtered = filtered.filter(s => s.status === activeTab);
+    }
+    if (search.trim()) {
+      const qs = search.toLowerCase();
+      filtered = filtered.filter(s => 
+        s.title.toLowerCase().includes(qs) || 
+        s.teacher?.toLowerCase().includes(qs)
+      );
+    }
+    return filtered;
+  }, [sessions, activeTab, search]);
 
   return (
-    <div className="pb-12 space-y-6">
-      <Breadcrumbs
-        items={[
-          { label: "Студент", href: "/student/dashboard" },
-          { label: "Сессии", href: "/student/sessions" },
-        ]}
-      />
-
-      <Section spacing="none" className="mt-2">
-        <Reveal>
-          <div className="overflow-hidden rounded-3xl border border-[color:var(--border-muted)] bg-[radial-gradient(circle_at_top_left,#1b233d_0%,transparent_55%),radial-gradient(circle_at_bottom_right,#15192f_0%,transparent_55%),linear-gradient(135deg,#050814_0%,#05060d_100%)] px-5 py-6 md:px-7 md:py-7">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full bg-surface-subtle/50 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-muted">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Student · Sessions
-                </div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
-                  Ваши учебные сессии
-                </h1>
-                <p className="max-w-xl text-sm text-muted">
-                  Здесь отображаются все занятия, экзамены и эфиры, к которым вы приглашены.
-                  Выберите активную или запланированную сессию, чтобы подключиться.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="grid grid-cols-2 gap-3 text-xs text-muted md:w-72">
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted">
-                      <RadioTower size={14} /> Live
-                    </div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {sessions.filter((s) => s.status === "live").length || 0}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-muted">Сеансов «в эфире» сейчас</div>
-                  </div>
-                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle/50 px-3 py-2.5">
-                    <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.18em] text-muted">
-                      <CalendarDays size={14} /> Upcoming
-                    </div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {sessions.filter((s) => s.status === "upcoming").length || 0}
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-muted">Будущие сессии</div>
-                  </div>
-                </div>
-                {apiAvailable && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void load()}
-                    disabled={loading}
-                    className="shrink-0 gap-1.5 border-white/20 text-muted hover:bg-surface-subtle"
-                  >
-                    <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                    Обновить
-                  </Button>
-                )}
-              </div>
-            </div>
+    <div className="min-h-screen bg-[#FAFAFB]">
+      <div className="mx-auto max-w-[1440px] px-4 md:px-8 py-8 space-y-8">
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+              Сессии
+            </h1>
           </div>
-        </Reveal>
-      </Section>
+        </div>
 
-      <Section spacing="none" className="mt-5">
-        <Reveal>
-          <Card>
-            <CardContent className="p-4 md:p-6">
-              {loading ? (
-                <div className="space-y-3">
-                  <div className="h-11 rounded-2xl bg-surface-subtle animate-pulse" />
-                  <div className="h-11 rounded-2xl bg-surface-subtle animate-pulse" />
-                  <div className="h-11 rounded-2xl bg-surface-subtle animate-pulse" />
-                </div>
-              ) : error ? (
-                <div className="py-8 flex flex-col items-center justify-center gap-4 text-center">
-                  <div className="flex items-center gap-2 text-sm text-[color:var(--error)]">
-                    <AlertCircle size={18} />
-                    <span>{error}</span>
-                  </div>
-                  <Button variant="outline" onClick={() => void load()} className="gap-2">
-                    <RefreshCw size={14} />
-                    Повторить
-                  </Button>
-                </div>
-              ) : !apiAvailable ? (
-                <div className="py-8 text-center text-sm text-muted">
-                  Войдите в аккаунт и убедитесь, что указан адрес сервера, чтобы видеть свои сессии.
-                  <div className="mt-3">
-                    <Link href="/auth/login">
-                      <Button variant="outline" size="sm">Войти</Button>
-                    </Link>
-                  </div>
-                </div>
-              ) : !hasSessions ? (
-                <div className="py-8 text-center text-sm text-muted">
-                  Сессий пока нет. Когда преподаватель создаст и откроет сессию для вашей
-                  группы, она появится здесь.
-                  <div className="mt-3">
-                    <Button variant="ghost" size="sm" onClick={() => void load()} className="gap-1">
-                      <RefreshCw size={14} />
-                      Обновить
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sessions.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => router.push(`/student/session/${s.id}`)}
-                      className="group w-full rounded-2xl border border-[color:var(--border)] bg-surface hover:bg-surface-subtle hover:border-[color:var(--border-strong)] transition text-left px-4 py-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="truncate text-sm font-semibold text-fg group-hover:text-fg-strong">
-                            {s.title}
-                          </div>
-                          <Badge
-                            variant={s.type === "exam" ? "warning" : "secondary"}
-                          >
-                            {s.type === "exam" ? "Экзамен" : "Лекция"}
-                          </Badge>
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
-                          {s.date && (
-                            <span className="inline-flex items-center gap-1">
-                              <Clock size={12} className="text-muted" />
-                              <span>{s.date}</span>
-                            </span>
-                          )}
-                          {s.teacher && (
-                            <span className="inline-flex items-center gap-1">
-                              · <span>Преподаватель:</span> <span>{s.teacher}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-1 flex items-center gap-3 md:mt-0">
-                        <Badge
-                          variant={
-                            s.status === "live"
-                              ? "success"
-                              : s.status === "upcoming"
-                              ? "primary"
-                              : "secondary"
-                          }
-                        >
-                          {statusLabel(s.status)}
-                        </Badge>
-                        <Button size="sm" variant="outline">
-                          Открыть
-                        </Button>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+        {/* Tabs */}
+        <div className="border-b border-slate-200 flex gap-6 overflow-x-auto no-scrollbar">
+          {(
+            [
+              { id: "all", label: "Все сессии" },
+              { id: "live", label: "Активные" },
+              { id: "upcoming", label: "Запланированные" },
+              { id: "ended", label: "Завершенные" },
+            ] as const
+          ).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={cn(
+                "pb-3 text-[14px] font-medium transition-colors border-b-2 whitespace-nowrap",
+                activeTab === tab.id 
+                  ? "border-[#7448FF] text-slate-900" 
+                  : "border-transparent text-slate-500 hover:text-slate-700"
               )}
-            </CardContent>
-          </Card>
-        </Reveal>
-      </Section>
-
-      {apiAvailable && (
-        <Section spacing="none" className="mt-4">
-          <Reveal>
-            <Link
-              href="/student/summary"
-              className="block rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 p-5 transition hover:bg-surface-subtle hover:border-[color:var(--border-strong)]"
             >
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-[rgb(var(--primary))]">
-                    <BarChart3 size={24} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Filters Row */}
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Поиск по сессиям, группам или преподавателям..." 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-slate-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-purple-500/20 shadow-[0_2px_12px_rgba(0,0,0,0.02)] transition-shadow"
+            />
+          </div>
+          <button className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-medium text-slate-600 shadow-[0_2px_12px_rgba(0,0,0,0.02)] hover:bg-slate-50 transition-colors w-full sm:w-auto">
+            <ListFilter size={16} />
+            Фильтры
+          </button>
+        </div>
+
+        {/* Session List */}
+        <div className="space-y-3">
+          {loading ? (
+             <div className="py-20 flex justify-center"><div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-[#7448FF] animate-spin"></div></div>
+          ) : filteredSessions.length > 0 ? (
+            filteredSessions.map((s) => {
+              const IconData = getIconForTitle(s.title);
+              const SIcon = IconData.icon;
+              return (
+                <div key={s.id} className="bg-white border border-slate-100 rounded-[20px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_2px_12px_rgba(0,0,0,0.015)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.04)] transition-shadow">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shrink-0", IconData.bg, IconData.text)}>
+                      <SIcon size={24} strokeWidth={2} />
+                    </div>
+                    <div className="min-w-0 pr-4">
+                      <h3 className="text-[15px] font-semibold text-slate-900 truncate">{s.title}</h3>
+                      <div className="flex items-center gap-2 text-[13px] text-slate-500 mt-1 truncate">
+                        <span>Преподаватель: {s.teacher || "Не указан"}</span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1.5"><CalendarDays size={12} className="text-slate-400"/> {s.date || "Дата не указана"}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="font-semibold text-fg">Отчёт по сессиям (ML)</div>
-                    <div className="mt-1 text-sm text-muted">
-                      Вовлечённость, эмоции и динамика по вашим сессиям — в разделе «Моя сводка».
+
+                  <div className="flex flex-col md:flex-row items-center gap-6 shrink-0 border-t md:border-t-0 pt-4 md:pt-0 border-slate-50">
+                    <div className="flex flex-col items-center justify-center min-w-[120px]">
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider mb-2",
+                        s.status === 'live' ? 'bg-emerald-50 text-emerald-600' : 
+                        s.status === 'upcoming' ? 'bg-amber-50 text-amber-600' : 
+                        'bg-slate-50 text-slate-500'
+                      )}>
+                        {s.status === 'live' ? 'Активная' : s.status === 'upcoming' ? 'Запланирована' : 'Завершена'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => router.push(`/student/session/${s.id}`)}
+                        className={cn("px-6 py-2.5 rounded-xl font-medium text-sm transition-colors", 
+                          s.status === 'live' ? "bg-[#7448FF] hover:bg-[#623ce6] text-white" : 
+                          "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                        )}>
+                        {s.status === 'live' ? 'Открыть' : s.status === 'ended' ? 'Отчёт' : 'Открыть'}
+                      </button>
+                      <button className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-50 transition-colors shrink-0">
+                        <MoreVertical size={18} />
+                      </button>
                     </div>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="shrink-0">
-                  Открыть сводку
-                </Button>
-              </div>
-            </Link>
-          </Reveal>
-        </Section>
-      )}
-
-      <Section spacing="none" className="mt-4">
-        <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4 text-xs text-muted">
-          <span className="mt-0.5">
-            После выбора строки вы перейдёте на экран подключения
-            <code className="mx-1 rounded-md bg-black/5 px-1 py-0.5 text-[11px] text-fg">
-              /student/session/&lt;id&gt;
-            </code>
-            , где название сессии и группы берётся из бэкенда.
-          </span>
+              );
+            })
+          ) : (
+            <div className="py-20 text-center text-slate-500 text-[15px]">
+              Не найдено сессий, удовлетворяющих заданным критериям.
+            </div>
+          )}
         </div>
-      </Section>
 
-      <Section spacing="none">
-        <div className="flex items-start gap-3 rounded-elas-lg bg-surface-subtle p-4 text-xs text-muted">
-          <span>
-            Если сессия отображается как «В эфире», но вы не можете подключиться, попросите
-            преподавателя убедиться, что он запустил эфир и вы добавлены в нужную группу.
-          </span>
-        </div>
-      </Section>
+      </div>
     </div>
   );
 }

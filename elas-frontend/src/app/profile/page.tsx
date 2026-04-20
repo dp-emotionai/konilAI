@@ -1,21 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Section from "@/components/common/Section";
-import EmptyState from "@/components/common/EmptyState";
-import { Card, CardContent } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-import Skeleton from "@/components/ui/Skeleton";
-import { useToast } from "@/components/ui/Toast";
-
-import { useUI } from "@/components/layout/Providers";
 import { cn } from "@/lib/cn";
+import { useUI } from "@/components/layout/Providers";
 import {
   api,
   clearAuth,
@@ -25,320 +14,126 @@ import {
 } from "@/lib/api/client";
 
 import {
-  Copy,
+  User,
   ShieldCheck,
+  Bell,
+  Blocks,
+  Globe,
+  CreditCard,
+  Laptop,
   Camera,
-  Wifi,
-  KeyRound,
   LogOut,
-  CheckCircle2,
-  AlertTriangle,
+  ChevronRight,
   Info,
-  Settings,
-  FileText,
-  Users,
-  BarChart3,
-  Database,
+  CheckCircle2,
+  Trash2,
+  Lock,
+  Smartphone,
+  Mail,
+  ChevronDown
 } from "lucide-react";
 
 type Role = "student" | "teacher" | "admin";
-
-type MeRes = {
-  id: string;
-  email: string;
-  role: Role;
-  name?: string | null;
-  status?: string | null;
-};
-
+type MeRes = { id: string; email: string; role: Role; name?: string | null; status?: string | null; };
 type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
 
-function safeInitial(email?: string | null, name?: string | null) {
-  const source = (name?.trim() || email?.trim() || "U").trim();
-  return source.slice(0, 1).toUpperCase();
-}
+const TABS = [
+  { id: "profile", label: "Профиль", icon: User },
+  { id: "security", label: "Безопасность", icon: ShieldCheck },
+  { id: "devices", label: "Устройства и Сеть", icon: Laptop },
+  { id: "notifications", label: "Уведомления", icon: Bell },
+  { id: "integrations", label: "Интеграции", icon: Blocks },
+  { id: "language", label: "Язык и регион", icon: Globe },
+  { id: "subscription", label: "Подписка", icon: CreditCard },
+  { id: "active_sessions", label: "Активные сессии", icon: Smartphone },
+];
 
-async function copyToClipboard(text: string) {
-  await navigator.clipboard.writeText(text);
-}
-
-function roleLabel(role?: Role) {
-  if (role === "teacher") return "Преподаватель";
-  if (role === "admin") return "Администратор";
-  return "Студент";
-}
-
-function statusLabel(status?: string | null) {
-  if (!status) return null;
-  const s = status.toLowerCase();
-  if (s === "approved") return "Подтверждённый доступ";
-  if (s === "pending") return "Ожидает одобрения";
-  if (s === "limited") return "Ограниченный доступ";
-  if (s === "blocked") return "Аккаунт заблокирован";
-  return null;
-}
-
-function PermissionPill({
-  label,
-  state,
-}: {
-  label: string;
-  state: PermissionStateLite;
-}) {
-  const variant =
-    state === "granted"
-      ? "success"
-      : state === "denied"
-      ? "danger"
-      : state === "prompt"
-      ? "warning"
-      : "secondary";
-
-  const text =
-    state === "granted"
-      ? "Granted"
-      : state === "denied"
-      ? "Denied"
-      : state === "prompt"
-      ? "Not requested"
-      : "Unsupported";
-
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-elas-lg bg-surface-subtle px-4 py-3">
-      <div className="text-sm text-fg">{label}</div>
-      <Badge variant={variant}>{text}</Badge>
-    </div>
-  );
-}
-
-function getRoleHome(role: Role): string {
-  if (role === "teacher") return "/teacher/dashboard";
-  if (role === "admin") return "/admin/dashboard";
-  return "/student/dashboard";
-}
-
-function getRoleQuickLinks(role: Role): Array<{
-  href: string;
-  label: string;
-  icon: ReactNode;
-}> {
-  if (role === "teacher") {
-    return [
-      { href: "/teacher/sessions", label: "Sessions", icon: <FileText size={16} /> },
-      { href: "/teacher/groups", label: "Groups", icon: <Users size={16} /> },
-      { href: "/teacher/reports", label: "Reports", icon: <BarChart3 size={16} /> },
-    ];
-  }
-
-  if (role === "admin") {
-    return [
-      { href: "/admin/users", label: "Users", icon: <Users size={16} /> },
-      { href: "/admin/groups", label: "Groups", icon: <FileText size={16} /> },
-      { href: "/admin/audit", label: "Audit", icon: <Database size={16} /> },
-    ];
-  }
-
-  return [
-    { href: "/student/sessions", label: "Sessions", icon: <FileText size={16} /> },
-    { href: "/student/groups", label: "Groups", icon: <Users size={16} /> },
-    { href: "/student/summary", label: "Summary", icon: <BarChart3 size={16} /> },
-  ];
-}
-
-export default function ProfilePage() {
+export default function UnifiedProfilePage() {
   const router = useRouter();
-  const toast = useToast();
   const ui = useUI();
+  const [activeTab, setActiveTab] = useState("profile");
 
-  const role = (ui.state.role as Role) || "student";
-  const home = getRoleHome(role);
-  const quickLinks = getRoleQuickLinks(role);
-
-  const stored = useMemo(() => getStoredAuth(), []);
   const [me, setMe] = useState<MeRes | null>(null);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  const consentGranted = ui.state.consent;
-  const uiStatus = ui.state.status ?? null;
 
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
   const [netMs, setNetMs] = useState<number | null>(null);
-  const [netStatus, setNetStatus] = useState<"idle" | "checking" | "ok" | "fail">(
-    "idle"
-  );
-
+  const [netStatus, setNetStatus] = useState<"idle" | "checking" | "ok" | "fail">("idle");
   const [previewOn, setPreviewOn] = useState(false);
+  
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-
-  const initials = safeInitial(
-    stored?.email ?? me?.email,
-    stored?.name ?? me?.name ?? null
-  );
+  const stored = useMemo(() => getStoredAuth(), []);
 
   useEffect(() => {
     let mounted = true;
-    const ac = new AbortController();
-
     async function loadMe() {
       setLoading(true);
-      setErr(null);
-
       if (!hasAuth()) {
-        setLoading(false);
         router.push("/auth/login");
         return;
       }
-
       if (!isApiAvailable()) {
-        if (mounted) {
-          setMe(
-            stored
-              ? {
-                  id: "local",
-                  email: stored.email,
-                  role: stored.role as Role,
-                  name: stored.name ?? null,
-                }
-              : null
-          );
-          setLoading(false);
-        }
+        if (mounted && stored) setMe({ id: "local", email: stored.email, role: stored.role as Role, name: stored.name });
+        setLoading(false);
         return;
       }
-
       try {
-        const data = await api.get<MeRes>("auth/me", { signal: ac.signal });
-        if (!mounted) return;
-        setMe(data);
-      } catch (e: any) {
-        if (!mounted) return;
-        setErr(e?.message || "Failed to load profile.");
-        setMe(null);
+         const data = await api.get<MeRes>("auth/me");
+         if (mounted) setMe(data);
+      } catch (e) {
+         setMe(null);
       } finally {
-        if (mounted) setLoading(false);
+         if (mounted) setLoading(false);
       }
     }
-
     loadMe();
-
-    return () => {
-      mounted = false;
-      ac.abort();
-    };
+    return () => { mounted = false; };
   }, [router, stored]);
 
   useEffect(() => {
     let cancelled = false;
-
     async function queryPerms() {
       const perms = (navigator as any)?.permissions;
-
-      if (!perms?.query) {
-        setCamPerm("unsupported");
-        setMicPerm("unsupported");
-        return;
-      }
-
+      if (!perms?.query) return;
       try {
         const cam = await perms.query({ name: "camera" });
-        if (!cancelled) {
-          setCamPerm((cam.state as PermissionStateLite) || "prompt");
-        }
-        cam.onchange = () => {
-          if (!cancelled) {
-            setCamPerm((cam.state as PermissionStateLite) || "prompt");
-          }
-        };
-      } catch {
-        setCamPerm("unsupported");
-      }
-
+        if (!cancelled) setCamPerm((cam.state as PermissionStateLite) || "prompt");
+      } catch {}
       try {
         const mic = await perms.query({ name: "microphone" });
-        if (!cancelled) {
-          setMicPerm((mic.state as PermissionStateLite) || "prompt");
-        }
-        mic.onchange = () => {
-          if (!cancelled) {
-            setMicPerm((mic.state as PermissionStateLite) || "prompt");
-          }
-        };
-      } catch {
-        setMicPerm("unsupported");
-      }
+        if (!cancelled) setMicPerm((mic.state as PermissionStateLite) || "prompt");
+      } catch {}
     }
-
     queryPerms();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   async function runNetworkCheck() {
-    if (!isApiAvailable()) {
-      toast.push({
-        type: "info",
-        title: "API not configured",
-        text: "Set NEXT_PUBLIC_API_URL to enable network checks.",
-      });
-      return;
-    }
-
+    if (!isApiAvailable()) return;
     setNetStatus("checking");
-    setNetMs(null);
-
     const t0 = performance.now();
-
     try {
       await api.get("health");
-      const dt = Math.round(performance.now() - t0);
-      setNetMs(dt);
+      setNetMs(Math.round(performance.now() - t0));
       setNetStatus("ok");
     } catch {
       setNetStatus("fail");
-      setNetMs(null);
     }
   }
 
   async function startPreview() {
     try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        toast.push({
-          type: "error",
-          title: "Camera not available",
-          text: "This browser doesn't support camera access.",
-        });
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false,
-      });
-
+      if (!navigator.mediaDevices?.getUserMedia) return;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       streamRef.current = stream;
-
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play().catch(() => {});
       }
-
       setPreviewOn(true);
-      toast.push({
-        type: "success",
-        title: "Camera check",
-        text: "Camera stream started (not recorded).",
-      });
-    } catch (e: any) {
-      toast.push({
-        type: "error",
-        title: "Camera blocked",
-        text: e?.message || "Permission denied.",
-      });
+    } catch {
       setPreviewOn(false);
     }
   }
@@ -347,11 +142,8 @@ export default function ProfilePage() {
     try {
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+      if (videoRef.current) videoRef.current.srcObject = null;
     } catch {}
-
     setPreviewOn(false);
   }
 
@@ -362,470 +154,567 @@ export default function ProfilePage() {
     router.push("/");
   }
 
-  const titleName = me?.name?.trim() ? me.name : "Profile";
-  const showRole = (me?.role ?? role) as Role;
+  const roleLabel = me?.role === 'teacher' ? 'Преподаватель' : me?.role === 'admin' ? 'Администратор' : 'Студент';
+  const nameParts = me?.name ? me.name.split(" ") : [];
+  const firstName = nameParts[0] || "";
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
 
   return (
-    <div className="pb-12">
-      <Breadcrumbs
-        items={[{ label: roleLabel(role), href: home }, { label: "Профиль" }]}
-      />
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">
+      <div className="mx-auto max-w-[1240px] px-4 md:px-8 pb-16">
+        
+        <div className="mb-8">
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Мой аккаунт</h1>
+          <p className="mt-1 text-[15px] text-slate-500">Управляйте своими данными и настройками аккаунта</p>
+        </div>
 
-      <PageHero
-        title="Профиль"
-        subtitle="Аккаунт, приватность, согласие и проверка устройства — в одном месте."
-        right={
-          <div className="flex items-center gap-2">
-            <Link href={home}>
-              <Button variant="outline" size="sm">
-                Назад
-              </Button>
-            </Link>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={signOut}
-              className="gap-2"
-            >
-              <LogOut size={16} />
-              Выйти
-            </Button>
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          
+          {/* Sidebar Navigation */}
+          <div className="w-full md:w-[260px] shrink-0 sticky top-24">
+            <nav className="space-y-1">
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-[14px] font-medium rounded-[14px] transition-all",
+                      isActive 
+                        ? "bg-purple-50 text-[#7448FF]" 
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                  >
+                    <Icon size={18} className={cn(isActive ? "text-[#7448FF]" : "text-slate-400")} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-        }
-      />
 
-      <Section className="mt-6">
-        {loading ? (
-          <div className="grid gap-6 lg:grid-cols-12">
-            <Card className="lg:col-span-7">
-              <CardContent className="p-6 md:p-7">
-                <Skeleton className="h-10 w-56" />
-                <div className="mt-4 grid gap-3">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
+          {/* Main Content Area */}
+          <div className="flex-1 w-full min-h-[500px]">
+             
+             {/* Profile Layout */}
+             {activeTab === "profile" && (
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                   {/* Left Col Profile Settings */}
+                   <div className="xl:col-span-2 space-y-6">
+                     
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Профильная информация</h2>
+                        
+                        <div className="flex flex-col sm:flex-row gap-8 items-start">
+                           <div className="flex flex-col items-center gap-4 shrink-0">
+                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner">
+                                <span className="text-4xl font-bold text-slate-300">
+                                   {me?.name ? me.name[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}
+                                </span>
+                                <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white">
+                                  <Camera size={14} />
+                                </button>
+                              </div>
+                              <span className="text-xs text-slate-400 font-medium tracking-wide">JPG, PNG не более 5 МБ</span>
+                           </div>
+
+                           <div className="flex-1 space-y-5 w-full">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                 <div>
+                                   <label className="text-xs font-semibold text-slate-500 mb-2 block">Имя</label>
+                                   <input type="text" readOnly value={firstName} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none" />
+                                 </div>
+                                 <div>
+                                   <label className="text-xs font-semibold text-slate-500 mb-2 block">Фамилия</label>
+                                   <input type="text" readOnly value={lastName} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none" />
+                                 </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Email</label>
+                                <input type="text" readOnly value={me?.email || ""} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none disabled:bg-slate-50" />
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Роль</label>
+                                <div className="relative">
+                                  <input type="text" readOnly value={roleLabel} className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[14px] text-slate-500 outline-none" />
+                                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">О себе</label>
+                                <textarea rows={3} readOnly value="Студент 3 курса, интересуюсь машинным обучением и анализом данных." className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none resize-none"></textarea>
+                                <div className="text-right text-[10px] text-slate-400 font-medium mt-1">0/200</div>
+                              </div>
+                              
+                              <div className="pt-2 flex justify-end">
+                                <button className="px-6 py-2.5 bg-[#7448FF] hover:bg-[#623ce6] text-white font-medium rounded-xl text-[14px] transition-colors cursor-not-allowed opacity-80 shadow-sm">
+                                  Сохранить изменения
+                                </button>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Безопасность</h2>
+                        <div className="space-y-4">
+                           <div className="flex items-center justify-between pb-4 border-b border-slate-50">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                 <Lock size={18} />
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Пароль</div>
+                                 <div className="text-[12px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                   <span className="tracking-widest">••••••••••••••</span>
+                                   <span className="text-slate-300">|</span>
+                                   <span>Обновлен 2 месяца назад</span>
+                                 </div>
+                               </div>
+                             </div>
+                             <button className="text-[13px] font-semibold text-[#7448FF]">Изменить</button>
+                           </div>
+
+                           <div className="flex items-center justify-between pb-4 border-b border-slate-50">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                 <ShieldCheck size={18} />
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Двухфакторная аутентификация</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Дополнительная защита аккаунта</div>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-4">
+                               <span className="text-[13px] text-slate-400 font-medium">Выключено</span>
+                               <button className="text-[13px] font-semibold text-[#7448FF]">Включить</button>
+                             </div>
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                 <ShieldCheck size={18} />
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Резервные коды</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Используйте для входа при недоступности 2FA</div>
+                               </div>
+                             </div>
+                             <button className="text-[13px] font-medium px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">Показать коды</button>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Интеграции</h2>
+                        <div className="space-y-4">
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
+                                 G
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Google</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "Не подключено"}</div>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-4">
+                               <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 bg-emerald-50 text-emerald-600 rounded">Подключено</span>
+                               <button className="text-slate-400 hover:text-slate-700"><ChevronRight size={18} className="rotate-90" /></button>
+                             </div>
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
+                                 Git
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">GitHub</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Не подключено</div>
+                               </div>
+                             </div>
+                             <button className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">
+                                 D
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Dropbox</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Не подключено</div>
+                               </div>
+                             </div>
+                             <button className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
+                           </div>
+                        </div>
+                     </div>
+                   </div>
+
+                   {/* Right Col Stats & Quick Actions */}
+                   <div className="space-y-6">
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[15px] font-bold text-slate-900 mb-6">Статистика активности</h2>
+                        <div className="space-y-5">
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> Присоединился</div>
+                            <div className="font-medium text-slate-900">10 марта 2026</div>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><CheckCircle2 size={14} className="text-[#7448FF]" /> Активность</div>
+                            <div className="font-medium text-emerald-500">Высокая</div>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><Blocks size={14} className="text-[#7448FF]" /> Завершено сессий</div>
+                            <div className="font-medium text-slate-900">18</div>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><Laptop size={14} className="text-[#7448FF]" /> Время в системе</div>
+                            <div className="font-medium text-slate-900">48 ч 32 мин</div>
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><Globe size={14} className="text-[#7448FF]" /> Последний вход</div>
+                            <div className="font-medium text-slate-900">Сегодня, 10:24</div>
+                          </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[15px] font-bold text-slate-900 mb-6">Быстрые действия</h2>
+                        <div className="gap-2 flex flex-col">
+                           <button onClick={() => setActiveTab("security")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <ShieldCheck size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Изменить пароль</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Обновите пароль от аккаунта</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+
+                           <button onClick={() => setActiveTab("notifications")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <Bell size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Настроить уведомления</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Выберите как получать уведомления</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+
+                           <button onClick={() => setActiveTab("subscription")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <CreditCard size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Управление подпиской</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Просмотр и изменение подписки</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+
+                           <button onClick={signOut} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <Laptop size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Выйти из всех устройств</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Завершить все активные сессии</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+                        </div>
+                     </div>
+                   </div>
                 </div>
-              </CardContent>
-            </Card>
+             )}
 
-            <Card className="lg:col-span-5">
-              <CardContent className="p-6 md:p-7">
-                <Skeleton className="h-6 w-40" />
-                <div className="mt-4 grid gap-3">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : err ? (
-          <EmptyState title="Не удалось загрузить профиль" text={err} />
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-12">
-            <div className="space-y-6 lg:col-span-7">
-              <Card>
-                <CardContent className="p-6 md:p-7">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="relative grid h-12 w-12 place-items-center overflow-hidden rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25">
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            background:
-                              "radial-gradient(circle at 30% 20%, rgba(142,91,255,.30) 0%, rgba(142,91,255,.14) 40%, rgba(142,91,255,0) 70%)",
-                          }}
-                        />
-                        <div className="relative z-10 font-semibold text-fg">
-                          {initials}
+             {/* Security Tab */}
+             {activeTab === "security" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Безопасность</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройки безопасности и защита вашего аккаунта</p>
+                   
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                      <div className="pb-6 border-b border-slate-50">
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Пароль</div>
+                           <button className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[#7448FF] font-semibold hover:bg-slate-100 transition-colors">Изменить пароль</button>
+                        </div>
+                        <div className="text-[13px] text-slate-500 mb-4">Используйте надежный пароль для защиты вашего аккаунта.</div>
+                        <div className="flex gap-16 text-[13px] text-slate-500 font-medium">
+                          <span className="tracking-widest">••••••••••••••••</span>
+                          <span>Обновлен 2 месяца назад</span>
                         </div>
                       </div>
 
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="truncate text-lg font-semibold text-fg">
-                            {titleName}
-                          </div>
-
-                          <Badge className="bg-surface-subtle ring-1 ring-[color:var(--border)]/30 shadow-none">
-                            {roleLabel(showRole)}
-                          </Badge>
-
-                          {statusLabel(me?.status ?? uiStatus) && (
-                            <Badge variant="secondary" className="gap-1">
-                              {statusLabel(me?.status ?? uiStatus)}
-                            </Badge>
-                          )}
-
-                          {consentGranted ? (
-                            <Badge variant="success" className="gap-1">
-                              <CheckCircle2 size={14} />
-                              Consent: OK
-                            </Badge>
-                          ) : (
-                            <Badge variant="warning" className="gap-1">
-                              <AlertTriangle size={14} />
-                              Consent required
-                            </Badge>
-                          )}
+                      <div className="pb-6 border-b border-slate-50">
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Двухфакторная аутентификация (2FA)</div>
+                           <button className="text-[13px] font-medium px-5 py-2.5 bg-[#7448FF] text-white rounded-xl font-semibold hover:bg-[#623ce6] transition-colors shadow-sm">Включить 2FA</button>
                         </div>
-
-                        <div className="mt-1 truncate text-sm text-muted">
-                          {me?.email ?? stored?.email ?? "—"}
-                        </div>
-
-                        <div className="mt-1 text-xs text-muted">
-                          Consent-first: мы не храним raw-видео. Используются только
-                          агрегированные метрики.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Link href="/consent">
-                        <Button size="sm" className="gap-2">
-                          <ShieldCheck size={16} />
-                          Центр согласия
-                        </Button>
-                      </Link>
-
-                      <Link href="/settings">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Settings size={16} />
-                          Настройки
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-xs text-muted">User ID</div>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <div className="truncate text-sm font-medium text-fg">
-                          {me?.id ?? "—"}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={async () => {
-                            if (!me?.id) return;
-                            await copyToClipboard(me.id);
-                            toast.push({
-                              type: "success",
-                              title: "Copied",
-                              text: "User ID copied to clipboard.",
-                            });
-                          }}
-                        >
-                          <Copy size={16} />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-xs text-muted">Email</div>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <div className="truncate text-sm font-medium text-fg">
-                          {me?.email ?? "—"}
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="shrink-0"
-                          onClick={async () => {
-                            if (!me?.email) return;
-                            await copyToClipboard(me.email);
-                            toast.push({
-                              type: "success",
-                              title: "Copied",
-                              text: "Email copied to clipboard.",
-                            });
-                          }}
-                        >
-                          <Copy size={16} />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    <Link href="/auth/forgot-password">
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <KeyRound size={16} />
-                        Сбросить пароль
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6 md:p-7">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-sm text-muted">Privacy</div>
-                      <div className="mt-2 text-lg font-semibold text-fg">
-                        Контроль данных
-                      </div>
-                      <div className="mt-2 text-sm text-muted">
-                        Прозрачные настройки для consent-first аналитики.
-                      </div>
-                    </div>
-
-                    <div className="inline-flex items-center gap-2 rounded-full bg-surface-subtle px-3 py-1 text-xs text-muted">
-                      <Info size={14} className="text-[rgb(var(--primary))]" />
-                      privacy
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">
-                        Consent status
-                      </div>
-                      <div className="mt-1 text-sm text-muted">
-                        Согласие требуется перед началом видео-аналитики. Может быть
-                        запрошено для каждой сессии отдельно.
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {consentGranted ? (
-                          <Badge variant="success">Granted</Badge>
-                        ) : (
-                          <Badge variant="warning">Not granted</Badge>
-                        )}
-                        <Link href="/consent">
-                          <Button size="sm">Review consent</Button>
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">
-                        Download my data
-                      </div>
-                      <div className="mt-1 text-sm text-muted">
-                        Экспорт данных появится позже, после финализации политики
-                        хранения.
-                      </div>
-                      <div className="mt-3">
-                        <Button size="sm" variant="outline" disabled>
-                          Coming soon
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="text-sm font-semibold text-fg">
-                        Delete account
-                      </div>
-                      <div className="mt-1 text-sm text-muted">
-                        Опасная операция. Будет требовать подтверждения и может быть
-                        ограничена администратором.
-                      </div>
-                      <div className="mt-3">
-                        <Button size="sm" variant="danger" disabled>
-                          Coming soon
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {role === "teacher" ? (
-                <Card>
-                  <CardContent className="p-6 md:p-7">
-                    <div className="text-sm text-muted">Teacher</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">
-                      Настройки преподавателя
-                    </div>
-                    <div className="mt-2 text-sm text-muted">
-                      Появятся позже: шаблоны уроков, дефолтные политики сессии,
-                      экспорты и интеграции.
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" disabled>
-                        Default session settings (soon)
-                      </Button>
-                      <Button variant="outline" size="sm" disabled>
-                        Templates (soon)
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-              {role === "admin" ? (
-                <Card>
-                  <CardContent className="p-6 md:p-7">
-                    <div className="text-sm text-muted">Admin</div>
-                    <div className="mt-2 text-lg font-semibold text-fg">
-                      Администрирование
-                    </div>
-                    <div className="mt-2 text-sm text-muted">
-                      Быстрые ссылки на аудит и управление пользователями.
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <Link href="/admin/audit">
-                        <Button variant="outline" size="sm">
-                          Audit
-                        </Button>
-                      </Link>
-                      <Link href="/admin/users">
-                        <Button variant="outline" size="sm">
-                          Users
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : null}
-            </div>
-
-            <div className="space-y-6 lg:col-span-5">
-              <Card>
-                <CardContent className="p-6 md:p-7">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-sm text-muted">Device readiness</div>
-                      <div className="mt-2 text-lg font-semibold text-fg">
-                        Проверка устройства
-                      </div>
-                      <div className="mt-2 text-sm text-muted">
-                        Перед LIVE убедитесь, что камера доступна. Видео не
-                        записывается.
-                      </div>
-                    </div>
-
-                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-elas-lg bg-surface-subtle text-[rgb(var(--primary))] ring-1 ring-[color:var(--border)]/25">
-                      <Camera size={18} />
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3">
-                    <PermissionPill label="Camera permission" state={camPerm} />
-                    <PermissionPill label="Microphone permission" state={micPerm} />
-
-                    <div className="rounded-elas-lg bg-surface-subtle p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-fg">
-                            Network check
-                          </div>
-                          <div className="text-sm text-muted">
-                            Ping backend /health и оценка задержки.
+                        <div className="text-[13px] text-slate-500 mb-4">Дополнительный уровень защиты вашего аккаунта.</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><ShieldCheck size={18}/></div>
+                          <div>
+                            <div className="text-[11px] text-slate-400 font-semibold tracking-wide uppercase">Статус</div>
+                            <div className="text-[14px] text-slate-900 font-medium">Выключено</div>
                           </div>
                         </div>
-
-                        <div className="inline-flex items-center gap-2">
-                          {netStatus === "ok" ? (
-                            <Badge variant="success" className="gap-1">
-                              <Wifi size={14} />
-                              {netMs} ms
-                            </Badge>
-                          ) : netStatus === "fail" ? (
-                            <Badge variant="danger" className="gap-1">
-                              <AlertTriangle size={14} />
-                              Failed
-                            </Badge>
-                          ) : (
-                            <Badge className="gap-1">
-                              <Wifi size={14} />
-                              {netStatus === "checking" ? "Checking…" : "Idle"}
-                            </Badge>
-                          )}
-                        </div>
                       </div>
 
-                      <div className="mt-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={runNetworkCheck}
-                          disabled={netStatus === "checking"}
-                        >
-                          Run check
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-elas-lg bg-surface-subtle p-4">
-                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-fg">
-                          Camera preview
+                         <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Резервные коды</div>
+                           <button className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-100 transition-colors">Показать коды</button>
                         </div>
-                        <div className="text-sm text-muted">
-                          Локальный preview, не отправляется на сервер.
+                        <div className="text-[13px] text-slate-500 mb-4">Используйте резервные коды для входа при недоступности 2FA.</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><Lock size={18}/></div>
+                          <div>
+                            <div className="text-[11px] text-slate-400 font-semibold tracking-wide uppercase">Резервные коды</div>
+                            <div className="text-[14px] text-slate-900 font-medium">0 кодов создано</div>
+                          </div>
                         </div>
                       </div>
+                   </div>
 
-                      <div className="flex items-center gap-2">
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Последняя активность</div>
+                      <div className="text-[13px] text-slate-500 mb-6">Устройства и места, с которых был выполнен вход в ваш аккаунт.</div>
+                      
+                      <div className="w-full">
+                        <div className="grid grid-cols-12 gap-4 pb-3 border-b border-slate-100 text-[11px] font-semibold text-slate-400 uppercase tracking-widest px-2">
+                           <div className="col-span-5">Устройство</div>
+                           <div className="col-span-4">Местоположение</div>
+                           <div className="col-span-2">Время входа</div>
+                           <div className="col-span-1 text-right">Статус</div>
+                        </div>
+
+                        <div className="py-2">
+                           {/* Current device */}
+                           <div className="grid grid-cols-12 gap-4 items-center py-4 px-2 hover:bg-slate-50 transition-colors rounded-xl">
+                              <div className="col-span-5 flex items-center gap-4">
+                                <div className="w-10 h-10 flex items-center justify-center rounded-xl bg-purple-50 text-[#7448FF]"><Laptop size={20}/></div>
+                                <div>
+                                  <div className="font-medium text-slate-900 text-[14px]">Windows PC</div>
+                                  <div className="text-[12px] text-slate-500">Chrome • Windows</div>
+                                </div>
+                              </div>
+                              <div className="col-span-4">
+                                <div className="font-medium text-slate-900 text-[14px]">Текущий город</div>
+                                <div className="text-[12px] text-slate-500">IP: Ваш текущий</div>
+                              </div>
+                              <div className="col-span-2">
+                                <div className="text-[13px] text-slate-600">Сегодня, Сейчас</div>
+                              </div>
+                              <div className="col-span-1 text-right">
+                                <span className="text-[11px] tracking-wide font-bold uppercase text-emerald-500 px-2.5 py-1 bg-emerald-50 rounded">Текущая</span>
+                              </div>
+                           </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                      <div className="flex items-center justify-between">
+                         <div>
+                            <div className="font-semibold text-[15px] text-slate-900 mb-1">Удаление аккаунта</div>
+                            <div className="text-[13px] text-slate-500">Удалите свой аккаунт и все связанные данные без возможности восстановления.</div>
+                         </div>
+                         <button className="text-[13px] font-semibold px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors">Удалить аккаунт</button>
+                      </div>
+                   </div>
+
+                </div>
+             )}
+
+             {/* Notifications Tab */}
+             {activeTab === "notifications" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Уведомления</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройте, какие уведомления вы хотите получать и как</p>
+                   
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Способы получения уведомлений</div>
+                      <div className="text-[13px] text-slate-500 mb-6">Выберите, куда и как вы хотите получать уведомления</div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between py-2">
+                           <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Mail size={18} /></div>
+                              <div>
+                                <div className="text-[14px] font-semibold text-slate-900">Email уведомления</div>
+                                <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "alisher.b@mail.ru"}</div>
+                              </div>
+                           </div>
+                           <div className="w-12 h-6 rounded-full bg-[#7448FF] p-1 flex justify-end cursor-pointer"><div className="w-4 h-4 bg-white rounded-full"></div></div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-t border-slate-50 pt-4">
+                           <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><Smartphone size={18} /></div>
+                              <div>
+                                <div className="text-[14px] font-semibold text-slate-900">Push уведомления</div>
+                                <div className="text-[12px] text-slate-500 mt-0.5">Уведомления в браузере</div>
+                              </div>
+                           </div>
+                           <div className="w-12 h-6 rounded-full bg-[#7448FF] p-1 flex justify-end cursor-pointer"><div className="w-4 h-4 bg-white rounded-full"></div></div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 border-t border-slate-50 pt-4">
+                           <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><CheckCircle2 size={18} /></div>
+                              <div>
+                                <div className="text-[14px] font-semibold text-slate-900">Ежедневная сводка</div>
+                                <div className="text-[12px] text-slate-500 mt-0.5">Получайте сводку по активности раз в день</div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                             <span className="px-4 py-2 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-600 bg-slate-50">Включено (09:00) <ChevronDown size={14} className="inline ml-2" /></span>
+                           </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Типы уведомлений</div>
+                      <div className="text-[13px] text-slate-500 mb-6">Выберите, о каких событиях вы хотите получать уведомления</div>
+
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-100">
+                             <th className="pb-4 font-normal text-[12px] text-slate-400"></th>
+                             <th className="pb-4 font-normal text-[12px] text-slate-500 w-24 text-center">Email</th>
+                             <th className="pb-4 font-normal text-[12px] text-slate-500 w-24 text-center">Push</th>
+                             <th className="pb-4 font-normal text-[12px] text-slate-400 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[
+                            { title: "Расписание и занятия", subtitle: "Изменения в расписании, напоминания о занятиях", icon: Bell },
+                            { title: "Задания и дедлайны", subtitle: "Новые задания, приближающиеся дедлайны", icon: CheckCircle2 },
+                            { title: "Сообщения", subtitle: "Личные сообщения и ответы в обсуждениях", icon: Mail },
+                            { title: "Группы и сессии", subtitle: "Приглашения, обновления в группах и сессиях", icon: Blocks },
+                          ].map((item, i) => {
+                             const Icon = item.icon;
+                             return (
+                              <tr key={i} className="border-b border-slate-50">
+                                <td className="py-4 font-medium flex items-center gap-3">
+                                   <Icon size={18} className="text-[#7448FF] shrink-0" />
+                                   <div>
+                                     <div className="text-[14px] text-slate-900">{item.title}</div>
+                                     <div className="text-[11px] text-slate-500 font-normal mt-0.5">{item.subtitle}</div>
+                                   </div>
+                                </td>
+                                <td className="py-4 text-center align-middle">
+                                  <div className="w-5 h-5 mx-auto bg-[#7448FF] rounded-md flex items-center justify-center text-white"><CheckCircle2 size={12} strokeWidth={4} /></div>
+                                </td>
+                                <td className="py-4 text-center align-middle">
+                                  <div className="w-5 h-5 mx-auto bg-[#7448FF] rounded-md flex items-center justify-center text-white"><CheckCircle2 size={12} strokeWidth={4} /></div>
+                                </td>
+                                <td className="py-4 text-right">
+                                  <ChevronDown size={14} className="text-slate-300" />
+                                </td>
+                              </tr>
+                             )
+                          })}
+                        </tbody>
+                      </table>
+                   </div>
+
+                </div>
+             )}
+
+             {/* Devices Tab from before */}
+             {activeTab === "devices" && (
+                <div className="p-8 max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2 flex items-center gap-2">
+                      Устройства и Сеть <Info size={18} className="text-slate-400" />
+                   </h2>
+                   
+                   <p className="text-[14px] text-slate-500 mb-8 w-full max-w-2xl">
+                     Перед подключением к сессиям вы можете проверить работоспособность вашей камеры и качество интернет-соединения прямо здесь.
+                   </p>
+
+                   <div className="border border-slate-100 rounded-[20px] p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                         <div>
+                            <h3 className="font-semibold text-slate-900 text-[15px]">Камера и микрофон</h3>
+                            <p className="text-[13px] text-slate-500 mt-1">Тест устройств работает полностью локально</p>
+                         </div>
+                         <div className="flex items-center gap-2">
+                            {camPerm === 'granted' ? <span className="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-700 text-[11px] font-bold uppercase tracking-wide">Доступ разрешен</span> : <span className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-[11px] font-bold uppercase tracking-wide">Тест не начат</span>}
+                         </div>
+                      </div>
+
+                      <div className={cn("rounded-2xl overflow-hidden bg-slate-900 aspect-video max-w-xl relative mx-auto my-6 shadow-lg border border-slate-200", !previewOn && "flex items-center justify-center")}>
+                         {previewOn ? (
+                           <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                         ) : (
+                           <Camera size={48} className="text-slate-700" />
+                         )}
+                      </div>
+
+                      <div className="flex justify-center mt-4 pt-4 border-t border-slate-200/50">
                         {!previewOn ? (
-                          <Button size="sm" onClick={startPreview}>
-                            Start
-                          </Button>
+                          <button onClick={startPreview} className="px-6 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm text-slate-700 font-medium rounded-xl text-[14px] transition-colors">
+                            Запустить предварительный просмотр
+                          </button>
                         ) : (
-                          <Button size="sm" variant="outline" onClick={stopPreview}>
-                            Stop
-                          </Button>
+                          <button onClick={stopPreview} className="px-6 py-2.5 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 shadow-sm font-medium rounded-xl text-[14px] transition-colors">
+                            Остановить тест
+                          </button>
                         )}
                       </div>
-                    </div>
+                   </div>
 
-                    <div
-                      className={cn(
-                        "mt-4 overflow-hidden rounded-elas-lg bg-bg ring-1 ring-[color:var(--border)]/30",
-                        previewOn ? "block" : "hidden"
-                      )}
-                    >
-                      <video
-                        ref={videoRef}
-                        muted
-                        playsInline
-                        className="aspect-video w-full object-cover"
-                      />
-                    </div>
+                   <div className="border border-slate-100 rounded-[20px] p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                         <div>
+                            <h3 className="font-semibold text-slate-900 text-[15px]">Проверка соединения</h3>
+                            <p className="text-[13px] text-slate-500 mt-1">Текущая задержка (ping) до серверов KonilAI</p>
+                         </div>
+                         <div className="flex items-center gap-4">
+                            {netStatus === 'ok' && <span className="text-[15px] font-bold text-emerald-600 drop-shadow-sm">{netMs} ms</span>}
+                            {netStatus === 'fail' && <span className="text-[15px] font-bold text-rose-600">Ошибка соединения</span>}
+                            {netStatus === 'checking' && <span className="text-[15px] font-medium text-slate-500 animate-pulse">Идет проверка...</span>}
 
-                    {!previewOn ? (
-                      <div className="mt-4 text-xs text-muted">
-                        Если камера заблокирована, откройте настройки браузера и
-                        разрешите доступ для сайта.
+                            <button 
+                              onClick={runNetworkCheck} 
+                              disabled={netStatus === 'checking'}
+                              className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm text-slate-700 font-medium rounded-xl text-[14px] transition-colors disabled:opacity-50"
+                            >
+                              Проверить сеть
+                            </button>
+                         </div>
                       </div>
-                    ) : null}
-                  </div>
-                </CardContent>
-              </Card>
+                   </div>
+                </div>
+             )}
 
-              <Card>
-                <CardContent className="p-6 md:p-7">
-                  <div className="text-sm text-muted">Navigation</div>
-                  <div className="mt-2 text-lg font-semibold text-fg">
-                    Быстрые ссылки
-                  </div>
+             {/* Stubs for other tabs */}
+             {["integrations", "language", "subscription", "active_sessions"].includes(activeTab) && (
+                <div className="p-8 h-full min-h-[500px] flex flex-col items-center justify-center text-center">
+                   <Blocks size={64} className="text-slate-200 mb-6" strokeWidth={1} />
+                   <h2 className="text-xl font-bold text-slate-900 mb-2">В разработке</h2>
+                   <p className="text-[15px] text-slate-500 max-w-sm">
+                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) будут доступны в следующих обновлениях.
+                   </p>
+                </div>
+             )}
 
-                  <div className="mt-4 grid gap-2">
-                    {quickLinks.map((item) => (
-                      <Link key={item.href} href={item.href} className="block">
-                        <Button variant="outline" className="w-full justify-between">
-                          <span className="inline-flex items-center gap-2">
-                            {item.icon}
-                            {item.label}
-                          </span>
-                          <span className="text-muted">→</span>
-                        </Button>
-                      </Link>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
           </div>
-        )}
-      </Section>
+
+        </div>
+      </div>
     </div>
   );
 }
