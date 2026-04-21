@@ -80,6 +80,9 @@ export default function TeacherLiveMonitorPage() {
   const [phase, setPhase] = useState<SessionPhase>("preflight");
   const [liveSeconds, setLiveSeconds] = useState(0);
 
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+
   // WebRTC State
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
@@ -503,33 +506,35 @@ export default function TeacherLiveMonitorPage() {
                   <TrendingUp size={18} className="text-emerald-500" />
                 </header>
                 <CardContent className="px-6 pb-6 pt-0">
-                  <div className="h-64 mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={metricsHistory}>
-                        <defs>
-                          <linearGradient id="colorEngage" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.1} />
-                            <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <Area
-                          type="monotone"
-                          dataKey="engagement"
-                          stroke={COLORS.purple}
-                          fillOpacity={1}
-                          fill="url(#colorEngage)"
-                          strokeWidth={3}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="attention"
-                          stroke={COLORS.blue}
-                          fill="transparent"
-                          strokeWidth={2}
-                          strokeDasharray="4 4"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  <div className="h-64 mt-2 min-w-0 relative">
+                    {isClient && (
+                      <ResponsiveContainer width="99%" height="100%">
+                        <AreaChart data={metricsHistory}>
+                          <defs>
+                            <linearGradient id="colorEngage" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.1} />
+                              <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <Area
+                            type="monotone"
+                            dataKey="engagement"
+                            stroke={COLORS.purple}
+                            fillOpacity={1}
+                            fill="url(#colorEngage)"
+                            strokeWidth={3}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="attention"
+                            stroke={COLORS.blue}
+                            fill="transparent"
+                            strokeWidth={2}
+                            strokeDasharray="4 4"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                   <div className="flex items-center gap-6 mt-4 pl-4">
                     <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#7448FF]" /><span className="text-[11px] font-bold text-slate-400">Вовлечённость</span></div>
@@ -544,24 +549,26 @@ export default function TeacherLiveMonitorPage() {
                   <Smile size={18} className="text-purple-400" />
                 </header>
                 <CardContent className="px-6 pb-6 pt-0 flex flex-col items-center">
-                  <div className="h-64 w-full mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={emotionStats}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={85}
-                          paddingAngle={8}
-                          dataKey="value"
-                        >
-                          {emotionStats.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={EMOTION_PIE_COLORS[index % EMOTION_PIE_COLORS.length]} />
-                          ))}
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <div className="h-64 w-full mt-2 min-w-0 relative">
+                    {isClient && (
+                      <ResponsiveContainer width="99%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={emotionStats}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={85}
+                            paddingAngle={8}
+                            dataKey="value"
+                          >
+                            {emotionStats.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={EMOTION_PIE_COLORS[index % EMOTION_PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                   <div className="flex flex-wrap justify-center gap-4 mt-2">
                     {emotionStats.map((e, index) => (
@@ -609,12 +616,14 @@ export default function TeacherLiveMonitorPage() {
                       <span className="text-[13px] font-bold text-slate-900 flex items-center gap-2"><TrendingUp size={16} className="text-purple-500" /> Вовлечённость</span>
                       <span className="text-[14px] font-black text-[#7448FF]">{metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].engagement : 0}%</span>
                     </div>
-                    <div className="h-14 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={metricsHistory}>
-                          <Area type="monotone" dataKey="engagement" stroke={COLORS.purple} strokeWidth={2} fill="transparent" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                    <div className="h-14 w-full min-w-0 relative">
+                      {isClient && (
+                        <ResponsiveContainer width="99%" height="100%">
+                          <AreaChart data={metricsHistory}>
+                            <Area type="monotone" dataKey="engagement" stroke={COLORS.purple} strokeWidth={2} fill="transparent" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   </div>
 
@@ -623,12 +632,14 @@ export default function TeacherLiveMonitorPage() {
                       <span className="text-[13px] font-bold text-slate-900 flex items-center gap-2"><Clock size={16} className="text-blue-500" /> Внимание</span>
                       <span className="text-[14px] font-black text-blue-500">{metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].attention : 0}%</span>
                     </div>
-                    <div className="h-14 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={metricsHistory}>
-                          <Area type="monotone" dataKey="attention" stroke={COLORS.blue} strokeWidth={2} fill="transparent" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                    <div className="h-14 w-full min-w-0 relative">
+                      {isClient && (
+                        <ResponsiveContainer width="99%" height="100%">
+                          <AreaChart data={metricsHistory}>
+                            <Area type="monotone" dataKey="attention" stroke={COLORS.blue} strokeWidth={2} fill="transparent" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
                     </div>
                   </div>
 
