@@ -444,6 +444,10 @@ export default function StudentJoinSessionPage() {
             risk: result.risk ?? 0,
             state: result.state ?? "NORMAL",
             dominant_emotion: result.dominant_emotion ?? "Neutral",
+            // Forward real ML engagement/stress/fatigue so teacher chart is accurate
+            engagement: result.engagement,
+            stress: result.stress,
+            fatigue: result.fatigue,
           }).catch(() => {});
         }
       } catch (err) {

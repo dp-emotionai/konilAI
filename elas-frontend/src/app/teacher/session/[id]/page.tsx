@@ -153,6 +153,21 @@ export default function TeacherLiveMonitorPage() {
 
   const [localNotes, setLocalNotes] = useState("");
 
+  // Persist notes to localStorage per session (local draft only, not server)
+  const notesKey = `elas_teacher_notes_${sessionId}`;
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(notesKey);
+      if (saved) setLocalNotes(saved);
+    } catch { /* ignore */ }
+  }, [notesKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(notesKey, localNotes);
+    } catch { /* ignore */ }
+  }, [localNotes, notesKey]);
+
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
   const roomId = sessionId;
@@ -717,8 +732,11 @@ export default function TeacherLiveMonitorPage() {
                       <div className="w-16 h-16 bg-white rounded-[20px] shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-300">
                         <FileText size={32} strokeWidth={1.5} />
                       </div>
-                      <p className="font-bold text-slate-900 mb-1">Нет прикрепленных материалов</p>
-                      <p className="text-[13px] text-slate-400 font-medium">Файлы для этого урока пока не загружены сервером.</p>
+                      <p className="font-bold text-slate-900 mb-1">Файлы не подключены</p>
+                      <p className="text-[13px] text-slate-400 font-medium max-w-sm mx-auto leading-relaxed">
+                        В бэкенде нет модели хранения файлов (File/Resource) и нет маршрута загрузки.<br/>
+                        Реализация файлового хранилища вне текущего scope MVP.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -728,13 +746,16 @@ export default function TeacherLiveMonitorPage() {
                       value={localNotes}
                       onChange={(e) => setLocalNotes(e.target.value)}
                       className="w-full flex-1 p-6 rounded-[24px] bg-slate-50/50 border border-slate-100 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all resize-none"
-                      placeholder="Напишите локальную черновую заметку..."
+                      placeholder="Напишите заметку к уроку..."
                     />
-                    <div className="mt-4 flex justify-start items-center px-2">
-                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
-                         <AlertTriangle size={14} className="text-orange-500" />
-                         <span className="text-[11px] font-bold text-orange-600">Черновик не сохраняется на сервере</span>
+                    <div className="mt-4 flex justify-between items-center px-2">
+                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-100">
+                         <Info size={14} className="text-amber-500" />
+                         <span className="text-[11px] font-bold text-amber-700">Сохраняется локально · не синхронизируется с сервером</span>
                        </div>
+                       {localNotes.length > 0 && (
+                         <span className="text-[11px] font-medium text-slate-400">{localNotes.length} симв.</span>
+                       )}
                     </div>
                   </div>
                 )}

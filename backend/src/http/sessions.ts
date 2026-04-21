@@ -8,7 +8,7 @@ function getUser(req: Express.Request): JwtPayload {
   return (req as Express.Request & { user: JwtPayload }).user;
 }
 
-// In-memory live metrics: sessionId -> userId -> { emotion, confidence, risk, state, dominant_emotion, updatedAt }
+// In-memory live metrics: sessionId -> userId -> { emotion, confidence, risk, state, dominant_emotion, engagement, stress, fatigue, updatedAt }
 const liveMetricsStore = new Map<
   string,
   Map<
@@ -19,6 +19,9 @@ const liveMetricsStore = new Map<
       risk: number;
       state: string;
       dominant_emotion: string;
+      engagement: number | null;
+      stress: number | null;
+      fatigue: number | null;
       updatedAt: Date;
     }
   >
@@ -34,6 +37,9 @@ function getOrCreateSessionMetrics(
     risk: number;
     state: string;
     dominant_emotion: string;
+    engagement: number | null;
+    stress: number | null;
+    fatigue: number | null;
     updatedAt: Date;
   }
 > {
@@ -484,6 +490,9 @@ export function registerSessionsRoutes(app: Express) {
         risk?: number;
         state?: string;
         dominant_emotion?: string;
+        engagement?: number;
+        stress?: number;
+        fatigue?: number;
       };
 
       const metrics = getOrCreateSessionMetrics(sessionId);
@@ -494,6 +503,9 @@ export function registerSessionsRoutes(app: Express) {
         state: typeof body.state === "string" ? body.state : "NORMAL",
         dominant_emotion:
           typeof body.dominant_emotion === "string" ? body.dominant_emotion : "Neutral",
+        engagement: typeof body.engagement === "number" ? body.engagement : null,
+        stress: typeof body.stress === "number" ? body.stress : null,
+        fatigue: typeof body.fatigue === "number" ? body.fatigue : null,
         updatedAt: new Date(),
       });
 
@@ -545,7 +557,7 @@ export function registerSessionsRoutes(app: Express) {
         const u = userMap.get(uid);
         return {
           userId: uid,
-          name: u?.name ?? u?.email ?? uid,
+          fullName: u?.name ?? u?.email ?? uid,
           email: u?.email,
           ...m,
           updatedAt: m.updatedAt.toISOString(),
@@ -556,7 +568,27 @@ export function registerSessionsRoutes(app: Express) {
       const avgConfidence =
         participants.reduce((s, p) => s + p.confidence, 0) / participants.length;
 
-      res.json({ participants, avgRisk, avgConfidence });
+      // Compute real averages from ML-forwarded values; fall back to derived formula only if missing
+      const withEngagement = participants.filter((p) => p.engagement != null);
+      const withStress = participants.filter((p) => p.stress != null);
+      const withFatigue = participants.filter((p) => p.fatigue != null);
+
+      const avgEngagement =
+        withEngagement.length > 0
+          ? withEngagement.reduce((s, p) => s + (p.engagement ?? 0), 0) / withEngagement.length
+          : 1 - avgRisk; // derived fallback
+
+      const avgStress =
+        withStress.length > 0
+          ? withStress.reduce((s, p) => s + (p.stress ?? 0), 0) / withStress.length
+          : avgRisk * 0.6; // derived fallback
+
+      const avgFatigue =
+        withFatigue.length > 0
+          ? withFatigue.reduce((s, p) => s + (p.fatigue ?? 0), 0) / withFatigue.length
+          : (1 - avgConfidence) * 0.4; // derived fallback
+
+      res.json({ participants, avgRisk, avgConfidence, avgEngagement, avgStress, avgFatigue });
     } catch (e) {
       console.error("GET /sessions/:id/live-metrics", e);
       res.status(500).json({ error: "Failed to get live metrics" });

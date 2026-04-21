@@ -96,7 +96,19 @@ export async function declineInvitation(invitationId: string): Promise<void> {
 /** Отправить результат ML в бэкенд для live-монитора преподавателя. */
 export async function sendSessionMetrics(
   sessionId: string,
-  metrics: { emotion: string; confidence: number; risk: number; state: string; dominant_emotion: string }
+  metrics: {
+    emotion: string;
+    confidence: number;
+    risk: number;
+    state: string;
+    dominant_emotion: string;
+    /** Direct ML output 0..1 */
+    engagement?: number;
+    /** Direct ML output 0..1 */
+    stress?: number;
+    /** Direct ML output 0..1 */
+    fatigue?: number;
+  }
 ): Promise<void> {
   if (!getApiBaseUrl() || !hasAuth()) return;
   try {
