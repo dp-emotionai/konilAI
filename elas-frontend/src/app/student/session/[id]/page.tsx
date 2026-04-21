@@ -36,6 +36,7 @@ import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
+import { StreamVideo } from "@/components/session/StreamVideo";
 
 import {
   Mic,
@@ -532,7 +533,7 @@ export default function StudentJoinSessionPage() {
 
                  {/* PIP Local Preview (Bottom Right instead of left in reference to avoid overlap if desired, but reference shows bottom left below the main text. We will stick to reference: PIP below main stream or floating) */}
                  <div className="absolute bottom-4 left-4 xl:left-auto xl:right-4 xl:bottom-4 w-[240px] aspect-[16/10] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
-                    <video ref={localThumbRef} className="w-full h-full object-cover" autoPlay playsInline muted />
+                    <StreamVideo stream={localStream} className="w-full h-full object-cover" autoPlay playsInline muted />
                     <div className="absolute bottom-2 left-2 bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
                       Вы <Mic size={12} className={isMicEnabled ? "text-white" : "text-red-400"}/>
                     </div>

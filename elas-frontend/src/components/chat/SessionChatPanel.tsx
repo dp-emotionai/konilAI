@@ -12,7 +12,7 @@ import {
   type SessionChatPolicy,
 } from "@/lib/api/teacher";
 import { getStoredAuth, isRealSessionId } from "@/lib/api/client";
-import { MessageCircle, Lock, LifeBuoy, SendHorizonal } from "lucide-react";
+import { MessageCircle, Lock, LifeBuoy, SendHorizonal, Paperclip } from "lucide-react";
 
 type Props = {
   sessionId: string;
@@ -157,58 +157,26 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
         : "Вопросы по теме, быстрые реплики и реакции.";
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-      {/* header */}
-      <div className="shrink-0 border-b border-[color:var(--border)] px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
-                {channel === "help" ? <LifeBuoy size={15} /> : <MessageCircle size={15} />}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-white">{title}</div>
-                <div className="mt-0.5 line-clamp-2 text-[11px] leading-relaxed text-white/42">
-                  {subtitle}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {chatLocked && (
-              <Badge className="border border-amber-400/20 bg-amber-500/10 text-amber-700 text-amber-700">
-                <Lock size={12} className="mr-1" />
-                Locked
-              </Badge>
-            )}
-            <Badge className="border border-[color:var(--border)] bg-surface-subtle/50 text-muted">
-              {channel === "help" ? "Help" : "Public"}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col bg-transparent font-sans">
       {/* messages — scrollable container */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <div className="space-y-2.5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 custom-scrollbar">
+        <div className="space-y-6">
         {!realSession && (
-          <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-black/20 px-4 py-4 text-xs text-muted">
-            Чат доступен для сессий, созданных в системе. Откройте сессию с реальным ID.
+          <div className="rounded-[20px] bg-slate-50 border border-slate-100 px-4 py-4 text-[13px] font-medium text-slate-500 text-center mx-4">
+            Чат доступен для сессий, созданных в системе.
           </div>
         )}
 
         {realSession && loading && (
-          <div className="space-y-2.5">
-            <div className="h-14 animate-pulse rounded-2xl bg-surface-subtle" />
-            <div className="ml-auto h-14 w-[82%] animate-pulse rounded-2xl bg-surface-subtle" />
-            <div className="h-14 w-[88%] animate-pulse rounded-2xl bg-surface-subtle" />
+          <div className="space-y-4">
+            <div className="h-16 animate-pulse rounded-[24px] bg-slate-50/80 mx-4" />
+            <div className="h-16 animate-pulse rounded-[24px] bg-slate-50/80 mx-4 ml-12" />
           </div>
         )}
 
         {realSession && !loading && orderedMessages.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-black/20 px-4 py-5 text-center text-xs text-muted">
-            Пока нет сообщений. Начните обсуждение.
+          <div className="rounded-[20px] bg-slate-50 border border-slate-100 px-4 py-8 text-center text-[13px] font-medium text-slate-400 mx-4">
+             Сообщений пока нет.
           </div>
         )}
 
@@ -217,58 +185,37 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
             const isYou = auth?.email && m.senderEmail === auth.email;
             const displayName = isYou
               ? "Вы"
-              : m.senderName || m.senderEmail || m.senderId || "Участник";
-            const initial =
-              displayName === "Вы"
-                ? "В"
-                : (displayName.charAt(0) || "?").toUpperCase();
+              : m.senderName || "Участник";
+            const initial = displayName.charAt(0).toUpperCase();
+            const timeStr = mounted ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "";
+
+            if (isYou) {
+              return (
+                <div key={m.id} className="flex flex-col items-end gap-1.5 w-full">
+                  <div className="bg-[#F4F0FF] rounded-t-[20px] rounded-bl-[20px] rounded-br-[4px] px-5 py-3.5 max-w-[85%] shadow-sm">
+                    <div className="text-[14px] text-[#333333] leading-relaxed font-medium whitespace-pre-wrap">
+                      {m.text}
+                    </div>
+                  </div>
+                  <div className="text-[10px] font-bold text-slate-300 pr-2">{timeStr}</div>
+                </div>
+              );
+            }
 
             return (
-              <div
-                key={m.id}
-                className={`flex items-end gap-2.5 ${isYou ? "justify-end" : "justify-start"}`}
-              >
-                {!isYou && (
-                  <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[color:var(--border)] bg-surface-subtle text-[11px] font-medium text-zinc-200"
-                    title={m.senderEmail ?? undefined}
-                  >
-                    {initial}
-                  </div>
-                )}
-
-                <div
-                  className={`max-w-[86%] rounded-2xl px-3.5 py-3 ${
-                    isYou
-                      ? "border border-violet-400/20 bg-violet-500/10 text-violet-700 text-white"
-                      : "border border-[color:var(--border)] bg-surface-subtle/50 text-zinc-100"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`text-sm font-medium ${
-                        isYou ? "text-violet-100" : "text-zinc-100"
-                      }`}
-                    >
-                      {displayName}
-                    </span>
-                    <span className="text-[10px] text-white/38">
-                      {mounted ? new Date(m.createdAt).toLocaleTimeString() : ""}
-                    </span>
-                  </div>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">
-                    {m.text}
-                  </p>
+              <div key={m.id} className="flex items-start gap-3 w-full">
+                <div className="w-8 h-8 rounded-full border border-slate-100 bg-white shadow-sm shrink-0 flex items-center justify-center overflow-hidden text-[12px] font-bold text-slate-500 mt-1">
+                   {initial}
                 </div>
-
-                {isYou && (
-                  <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-violet-400/20 bg-violet-500/20 text-[11px] font-medium text-violet-100"
-                    title={m.senderEmail ?? undefined}
-                  >
-                    {initial}
+                <div className="flex flex-col items-start gap-1 max-w-[85%]">
+                  <div className="text-[12px] font-bold text-slate-900 ml-1">{displayName}</div>
+                  <div className="bg-[#F8F9FA] rounded-t-[20px] rounded-tr-[20px] rounded-bl-[4px] rounded-br-[20px] px-5 py-3.5 border border-slate-100/50 shadow-sm">
+                    <div className="text-[14px] text-[#333333] leading-relaxed font-medium whitespace-pre-wrap">
+                      {m.text}
+                    </div>
                   </div>
-                )}
+                  <div className="text-[10px] font-bold text-slate-300 pl-2">{timeStr}</div>
+                </div>
               </div>
             );
           })}
@@ -277,57 +224,34 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
       </div>
 
       {/* composer */}
-      <div className="shrink-0 border-t border-[color:var(--border)] bg-black/10 px-4 py-3">
-        {sendError && <p className="mb-2 text-xs text-red-400">{sendError}</p>}
-
-        <div className="space-y-3">
-          <textarea
-            rows={2}
-            className="w-full resize-none rounded-2xl border border-[color:var(--border)] bg-surface-subtle/80 px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-400/35"
+      <div className="shrink-0 px-5 pt-2 pb-5 bg-transparent">
+        {sendError && <p className="mb-2 text-[11px] font-bold text-rose-500 px-2">{sendError}</p>}
+        
+        <div className="relative flex items-end gap-1.5 bg-[#F8F9FA] rounded-[28px] p-2 pl-5 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] focus-within:ring-2 focus-within:ring-[#7448FF]/20 transition-all">
+          <input
+            type="text"
+            className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-[14px] font-medium text-slate-800 placeholder-slate-400 h-10 min-w-0"
             placeholder={placeholder}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={!canSend}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+              if (e.key === "Enter") {
                 e.preventDefault();
                 void handleSend();
               }
             }}
           />
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-[10px] uppercase tracking-[0.18em] text-white/30">
-                Quick
-              </span>
-              {QUICK_REACTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setInput((v) => (v ? `${v} ${emoji}` : emoji))}
-                  className="rounded-full border border-[color:var(--border)] bg-surface-subtle/50 px-2.5 py-1 text-sm text-muted transition hover:bg-surface-subtle"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="hidden text-[11px] text-white/30 sm:inline">
-                Ctrl/Cmd + Enter
-              </span>
-              <Button
-                size="sm"
-                onClick={handleSend}
-                disabled={!canSend || !input.trim()}
-                className="gap-2"
-              >
-                <SendHorizonal size={14} />
-                Отправить
-              </Button>
-            </div>
-          </div>
+          <button className="w-10 h-10 rounded-full text-slate-400 hover:text-slate-600 flex items-center justify-center shrink-0 transition-colors">
+            <Paperclip size={18} />
+          </button>
+          <button 
+             onClick={handleSend}
+             disabled={!canSend || !input.trim()}
+             className="w-10 h-10 bg-[#7448FF] hover:bg-purple-600 rounded-full flex items-center justify-center text-white shrink-0 ml-1 shadow-[0_4px_12px_rgba(116,72,255,0.25)] disabled:opacity-50 disabled:shadow-none transition-all"
+          >
+            <SendHorizonal size={16} className="-ml-0.5" />
+          </button>
         </div>
       </div>
     </div>

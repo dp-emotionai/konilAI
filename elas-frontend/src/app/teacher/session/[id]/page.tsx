@@ -750,9 +750,9 @@ export default function TeacherLiveMonitorPage() {
                 </header>
                 <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col">
                   {hasMl ? (
-                    <div className="flex-1 w-full min-w-0 min-h-[160px] relative">
+                    <div className="flex-1 w-full min-w-0 h-[160px] relative">
                       {isClient && (
-                        <ResponsiveContainer width="99%" height="100%">
+                        <ResponsiveContainer width="99%" height={160}>
                            <AreaChart data={metricsHistory}>
                              <defs>
                                 <linearGradient id="colorEngage" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.1}/><stop offset="95%" stopColor={COLORS.purple} stopOpacity={0}/></linearGradient>
@@ -782,9 +782,9 @@ export default function TeacherLiveMonitorPage() {
                 <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col items-center">
                   {hasMl && emotionStats.length > 0 ? (
                     <>
-                      <div className="flex-1 w-full min-w-0 relative">
+                      <div className="flex-1 w-full min-w-0 h-[180px] relative">
                         {isClient && (
-                          <ResponsiveContainer width="99%" height="100%">
+                          <ResponsiveContainer width="99%" height={180}>
                             <PieChart>
                               <Pie data={emotionStats} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={8} dataKey="value">
                                 {emotionStats.map((entry, index) => (

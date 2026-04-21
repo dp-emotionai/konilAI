@@ -368,7 +368,7 @@ export default function UnifiedProfilePage() {
                             <div className="flex flex-col items-center gap-4 shrink-0">
                               <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner overflow-hidden border border-slate-200">
                                 {displayAvatar ? (
-                                  <Image src={displayAvatar} alt={me?.fullName || "Avatar"} fill className="object-cover" />
+                                  <img src={displayAvatar} alt={me?.fullName || "Avatar"} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 ) : (
                                   <span className="text-4xl font-bold text-slate-300">
                                      {me?.fullName ? me.fullName[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}

@@ -413,9 +413,11 @@ export default function TopNav() {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const safeRole: Role | null = state.role ?? null;
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
@@ -457,11 +459,14 @@ export default function TopNav() {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
       }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
     };
 
-    if (profileOpen) document.addEventListener("mousedown", onOutside);
+    if (profileOpen || notifOpen) document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
-  }, [profileOpen]);
+  }, [profileOpen, notifOpen]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -572,18 +577,24 @@ export default function TopNav() {
 
               {state.loggedIn && (
                 <>
-                  <Link
-                    href="/settings"
-                    aria-label="Уведомления"
-                    className="hidden md:inline-flex relative"
-                  >
+                  <div className="relative hidden md:inline-flex" ref={notifRef}>
                     <button
                       type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle"
+                      onClick={() => setNotifOpen((o) => !o)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
                     >
                       <Bell size={18} />
                     </button>
-                  </Link>
+                    {notifOpen && (
+                      <div className="absolute right-0 top-12 w-80 rounded-2xl bg-white shadow-xl ring-1 ring-black/5 overflow-hidden z-50 p-4">
+                        <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3 mb-3">Уведомления</div>
+                        <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                           <Bell className="mb-2 text-slate-300" size={24} />
+                           <div className="text-[13px] font-medium leading-relaxed">У вас пока нет новых уведомлений</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="relative" ref={profileRef}>
                     <button
@@ -595,12 +606,11 @@ export default function TopNav() {
                       aria-label="Меню аккаунта"
                     >
                       {state.avatarUrl ? (
-                         <Image 
+                         <img 
                            src={resolveAvatarUrl(state.avatarUrl, state.avatarVersion)!} 
                            alt={state.fullName || "User"} 
-                           width={36} 
-                           height={36} 
-                           className="h-full w-full object-cover"
+                           className="h-full w-full object-cover" 
+                           referrerPolicy="no-referrer"
                          />
                       ) : (
                          <User size={18} />
