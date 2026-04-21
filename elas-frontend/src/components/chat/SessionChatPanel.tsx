@@ -5,7 +5,6 @@ import { Send, Paperclip } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { getStoredAuth, getToken } from "@/lib/api/client";
-import { getWsBaseUrl } from "@/lib/env";
 import { getSessionMessages, postSessionMessage } from "@/lib/api/teacher";
 import { ChatClient } from "@/lib/ws/chatClient";
 
@@ -36,6 +35,15 @@ type RawChatMessage = {
   session_id?: string | null;
 };
 
+type MessageNewEvent = {
+  type?: string;
+  scope?: string | null;
+  sessionId?: string | null;
+  roomId?: string | null;
+  session_id?: string | null;
+  event?: Record<string, unknown> | null;
+};
+
 type NormalizedChatMessage = {
   id: string;
   text: string;
@@ -45,6 +53,7 @@ type NormalizedChatMessage = {
   senderRole: string;
   createdAt: string;
   channel: "public" | "help";
+  sessionId: string | null;
 };
 
 function normalizeSenderName(raw: RawChatMessage) {
@@ -75,106 +84,35 @@ function normalizeMessage(raw: RawChatMessage): NormalizedChatMessage | null {
     senderRole: raw.senderRole || raw.role || "student",
     createdAt: raw.createdAt || raw.timestamp || new Date().toISOString(),
     channel: raw.channel === "help" ? "help" : "public",
+    sessionId: raw.sessionId ?? raw.roomId ?? raw.session_id ?? null,
   };
-}
-
-function parseSessionIdFromRoom(room?: string | null) {
-  if (!room || typeof room !== "string") return null;
-  if (!room.startsWith("session_")) return null;
-  return room.slice("session_".length);
 }
 
 function extractRealtimeMessage(raw: unknown): RawChatMessage | null {
   if (!raw || typeof raw !== "object") return null;
 
-  const envelope = raw as {
-    type?: string;
-    room?: string;
-    channel?: string | null;
-    scope?: string | null;
-    sessionId?: string | null;
-    roomId?: string | null;
-    session_id?: string | null;
-    event?: Record<string, unknown>;
-    message?: Record<string, unknown>;
-    payload?: Record<string, unknown>;
-  };
+  const packet = raw as MessageNewEvent;
+  if (packet.type !== "message.new") return null;
 
-  const event =
-    envelope.event && typeof envelope.event === "object" ? envelope.event : null;
+  const event = packet.event;
+  if (!event || typeof event !== "object") return null;
 
-  const payload =
-    event?.message && typeof event.message === "object"
-      ? (event.message as Record<string, unknown>)
-      : envelope.message && typeof envelope.message === "object"
-        ? envelope.message
-        : event?.payload && typeof event.payload === "object"
-          ? (event.payload as Record<string, unknown>)
-          : envelope.payload && typeof envelope.payload === "object"
-            ? envelope.payload
-            : event && typeof event.text === "string"
-              ? event
-              : envelope;
-
-  const eventRecord = (event ?? {}) as Record<string, unknown>;
-  const payloadRecord = payload as Record<string, unknown>;
-
-  const eventTypes = [
-    envelope.type,
-    typeof eventRecord.type === "string" ? eventRecord.type : null,
-    typeof eventRecord.kind === "string" ? eventRecord.kind : null,
-    typeof payloadRecord.type === "string" ? payloadRecord.type : null,
-    typeof payloadRecord.eventType === "string" ? String(payloadRecord.eventType) : null,
-    typeof payloadRecord.kind === "string" ? String(payloadRecord.kind) : null,
-  ]
-    .filter((value): value is string => Boolean(value))
-    .map((value) => value.toLowerCase());
-
-  const hasMessageFields =
-    typeof payloadRecord.text === "string" ||
-    typeof payloadRecord.message === "string" ||
-    typeof payloadRecord.body === "string";
-
-  const looksLikeMessage =
-    hasMessageFields ||
-    eventTypes.some((value) =>
-      [
-        "chat-event",
-        "message.new",
-        "message:new",
-        "chat.message",
-        "session.message",
-        "message",
-        "new_message",
-      ].includes(value)
-    );
-
-  if (!looksLikeMessage) return null;
+  const message = event as Record<string, unknown>;
+  const channel =
+    typeof message.channel === "string" ? message.channel : null;
+  const sessionId =
+    (typeof message.sessionId === "string" ? message.sessionId : null) ??
+    (typeof message.roomId === "string" ? message.roomId : null) ??
+    (typeof message.session_id === "string" ? message.session_id : null) ??
+    packet.sessionId ??
+    packet.roomId ??
+    packet.session_id ??
+    null;
 
   return {
-    ...(payload as RawChatMessage),
-    channel:
-      (typeof payloadRecord.channel === "string" ? payloadRecord.channel : null) ??
-      (typeof eventRecord.channel === "string" ? eventRecord.channel : null) ??
-      (typeof envelope.channel === "string" ? envelope.channel : null) ??
-      null,
-    scope:
-      (typeof payloadRecord.scope === "string" ? payloadRecord.scope : null) ??
-      (typeof eventRecord.scope === "string" ? eventRecord.scope : null) ??
-      envelope.scope ??
-      null,
-    sessionId:
-      (typeof payloadRecord.sessionId === "string" ? payloadRecord.sessionId : null) ??
-      (typeof payloadRecord.roomId === "string" ? payloadRecord.roomId : null) ??
-      (typeof payloadRecord.session_id === "string" ? payloadRecord.session_id : null) ??
-      (typeof eventRecord.sessionId === "string" ? eventRecord.sessionId : null) ??
-      (typeof eventRecord.roomId === "string" ? eventRecord.roomId : null) ??
-      (typeof eventRecord.session_id === "string" ? eventRecord.session_id : null) ??
-      envelope.sessionId ??
-      envelope.roomId ??
-      envelope.session_id ??
-      parseSessionIdFromRoom(envelope.room) ??
-      null,
+    ...(message as RawChatMessage),
+    channel,
+    sessionId,
   };
 }
 
@@ -194,21 +132,19 @@ export function SessionChatPanel({
   type: ChatType;
 }) {
   const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
-  const currentUserId = useMemo(() => {
-    const maybeAuth = auth as { id?: string | null; email?: string | null } | null;
-    return maybeAuth?.id ?? maybeAuth?.email ?? null;
-  }, [auth]);
-
-  const currentUserEmail = auth?.email?.toLowerCase?.() ?? null;
-  const authFullName = auth?.fullName?.trim().toLowerCase() ?? null;
-
   const [messages, setMessages] = useState<NormalizedChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
-
   const listRef = useRef<HTMLDivElement | null>(null);
+
   const activeChannel: "public" | "help" = type === "exam" ? "help" : "public";
+  const currentUserId = useMemo(() => {
+    const maybeAuth = auth as { id?: string | null; email?: string | null } | null;
+    return maybeAuth?.id ?? maybeAuth?.email ?? null;
+  }, [auth]);
+  const currentUserEmail = auth?.email?.toLowerCase?.() ?? null;
+  const authFullName = auth?.fullName?.trim().toLowerCase() ?? null;
 
   useEffect(() => {
     setAuth(getStoredAuth());
@@ -217,13 +153,14 @@ export function SessionChatPanel({
   const appendMessage = useCallback(
     (incoming: NormalizedChatMessage) => {
       if (incoming.channel !== activeChannel) return;
+      if (incoming.sessionId && incoming.sessionId !== sessionId) return;
 
       setMessages((prev) => {
         if (prev.some((message) => message.id === incoming.id)) return prev;
         return [...prev, incoming];
       });
     },
-    [activeChannel]
+    [activeChannel, sessionId]
   );
 
   const loadMessages = useCallback(async () => {
@@ -238,8 +175,8 @@ export function SessionChatPanel({
         : [];
 
       setMessages(normalized);
-    } catch (err) {
-      console.error("getSessionMessages failed", err);
+    } catch (error) {
+      console.error("getSessionMessages failed", error);
       setMessages([]);
     } finally {
       setLoading(false);
@@ -251,21 +188,19 @@ export function SessionChatPanel({
   }, [loadMessages]);
 
   useEffect(() => {
-    const wsBase = getWsBaseUrl();
-    if (!wsBase?.startsWith("ws") || !getToken()) return;
+    if (!getToken()) return;
 
     const client = new ChatClient((raw) => {
       try {
-        const payload = extractRealtimeMessage(raw);
-        if (!payload) return;
-        if (payload.sessionId && payload.sessionId !== sessionId) return;
+        const realtime = extractRealtimeMessage(raw);
+        if (!realtime) return;
 
-        const normalized = normalizeMessage(payload);
+        const normalized = normalizeMessage(realtime);
         if (!normalized) return;
 
         appendMessage(normalized);
-      } catch (err) {
-        console.error("chat websocket parse failed", err);
+      } catch (error) {
+        console.error("chat websocket parse failed", error);
       }
     });
 
@@ -303,8 +238,8 @@ export function SessionChatPanel({
       }
 
       setDraft("");
-    } catch (err) {
-      console.error("postSessionMessage failed", err);
+    } catch (error) {
+      console.error("postSessionMessage failed", error);
     } finally {
       setSending(false);
     }

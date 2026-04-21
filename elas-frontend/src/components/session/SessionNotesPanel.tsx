@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Save, Trash2, StickyNote } from "lucide-react";
+import { Loader2, Plus, Save, Trash2, StickyNote, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import {
@@ -29,17 +29,6 @@ function getNotePreview(note: SessionNote) {
   return compact || "Пустая заметка";
 }
 
-function isRouteMissingError(error: unknown) {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
-  return (
-    message.includes("notes_api_unavailable") ||
-    message.includes("cannot get") ||
-    message.includes("cannot post") ||
-    message.includes("http 404") ||
-    message.includes("not found")
-  );
-}
-
 export function SessionNotesPanel({
   sessionId,
   role,
@@ -54,7 +43,6 @@ export function SessionNotesPanel({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [backendUnavailable, setBackendUnavailable] = useState(false);
 
   const selectedNote = useMemo(
     () => notes.find((note) => note.id === selectedId) ?? null,
@@ -69,7 +57,6 @@ export function SessionNotesPanel({
 
     try {
       const data = await getSessionNotes(sessionId);
-      setBackendUnavailable(false);
       setNotes(data);
       setSelectedId((current) => {
         if (current === "new") return current;
@@ -77,9 +64,8 @@ export function SessionNotesPanel({
       });
     } catch (err) {
       setNotes([]);
-      setBackendUnavailable(isRouteMissingError(err));
-      setError(err instanceof Error ? err.message : "Не удалось загрузить заметки.");
       setSelectedId("new");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить заметки.");
     } finally {
       setLoading(false);
     }
@@ -119,8 +105,7 @@ export function SessionNotesPanel({
         if (updated) {
           setNotes((prev) =>
             [updated, ...prev.filter((note) => note.id !== updated.id)].sort(
-              (a, b) =>
-                new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
             )
           );
           setSelectedId(updated.id);
@@ -130,14 +115,17 @@ export function SessionNotesPanel({
       } else {
         const created = await createSessionNote(sessionId, text);
         if (created) {
-          setNotes((prev) => [created, ...prev.filter((note) => note.id !== created.id)]);
+          setNotes((prev) =>
+            [created, ...prev.filter((note) => note.id !== created.id)].sort(
+              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+            )
+          );
           setSelectedId(created.id);
         } else {
           await loadNotes();
         }
       }
     } catch (err) {
-      setBackendUnavailable(isRouteMissingError(err));
       setError(err instanceof Error ? err.message : "Не удалось сохранить заметку.");
     } finally {
       setSaving(false);
@@ -156,7 +144,6 @@ export function SessionNotesPanel({
       setSelectedId("new");
       setDraft("");
     } catch (err) {
-      setBackendUnavailable(isRouteMissingError(err));
       setError(err instanceof Error ? err.message : "Не удалось удалить заметку.");
     } finally {
       setDeleting(false);
@@ -171,21 +158,6 @@ export function SessionNotesPanel({
     );
   }
 
-  if (backendUnavailable) {
-    return (
-      <div className="flex min-h-[260px] flex-col items-center justify-center rounded-[24px] border border-slate-100 bg-slate-50/50 px-6 text-center">
-        <div className="mb-3 rounded-[18px] bg-white p-4 text-slate-300 shadow-sm">
-          <StickyNote size={28} strokeWidth={1.5} />
-        </div>
-        <div className="text-sm font-semibold text-slate-700">Заметки недоступны</div>
-        <div className="mt-2 max-w-md text-sm text-slate-400">
-          В этом окружении API заметок не отвечает по контракту `/sessions/:id/notes`. Фронтенд не
-          подменяет его локальным хранилищем.
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="grid min-h-[320px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
       <div className="flex min-h-0 flex-col rounded-[24px] border border-slate-100 bg-slate-50/60">
@@ -196,17 +168,27 @@ export function SessionNotesPanel({
               {notes.length > 0 ? `${notes.length} шт.` : "Пока без заметок"}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleCreateNew}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-            aria-label="Создать заметку"
-          >
-            <Plus size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void loadNotes()}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+              aria-label="Обновить заметки"
+            >
+              <RefreshCw size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+              aria-label="Создать заметку"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
+        <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
           {notes.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
               У этой сессии пока нет сохранённых заметок.
@@ -231,7 +213,9 @@ export function SessionNotesPanel({
                     {getNotePreview(note)}
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
-                    <span className="truncate">{note.authorName || (role === "teacher" ? "Преподаватель" : "Студент")}</span>
+                    <span className="truncate">
+                      {note.authorName || (role === "teacher" ? "Преподаватель" : "Студент")}
+                    </span>
                     <span className="shrink-0">{formatNoteTime(note.updatedAt)}</span>
                   </div>
                 </button>
@@ -279,18 +263,21 @@ export function SessionNotesPanel({
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col p-5">
+          {error && (
+            <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              <div className="flex items-start gap-3">
+                <StickyNote size={16} className="mt-0.5 shrink-0" />
+                <div>{error}</div>
+              </div>
+            </div>
+          )}
+
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             className="min-h-[220px] flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-5 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-300 focus:ring-2 focus:ring-[#7448FF]/10"
             placeholder="Напишите заметку по сессии. Она будет сохранена на сервере и останется доступной после перезагрузки."
           />
-
-          {error && (
-            <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              {error}
-            </div>
-          )}
         </div>
       </div>
     </div>

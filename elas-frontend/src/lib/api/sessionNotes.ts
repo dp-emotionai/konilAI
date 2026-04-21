@@ -90,11 +90,7 @@ export async function getSessionNotes(sessionId: string): Promise<SessionNote[]>
 
 export async function createSessionNote(sessionId: string, text: string): Promise<SessionNote | null> {
   ensureNotesApiAvailable();
-  const payload = await api.post<unknown>(`sessions/${sessionId}/notes`, {
-    text,
-    content: text,
-    body: text,
-  });
+  const payload = await api.post<unknown>(`sessions/${sessionId}/notes`, { text });
 
   const notes = normalizeNotesPayload(payload);
   return notes[0] ?? normalizeNote(payload as RawSessionNote, 0);
@@ -106,11 +102,7 @@ export async function updateSessionNote(
   text: string
 ): Promise<SessionNote | null> {
   ensureNotesApiAvailable();
-  const payload = await api.patch<unknown>(`sessions/${sessionId}/notes/${noteId}`, {
-    text,
-    content: text,
-    body: text,
-  });
+  const payload = await api.patch<unknown>(`sessions/${sessionId}/notes/${noteId}`, { text });
 
   const notes = normalizeNotesPayload(payload);
   return notes[0] ?? normalizeNote(payload as RawSessionNote, 0);
