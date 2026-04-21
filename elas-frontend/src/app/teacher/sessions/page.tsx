@@ -2,37 +2,115 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { cn } from "@/lib/cn";
 
-import { getTeacherAllSessions, updateSessionStatus, type GroupSession } from "@/lib/api/teacher";
-import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
+import { cn } from "@/lib/cn";
+import { formatSessionDateTime, parseSessionTimestamp } from "@/lib/utils/sessionCalendar";
+import {
+  getTeacherAllSessions,
+  updateSessionStatus,
+  type GroupSession,
+} from "@/lib/api/teacher";
 
 import {
-  Search, Plus, Filter, MoreVertical, 
-  Video, Code, Database, LayoutTemplate, ShieldCheck, PlayCircle, Users, Activity, BarChart, Calendar as CalendarIcon
+  Search,
+  Plus,
+  Video,
+  PlayCircle,
+  BookOpen,
+  ClipboardList,
+  Calendar as CalendarIcon,
+  ArrowRight,
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 
 type TabValue = "all" | "live" | "upcoming" | "ended";
 
-const statusToBackend = (next: string): "active" | "finished" | "draft" =>
+const statusToBackend = (next: GroupSession["status"]): "active" | "finished" | "draft" =>
   next === "live" ? "active" : next === "ended" ? "finished" : "draft";
 
-// Helper for dynamic coloring based on topic matching design mock
-function getIconForTopic(title: string) {
-  const t = title.toLowerCase();
-  if (t.includes('алгоритм') || t.includes('код')) return { icon: Code, color: 'text-rose-500', bg: 'bg-rose-50' };
-  if (t.includes('данных') || t.includes('баз')) return { icon: Database, color: 'text-emerald-500', bg: 'bg-emerald-50' };
-  if (t.includes('безопасность')) return { icon: ShieldCheck, color: 'text-amber-500', bg: 'bg-amber-50' };
-  if (t.includes('сеть')) return { icon: Activity, color: 'text-purple-600', bg: 'bg-purple-50' };
-  if (t.includes('дизайн') || t.includes('веб')) return { icon: LayoutTemplate, color: 'text-[#7448FF]', bg: 'bg-indigo-50' };
-  return { icon: PlayCircle, color: 'text-blue-500', bg: 'bg-blue-50' };
+const tabs: Array<{ id: TabValue; label: string }> = [
+  { id: "all", label: "Все сессии" },
+  { id: "live", label: "Активные" },
+  { id: "upcoming", label: "Запланированные" },
+  { id: "ended", label: "Завершённые" },
+];
+
+function getIconForSession(type: GroupSession["type"], status: GroupSession["status"]) {
+  if (status === "live") {
+    return { icon: PlayCircle, color: "text-emerald-600", bg: "bg-emerald-50" };
+  }
+
+  if (type === "exam") {
+    return { icon: ClipboardList, color: "text-amber-600", bg: "bg-amber-50" };
+  }
+
+  return { icon: BookOpen, color: "text-[#7448FF]", bg: "bg-[#F4F1FF]" };
+}
+
+function getStatusMeta(status: GroupSession["status"]) {
+  if (status === "live") {
+    return {
+      label: "Активная",
+      badgeClass: "bg-emerald-50 text-emerald-700",
+      lifecycleLabel: "Завершить",
+      nextStatus: "ended" as const,
+    };
+  }
+
+  if (status === "ended") {
+    return {
+      label: "Завершена",
+      badgeClass: "bg-slate-100 text-slate-600",
+      lifecycleLabel: "Открыть снова",
+      nextStatus: "upcoming" as const,
+    };
+  }
+
+  return {
+    label: "Запланирована",
+    badgeClass: "bg-orange-50 text-orange-700",
+    lifecycleLabel: "Начать",
+    nextStatus: "live" as const,
+  };
+}
+
+function getSessionTimestamp(session: GroupSession): string | null {
+  return session.startsAt ?? session.createdAt ?? null;
+}
+
+function getSessionTimingCopy(session: GroupSession): string {
+  const timestamp = getSessionTimestamp(session);
+  if (!timestamp) return "Время не назначено в backend";
+
+  const parsed = parseSessionTimestamp(timestamp);
+  if (!parsed) return "Время не назначено в backend";
+
+  const prefix =
+    session.status === "live"
+      ? "Идёт сейчас"
+      : session.status === "upcoming"
+        ? "Запланировано"
+        : "Проведена";
+
+  return `${prefix} · ${formatSessionDateTime(timestamp)}`;
+}
+
+function getActionHref(session: GroupSession): string {
+  if (session.status === "ended") {
+    return `/teacher/session/${session.id}/analytics`;
+  }
+
+  return `/teacher/session/${session.id}`;
+}
+
+function getActionLabel(session: GroupSession): string {
+  if (session.status === "live") return "Открыть монитор";
+  if (session.status === "ended") return "Открыть отчет";
+  return "Открыть сессию";
 }
 
 export default function TeacherSessionsPage() {
-  const router = useRouter();
   const [tick, setTick] = useState(0);
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,196 +135,236 @@ export default function TeacherSessionsPage() {
   }, [loadSessions, tick]);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return sessions.filter((it) => {
-      if (activeTab !== "all") {
-        if (activeTab === "live" && it.status !== "live") return false;
-        if (activeTab === "ended" && it.status !== "ended") return false;
-        if (activeTab === "upcoming" && it.status !== "upcoming") return false;
-      }
-      if (!s) return true;
-      return `${it.title} ${it.groupId}`.toLowerCase().includes(s);
+    const search = q.trim().toLowerCase();
+
+    const byTab = sessions.filter((session) => {
+      if (activeTab === "all") return true;
+      return session.status === activeTab;
+    });
+
+    const bySearch = byTab.filter((session) => {
+      if (!search) return true;
+
+      const haystack = [session.title, session.groupName, session.groupId, session.type, session.status]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(search);
+    });
+
+    return [...bySearch].sort((left, right) => {
+      const leftTs = parseSessionTimestamp(getSessionTimestamp(left))?.getTime() ?? 0;
+      const rightTs = parseSessionTimestamp(getSessionTimestamp(right))?.getTime() ?? 0;
+      return rightTs - leftTs;
     });
   }, [sessions, q, activeTab]);
 
-  const handleLifecycle = async (s: GroupSession) => {
-    const action = s.status === "upcoming" ? { next: "live" as const } : s.status === "live" ? { next: "ended" as const } : { next: "upcoming" as const };
-    setActioningId(s.id);
+  const counts = useMemo(
+    () => ({
+      all: sessions.length,
+      live: sessions.filter((session) => session.status === "live").length,
+      upcoming: sessions.filter((session) => session.status === "upcoming").length,
+      ended: sessions.filter((session) => session.status === "ended").length,
+    }),
+    [sessions]
+  );
+
+  const handleLifecycle = async (session: GroupSession) => {
+    const nextStatus = getStatusMeta(session.status).nextStatus;
+
+    setActioningId(session.id);
     setConfirmEndSession(null);
+
     try {
-      await updateSessionStatus(s.id, statusToBackend(action.next));
-      setTick((x) => x + 1);
+      await updateSessionStatus(session.id, statusToBackend(nextStatus));
+      setTick((value) => value + 1);
     } finally {
       setActioningId(null);
     }
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12 pb-16">
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pb-16 pt-8 md:pt-12">
       <div className="mx-auto max-w-[1240px] px-4 md:px-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+        <div className="mb-8 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <h1 className="text-[32px] font-bold tracking-tight text-slate-900 mb-6">Сессии</h1>
-            <div className="flex items-center gap-6 border-b border-slate-200">
-              {[
-                { id: "all", label: "Все сессии" },
-                { id: "live", label: "Активные" },
-                { id: "upcoming", label: "Запланированные" },
-                { id: "ended", label: "Завершённые" },
-              ].map((tab) => (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              <span>{counts.all} всего</span>
+              <span>•</span>
+              <span>{counts.live} live</span>
+              <span>•</span>
+              <span>{counts.upcoming} запланировано</span>
+            </div>
+
+            <h1 className="mb-6 mt-2 text-[32px] font-bold tracking-tight text-slate-900">Сессии</h1>
+
+            <div className="flex flex-wrap items-center gap-6 border-b border-slate-200">
+              {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabValue)}
+                  onClick={() => setActiveTab(tab.id)}
                   className={cn(
-                    "pb-3 text-[14px] font-bold transition-colors relative",
+                    "relative pb-3 text-[14px] font-bold transition-colors",
                     activeTab === tab.id ? "text-[#7448FF]" : "text-slate-400 hover:text-slate-700"
                   )}
                 >
                   {tab.label}
+                  <span className="ml-2 text-slate-400">
+                    {tab.id === "all"
+                      ? counts.all
+                      : tab.id === "live"
+                        ? counts.live
+                        : tab.id === "upcoming"
+                          ? counts.upcoming
+                          : counts.ended}
+                  </span>
                   {activeTab === tab.id && (
-                    <span className="absolute bottom-0 left-0 w-full h-[3px] bg-[#7448FF] rounded-t-full" />
+                    <span className="absolute bottom-0 left-0 h-[3px] w-full rounded-t-full bg-[#7448FF]" />
                   )}
                 </button>
               ))}
             </div>
           </div>
 
-          <Link href="/teacher/sessions/new" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#7448FF] text-white text-[14px] font-bold rounded-xl hover:bg-[#623ce6] transition-colors shadow-sm self-start md:self-auto shrink-0 mb-1">
-            <Plus size={18} /> Создать сессию
+          <Link
+            href="/teacher/sessions/new"
+            className="mb-1 inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-[#7448FF] px-5 py-2.5 text-[14px] font-bold text-white shadow-sm transition-colors hover:bg-[#623ce6] md:self-auto"
+          >
+            <Plus size={18} />
+            Создать сессию
           </Link>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="relative flex-1 max-w-xl">
+        <div className="mb-6 flex items-center gap-4">
+          <div className="relative max-w-xl flex-1">
             <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Поиск по сессиям..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] outline-none hover:border-slate-300 focus:border-[#7448FF] transition-colors shadow-sm"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-11 pr-4 text-[14px] outline-none transition-colors hover:border-slate-300 focus:border-[#7448FF] shadow-sm"
             />
           </div>
-          <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] font-bold text-[#7448FF] hover:bg-slate-50 transition-colors shadow-sm">
-             <Filter size={16} /> Фильтры
-          </button>
         </div>
 
-        {/* List */}
         <div className="space-y-3">
           {loading ? (
-            Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-24 bg-surface-subtle/50 rounded-[16px] animate-pulse" />
+            Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-28 rounded-[16px] bg-surface-subtle/50 animate-pulse" />
             ))
           ) : filtered.length === 0 ? (
-            <div className="py-16 text-center bg-white rounded-[20px] border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-               <Video size={48} className="mx-auto text-slate-200 mb-4" />
-               <h3 className="text-lg font-bold text-slate-900">Ничего не найдено</h3>
-               <p className="text-slate-500 mt-1 max-w-sm mx-auto text-[14px]">
-                 Вы пока не создали ни одной сессии в этой категории, либо поиск не дал результатов.
-               </p>
+            <div className="rounded-[20px] border border-slate-100 bg-white py-16 text-center shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+              <Video size={48} className="mx-auto mb-4 text-slate-200" />
+              <h3 className="text-lg font-bold text-slate-900">Сессии не найдены</h3>
+              <p className="mx-auto mt-1 max-w-sm text-[14px] text-slate-500">
+                Либо в этой категории пока нет сессий, либо поиск не дал совпадений.
+              </p>
             </div>
           ) : (
-            filtered.map((s) => {
-              const { icon: Icon, bg, color } = getIconForTopic(s.title);
-              
-              const isLive = s.status === 'live';
-              const isUpcoming = s.status === 'upcoming';
-              const isEnded = s.status === 'ended';
-
-              const progressW = isEnded ? 100 : isLive ? '71' : 0;
-              const participants = isUpcoming ? 24 : isLive ? 32 : 21; 
+            filtered.map((session) => {
+              const { icon: Icon, bg, color } = getIconForSession(session.type, session.status);
+              const statusMeta = getStatusMeta(session.status);
+              const isEnding = session.status === "live";
+              const groupLabel = session.groupName?.trim() || session.groupId;
 
               return (
-                <div key={s.id} className="group flex flex-col md:flex-row items-start md:items-center justify-between p-5 bg-white rounded-[16px] border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 hover:shadow-md transition-all gap-4">
-                  
-                  {/* Left: Info */}
-                  <div className="flex items-center gap-5 min-w-[280px]">
-                    <div className={cn("w-12 h-12 rounded-[14px] flex items-center justify-center shrink-0", bg, color)}>
-                      <Icon size={24} strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <h3 className="text-[15px] font-bold text-slate-900 leading-tight">{s.title}</h3>
-                      <div className="text-[13px] font-medium text-slate-500 mt-0.5">Группа {s.groupId}</div>
-                      <div className="text-[12px] text-slate-400 mt-0.5">
-                        {isLive ? 'Сегодня, 10:00 - 11:30' : isUpcoming ? 'Завтра, 09:00 - 10:30' : 'Вчера, 10:00 - 11:00'}
+                <div
+                  key={session.id}
+                  className="group rounded-[20px] border border-slate-100 bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all hover:border-slate-200 hover:shadow-md"
+                >
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-4">
+                        <div
+                          className={cn(
+                            "flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px]",
+                            bg,
+                            color
+                          )}
+                        >
+                          <Icon size={22} strokeWidth={1.8} />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-[16px] font-bold text-slate-900">{session.title}</h3>
+                            <span
+                              className={cn(
+                                "inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+                                statusMeta.badgeClass
+                              )}
+                            >
+                              {statusMeta.label}
+                            </span>
+                            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                              {session.type === "exam" ? "Экзамен" : "Занятие"}
+                            </span>
+                          </div>
+
+                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-slate-500">
+                            <span className="font-medium text-slate-600">Группа {groupLabel}</span>
+                            <span className="flex items-center gap-1.5">
+                              <CalendarIcon size={14} />
+                              {getSessionTimingCopy(session)}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-500">
+                            {session.status === "live"
+                              ? "Состав участников и live-метрики доступны в мониторе сессии."
+                              : session.status === "ended"
+                                ? "Детальная аналитика и история доступны на странице отчёта."
+                                : "Сессия создана, но backend ещё не передаёт отдельные поля расписания и состава участников."}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Center: Status & Metrics */}
-                  <div className="flex items-center justify-between flex-1 md:w-[30%] min-w-[200px] md:mx-8">
-                     <div>
-                       {isLive && <span className="inline-block bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Активная</span>}
-                       {isUpcoming && <span className="inline-block bg-orange-50 text-orange-600 px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Запланирована</span>}
-                       {isEnded && <span className="inline-block bg-[#F4F1FF] text-[#7448FF] px-2.5 py-1 rounded-[6px] text-[11px] font-bold uppercase tracking-wide mb-1">Завершена</span>}
-                       <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-500">
-                         <Users size={14} /> {participants} {isEnded ? 'участник' : isLive ? 'участника' : 'участников'}
-                       </div>
-                     </div>
-
-                     {!isUpcoming ? (
-                       <div className="w-48 hidden lg:block">
-                         <div className="flex justify-between text-[13px] font-bold text-slate-900 mb-1.5">
-                           {progressW}% <span className="text-slate-400 font-medium">Прогресс</span>
-                         </div>
-                         <div className="w-full bg-slate-100 rounded-full h-1.5">
-                           <div className="bg-[#7448FF] h-1.5 rounded-full" style={{ width: `${progressW}%` }} />
-                         </div>
-                       </div>
-                     ) : (
-                       <div className="w-48 hidden lg:flex items-center text-slate-400 font-medium gap-2 text-[13px]">
-                         <CalendarIcon size={16} /> 10 мая 2026, 09:00 - 10:30
-                       </div>
-                     )}
-                  </div>
-
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-3 shrink-0">
-                    {isLive ? (
-                      <Link href={`/teacher/session/${s.id}`} className="px-5 py-2.5 bg-[#7448FF] text-white shadow-sm font-bold text-[13px] rounded-xl hover:bg-[#623ce6] transition-colors">
-                        Открыть
+                    <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+                      <Link
+                        href={getActionHref(session)}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-colors",
+                          session.status === "live"
+                            ? "bg-[#7448FF] text-white shadow-sm hover:bg-[#623ce6]"
+                            : "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                        )}
+                      >
+                        {getActionLabel(session)}
+                        <ArrowRight size={15} />
                       </Link>
-                    ) : isUpcoming ? (
-                      <Link href={`/teacher/session/${s.id}`} className="px-5 py-2.5 bg-white border border-slate-200 text-[#7448FF] font-bold text-[13px] rounded-xl hover:bg-slate-50 shadow-sm transition-colors">
-                        Продолжить
-                      </Link>
-                    ) : (
-                      <Link href={`/teacher/session/${s.id}/analytics`} className="px-5 py-2.5 bg-white border border-slate-200 text-slate-600 font-bold text-[13px] rounded-xl hover:bg-slate-50 shadow-sm transition-colors cursor-pointer">
-                        Смотреть отчёт
-                      </Link>
-                    )}
-                    <button className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                       <MoreVertical size={16} />
-                    </button>
-                  </div>
 
+                      <Button
+                        variant="ghost"
+                        disabled={actioningId === session.id}
+                        className="rounded-xl px-4 py-2.5 text-[13px] font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                        onClick={() => {
+                          if (isEnding) {
+                            setConfirmEndSession(session);
+                            return;
+                          }
+
+                          void handleLifecycle(session);
+                        }}
+                      >
+                        {actioningId === session.id ? "Обновляем..." : statusMeta.lifecycleLabel}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               );
             })
           )}
         </div>
 
-        {/* Pagination mock */}
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between mt-8 text-[13px] font-medium text-slate-500">
-             <div>
-               Показывать: <select className="bg-transparent font-bold text-slate-900 cursor-pointer outline-none"><option>10</option></select>
-             </div>
-             <div>1–{filtered.length < 10 ? filtered.length : 10} из {filtered.length} сессий</div>
-             <div className="flex items-center gap-1">
-               <button className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-50">{"<"}</button>
-               <button className="w-8 h-8 bg-[#7448FF] text-white rounded-lg flex items-center justify-center shadow-sm">1</button>
-               <button className="w-8 h-8 bg-white text-slate-700 border border-transparent rounded-lg flex items-center justify-center shadow-none hover:bg-slate-100">2</button>
-               <button className="w-8 h-8 bg-white text-slate-700 border border-transparent rounded-lg flex items-center justify-center shadow-none hover:bg-slate-100">3</button>
-               <button className="w-8 h-8 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-50">{">"}</button>
-             </div>
+          <div className="mt-6 rounded-[16px] border border-slate-100 bg-white px-4 py-3 text-sm text-slate-500 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+            Показано {filtered.length} {filtered.length === 1 ? "сессия" : filtered.length < 5 ? "сессии" : "сессий"}.
+            Отдельная пагинация не нужна, пока backend возвращает компактный список.
           </div>
         )}
-
       </div>
 
       <Modal
@@ -255,8 +373,13 @@ export default function TeacherSessionsPage() {
         title="Завершить сессию?"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmEndSession(null)}>Отмена</Button>
-            <Button className="bg-red-500 hover:bg-red-600" onClick={() => confirmEndSession && void handleLifecycle(confirmEndSession)}>
+            <Button variant="ghost" onClick={() => setConfirmEndSession(null)}>
+              Отмена
+            </Button>
+            <Button
+              className="bg-red-500 hover:bg-red-600"
+              onClick={() => confirmEndSession && void handleLifecycle(confirmEndSession)}
+            >
               Завершить
             </Button>
           </div>
@@ -264,11 +387,11 @@ export default function TeacherSessionsPage() {
       >
         {confirmEndSession && (
           <p className="text-sm text-slate-500">
-            Сессия «{confirmEndSession.title}» будет завершена. Участники будут отключены. Отменить невозможно.
+            Сессия «{confirmEndSession.title}» будет завершена. Участники будут отключены, а live-монитор
+            перейдёт в состояние завершённой сессии.
           </p>
         )}
       </Modal>
-
     </div>
   );
 }
