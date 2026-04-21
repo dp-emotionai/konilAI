@@ -58,7 +58,7 @@ import {
   FileText,
   Clock,
   PenTool,
-  CheckSquare
+  CheckSquare,
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
@@ -66,20 +66,24 @@ import { cn } from "@/lib/cn";
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-[20px] border border-slate-100 bg-slate-50 px-4 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-      <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">
+        {label}
+      </div>
       <div className="mt-1.5 text-sm font-semibold text-slate-900">{value}</div>
     </div>
   );
 }
 
-function formatPersonName(input?: {
-  fullName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  role?: string | null;
-  id?: string | null;
-} | null) {
+function formatPersonName(
+  input?: {
+    fullName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    role?: string | null;
+    id?: string | null;
+  } | null
+) {
   if (!input) return "Участник";
 
   const fullName = input.fullName?.trim();
@@ -98,10 +102,11 @@ function formatPersonName(input?: {
 
 function formatParticipantLabel(p?: Participant | null) {
   if (!p) return "Преподаватель";
+
   return formatPersonName({
     fullName: p.fullName,
-    firstName: (p as any).firstName,
-    lastName: (p as any).lastName,
+    firstName: (p as { firstName?: string | null }).firstName,
+    lastName: (p as { lastName?: string | null }).lastName,
     email: p.email,
     role: p.role,
     id: p.id,
@@ -109,12 +114,12 @@ function formatParticipantLabel(p?: Participant | null) {
 }
 
 function CallControlButton({
-  active,
+  active = true,
   icon,
   dangerIcon,
   label,
   onClick,
-  disabled
+  disabled,
 }: {
   active?: boolean;
   icon: React.ReactNode;
@@ -131,7 +136,9 @@ function CallControlButton({
         disabled={disabled}
         className={cn(
           "w-14 h-14 rounded-full flex items-center justify-center transition-all bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)]",
-          !active ? "bg-slate-100 text-slate-600" : "text-slate-900 hover:bg-slate-50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
+          !active
+            ? "bg-slate-100 text-slate-600"
+            : "text-slate-900 hover:bg-slate-50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
@@ -146,11 +153,14 @@ export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
   const { state } = useUI();
+  const chatSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
   const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
-  const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">("whiteboard");
+  const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">(
+    "whiteboard"
+  );
 
   const loadJoinInfo = useCallback(async () => {
     if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
@@ -221,13 +231,16 @@ export default function StudentJoinSessionPage() {
   const [mlActive, setMlActive] = useState(false);
   const [mlUnavailable, setMlUnavailable] = useState(false);
 
-  const [connectionState, setConnectionState] = useState<"idle" | "connecting" | "connected" | "error">("idle");
+  const [connectionState, setConnectionState] = useState<
+    "idle" | "connecting" | "connected" | "error"
+  >("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [wsDisconnected, setWsDisconnected] = useState(false);
 
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+
   const screenStreamRef = useRef<MediaStream | null>(null);
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
@@ -258,7 +271,9 @@ export default function StudentJoinSessionPage() {
 
   useEffect(() => {
     if (!live || connectionState !== "connected") return;
+
     sessionStartTime.current = Date.now();
+
     const updater = setInterval(() => {
       const span = Date.now() - sessionStartTime.current;
       const s = Math.floor(span / 1000);
@@ -267,6 +282,7 @@ export default function StudentJoinSessionPage() {
       const fmt = (v: number) => v.toString().padStart(2, "0");
       setSessionTimerLabel(`${fmt(h)}:${fmt(m % 60)}:${fmt(s % 60)}`);
     }, 1000);
+
     return () => clearInterval(updater);
   }, [live, connectionState]);
 
@@ -304,7 +320,7 @@ export default function StudentJoinSessionPage() {
     peerManagerRef.current = manager;
     signaling.connect();
 
-    (async () => {
+    void (async () => {
       try {
         const stream = await manager.initLocalStream({ video: true, audio: true });
         setLocalStream(stream);
@@ -486,18 +502,21 @@ export default function StudentJoinSessionPage() {
     return (
       <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col z-40 overflow-hidden">
         <div className="mx-auto max-w-[1550px] w-full px-4 md:px-8 py-8 flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-[0.98] duration-300">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-            <div>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shrink-0">
+            <div className="min-w-0">
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-slate-900">{title}</h1>
-                <Badge className="bg-purple-50 text-[#7448FF] border-none font-semibold px-2.5 py-0.5">
+                <h1 className="text-2xl font-bold text-slate-900 truncate">{title}</h1>
+                <Badge className="bg-purple-50 text-[#7448FF] border-none font-semibold px-2.5 py-0.5 shrink-0">
                   Онлайн-сессия
                 </Badge>
               </div>
+
               <div className="flex flex-wrap items-center gap-6 mt-2 text-[13px] text-slate-500 font-medium">
                 <span>
-                  Преподаватель: <span className="text-slate-900">{formatParticipantLabel(teacherParticipant)}</span>
+                  Преподаватель:{" "}
+                  <span className="text-slate-900">{formatParticipantLabel(teacherParticipant)}</span>
                 </span>
+
                 {connectionState === "connected" ? (
                   <span className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -505,9 +524,18 @@ export default function StudentJoinSessionPage() {
                   </span>
                 ) : (
                   <span className="flex items-center gap-2 text-amber-600">
-                    <AlertCircle size={14} /> {connectionState === "connecting" ? "Подключение..." : "Сбой соединения"}
+                    <AlertCircle size={14} />{" "}
+                    {connectionState === "connecting" ? "Подключение..." : "Сбой соединения"}
                   </span>
                 )}
+
+                {wsDisconnected && (
+                  <span className="flex items-center gap-2 text-rose-600">
+                    <AlertTriangle size={14} />
+                    Соединение потеряно
+                  </span>
+                )}
+
                 {connectionState === "connected" && (
                   <span className="tabular-nums opacity-60 font-semibold">{sessionTimerLabel}</span>
                 )}
@@ -526,140 +554,204 @@ export default function StudentJoinSessionPage() {
           </div>
 
           <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-6 items-stretch overflow-hidden">
-            <div className="space-y-6 flex flex-col min-h-0 h-full overflow-y-auto pr-2">
-              <div className="relative w-full aspect-[16/9] lg:aspect-[21/9] rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50">
-                {remoteStream ? (
-                  <StreamVideo stream={remoteStream} className="w-full h-full object-cover" autoPlay playsInline />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
-                    <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
-                      <span className="text-2xl">👨🏻‍🏫</span>
+            <div className="flex flex-col min-h-0 h-full overflow-hidden">
+              <div className="shrink-0 space-y-6">
+                <div className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[320px] sm:h-[380px] lg:h-[420px] xl:h-[500px] shrink-0">
+                  {remoteStream ? (
+                    <StreamVideo
+                      stream={remoteStream}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      playsInline
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
+                      <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+                        <span className="text-2xl">👨🏻‍🏫</span>
+                      </div>
+                      <div className="text-slate-500 font-medium text-sm">
+                        Ожидание подключения преподавателя...
+                      </div>
                     </div>
-                    <div className="text-slate-500 font-medium text-sm">
-                      Ожидание подключения преподавателя...
+                  )}
+
+                  <div className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer">
+                    <Maximize2 size={16} strokeWidth={2.5} />
+                  </div>
+
+                  {remoteStream && (
+                    <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
+                      <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
+                        🎓
+                      </div>
+                      <span className="truncate">{formatParticipantLabel(teacherParticipant)}</span>
+                    </div>
+                  )}
+
+                  <div className="absolute bottom-4 right-4 w-[160px] sm:w-[200px] xl:w-[240px] h-[96px] sm:h-[120px] xl:h-[150px] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
+                    <StreamVideo
+                      stream={localStream}
+                      className="w-full h-full object-cover"
+                      autoPlay
+                      playsInline
+                      muted
+                    />
+                    <div className="absolute bottom-2 left-2 max-w-[85%] bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
+                      <span className="truncate">{currentStudentName}</span>
+                      <Mic size={12} className={isMicEnabled ? "text-white shrink-0" : "text-red-400 shrink-0"} />
                     </div>
                   </div>
-                )}
-
-                <div className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer">
-                  <Maximize2 size={16} strokeWidth={2.5} />
                 </div>
 
-                {remoteStream && (
-                  <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm">
-                    <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center">🎓</div>
-                    {formatParticipantLabel(teacherParticipant)}
-                  </div>
-                )}
-
-                <div className="absolute bottom-4 right-4 w-[240px] aspect-[16/10] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
-                  <StreamVideo stream={localStream} className="w-full h-full object-cover" autoPlay playsInline muted />
-                  <div className="absolute bottom-2 left-2 bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
-                    {currentStudentName}
-                    <Mic size={12} className={isMicEnabled ? "text-white" : "text-red-400"} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-center gap-4 py-2">
-                <CallControlButton active={isMicEnabled} icon={<Mic size={22} />} label="Микрофон" dangerIcon={<MicOff size={22} />} onClick={toggleMic} />
-                <CallControlButton active={isCameraEnabled} icon={<Video size={22} />} label="Камера" dangerIcon={<VideoOff size={22} />} onClick={toggleCamera} disabled={isScreenSharing} />
-                <CallControlButton active={isScreenSharing} icon={<Share2 size={22} />} label="Экран" onClick={toggleScreenShare} />
-
-                <CallControlButton active icon={<MessageSquare size={22} />} label="Чат" />
-
-                <CallControlButton active={false} disabled icon={<MoreHorizontal size={22} />} label="Еще" />
-
-                <div className="flex flex-col items-center gap-2 mx-1">
-                  <button
+                <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                  <CallControlButton
+                    active={isMicEnabled}
+                    icon={<Mic size={22} />}
+                    label="Микрофон"
+                    dangerIcon={<MicOff size={22} />}
+                    onClick={toggleMic}
+                  />
+                  <CallControlButton
+                    active={isCameraEnabled}
+                    icon={<Video size={22} />}
+                    label="Камера"
+                    dangerIcon={<VideoOff size={22} />}
+                    onClick={toggleCamera}
+                    disabled={isScreenSharing}
+                  />
+                  <CallControlButton
+                    active={isScreenSharing}
+                    icon={<Share2 size={22} />}
+                    label="Экран"
+                    onClick={toggleScreenShare}
+                  />
+                  <CallControlButton
+                    active
+                    icon={<MessageSquare size={22} />}
+                    label="Чат"
                     onClick={() => {
-                      setLive(false);
-                      setTab("prepare");
+                      chatSectionRef.current?.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                      });
                     }}
-                    className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
-                  >
-                    <PhoneOff size={22} />
-                  </button>
-                  <span className="text-xs font-semibold text-slate-700">Выйти</span>
+                  />
+                  <CallControlButton
+                    active={false}
+                    disabled
+                    icon={<MoreHorizontal size={22} />}
+                    label="Еще"
+                  />
+
+                  <div className="flex flex-col items-center gap-2 mx-1">
+                    <button
+                      onClick={() => {
+                        setLive(false);
+                        setTab("prepare");
+                      }}
+                      className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
+                    >
+                      <PhoneOff size={22} />
+                    </button>
+                    <span className="text-xs font-semibold text-slate-700">Выйти</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-4">
-                <div className="flex items-center gap-2 border-b border-slate-100 mb-6">
-                  {["Материалы", "Заметки", "Доска"].map((t) => {
-                    const id = t === "Материалы" ? "materials" : t === "Заметки" ? "notes" : "whiteboard";
-                    const isActive = activeBottomTab === id;
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setActiveBottomTab(id as "materials" | "notes" | "whiteboard")}
-                        className={cn(
-                          "px-5 py-3 text-sm font-semibold transition-colors relative",
-                          isActive ? "text-[#7448FF]" : "text-slate-500 hover:text-slate-700"
-                        )}
-                      >
-                        {t}
-                        {isActive && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#7448FF] rounded-t-full" />}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="min-h-0 flex-1 overflow-y-auto pr-2 pt-2 space-y-6 custom-scrollbar">
+                <div>
+                  <div className="flex items-center gap-2 border-b border-slate-100 mb-6">
+                    {["Материалы", "Заметки", "Доска"].map((t) => {
+                      const id =
+                        t === "Материалы"
+                          ? "materials"
+                          : t === "Заметки"
+                            ? "notes"
+                            : "whiteboard";
+                      const isActive = activeBottomTab === id;
 
-                <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] min-h-[300px] flex items-center justify-center p-8">
-                  {activeBottomTab === "whiteboard" && (
-                    <div className="text-center w-full">
-                      <Reveal>
-                        <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
-                          <PenTool size={32} className="text-slate-200" strokeWidth={1} />
-                          <div className="font-semibold text-slate-700">Интерактивная доска недоступна</div>
-                          <div className="text-sm max-w-sm">
-                            Модуль совместной работы (Whiteboard) пока находится в разработке.
-                          </div>
-                        </div>
-                      </Reveal>
-                    </div>
-                  )}
-
-                  {activeBottomTab === "notes" && (
-                    <div className="text-center w-full">
-                      <Reveal>
-                        <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
-                          <FileText size={32} className="text-slate-200" strokeWidth={1} />
-                          <div className="font-semibold text-slate-700">Заметки к сессии пусты</div>
-                          <div className="text-sm max-w-sm">Пока заметок нет.</div>
-                        </div>
-                      </Reveal>
-                    </div>
-                  )}
-
-                  {activeBottomTab === "materials" && (
-                    <div className="text-center w-full">
-                      <Reveal>
-                        <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
-                          <CheckSquare size={32} className="text-slate-200" strokeWidth={1} />
-                          <div className="font-semibold text-slate-700">Нет материалов</div>
-                          <div className="text-sm max-w-sm">Учебный план для данной сессии не загружен сервером.</div>
-                        </div>
-                      </Reveal>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
-                    <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
-                    <div className="text-center py-8 text-slate-400">План не загружен</div>
+                      return (
+                        <button
+                          key={id}
+                          onClick={() =>
+                            setActiveBottomTab(id as "materials" | "notes" | "whiteboard")
+                          }
+                          className={cn(
+                            "px-5 py-3 text-sm font-semibold transition-colors relative",
+                            isActive ? "text-[#7448FF]" : "text-slate-500 hover:text-slate-700"
+                          )}
+                        >
+                          {t}
+                          {isActive && (
+                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#7448FF] rounded-t-full" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
-                    <h3 className="font-bold text-slate-900 text-[15px] mb-4">Важные тезисы</h3>
-                    <div className="text-center py-8 text-slate-400">Записей нет</div>
+                  <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] min-h-[300px] flex items-center justify-center p-8">
+                    {activeBottomTab === "whiteboard" && (
+                      <div className="text-center w-full">
+                        <Reveal>
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                            <PenTool size={32} className="text-slate-200" strokeWidth={1} />
+                            <div className="font-semibold text-slate-700">
+                              Интерактивная доска недоступна
+                            </div>
+                            <div className="text-sm max-w-sm">
+                              Модуль совместной работы (Whiteboard) пока находится в разработке.
+                            </div>
+                          </div>
+                        </Reveal>
+                      </div>
+                    )}
+
+                    {activeBottomTab === "notes" && (
+                      <div className="text-center w-full">
+                        <Reveal>
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                            <FileText size={32} className="text-slate-200" strokeWidth={1} />
+                            <div className="font-semibold text-slate-700">
+                              Заметки к сессии пусты
+                            </div>
+                            <div className="text-sm max-w-sm">Пока заметок нет.</div>
+                          </div>
+                        </Reveal>
+                      </div>
+                    )}
+
+                    {activeBottomTab === "materials" && (
+                      <div className="text-center w-full">
+                        <Reveal>
+                          <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                            <CheckSquare size={32} className="text-slate-200" strokeWidth={1} />
+                            <div className="font-semibold text-slate-700">Нет материалов</div>
+                            <div className="text-sm max-w-sm">
+                              Учебный план для данной сессии не загружен сервером.
+                            </div>
+                          </div>
+                        </Reveal>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                      <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
+                      <div className="text-center py-8 text-slate-400">План не загружен</div>
+                    </div>
+
+                    <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                      <h3 className="font-bold text-slate-900 text-[15px] mb-4">Важные тезисы</h3>
+                      <div className="text-center py-8 text-slate-400">Записей нет</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-6 min-w-0 h-full overflow-hidden">
+            <div ref={chatSectionRef} className="flex flex-col gap-6 min-w-0 h-full overflow-hidden">
               <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col flex-1 min-h-0 overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
@@ -696,11 +788,13 @@ export default function StudentJoinSessionPage() {
                         <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
                           👩🏻‍🏫
                         </div>
-                        <div>
-                          <div className="font-semibold text-[13px] text-slate-900">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[13px] text-slate-900 truncate">
                             {formatParticipantLabel(teacherParticipant)}
                           </div>
-                          <div className="text-[11px] text-slate-500 font-medium">Преподаватель</div>
+                          <div className="text-[11px] text-slate-500 font-medium">
+                            Преподаватель
+                          </div>
                         </div>
                       </div>
 
@@ -708,8 +802,8 @@ export default function StudentJoinSessionPage() {
                         <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
                           👦🏻
                         </div>
-                        <div>
-                          <div className="font-semibold text-[13px] text-slate-900">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-[13px] text-slate-900 truncate">
                             {currentStudentName}
                           </div>
                           <div className="text-[11px] text-[#7448FF] font-semibold flex items-center gap-1">
@@ -728,17 +822,27 @@ export default function StudentJoinSessionPage() {
                       Ваши локальные ML-метрики
                     </div>
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-4">
                         <span className="text-slate-500">Эмоция</span>
-                        <span className="font-semibold text-slate-900">{mlResult.dominant_emotion || mlResult.emotion || "—"}</span>
+                        <span className="font-semibold text-slate-900 text-right">
+                          {mlResult.dominant_emotion || mlResult.emotion || "—"}
+                        </span>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-4">
                         <span className="text-slate-500">Уверенность</span>
-                        <span className="font-semibold text-slate-900">
-                          {typeof mlResult.confidence === "number" ? `${Math.round(mlResult.confidence * 100)}%` : "—"}
+                        <span className="font-semibold text-slate-900 text-right">
+                          {typeof mlResult.confidence === "number"
+                            ? `${Math.round(mlResult.confidence * 100)}%`
+                            : "—"}
                         </span>
                       </div>
                     </div>
+                  </div>
+                )}
+
+                {mlActive && !mlResult && !mlUnavailable && (
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
+                    ML-анализ активен. Ожидание первых результатов...
                   </div>
                 )}
 
@@ -753,12 +857,27 @@ export default function StudentJoinSessionPage() {
                 <h3 className="font-bold text-slate-900 text-[16px] mb-4">Файлы</h3>
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
                   <FileText size={20} className="text-slate-300 mb-2" strokeWidth={1.5} />
-                  <div className="text-[13px] font-semibold text-slate-500">Нет прикрепленных файлов</div>
+                  <div className="text-[13px] font-semibold text-slate-500">
+                    Нет прикрепленных файлов
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
+
+        <style jsx global>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+          }
+        `}</style>
       </div>
     );
   }
@@ -773,7 +892,10 @@ export default function StudentJoinSessionPage() {
         ]}
       />
 
-      <Link href="/student/sessions" className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800">
+      <Link
+        href="/student/sessions"
+        className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
+      >
         ← К списку сессий
       </Link>
 
@@ -856,7 +978,9 @@ export default function StudentJoinSessionPage() {
                   <>
                     <div className="text-sm text-slate-500">Статус сессии</div>
                     <div className="text-lg font-semibold text-slate-900">
-                      {blockReason === "session_ended" ? "Сессия завершена." : "Сессия ещё не началась."}
+                      {blockReason === "session_ended"
+                        ? "Сессия завершена."
+                        : "Сессия ещё не началась."}
                     </div>
                     <div className="text-sm text-slate-500">
                       {blockReason === "session_ended"
@@ -938,7 +1062,10 @@ export default function StudentJoinSessionPage() {
                       </div>
 
                       {!state.consent && (
-                        <Link href={`/consent?returnUrl=${encodeURIComponent(`/student/session/${sessionId}`)}`} className="inline-flex mt-2">
+                        <Link
+                          href={`/consent?returnUrl=${encodeURIComponent(`/student/session/${sessionId}`)}`}
+                          className="inline-flex mt-2"
+                        >
                           <Button className="gap-2 bg-[#7448FF] hover:bg-[#623ce6] text-white shadow-sm border-none">
                             <ShieldCheck size={18} />
                             Подтвердить согласие
