@@ -371,8 +371,16 @@ export default function TeacherLiveMonitorPage() {
                 </button>
               </div>
 
+              {/* Participant Info Badge */}
+              <div className="absolute bottom-6 left-6 z-10">
+                <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl text-[12px] text-white font-bold flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-purple-400" />
+                  {selectedPeerId ? (participants.find(p => p.id === selectedPeerId)?.fullName || selectedPeerId) : "Алишер Бектурсын"}
+                </div>
+              </div>
+
               {/* PIP Local Preview */}
-              <div className="absolute bottom-24 right-6 w-52 aspect-[14/9] bg-slate-800 rounded-2xl overflow-hidden border-4 border-white/10 shadow-2xl z-20">
+              <div className="absolute bottom-6 right-6 w-48 aspect-video bg-slate-800 rounded-2xl overflow-hidden border-2 border-slate-700/50 shadow-[0_10px_30px_rgba(0,0,0,0.4)] z-20 group-hover:scale-105 transition-transform duration-300">
                 <video
                   autoPlay
                   playsInline
@@ -380,35 +388,36 @@ export default function TeacherLiveMonitorPage() {
                   ref={el => { if (el && localStream) el.srcObject = localStream; }}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute bottom-2 left-2 bg-black/40 backdrop-blur-md px-2 py-0.5 rounded-lg text-[10px] text-white font-bold">Вы (Монитор)</div>
-              </div>
-
-              {/* CONTROL BAR */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-white/95 backdrop-blur-2xl px-5 py-4 rounded-[28px] shadow-2xl border border-white/50 pointer-events-auto z-30 transition-transform group-hover:scale-105 duration-500">
-                <button onClick={toggleMic} className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all", isMicOn ? 'bg-purple-50 text-[#7448FF] hover:bg-purple-100' : 'bg-rose-500 text-white hover:bg-rose-600')}>
-                  {isMicOn ? <Mic size={22} /> : <MicOff size={22} />}
-                </button>
-                <button onClick={toggleCam} className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all", isCamOn ? 'bg-purple-50 text-[#7448FF] hover:bg-purple-100' : 'bg-rose-500 text-white hover:bg-rose-600')}>
-                  {isCamOn ? <Video size={22} /> : <VideoOff size={22} />}
-                </button>
-                <button onClick={toggleScreen} className={cn("w-12 h-12 rounded-2xl flex items-center justify-center transition-all", isScreenSharing ? 'bg-[#7448FF] text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900')}>
-                  <MonitorUp size={22} />
-                </button>
-                <div className="w-px h-8 bg-slate-100 mx-1" />
-                <button className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center transition-all">
-                  <MessageSquare size={22} />
-                </button>
-                <button className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-900 flex items-center justify-center transition-all">
-                  <MoreHorizontal size={22} />
-                </button>
-                <button onClick={() => setConfirmEndOpen(true)} className="w-12 h-12 rounded-2xl bg-rose-500 text-white hover:bg-rose-600 flex items-center justify-center transition-all shadow-lg shadow-rose-500/20">
-                  <PhoneOff size={22} fill="currentColor" />
-                </button>
+                <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] text-white font-bold flex items-center gap-1.5">
+                  Вы <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                </div>
               </div>
             </div>
 
+            {/* CALL CONTROLS */}
+            <div className="flex items-center justify-center gap-6 py-2">
+              <button aria-label="Microphone" onClick={toggleMic} className={cn("w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm", isMicOn ? 'bg-[#7448FF] text-white hover:bg-purple-600' : 'bg-rose-500 text-white hover:bg-rose-600')}>
+                {isMicOn ? <Mic size={24} /> : <MicOff size={24} />}
+              </button>
+              <button aria-label="Camera" onClick={toggleCam} className={cn("w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm", isCamOn ? 'bg-purple-100 text-[#7448FF] hover:bg-purple-200' : 'bg-rose-500 text-white hover:bg-rose-600')}>
+                {isCamOn ? <Video size={24} /> : <VideoOff size={24} />}
+              </button>
+              <button aria-label="Screen Share" onClick={toggleScreen} className={cn("w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm", isScreenSharing ? 'bg-[#7448FF] text-white hover:bg-purple-600' : 'bg-purple-50 text-[#7448FF] hover:bg-purple-100')}>
+                <MonitorUp size={24} />
+              </button>
+              <button aria-label="Chat" className="w-14 h-14 rounded-full bg-purple-50 text-[#7448FF] hover:bg-purple-100 flex items-center justify-center transition-all shadow-sm">
+                <MessageSquare size={24} />
+              </button>
+              <button aria-label="More Options" className="w-14 h-14 rounded-full bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 flex items-center justify-center transition-all shadow-sm">
+                <MoreHorizontal size={24} />
+              </button>
+              <button aria-label="End Call" onClick={() => setConfirmEndOpen(true)} className="w-14 h-14 rounded-full bg-rose-500 text-white hover:bg-rose-600 flex items-center justify-center transition-all shadow-[0_8px_20px_rgba(244,63,94,0.3)]">
+                <PhoneOff size={24} fill="currentColor" />
+              </button>
+            </div>
+
             {/* TABBED WORKSPACE */}
-            <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col flex-1 min-h-[500px]">
+            <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col flex-1 min-h-[450px]">
               <div className="flex border-b border-slate-50 px-8">
                 {["Доска", "Материалы", "Заметки"].map((t) => {
                   const id = t === "Доска" ? "board" : t === "Материалы" ? "materials" : "notes";
@@ -577,6 +586,77 @@ export default function TeacherLiveMonitorPage() {
                         <span className="text-[11px] font-bold text-slate-400">{e.name} ({Math.round(e.value / (liveMetrics?.participants.length || 1) * 100)}%)</span>
                       </div>
                     ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ADDITIONAL PANELS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0 mt-2">
+              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white">
+                <header className="px-6 pt-6 pb-4">
+                  <h3 className="font-extrabold text-slate-900 text-[14px]">План занятия</h3>
+                </header>
+                <CardContent className="px-6 pb-6 pt-0 space-y-3">
+                  {['Теория матриц', 'Операции над матрицами', 'Определители'].map((t, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-[6px] bg-[#7448FF] text-white flex items-center justify-center shrink-0">
+                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </div>
+                      <span className="text-[13px] font-bold text-slate-600 truncate">{t}</span>
+                    </div>
+                  ))}
+                  {['Обратная матрица', 'Примеры и задачи'].map((t, i) => (
+                    <div key={i} className="flex items-center gap-3 opacity-60">
+                      <div className="w-5 h-5 rounded-[6px] border-2 border-slate-200 shrink-0" />
+                      <span className="text-[13px] font-bold text-slate-500 truncate">{t}</span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white">
+                <header className="px-6 pt-6 pb-4 flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-[14px]">Заметки</h3>
+                </header>
+                <CardContent className="px-6 pb-6 pt-0">
+                  <p className="text-[13px] font-medium text-slate-500 leading-relaxed">Важно запомнить формулу для обратной матрицы и потренироваться в решении задач.</p>
+                  <div className="mt-4 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-400">14:15</span>
+                    <MoreVertical size={14} className="text-slate-400" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white flex flex-col">
+                <header className="px-6 pt-6 pb-4">
+                  <h3 className="font-extrabold text-slate-900 text-[14px]">Файлы</h3>
+                </header>
+                <CardContent className="px-6 pb-6 pt-0 space-y-3 flex flex-col flex-1">
+                  <div className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText size={16} className="text-rose-500 shrink-0" />
+                      <div>
+                        <div className="text-[12px] font-bold text-slate-700 truncate">Конспект_матрицы.pdf</div>
+                        <div className="text-[10px] text-slate-400 font-medium">1.2 MB</div>
+                      </div>
+                    </div>
+                    <Download size={14} className="text-slate-400 hover:text-slate-900 cursor-pointer" />
+                  </div>
+                  <div className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <FileText size={16} className="text-rose-500 shrink-0" />
+                      <div>
+                        <div className="text-[12px] font-bold text-slate-700 truncate">Домашнее_задание.pdf</div>
+                        <div className="text-[10px] text-slate-400 font-medium">856 KB</div>
+                      </div>
+                    </div>
+                    <Download size={14} className="text-slate-400 hover:text-slate-900 cursor-pointer" />
+                  </div>
+                  <div className="mt-auto pt-4 relative bottom-0">
+                    <Button variant="outline" className="w-full h-9 text-[12px] font-bold text-[#7448FF] border-slate-100 hover:bg-purple-50 bg-white">
+                      <MonitorUp size={14} className="mr-2" /> Загрузить файл
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
