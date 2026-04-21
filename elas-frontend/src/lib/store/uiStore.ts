@@ -111,51 +111,35 @@ export function useUIStore() {
     }
   }, [state]);
 
-  useEffect(() => {
-    const handleUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<UIState>;
-      if (customEvent.detail) {
-        setState(customEvent.detail);
-      }
-    };
-    window.addEventListener("elas_ui_update", handleUpdate);
-    return () => window.removeEventListener("elas_ui_update", handleUpdate);
-  }, []);
-
-  const dispatchUpdate = (next: UIState) => {
-    setState(next);
-    window.dispatchEvent(new CustomEvent("elas_ui_update", { detail: next }));
-  };
-
   return {
     state,
     setLoggedIn: (v: boolean) =>
-      dispatchUpdate({
-        ...state,
+      setState((s) => ({
+        ...s,
         loggedIn: v,
-        role: v ? state.role : null,
-        status: v ? state.status : null,
-      }),
+        role: v ? s.role : null,
+        status: v ? s.status : null,
+      })),
     setRole: (role: Role | null) =>
-      dispatchUpdate({
-        ...state,
+      setState((s) => ({
+        ...s,
         role,
-      }),
+      })),
     setConsent: (consent: boolean) =>
-      dispatchUpdate({
-        ...state,
+      setState((s) => ({
+        ...s,
         consent,
-      }),
+      })),
     setStatus: (status: UserStatus | null) =>
-      dispatchUpdate({
-        ...state,
+      setState((s) => ({
+        ...s,
         status,
-      }),
+      })),
     setUserInfo: (info: { firstName?: string; lastName?: string; fullName?: string; avatarUrl?: string; avatarVersion?: number }) =>
-      dispatchUpdate({
-        ...state,
+      setState((s) => ({
+        ...s,
         ...info
-      }),
-    reset: () => dispatchUpdate(defaultState),
+      })),
+    reset: () => setState(defaultState),
   };
 }
