@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Send, Paperclip } from "lucide-react";
+
 import { cn } from "@/lib/cn";
 import { getStoredAuth, getToken } from "@/lib/api/client";
 import { getWsBaseUrl } from "@/lib/env";
 import { getSessionMessages, postSessionMessage } from "@/lib/api/teacher";
+import { ChatClient } from "@/lib/ws/chatClient";
 
 type ChatRole = "teacher" | "student";
 type ChatType = "lecture" | "exam";
@@ -52,7 +54,7 @@ function normalizeSenderName(raw: RawChatMessage) {
     raw.name?.trim() ||
     raw.senderEmail?.trim() ||
     raw.email?.trim() ||
-    "РЈС‡Р°СЃС‚РЅРёРє"
+    "Участник"
   );
 }
 
@@ -100,6 +102,7 @@ function extractRealtimeMessage(raw: unknown): RawChatMessage | null {
 
   const event =
     envelope.event && typeof envelope.event === "object" ? envelope.event : null;
+
   const payload =
     event?.message && typeof event.message === "object"
       ? (event.message as Record<string, unknown>)
@@ -190,7 +193,7 @@ export function SessionChatPanel({
   role: ChatRole;
   type: ChatType;
 }) {
-  const auth = useMemo(() => getStoredAuth(), []);
+  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
   const currentUserId = useMemo(() => {
     const maybeAuth = auth as { id?: string | null; email?: string | null } | null;
     return maybeAuth?.id ?? maybeAuth?.email ?? null;
@@ -207,71 +210,52 @@ export function SessionChatPanel({
   const listRef = useRef<HTMLDivElement | null>(null);
   const activeChannel: "public" | "help" = type === "exam" ? "help" : "public";
 
+  useEffect(() => {
+    setAuth(getStoredAuth());
+  }, []);
+
   const appendMessage = useCallback(
     (incoming: NormalizedChatMessage) => {
       if (incoming.channel !== activeChannel) return;
 
       setMessages((prev) => {
-        if (prev.some((m) => m.id === incoming.id)) return prev;
+        if (prev.some((message) => message.id === incoming.id)) return prev;
         return [...prev, incoming];
       });
     },
     [activeChannel]
   );
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadMessages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const raw = await getSessionMessages(sessionId, { channel: activeChannel });
+      const normalized = Array.isArray(raw)
+        ? raw
+            .map((item) => normalizeMessage(item as RawChatMessage))
+            .filter((item): item is NormalizedChatMessage => Boolean(item))
+            .filter((item) => item.channel === activeChannel)
+        : [];
 
-    const load = async () => {
-      setLoading(true);
-      try {
-        const raw = await getSessionMessages(sessionId, { channel: activeChannel });
-        if (cancelled) return;
-
-        const normalized = Array.isArray(raw)
-          ? raw
-              .map((item) => normalizeMessage(item as RawChatMessage))
-              .filter((item): item is NormalizedChatMessage => Boolean(item))
-              .filter((item) => item.channel === activeChannel)
-          : [];
-
-        setMessages(normalized);
-      } catch (err) {
-        console.error("getSessionMessages failed", err);
-        if (!cancelled) setMessages([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
+      setMessages(normalized);
+    } catch (err) {
+      console.error("getSessionMessages failed", err);
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
   }, [activeChannel, sessionId]);
 
   useEffect(() => {
+    void loadMessages();
+  }, [loadMessages]);
+
+  useEffect(() => {
     const wsBase = getWsBaseUrl();
-    if (!wsBase?.startsWith("ws")) return;
+    if (!wsBase?.startsWith("ws") || !getToken()) return;
 
-    const token = getToken();
-    const socket = new WebSocket(`${wsBase}/ws-chat`);
-
-    socket.onopen = () => {
+    const client = new ChatClient((raw) => {
       try {
-        if (token) {
-          socket.send(JSON.stringify({ type: "auth", token }));
-        }
-        socket.send(JSON.stringify({ type: "join", room: "session", id: sessionId }));
-      } catch (err) {
-        console.error("chat join failed", err);
-      }
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const raw = JSON.parse(event.data);
         const payload = extractRealtimeMessage(raw);
         if (!payload) return;
         if (payload.sessionId && payload.sessionId !== sessionId) return;
@@ -283,24 +267,20 @@ export function SessionChatPanel({
       } catch (err) {
         console.error("chat websocket parse failed", err);
       }
-    };
+    });
 
-    socket.onerror = (err) => {
-      console.error("chat websocket error", err);
-    };
+    client.connect();
+    client.joinSession(sessionId);
 
     return () => {
-      try {
-        socket.send(JSON.stringify({ type: "leave", room: "session", id: sessionId }));
-      } catch {}
-      socket.close();
+      client.disconnect();
     };
   }, [appendMessage, sessionId]);
 
   useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const element = listRef.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
   }, [messages]);
 
   const handleSend = useCallback(async () => {
@@ -319,16 +299,7 @@ export function SessionChatPanel({
       if (normalized) {
         appendMessage(normalized);
       } else {
-        appendMessage({
-          id: `local:${Date.now()}`,
-          text,
-          senderId: currentUserId,
-          senderName: auth?.fullName || auth?.email || "Р’С‹",
-          senderEmail: currentUserEmail,
-          senderRole: role,
-          createdAt: new Date().toISOString(),
-          channel: activeChannel,
-        });
+        await loadMessages();
       }
 
       setDraft("");
@@ -337,23 +308,12 @@ export function SessionChatPanel({
     } finally {
       setSending(false);
     }
-  }, [
-    activeChannel,
-    appendMessage,
-    auth?.email,
-    auth?.fullName,
-    currentUserEmail,
-    currentUserId,
-    draft,
-    role,
-    sending,
-    sessionId,
-  ]);
+  }, [activeChannel, appendMessage, draft, loadMessages, sending, sessionId]);
 
   const handleKeyDown = useCallback(
-    async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
+    async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
         await handleSend();
       }
     },
@@ -364,42 +324,42 @@ export function SessionChatPanel({
     <div className="flex h-full min-h-0 flex-col">
       <div
         ref={listRef}
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3 custom-scrollbar"
+        className="custom-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-4"
       >
         {loading ? (
-          <div className="text-sm text-slate-400">Р—Р°РіСЂСѓР·РєР° СЃРѕРѕР±С‰РµРЅРёР№...</div>
+          <div className="text-sm text-slate-400">Загрузка сообщений...</div>
         ) : messages.length === 0 ? (
-          <div className="text-sm text-slate-400">РЎРѕРѕР±С‰РµРЅРёР№ РїРѕРєР° РЅРµС‚</div>
+          <div className="text-sm text-slate-400">Сообщений пока нет</div>
         ) : (
-          messages.map((msg) => {
-            const senderName = msg.senderName.trim().toLowerCase();
+          messages.map((message) => {
+            const senderName = message.senderName.trim().toLowerCase();
             const isMine =
-              (currentUserId && msg.senderId && msg.senderId === currentUserId) ||
-              (currentUserEmail && msg.senderEmail === currentUserEmail) ||
+              (currentUserId && message.senderId && message.senderId === currentUserId) ||
+              (currentUserEmail && message.senderEmail === currentUserEmail) ||
               (authFullName && senderName === authFullName) ||
               (currentUserEmail && senderName === currentUserEmail);
 
             return (
               <div
-                key={msg.id}
+                key={message.id}
                 className={cn("flex", isMine ? "justify-end" : "justify-start")}
               >
                 <div className={cn("max-w-[82%]", isMine ? "items-end" : "items-start")}>
-                  <div className="mb-1 text-[11px] font-semibold text-slate-500 px-1">
-                    {isMine ? "Р’С‹" : msg.senderName}
+                  <div className="mb-1 px-1 text-[11px] font-semibold text-slate-500">
+                    {isMine ? "Вы" : message.senderName}
                   </div>
                   <div
                     className={cn(
-                      "rounded-2xl px-4 py-3 text-sm shadow-sm break-words",
+                      "break-words rounded-2xl px-4 py-3 text-sm shadow-sm",
                       isMine
-                        ? "bg-[#7448FF] text-white rounded-br-md"
-                        : "bg-white border border-slate-100 text-slate-800 rounded-bl-md"
+                        ? "rounded-br-md bg-[#7448FF] text-white"
+                        : "rounded-bl-md border border-slate-100 bg-white text-slate-800"
                     )}
                   >
-                    {msg.text}
+                    {message.text}
                   </div>
                   <div className="mt-1 px-1 text-[10px] text-slate-400">
-                    {formatTime(msg.createdAt)}
+                    {formatTime(message.createdAt)}
                   </div>
                 </div>
               </div>
@@ -413,17 +373,17 @@ export function SessionChatPanel({
           <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
             <textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleKeyDown}
               rows={1}
-              placeholder="РЎРѕРѕР±С‰РµРЅРёРµ РІ С‡Р°С‚ СЃРµСЃСЃРёРё..."
+              placeholder="Сообщение в чат сессии..."
               className="w-full resize-none bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
             />
           </div>
 
           <button
             type="button"
-            className="h-11 w-11 rounded-2xl border border-slate-200 bg-white text-slate-400 flex items-center justify-center"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400"
             disabled
             aria-label="Attach"
           >
@@ -434,7 +394,7 @@ export function SessionChatPanel({
             type="button"
             onClick={() => void handleSend()}
             disabled={!draft.trim() || sending}
-            className="h-11 w-11 rounded-2xl bg-[#7448FF] text-white flex items-center justify-center disabled:opacity-50"
+            className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7448FF] text-white disabled:opacity-50"
             aria-label="Send"
           >
             <Send size={16} />

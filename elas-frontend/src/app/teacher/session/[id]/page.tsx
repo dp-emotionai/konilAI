@@ -22,6 +22,7 @@ import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { getWsBaseUrl } from "@/lib/env";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
+import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
 import { StreamVideo } from "@/components/session/StreamVideo";
 import CameraCheck from "@/components/session/CameraCheck";
 import Modal from "@/components/ui/Modal";
@@ -287,14 +288,13 @@ export default function TeacherLiveMonitorPage() {
   const [sessionTitle, setSessionTitle] = useState("Загрузка...");
   const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
   const [activeTab, setActiveTab] = useState<"board" | "materials" | "notes">("board");
-  const [localNotes, setLocalNotes] = useState("");
+  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
   const roomId = sessionId;
   const isLive = phase === "live";
 
-  const auth = useMemo(() => getStoredAuth(), []);
   const teacherDisplayName = useMemo(
     () =>
       formatPersonName({
@@ -306,6 +306,9 @@ export default function TeacherLiveMonitorPage() {
       }),
     [auth]
   );
+  useEffect(() => {
+    setAuth(getStoredAuth());
+  }, []);
 
   useEffect(() => {
     import("@/lib/api/teacher")
@@ -373,6 +376,7 @@ export default function TeacherLiveMonitorPage() {
     });
 
     peerManagerRef.current = manager;
+    signaling.on("open", () => setWsDisconnected(false));
     signaling.connect();
 
     void (async () => {
@@ -802,8 +806,8 @@ export default function TeacherLiveMonitorPage() {
   }
 
   return (
-    <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF] z-40 overflow-hidden flex flex-col">
-      <div className="mx-auto w-full max-w-[1700px] px-4 sm:px-6 py-6 flex-1 flex flex-col min-h-0">
+    <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF]">
+      <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[1700px] flex-col px-4 py-6 sm:px-6">
         <header className="flex items-center justify-between mb-6 shrink-0">
           <div className="flex items-center gap-6 min-w-0">
             <Link
@@ -858,8 +862,8 @@ export default function TeacherLiveMonitorPage() {
           </Button>
         </header>
 
-        <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8 min-h-0 overflow-hidden pb-4">
-          <div className="flex flex-col min-h-0 h-full overflow-hidden">
+        <div className="grid flex-1 grid-cols-1 gap-8 pb-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="flex min-w-0 flex-col">
             {participants.length > 0 && (
               <div className="shrink-0 flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
                 {participants.map((p) => {
@@ -885,6 +889,13 @@ export default function TeacherLiveMonitorPage() {
                         <div className="text-[11px] font-medium text-slate-400 mt-0.5">
                           {remoteStreams[p.id] ? "Видео потоком" : "Ожидание медиа"}
                         </div>
+                        <button hidden
+                          type="button"
+                          onClick={() => {}}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        >
+                          Очистить заметки
+                        </button>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500">
@@ -1034,7 +1045,7 @@ export default function TeacherLiveMonitorPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto pr-2 pt-2 space-y-6 custom-scrollbar">
+            <div className="min-w-0 flex-1 space-y-6 pt-2">
               <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col min-h-[450px]">
                 <div className="flex border-b border-slate-50 px-4 sm:px-8 overflow-x-auto hide-scrollbar">
                   {["Доска", "Материалы", "Заметки"].map((t) => {
@@ -1089,21 +1100,30 @@ export default function TeacherLiveMonitorPage() {
                     </div>
                   )}
 
-                  {activeTab === "notes" && (
+                  {activeTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="teacher" />}
+
+                  {activeTab === "notes" && false && (
                     <div className="h-full flex flex-col">
                       <textarea
-                        value={localNotes}
-                        onChange={(e) => setLocalNotes(e.target.value)}
+                        value=""
+                        onChange={() => {}}
                         className="w-full flex-1 p-6 rounded-[24px] bg-slate-50/50 border border-slate-100 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all resize-none"
                         placeholder="Напишите локальную черновую заметку..."
                       />
-                      <div className="mt-4 flex justify-start items-center px-2">
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2">
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
                           <AlertTriangle size={14} className="text-orange-500" />
                           <span className="text-[11px] font-bold text-orange-600">
                             Черновик не сохраняется на сервере
                           </span>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => {}}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                        >
+                          Очистить заметки
+                        </button>
                       </div>
                     </div>
                   )}
@@ -1119,8 +1139,8 @@ export default function TeacherLiveMonitorPage() {
                     <TrendingUp size={18} className="text-[#7448FF]" />
                   </header>
                   <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col">
-                    {hasMl ? (
-                      <div className="flex-1 w-full min-w-0 h-[160px] overflow-hidden">
+                    {hasMl && metricsHistory.length > 0 ? (
+                      <div className="relative h-[180px] min-h-[180px] w-full min-w-0 overflow-hidden">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={metricsHistory}>
                             <defs>
@@ -1225,7 +1245,7 @@ export default function TeacherLiveMonitorPage() {
           <aside
             ref={chatSectionRef}
             className={cn(
-              "w-full bg-white rounded-[32px] border border-slate-100 shadow-sm xl:flex xl:min-h-0 xl:flex-col overflow-hidden",
+              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm xl:sticky xl:top-4 xl:flex xl:max-h-[calc(100dvh-96px)] xl:min-h-0 xl:flex-col",
               chatOpen
                 ? "flex min-h-0 flex-col fixed inset-0 z-50 rounded-none border-none sm:relative sm:inset-auto sm:z-auto"
                 : "hidden xl:flex"

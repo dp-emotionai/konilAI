@@ -26,6 +26,8 @@ export class ChatClient {
   }
 
   connect() {
+    if (this.manuallyClosed) return;
+
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -111,6 +113,7 @@ export class ChatClient {
     this.socket = null;
     this.connected = false;
     this.ready = false;
+    this.pendingRooms = [];
   }
 
   private send(msg: any) {
@@ -123,7 +126,9 @@ export class ChatClient {
     if (!this.connected) this.connect();
 
     if (!this.ready) {
-      this.pendingRooms.push({ kind: "group", id: groupId });
+      if (!this.pendingRooms.some((room) => room.kind === "group" && room.id === groupId)) {
+        this.pendingRooms.push({ kind: "group", id: groupId });
+      }
       return;
     }
 
@@ -135,7 +140,9 @@ export class ChatClient {
     if (!this.connected) this.connect();
 
     if (!this.ready) {
-      this.pendingRooms.push({ kind: "session", id: sessionId });
+      if (!this.pendingRooms.some((room) => room.kind === "session" && room.id === sessionId)) {
+        this.pendingRooms.push({ kind: "session", id: sessionId });
+      }
       return;
     }
 

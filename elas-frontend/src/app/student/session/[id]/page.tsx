@@ -32,6 +32,7 @@ import {
 } from "@/lib/api/ml";
 
 import CameraCheck from "@/components/session/CameraCheck";
+import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
 import { StudentSessionTabs } from "@/components/session/StudentSessionTabs";
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
@@ -167,6 +168,7 @@ export default function StudentJoinSessionPage() {
   const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">(
     "whiteboard"
   );
+  const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredAuth>>(null);
 
   const loadJoinInfo = useCallback(async () => {
     if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
@@ -259,7 +261,6 @@ export default function StudentJoinSessionPage() {
     [participants]
   );
 
-  const currentUser = useMemo(() => getStoredAuth(), []);
   const currentStudentName = useMemo(
     () =>
       formatPersonName({
@@ -271,6 +272,9 @@ export default function StudentJoinSessionPage() {
       }),
     [currentUser]
   );
+  useEffect(() => {
+    setCurrentUser(getStoredAuth());
+  }, []);
   const teacherDisplayName = useMemo(() => {
     const liveParticipantName = formatParticipantLabel(teacherParticipant);
     if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
@@ -329,6 +333,7 @@ export default function StudentJoinSessionPage() {
     });
 
     peerManagerRef.current = manager;
+    signaling.on("open", () => setWsDisconnected(false));
     signaling.connect();
 
     void (async () => {
@@ -526,8 +531,8 @@ export default function StudentJoinSessionPage() {
 
   if (tab === "live") {
     return (
-      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col z-40 overflow-y-auto lg:overflow-hidden">
-        <div className="mx-auto max-w-[1550px] w-full px-4 md:px-8 py-8 flex flex-col flex-1 min-h-full lg:min-h-0 animate-in fade-in zoom-in-[0.98] duration-300">
+      <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB]">
+        <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[1550px] flex-col px-4 py-8 md:px-8 animate-in fade-in zoom-in-[0.98] duration-300">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shrink-0">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
@@ -579,8 +584,8 @@ export default function StudentJoinSessionPage() {
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-6 items-stretch lg:overflow-hidden">
-            <div className="flex flex-col min-h-0 h-full lg:overflow-hidden">
+          <div className="grid flex-1 grid-cols-1 gap-6 items-start lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="flex min-w-0 flex-col">
               <div className="shrink-0 space-y-6">
                 <div className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[320px] sm:h-[380px] lg:h-[420px] xl:h-[500px] shrink-0">
                   {remoteStream ? (
@@ -684,7 +689,7 @@ export default function StudentJoinSessionPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto pr-2 pt-2 space-y-6 custom-scrollbar">
+              <div className="min-w-0 flex-1 space-y-6 pt-2">
                 <div>
                   <div className="flex items-center gap-2 border-b border-slate-100 mb-6">
                     {["Материалы", "Заметки", "Доска"].map((t) => {
@@ -733,17 +738,31 @@ export default function StudentJoinSessionPage() {
                       </div>
                     )}
 
-                    {activeBottomTab === "notes" && (
-                      <div className="text-center w-full">
-                        <Reveal>
-                          <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
-                            <FileText size={32} className="text-slate-200" strokeWidth={1} />
-                            <div className="font-semibold text-slate-700">
-                              Заметки к сессии пусты
-                            </div>
-                            <div className="text-sm max-w-sm">Пока заметок нет.</div>
+                    {activeBottomTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="student" />}
+
+                    {activeBottomTab === "notes" && false && (
+                      <div className="flex h-full w-full flex-col text-left">
+                        <textarea
+                          value=""
+                          onChange={() => {}}
+                          className="min-h-[220px] w-full flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-6 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all"
+                          placeholder="Личные заметки по сессии. Сохраняются только в этом браузере."
+                        />
+                        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2">
+                          <div className="flex items-center gap-2 rounded-lg border border-orange-100 bg-orange-50 px-3 py-1.5">
+                            <AlertTriangle size={14} className="text-orange-500" />
+                            <span className="text-[11px] font-bold text-orange-600">
+                              Личные заметки не синхронизируются с сервером
+                            </span>
                           </div>
-                        </Reveal>
+                          <button
+                            type="button"
+                            onClick={() => {}}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                          >
+                            Очистить заметки
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -777,8 +796,8 @@ export default function StudentJoinSessionPage() {
               </div>
             </div>
 
-            <div ref={chatSectionRef} className="flex flex-col gap-6 min-w-0 h-full lg:overflow-hidden">
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div ref={chatSectionRef} className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-96px)]">
+              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[420px] overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                   <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">

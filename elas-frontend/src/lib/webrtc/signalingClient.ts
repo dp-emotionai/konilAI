@@ -9,6 +9,7 @@ import type {
 } from "./types";
 
 type EventHandlers = {
+  open: () => void;
   joined: (self: Participant, participants: Participant[]) => void;
   "user-joined": (participant: Participant) => void;
   "user-left": (participant: Participant) => void;
@@ -46,6 +47,8 @@ export class SignalingClient {
   }
 
   connect() {
+    if (this.closedManually) return;
+
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -74,6 +77,7 @@ export class SignalingClient {
       }
 
       this.flushQueue();
+      this.handlers.open?.();
       this.resolveOpen?.();
       this.resolveOpen = undefined;
       this.rejectOpen = undefined;
@@ -181,6 +185,8 @@ export class SignalingClient {
   }
 
   private send(msg: ClientMessage) {
+    if (this.closedManually) return;
+
     if (!this.socket || !this.isOpen || this.socket.readyState !== WebSocket.OPEN) {
       this.queue.push(msg);
       this.connect();
