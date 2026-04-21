@@ -9,7 +9,7 @@ import {
 } from "recharts";
 
 import {
-  getSessionLiveMetrics, getSessionChatPolicy, updateSessionChatPolicy, postSessionMessage,
+  getSessionLiveMetrics, getSessionChatPolicy, updateSessionChatPolicy, postSessionMessage, updateSessionStatus,
   type SessionLiveMetrics, type SessionChatPolicy, type LiveMetricsParticipant,
 } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, isRealSessionId } from "@/lib/api/client";
@@ -432,7 +432,7 @@ export default function TeacherLiveMonitorPage() {
   // RENDER: PREFLIGHT
   if (phase === "preflight") {
     return (
-      <div className="min-h-screen bg-[#FAFAFB] flex flex-col pt-12 px-6 pb-24 selection:bg-purple-100 selection:text-[#7448FF] overflow-y-auto">
+      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col pt-12 px-6 pb-24 selection:bg-purple-100 selection:text-[#7448FF] overflow-y-auto z-40">
         <div className="mx-auto w-full max-w-[1000px] space-y-8">
           <header className="flex items-center text-slate-500 transition-colors">
             <Link href="/teacher/sessions" className="flex items-center gap-2 text-[14px] font-bold hover:text-slate-900 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100"><ArrowLeft size={16} /> Назад к сессиям</Link>
@@ -490,7 +490,17 @@ export default function TeacherLiveMonitorPage() {
 
                    <div className="pt-4 border-t border-slate-50">
                       <Button 
-                        onClick={() => { if(criticalOk) { setPhase("live"); setLiveSeconds(0); } }} 
+                        onClick={async () => { 
+                          if(criticalOk) { 
+                            try {
+                              await updateSessionStatus(roomId, "active");
+                            } catch (e) {
+                              console.error("Failed to start session on backend", e);
+                            }
+                            setPhase("live"); 
+                            setLiveSeconds(0); 
+                          } 
+                        }} 
                         disabled={!criticalOk}
                         className="w-full h-14 rounded-2xl font-bold bg-[#7448FF] hover:bg-purple-600 shadow-[0_10px_25px_rgba(116,72,255,0.2)] disabled:opacity-50 disabled:shadow-none transition-all"
                       >
@@ -537,8 +547,8 @@ export default function TeacherLiveMonitorPage() {
 
   // RENDER: LIVE
   return (
-    <div className="min-h-screen bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF]">
-      <div className="mx-auto max-w-[1700px] px-4 sm:px-6 py-6 h-screen flex flex-col min-h-0">
+    <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF] z-40 overflow-hidden flex flex-col">
+      <div className="mx-auto w-full max-w-[1700px] px-4 sm:px-6 py-6 flex-1 flex flex-col min-h-0">
 
         {/* HEADER */}
         <header className="flex items-center justify-between mb-6 shrink-0">

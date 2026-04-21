@@ -470,8 +470,8 @@ export default function StudentJoinSessionPage() {
   // If live and active, render the premium redesign directly
   if (tab === "live") {
     return (
-      <div className="min-h-screen bg-[#FAFAFB]">
-        <div className="mx-auto max-w-[1550px] px-4 md:px-8 py-8 animate-in fade-in zoom-in-[0.98] duration-300">
+      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col z-40 overflow-hidden">
+        <div className="mx-auto max-w-[1550px] w-full px-4 md:px-8 py-8 flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-[0.98] duration-300">
           
           {/* HEADER */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
@@ -498,10 +498,11 @@ export default function StudentJoinSessionPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] 2xl:grid-cols-[1fr_380px] gap-6 xl:gap-8 items-start">
+          {/* MAIN GRID */}
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-6 items-stretch overflow-hidden">
             
             {/* LEFT COLUMN - MAIN WORKSPACE */}
-            <div className="space-y-6 flex flex-col min-w-0">
+            <div className="space-y-6 flex flex-col min-h-0 h-full overflow-y-auto pr-2">
               
               {/* VIDEO STAGE */}
               <div className="relative w-full aspect-[16/9] lg:aspect-[21/9] rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50">
@@ -630,9 +631,9 @@ export default function StudentJoinSessionPage() {
             </div>
 
             {/* RIGHT COLUMN - TOOLS */}
-            <div className="flex flex-col gap-6 sticky top-8 pb-8 min-w-0">
+            <div className="flex flex-col gap-6 min-w-0 h-full overflow-hidden">
               {/* Chat Panel */}
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col h-[500px] overflow-hidden">
+              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col flex-1 min-h-0 overflow-hidden">
                  <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10">
                     <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                     <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none"><Users2 size={12}/> {participants.length || 1}</Badge>
