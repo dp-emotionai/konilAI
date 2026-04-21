@@ -16,6 +16,7 @@ import Badge from "@/components/ui/Badge";
 import { useUI } from "@/components/layout/Providers";
 import {
   getSessionJoinInfo,
+  getStudentSessionDetails,
   recordSessionConsent,
   sendSessionMetrics,
   type SessionJoinInfo,
@@ -24,7 +25,7 @@ import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
 import {
   getMlApiBaseUrl,
   mlAnalyzeFrame,
-  captureFrame64x64Grayscale,
+  captureSquareFrameGrayscale,
   ML_INTERVAL,
   ML_429_PAUSE_MS,
   type MlAnalyzeResponse,
@@ -113,6 +114,10 @@ function formatParticipantLabel(p?: Participant | null) {
   });
 }
 
+function formatPercentMetric(value?: number | null) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
 function CallControlButton({
   active = true,
   icon,
@@ -156,6 +161,7 @@ export default function StudentJoinSessionPage() {
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
+  const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
   const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
   const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">(
@@ -265,6 +271,11 @@ export default function StudentJoinSessionPage() {
       }),
     [currentUser]
   );
+  const teacherDisplayName = useMemo(() => {
+    const liveParticipantName = formatParticipantLabel(teacherParticipant);
+    if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
+    return liveParticipantName;
+  }, [sessionTeacherName, teacherParticipant]);
 
   const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
   const sessionStartTime = useRef<number>(Date.now());
@@ -375,6 +386,21 @@ export default function StudentJoinSessionPage() {
     };
   }, [live, roomId]);
 
+  useEffect(() => {
+    if (!live || !sessionId || !apiAvailable) return;
+
+    let cancelled = false;
+
+    void getStudentSessionDetails(sessionId).then((details) => {
+      if (cancelled || !details) return;
+      setSessionTeacherName(details.teacherFullName || details.teacher || null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiAvailable, live, sessionId]);
+
   const toggleMic = () => {
     const next = !isMicEnabled;
     peerManagerRef.current?.setAudioEnabled(next);
@@ -445,7 +471,7 @@ export default function StudentJoinSessionPage() {
       if (cancelled || inflight) return;
       if (Date.now() < pausedUntil) return;
 
-      const frame = captureFrame64x64Grayscale(hiddenVideo);
+      const frame = captureSquareFrameGrayscale(hiddenVideo, 192);
       if (!frame) return;
 
       try {
@@ -500,8 +526,8 @@ export default function StudentJoinSessionPage() {
 
   if (tab === "live") {
     return (
-      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col z-40 overflow-hidden">
-        <div className="mx-auto max-w-[1550px] w-full px-4 md:px-8 py-8 flex flex-col flex-1 min-h-0 animate-in fade-in zoom-in-[0.98] duration-300">
+      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col z-40 overflow-y-auto lg:overflow-hidden">
+        <div className="mx-auto max-w-[1550px] w-full px-4 md:px-8 py-8 flex flex-col flex-1 min-h-full lg:min-h-0 animate-in fade-in zoom-in-[0.98] duration-300">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shrink-0">
             <div className="min-w-0">
               <div className="flex items-center gap-3">
@@ -514,7 +540,7 @@ export default function StudentJoinSessionPage() {
               <div className="flex flex-wrap items-center gap-6 mt-2 text-[13px] text-slate-500 font-medium">
                 <span>
                   Преподаватель:{" "}
-                  <span className="text-slate-900">{formatParticipantLabel(teacherParticipant)}</span>
+                  <span className="text-slate-900">{teacherDisplayName}</span>
                 </span>
 
                 {connectionState === "connected" ? (
@@ -553,8 +579,8 @@ export default function StudentJoinSessionPage() {
             </button>
           </div>
 
-          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-6 items-stretch overflow-hidden">
-            <div className="flex flex-col min-h-0 h-full overflow-hidden">
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px] gap-6 items-stretch lg:overflow-hidden">
+            <div className="flex flex-col min-h-0 h-full lg:overflow-hidden">
               <div className="shrink-0 space-y-6">
                 <div className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[320px] sm:h-[380px] lg:h-[420px] xl:h-[500px] shrink-0">
                   {remoteStream ? (
@@ -751,7 +777,7 @@ export default function StudentJoinSessionPage() {
               </div>
             </div>
 
-            <div ref={chatSectionRef} className="flex flex-col gap-6 min-w-0 h-full overflow-hidden">
+            <div ref={chatSectionRef} className="flex flex-col gap-6 min-w-0 h-full lg:overflow-hidden">
               <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col flex-1 min-h-0 overflow-hidden">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
@@ -790,7 +816,7 @@ export default function StudentJoinSessionPage() {
                         </div>
                         <div className="min-w-0">
                           <div className="font-semibold text-[13px] text-slate-900 truncate">
-                            {formatParticipantLabel(teacherParticipant)}
+                            {teacherDisplayName}
                           </div>
                           <div className="text-[11px] text-slate-500 font-medium">
                             Преподаватель
@@ -821,21 +847,65 @@ export default function StudentJoinSessionPage() {
                     <div className="text-[12px] font-black uppercase tracking-widest text-slate-400 mb-2">
                       Ваши локальные ML-метрики
                     </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between gap-4">
-                        <span className="text-slate-500">Эмоция</span>
-                        <span className="font-semibold text-slate-900 text-right">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Эмоция
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
                           {mlResult.dominant_emotion || mlResult.emotion || "—"}
-                        </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between gap-4">
-                        <span className="text-slate-500">Уверенность</span>
-                        <span className="font-semibold text-slate-900 text-right">
-                          {typeof mlResult.confidence === "number"
-                            ? `${Math.round(mlResult.confidence * 100)}%`
-                            : "—"}
-                        </span>
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Уверенность
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
+                          {formatPercentMetric(mlResult.confidence)}
+                        </div>
                       </div>
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Вовлечённость
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
+                          {formatPercentMetric(mlResult.engagement)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Стресс
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
+                          {formatPercentMetric(mlResult.stress)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Усталость
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
+                          {formatPercentMetric(mlResult.fatigue)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                          Риск
+                        </div>
+                        <div className="mt-1.5 font-semibold text-slate-900">
+                          {formatPercentMetric(mlResult.risk)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                        Состояние: {mlResult.state || "—"}
+                      </span>
+                      {typeof mlResult.face_detected === "boolean" && (
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                          Лицо в кадре: {mlResult.face_detected ? "обнаружено" : "не найдено"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}

@@ -173,7 +173,9 @@ export async function getTeacherGroups(): Promise<TeacherGroup[]> {
 /** Участник с ML-метриками для live-монитора. */
 export type LiveMetricsParticipant = {
   userId: string;
-  fullName: string;
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email?: string | null;
   emotion: string;
   confidence: number;
@@ -187,6 +189,13 @@ export type LiveMetricsParticipant = {
   /** 0..1 */
   fatigue?: number | null;
   updatedAt: string;
+};
+
+type RawLiveMetricsParticipant = Omit<LiveMetricsParticipant, "fullName" | "firstName" | "lastName"> & {
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  name?: string | null;
 };
 
 export type SessionLiveMetrics = {
@@ -208,7 +217,35 @@ export type SessionLiveMetrics = {
 export async function getSessionLiveMetrics(sessionId: string): Promise<SessionLiveMetrics | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
   try {
-    return await api.get<SessionLiveMetrics>(`sessions/${sessionId}/live-metrics`);
+    const raw = await api.get<
+      Omit<SessionLiveMetrics, "participants"> & {
+        participants?: RawLiveMetricsParticipant[] | null;
+      }
+    >(`sessions/${sessionId}/live-metrics`);
+
+    const participants = Array.isArray(raw?.participants)
+      ? raw.participants.map((participant) => {
+          const firstName = participant.firstName?.trim() || null;
+          const lastName = participant.lastName?.trim() || null;
+          const fullName =
+            participant.fullName?.trim() ||
+            participant.name?.trim() ||
+            [firstName, lastName].filter(Boolean).join(" ").trim() ||
+            null;
+
+          return {
+            ...participant,
+            fullName,
+            firstName,
+            lastName,
+          };
+        })
+      : [];
+
+    return {
+      ...raw,
+      participants,
+    };
   } catch {
     return null;
   }

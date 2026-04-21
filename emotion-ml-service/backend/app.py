@@ -5,6 +5,7 @@ import numpy as np
 
 from backend.model_logic import EmotionRiskModel
 from backend.metrics_output import compute_per_frame_metrics
+from inference.face_processor import FaceProcessor, crop_face_with_margin
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -14,6 +15,7 @@ app = FastAPI(
 )
 
 emotion_engine = EmotionRiskModel("emotion_model.h5")
+face_processor = FaceProcessor(detector="haar", min_face_size=(24, 24))
 
 # 1–2 FPS: min interval between processing frames (seconds)
 MIN_FRAME_INTERVAL = 0.5
@@ -40,7 +42,24 @@ def health():
 
 
 class FrameRequest(BaseModel):
-    image: list  # grayscale 2D array (64x64)
+    image: list  # grayscale 2D array (64x64 or larger)
+
+
+def _pick_face_crop(frame: np.ndarray) -> tuple[np.ndarray, bool]:
+    """
+    Prefer the largest detected face crop, but stay backward-compatible:
+    if no face is detected, analyze the full frame instead of failing hard.
+    """
+    if frame.ndim != 2:
+        raise HTTPException(status_code=400, detail="Frame must be a 2D grayscale array")
+
+    if min(frame.shape[:2]) >= 96:
+        faces = face_processor.detect(frame, use_gray=True)
+        if faces:
+            largest = max(faces, key=lambda box: box[2] * box[3])
+            return crop_face_with_margin(frame, largest, margin=0.18), True
+
+    return frame, False
 
 
 @app.post("/analyze")
@@ -49,8 +68,10 @@ def analyze_frame(data: FrameRequest):
 
     # Validate shape before any processing
     frame = np.array(data.image, dtype=np.uint8)
-    if frame.shape != (64, 64):
-        raise HTTPException(status_code=400, detail="Frame must be 64x64 grayscale")
+    if frame.ndim != 2:
+        raise HTTPException(status_code=400, detail="Frame must be a 2D grayscale array")
+    if frame.shape[0] < 64 or frame.shape[1] < 64:
+        raise HTTPException(status_code=400, detail="Frame must be at least 64x64 grayscale")
 
     # Limit to 1–2 FPS: skip inference if called too soon
     now = time.time()
@@ -61,8 +82,10 @@ def analyze_frame(data: FrameRequest):
             headers={"Retry-After": str(int(MIN_FRAME_INTERVAL))},
         )
 
-    # Process frame in memory only; never store the frame
-    emotion_raw, conf = emotion_engine.predict_emotion(frame)
+    # Process frame in memory only; never store the frame.
+    # If a larger web frame is provided, try to isolate the face first.
+    frame_for_model, face_detected = _pick_face_crop(frame)
+    emotion_raw, conf = emotion_engine.predict_emotion(frame_for_model)
     _last_processed_time = time.time()
 
     # Temporal risk from internal buffer (backward-compatible extension)
@@ -84,4 +107,7 @@ def analyze_frame(data: FrameRequest):
         "stress": out["stress"],
         "fatigue": out["fatigue"],
         "timestamp": out["timestamp"],
+        "face_detected": face_detected,
+        "input_width": int(frame.shape[1]),
+        "input_height": int(frame.shape[0]),
     }

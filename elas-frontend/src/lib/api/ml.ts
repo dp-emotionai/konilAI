@@ -256,6 +256,9 @@ export type MlAnalyzeResponse = {
   stress?: number;
   fatigue?: number;
   timestamp?: number;
+  face_detected?: boolean;
+  input_width?: number;
+  input_height?: number;
 };
 
 type AnalyzeOptions = {
@@ -325,6 +328,9 @@ export async function mlAnalyzeFrame(
       stress: typeof d.stress === "number" ? d.stress : undefined,
       fatigue: typeof d.fatigue === "number" ? d.fatigue : undefined,
       timestamp: typeof d.timestamp === "number" ? d.timestamp : undefined,
+      face_detected: typeof d.face_detected === "boolean" ? d.face_detected : undefined,
+      input_width: typeof d.input_width === "number" ? d.input_width : undefined,
+      input_height: typeof d.input_height === "number" ? d.input_height : undefined,
     };
 
     // If it's completely empty, treat as invalid.
@@ -410,24 +416,28 @@ export function startMlLoop(params: {
 let _canvas: HTMLCanvasElement | null = null;
 let _ctx: CanvasRenderingContext2D | null = null;
 
-export function captureFrame64x64Grayscale(
-  video: HTMLVideoElement
+export function captureSquareFrameGrayscale(
+  video: HTMLVideoElement,
+  size = 64
 ): number[][] | null {
   if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return null;
 
-  const size = 64;
-
   if (!_canvas) {
     _canvas = document.createElement("canvas");
-    _canvas.width = size;
-    _canvas.height = size;
     _ctx = _canvas.getContext("2d", { willReadFrequently: true });
   }
 
   const ctx = _ctx;
   if (!ctx || !_canvas) return null;
 
-  ctx.drawImage(video, 0, 0, size, size);
+  if (_canvas.width !== size) _canvas.width = size;
+  if (_canvas.height !== size) _canvas.height = size;
+
+  const sourceSize = Math.min(video.videoWidth, video.videoHeight);
+  const sx = Math.max(0, (video.videoWidth - sourceSize) / 2);
+  const sy = Math.max(0, (video.videoHeight - sourceSize) / 2);
+
+  ctx.drawImage(video, sx, sy, sourceSize, sourceSize, 0, 0, size, size);
 
   const imageData = ctx.getImageData(0, 0, size, size);
   const data = imageData.data;
@@ -446,4 +456,10 @@ export function captureFrame64x64Grayscale(
     out.push(row);
   }
   return out;
+}
+
+export function captureFrame64x64Grayscale(
+  video: HTMLVideoElement
+): number[][] | null {
+  return captureSquareFrameGrayscale(video, 64);
 }

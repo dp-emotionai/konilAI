@@ -97,6 +97,43 @@ function formatParticipantLabel(p?: Participant | "local" | null) {
   });
 }
 
+function getMetricLabel(metric?: LiveMetricsParticipant | null) {
+  if (!metric) return null;
+
+  return formatPersonName({
+    fullName: metric.fullName,
+    firstName: metric.firstName,
+    lastName: metric.lastName,
+    email: metric.email,
+  });
+}
+
+function participantHasIdentity(participant?: Participant | null) {
+  if (!participant) return false;
+
+  return Boolean(
+    participant.fullName?.trim() ||
+      (participant as { firstName?: string | null }).firstName?.trim() ||
+      (participant as { lastName?: string | null }).lastName?.trim() ||
+      participant.email?.trim()
+  );
+}
+
+function getParticipantDisplayName(
+  participant?: Participant | "local" | null,
+  metric?: LiveMetricsParticipant | null
+) {
+  if (participant === "local") return "Р’С‹";
+  if (participant && participantHasIdentity(participant)) {
+    return formatParticipantLabel(participant);
+  }
+  return getMetricLabel(metric) || formatParticipantLabel(participant);
+}
+
+function formatMetricPercent(value?: number | null) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
 function ChecklistItem({
   label,
   ok,
@@ -135,27 +172,76 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getMetricsForParticipant(
-  participant: Participant,
+function buildParticipantMetricsMap(
+  participants: Participant[],
   mlParticipants: LiveMetricsParticipant[]
-): LiveMetricsParticipant | null {
-  const participantEmail = normalizeKey(participant.email);
-  const participantFullName = normalizeKey(participant.fullName);
+) {
+  const map = new Map<string, LiveMetricsParticipant | null>();
+  const assignedMetricIds = new Set<string>();
+  const unresolvedParticipants: Participant[] = [];
 
-  const direct =
-    mlParticipants.find((m) => m.userId && m.userId === participant.id) ||
-    mlParticipants.find(
-      (m) => normalizeKey(m.email) && normalizeKey(m.email) === participantEmail
-    ) ||
-    mlParticipants.find(
-      (m) =>
-        normalizeKey(m.fullName) && normalizeKey(m.fullName) === participantFullName
+  const getMetricId = (metric: LiveMetricsParticipant, index: number) =>
+    `${metric.userId || "metric"}:${metric.email || metric.fullName || index}`;
+
+  for (const participant of participants) {
+    const participantUserId = normalizeKey(participant.userId);
+    const participantEmail = normalizeKey(participant.email);
+    const participantFullName = normalizeKey(
+      participant.fullName ||
+        `${(participant as { firstName?: string | null }).firstName || ""} ${(participant as {
+          lastName?: string | null;
+        }).lastName || ""}`.trim()
     );
 
-  if (direct) return direct;
-  if (mlParticipants.length === 1) return mlParticipants[0];
+    const candidates = mlParticipants.filter((metric, index) => {
+      const metricId = getMetricId(metric, index);
+      if (assignedMetricIds.has(metricId)) return false;
 
-  return null;
+      const userIdMatch =
+        normalizeKey(metric.userId) &&
+        participantUserId &&
+        normalizeKey(metric.userId) === participantUserId;
+      const emailMatch =
+        normalizeKey(metric.email) &&
+        participantEmail &&
+        normalizeKey(metric.email) === participantEmail;
+      const fullNameMatch =
+        normalizeKey(metric.fullName) &&
+        participantFullName &&
+        normalizeKey(metric.fullName) === participantFullName;
+
+      return Boolean(userIdMatch || emailMatch || fullNameMatch);
+    });
+
+    if (candidates.length === 1) {
+      const metric = candidates[0];
+      map.set(participant.id, metric);
+      assignedMetricIds.add(getMetricId(metric, mlParticipants.indexOf(metric)));
+    } else {
+      unresolvedParticipants.push(participant);
+    }
+  }
+
+  if (participants.length === 1 && mlParticipants.length === 1) {
+    map.set(participants[0].id, mlParticipants[0]);
+    return map;
+  }
+
+  const remainingMetrics = mlParticipants.filter(
+    (metric, index) => !assignedMetricIds.has(getMetricId(metric, index))
+  );
+
+  if (unresolvedParticipants.length === 1 && remainingMetrics.length === 1) {
+    map.set(unresolvedParticipants[0].id, remainingMetrics[0]);
+  }
+
+  for (const participant of unresolvedParticipants) {
+    if (!map.has(participant.id)) {
+      map.set(participant.id, null);
+    }
+  }
+
+  return map;
 }
 
 export default function TeacherLiveMonitorPage() {
@@ -470,6 +556,8 @@ export default function TeacherLiveMonitorPage() {
     metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].engagement : 0;
   const avgStress =
     metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].stress : 0;
+  const avgRisk = liveMetrics?.avgRisk != null ? Math.round(liveMetrics.avgRisk * 100) : 0;
+  const avgFatigue = liveMetrics?.avgFatigue != null ? Math.round(liveMetrics.avgFatigue * 100) : 0;
 
   const gates = { backend: apiAvailable, ws: Boolean(wsUrl), camera: cameraReady };
   const criticalOk = gates.backend && gates.ws && gates.camera;
@@ -545,18 +633,17 @@ export default function TeacherLiveMonitorPage() {
   const hasRemoteFocus =
     !!activeRemoteParticipant && !!remoteStreams[activeRemoteParticipant.id];
 
+  const participantMetricsMap = useMemo(() => {
+    return buildParticipantMetricsMap(participants, mlParticipants);
+  }, [participants, mlParticipants]);
+
   const activeMainLabel =
     hasRemoteFocus && activeRemoteParticipant
-      ? formatParticipantLabel(activeRemoteParticipant)
+      ? getParticipantDisplayName(
+          activeRemoteParticipant,
+          participantMetricsMap.get(activeRemoteParticipant.id) ?? null
+        )
       : teacherDisplayName;
-
-  const participantMetricsMap = useMemo(() => {
-    const map = new Map<string, LiveMetricsParticipant | null>();
-    for (const p of participants) {
-      map.set(p.id, getMetricsForParticipant(p, mlParticipants));
-    }
-    return map;
-  }, [participants, mlParticipants]);
 
   if (phase === "preflight") {
     return (
@@ -738,7 +825,14 @@ export default function TeacherLiveMonitorPage() {
                 <span className="truncate">
                   Фокус:{" "}
                   <span className="text-slate-600 underline decoration-slate-200 underline-offset-4 cursor-pointer">
-                    {formatParticipantLabel(focusedParticipant)}
+                    {getParticipantDisplayName(
+                      focusedParticipant,
+                      focusedParticipant &&
+                        focusedParticipant !== "local" &&
+                        "id" in focusedParticipant
+                        ? participantMetricsMap.get(focusedParticipant.id) ?? null
+                        : null
+                    )}
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5 text-emerald-500 font-bold shrink-0">
@@ -786,7 +880,7 @@ export default function TeacherLiveMonitorPage() {
                     >
                       <div className="min-w-0 pr-3">
                         <div className="text-[13px] font-bold text-slate-900 truncate">
-                          {formatParticipantLabel(p)}
+                          {getParticipantDisplayName(p, metric)}
                         </div>
                         <div className="text-[11px] font-medium text-slate-400 mt-0.5">
                           {remoteStreams[p.id] ? "Видео потоком" : "Ожидание медиа"}
@@ -1026,8 +1120,8 @@ export default function TeacherLiveMonitorPage() {
                   </header>
                   <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col">
                     {hasMl ? (
-                      <div className="flex-1 w-full min-w-0 h-[160px] relative">
-                        <ResponsiveContainer width="99%" height={160}>
+                      <div className="flex-1 w-full min-w-0 h-[160px] overflow-hidden">
+                        <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={metricsHistory}>
                             <defs>
                               <linearGradient id="teacherColorEngage" x1="0" y1="0" x2="0" y2="1">
@@ -1196,6 +1290,32 @@ export default function TeacherLiveMonitorPage() {
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                      <span>Усталость</span>
+                      <span className="text-amber-500">{avgFatigue}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500 transition-all duration-1000 ease-out"
+                        style={{ width: `${avgFatigue}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                      <span>Риск</span>
+                      <span className="text-slate-700">{avgRisk}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-slate-700 transition-all duration-1000 ease-out"
+                        style={{ width: `${avgRisk}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1223,7 +1343,7 @@ export default function TeacherLiveMonitorPage() {
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div className="text-[14px] font-bold text-slate-900 truncate">
-                                {formatParticipantLabel(p)}
+                                {getParticipantDisplayName(p, participantMetric)}
                               </div>
                               <div className="mt-1 text-[12px] text-slate-400 font-medium">
                                 {participantMetric
@@ -1239,15 +1359,13 @@ export default function TeacherLiveMonitorPage() {
                             </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-3 gap-2">
+                          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
                             <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
                               <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                                 Confidence
                               </div>
                               <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {typeof participantMetric?.confidence === "number"
-                                  ? `${Math.round(participantMetric.confidence * 100)}%`
-                                  : "—"}
+                                {formatMetricPercent(participantMetric?.confidence)}
                               </div>
                             </div>
 
@@ -1256,9 +1374,7 @@ export default function TeacherLiveMonitorPage() {
                                 Stress
                               </div>
                               <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {typeof participantMetric?.stress === "number"
-                                  ? `${Math.round(participantMetric.stress * 100)}%`
-                                  : "—"}
+                                {formatMetricPercent(participantMetric?.stress)}
                               </div>
                             </div>
 
@@ -1267,9 +1383,25 @@ export default function TeacherLiveMonitorPage() {
                                 Engage
                               </div>
                               <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {typeof participantMetric?.engagement === "number"
-                                  ? `${Math.round(participantMetric.engagement * 100)}%`
-                                  : "—"}
+                                {formatMetricPercent(participantMetric?.engagement)}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                Fatigue
+                              </div>
+                              <div className="mt-2 text-[14px] font-bold text-slate-900">
+                                {formatMetricPercent(participantMetric?.fatigue)}
+                              </div>
+                            </div>
+
+                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
+                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                Risk
+                              </div>
+                              <div className="mt-2 text-[14px] font-bold text-slate-900">
+                                {formatMetricPercent(participantMetric?.risk)}
                               </div>
                             </div>
                           </div>

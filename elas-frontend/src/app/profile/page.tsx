@@ -200,7 +200,13 @@ export default function UnifiedProfilePage() {
           setProfileMessage({ type: 'success', text: 'Профиль успешно сохранен.' });
           
           setMe(updated);
-          // Sync auth storage
+          ui.setUserInfo({
+            firstName: updated.firstName ?? undefined,
+            lastName: updated.lastName ?? undefined,
+            fullName: updated.fullName ?? undefined,
+            avatarUrl: updated.avatarUrl ?? undefined,
+          });
+
           if (stored) {
             setAuth({ 
               ...stored, 

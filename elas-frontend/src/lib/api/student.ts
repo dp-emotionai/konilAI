@@ -43,10 +43,65 @@ export type SessionJoinInfo = {
   groupName?: string;
 };
 
+export type StudentSessionDetails = {
+  id: string;
+  title: string;
+  type: "lecture" | "exam";
+  status: string;
+  code: string;
+  groupId: string;
+  groupName?: string;
+  teacher?: string | null;
+  teacherFullName?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  createdAt?: string;
+};
+
 export async function getSessionJoinInfo(sessionId: string): Promise<SessionJoinInfo | null> {
   if (!getApiBaseUrl() || !hasAuth()) return null;
   const data = await api.get<SessionJoinInfo>(`sessions/${sessionId}/join-info`);
   return data ?? null;
+}
+
+export async function getStudentSessionDetails(
+  sessionId: string
+): Promise<StudentSessionDetails | null> {
+  if (!getApiBaseUrl() || !hasAuth()) return null;
+
+  try {
+    const data = await api.get<{
+      id: string;
+      title: string;
+      type: string;
+      status: string;
+      code: string;
+      groupId: string;
+      groupName?: string;
+      teacher?: string | null;
+      teacherName?: string | null;
+      startedAt?: string | null;
+      endedAt?: string | null;
+      createdAt?: string;
+    }>(`sessions/${sessionId}`);
+
+    return {
+      id: data.id,
+      title: data.title,
+      type: data.type === "exam" ? "exam" : "lecture",
+      status: data.status,
+      code: data.code,
+      groupId: data.groupId,
+      groupName: data.groupName,
+      teacher: data.teacher ?? null,
+      teacherFullName: data.teacherName?.trim() || null,
+      startedAt: data.startedAt,
+      endedAt: data.endedAt,
+      createdAt: data.createdAt,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Записать согласие на сессию (после принятия на странице /consent). */
