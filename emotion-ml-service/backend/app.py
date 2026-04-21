@@ -42,24 +42,28 @@ def health():
 
 
 class FrameRequest(BaseModel):
-    image: list  # grayscale 2D array (64x64 or larger)
+    image: list  # grayscale 2D array (cropped face 64x64 or larger square frame)
 
 
-def _pick_face_crop(frame: np.ndarray) -> tuple[np.ndarray, bool]:
+def _pick_face_crop(frame: np.ndarray) -> tuple[np.ndarray | None, bool]:
     """
-    Prefer the largest detected face crop, but stay backward-compatible:
-    if no face is detected, analyze the full frame instead of failing hard.
+    Prefer the largest detected face crop.
+    Backward-compatibility rule:
+    - small legacy inputs (<96 px) are assumed to already be a face crop
+    - larger web frames require an actual detected face
     """
     if frame.ndim != 2:
         raise HTTPException(status_code=400, detail="Frame must be a 2D grayscale array")
 
-    if min(frame.shape[:2]) >= 96:
-        faces = face_processor.detect(frame, use_gray=True)
-        if faces:
-            largest = max(faces, key=lambda box: box[2] * box[3])
-            return crop_face_with_margin(frame, largest, margin=0.18), True
+    if min(frame.shape[:2]) < 96:
+        return frame, True
 
-    return frame, False
+    faces = face_processor.detect(frame, use_gray=True)
+    if faces:
+        largest = max(faces, key=lambda box: box[2] * box[3])
+        return crop_face_with_margin(frame, largest, margin=0.18), True
+
+    return None, False
 
 
 @app.post("/analyze")
@@ -83,8 +87,25 @@ def analyze_frame(data: FrameRequest):
         )
 
     # Process frame in memory only; never store the frame.
-    # If a larger web frame is provided, try to isolate the face first.
+    # If a larger web frame is provided, require a detected face crop.
     frame_for_model, face_detected = _pick_face_crop(frame)
+    if frame_for_model is None:
+        _last_processed_time = now
+        return {
+            "state": "NO_FACE",
+            "risk": None,
+            "dominant_emotion": None,
+            "confidence": None,
+            "emotion": None,
+            "engagement": None,
+            "stress": None,
+            "fatigue": None,
+            "timestamp": _last_processed_time,
+            "face_detected": False,
+            "input_width": int(frame.shape[1]),
+            "input_height": int(frame.shape[0]),
+        }
+
     emotion_raw, conf = emotion_engine.predict_emotion(frame_for_model)
     _last_processed_time = time.time()
 

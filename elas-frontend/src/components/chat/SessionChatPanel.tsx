@@ -256,10 +256,10 @@ export function SessionChatPanel({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <div
         ref={listRef}
-        className="custom-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto px-4 py-4"
+        className="custom-scrollbar flex-1 min-h-0 space-y-3 overflow-y-auto overscroll-y-contain px-4 py-4"
       >
         {loading ? (
           <div className="text-sm text-slate-400">Загрузка сообщений...</div>
@@ -279,7 +279,7 @@ export function SessionChatPanel({
                 key={message.id}
                 className={cn("flex", isMine ? "justify-end" : "justify-start")}
               >
-                <div className={cn("max-w-[82%]", isMine ? "items-end" : "items-start")}>
+                <div className={cn("min-w-0 max-w-[85%] sm:max-w-[82%]", isMine ? "items-end" : "items-start")}>
                   <div className="mb-1 px-1 text-[11px] font-semibold text-slate-500">
                     {isMine ? "Вы" : message.senderName}
                   </div>

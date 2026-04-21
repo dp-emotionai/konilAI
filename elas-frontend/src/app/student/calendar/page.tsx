@@ -1,156 +1,375 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { cn } from "@/lib/cn";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
-import { 
-  CalendarDays, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
-  MapPin, 
+import {
+  buildMonthCells,
+  formatSessionDateTime,
+  formatSessionTime,
+  isSameCalendarDay,
+  isToday,
+  parseSessionTimestamp,
+} from "@/lib/utils/sessionCalendar";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
   VideoIcon,
-  HelpCircle
 } from "lucide-react";
+import { cn } from "@/lib/cn";
 
 const MONTHS = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
 ];
+
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+
+function statusLabel(status: StudentSessionRow["status"]) {
+  if (status === "live") return "Активная";
+  if (status === "ended") return "Завершена";
+  return "Запланирована";
+}
 
 export default function StudentCalendarPage() {
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
-  const apiAvailable = getApiBaseUrl() && hasAuth();
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
 
   useEffect(() => {
     if (!apiAvailable) {
       setLoading(false);
       return;
     }
-    
+
     getStudentSessionsList()
       .then(setSessions)
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, [apiAvailable]);
 
-  // Calendar logic
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstDayIndex = new Date(year, month, 1).getDay();
-  const startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+  const monthCells = useMemo(() => buildMonthCells(currentDate), [currentDate]);
 
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const scheduledSessions = useMemo(
+    () =>
+      sessions
+        .map((session) => ({
+          session,
+          scheduledAt: parseSessionTimestamp(session.scheduledAt ?? session.date),
+        }))
+        .filter(
+          (
+            item
+          ): item is {
+            session: StudentSessionRow;
+            scheduledAt: Date;
+          } => Boolean(item.scheduledAt)
+        )
+        .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime()),
+    [sessions]
+  );
+
+  const unscheduledSessions = useMemo(
+    () => sessions.filter((session) => !parseSessionTimestamp(session.scheduledAt ?? session.date)),
+    [sessions]
+  );
+
+  const selectedDaySessions = useMemo(
+    () =>
+      scheduledSessions.filter(({ scheduledAt }) => isSameCalendarDay(scheduledAt, selectedDate)),
+    [scheduledSessions, selectedDate]
+  );
+
+  const monthSessions = useMemo(
+    () =>
+      scheduledSessions.filter(
+        ({ scheduledAt }) =>
+          scheduledAt.getFullYear() === currentDate.getFullYear() &&
+          scheduledAt.getMonth() === currentDate.getMonth()
+      ),
+    [currentDate, scheduledSessions]
+  );
+
+  const goPrevMonth = () =>
+    setCurrentDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1)
+    );
+
+  const goNextMonth = () =>
+    setCurrentDate(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1)
+    );
+
   const goToday = () => {
-    const t = new Date();
-    setCurrentDate(new Date(t.getFullYear(), t.getMonth(), 1));
-    setSelectedDate(t);
+    const today = new Date();
+    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    setSelectedDate(today);
   };
-
-  const isSessionInCurrentMonth = (s: StudentSessionRow) => {
-    // If we parse real ISO date:
-    // const d = new Date(s.date);
-    // return d.getMonth() === month && d.getFullYear() === year;
-    return true; // Simplified: assume all returned sessions are for this time or just parse raw strings
-  };
-
-  const getSessionsForDay = (day: number) => {
-    return sessions.filter((s) => {
-      const parsedDay = s.date?.match(/(\d{1,2})\s/);
-      if (parsedDay && parseInt(parsedDay[1], 10) === day) return true;
-      return false;
-    });
-  };
-
-  const unscheduledSessions = sessions.filter((s) => {
-    const parsedDay = s.date?.match(/(\d{1,2})\s/);
-    return !parsedDay;
-  });
-
-  const selectedDaySessions = getSessionsForDay(selectedDate.getDate());
 
   return (
     <div className="min-h-screen bg-[#FAFAFB]">
-      <div className="mx-auto max-w-[1440px] px-4 md:px-8 py-8 space-y-8">
-        
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="mx-auto max-w-[1440px] px-4 py-8 md:px-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Календарь
-            </h1>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Календарь</h1>
             <p className="mt-1.5 text-[15px] text-slate-500">
-              Ваше расписание
+              Реальные сессии из вашего расписания по группам.
             </p>
           </div>
+
           <div className="flex items-center gap-2">
-            <button 
+            <button
               onClick={goToday}
-              className="px-4 py-2 bg-white border border-slate-200 text-slate-700 text-[13px] font-medium rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
             >
               Сегодня
             </button>
-            <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
-              <button onClick={prevMonth} className="px-2 py-1 text-slate-600 hover:bg-slate-50 rounded-lg"><ChevronLeft size={18} /></button>
-              <button onClick={nextMonth} className="px-2 py-1 text-slate-600 hover:bg-slate-50 rounded-lg"><ChevronRight size={18} /></button>
+            <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                onClick={goPrevMonth}
+                className="rounded-lg px-2 py-1 text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                onClick={goNextMonth}
+                className="rounded-lg px-2 py-1 text-slate-600 transition-colors hover:bg-slate-50"
+              >
+                <ChevronRight size={18} />
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] 2xl:grid-cols-[1fr_400px] gap-8 items-start">
-          
-          {/* Main Space */}
-          <div className="bg-white border border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col p-12 text-center items-center justify-center min-h-[400px]">
-            <CalendarDays size={48} className="text-slate-300 mb-4" />
-             <h2 className="text-xl font-bold text-slate-900 mb-2">Календарь недоступен</h2>
-             <p className="text-[14px] text-slate-500 max-w-md">Модуль интеграции с расписанием находится в разработке. Вы можете следить за своими активными сессиями на главной странице или в разделе Сессии.</p>
-          </div>
+        <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+            <div className="mb-6 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-[13px] font-medium uppercase tracking-wide text-slate-400">
+                  Месяц
+                </div>
+                <div className="text-2xl font-bold text-slate-900">
+                  {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+                </div>
+              </div>
 
-          {/* Right Sidebar - All real sessions */}
-          <div className="flex flex-col gap-6 sticky top-24 pb-12">
-            
-            {/* Real sessions summary */}
-            <div className="bg-white border text-sm border-slate-100 rounded-[24px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden flex flex-col max-h-[500px]">
-               <div className="p-6 pb-4 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                  <h3 className="text-lg font-bold text-slate-900">Ближайшие сессии</h3>
-                  <span className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-purple-600 shadow-sm">{sessions.length}</span>
-               </div>
-
-               <div className="p-6 flex-1 overflow-y-auto no-scrollbar relative min-h-[200px]">
-                 {sessions.length > 0 ? (
-                   <div className="space-y-4">
-                     {sessions.map(s => (
-                       <div key={s.id} className="relative group">
-                         <div className="bg-white border border-slate-100 p-4 rounded-2xl shadow-sm group-hover:shadow-md transition-shadow">
-                            <h4 className="font-semibold text-slate-900 mb-1">{s.title}</h4>
-                            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-[12px] text-slate-500 font-medium">
-                              <span className="flex items-center gap-1.5"><Clock size={14} className="text-slate-400"/> {s.date || "Дата не указана"}</span>
-                              <span className="flex items-center gap-1.5 capitalize text-purple-600">{s.status === "live" ? "Активная" : s.status === "upcoming" ? "Предстоит" : "Завершена"}</span>
-                            </div>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 ) : (
-                   <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-                      <p className="text-[15px] font-medium text-slate-600 mb-2">Нет предстоящих сессий</p>
-                   </div>
-                 )}
-               </div>
+              <div className="rounded-2xl bg-slate-50 px-4 py-3 text-right">
+                <div className="text-[12px] font-semibold text-slate-400">
+                  Сессий в месяце
+                </div>
+                <div className="text-lg font-bold text-[#7448FF]">
+                  {monthSessions.length}
+                </div>
+              </div>
             </div>
 
+            <div className="grid grid-cols-7 gap-2">
+              {DAYS.map((day) => (
+                <div
+                  key={day}
+                  className="pb-2 text-center text-[12px] font-semibold uppercase tracking-wide text-slate-400"
+                >
+                  {day}
+                </div>
+              ))}
+
+              {monthCells.map(({ date, inCurrentMonth }) => {
+                const daySessions = scheduledSessions.filter(({ scheduledAt }) =>
+                  isSameCalendarDay(scheduledAt, date)
+                );
+                const selected = isSameCalendarDay(date, selectedDate);
+
+                return (
+                  <button
+                    key={date.toISOString()}
+                    onClick={() => setSelectedDate(date)}
+                    className={cn(
+                      "min-h-[108px] rounded-[20px] border p-3 text-left transition-all",
+                      selected
+                        ? "border-[#7448FF]/30 bg-[#F4F1FF]"
+                        : "border-slate-100 bg-slate-50/40 hover:border-slate-200 hover:bg-white",
+                      !inCurrentMonth && "opacity-45"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={cn(
+                          "text-sm font-semibold",
+                          selected ? "text-[#7448FF]" : "text-slate-700",
+                          isToday(date) && "rounded-full bg-slate-900 px-2 py-0.5 text-white"
+                        )}
+                      >
+                        {date.getDate()}
+                      </span>
+
+                      {daySessions.length > 0 && (
+                        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500 shadow-sm">
+                          {daySessions.length}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {daySessions.slice(0, 2).map(({ session, scheduledAt }) => (
+                        <div
+                          key={session.id}
+                          className="truncate rounded-xl bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 shadow-sm"
+                        >
+                          <div className="truncate text-slate-900">{session.title}</div>
+                          <div className="mt-0.5 text-slate-400">
+                            {formatSessionTime(scheduledAt.toISOString())}
+                          </div>
+                        </div>
+                      ))}
+
+                      {daySessions.length > 2 && (
+                        <div className="text-[11px] font-medium text-slate-400">
+                          + ещё {daySessions.length - 2}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-        </div>
+          <div className="flex flex-col gap-6">
+            <div className="rounded-[24px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+              <div className="border-b border-slate-50 px-6 py-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {selectedDate.toLocaleDateString("ru-RU", {
+                        day: "numeric",
+                        month: "long",
+                      })}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Сессии на выбранную дату
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                    {selectedDaySessions.length}
+                  </span>
+                </div>
+              </div>
 
+              <div className="max-h-[420px] space-y-3 overflow-y-auto p-6">
+                {loading ? (
+                  <div className="rounded-2xl bg-slate-50 p-6 text-sm text-slate-400">
+                    Загрузка календаря...
+                  </div>
+                ) : selectedDaySessions.length > 0 ? (
+                  selectedDaySessions.map(({ session, scheduledAt }) => (
+                    <Link
+                      key={session.id}
+                      href={`/student/session/${session.id}`}
+                      className="block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-slate-900">
+                            {session.title}
+                          </div>
+                          <div className="mt-1 text-sm text-slate-500">
+                            {session.teacher || "Преподаватель не указан"}
+                          </div>
+                        </div>
+                        <span
+                          className={cn(
+                            "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                            session.status === "live"
+                              ? "bg-emerald-50 text-emerald-600"
+                              : session.status === "ended"
+                              ? "bg-slate-100 text-slate-500"
+                              : "bg-amber-50 text-amber-600"
+                          )}
+                        >
+                          {statusLabel(session.status)}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-slate-500">
+                        <span className="flex items-center gap-1.5">
+                          <Clock size={14} className="text-slate-400" />
+                          {formatSessionDateTime(scheduledAt.toISOString())}
+                        </span>
+                        <span className="flex items-center gap-1.5">
+                          <VideoIcon size={14} className="text-slate-400" />
+                          {session.type === "exam" ? "Экзамен" : "Лекция"}
+                        </span>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-5 py-8 text-center">
+                    <CalendarDays size={28} className="mx-auto text-slate-300" />
+                    <p className="mt-3 text-sm font-medium text-slate-700">
+                      На эту дату сессий нет
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Выберите другой день или проверьте ближайшие занятия ниже.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-slate-100 bg-white p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Без назначенного времени</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Сессии, у которых backend пока не отдал timestamp.
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                  {unscheduledSessions.length}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {unscheduledSessions.length > 0 ? (
+                  unscheduledSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
+                    >
+                      <div className="font-medium text-slate-900">{session.title}</div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        {session.teacher || "Преподаватель не указан"}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-slate-50/70 px-4 py-5 text-sm text-slate-500">
+                    Все доступные сессии уже имеют дату и время.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

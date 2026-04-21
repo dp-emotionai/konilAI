@@ -5,6 +5,7 @@ export type StudentSessionRow = {
   title: string;
   type: "lecture" | "exam";
   date: string;
+  scheduledAt?: string | null;
   teacher: string;
   status: "upcoming" | "live" | "ended";
 };
@@ -19,12 +20,21 @@ function mapBackendToRow(raw: {
   groupName?: string;
 }): StudentSessionRow {
   const status = raw.status === "live" ? "live" : raw.status === "ended" ? "ended" : "upcoming";
-  const date = raw.date ? new Date(raw.date).toLocaleString() : "";
+  const scheduledAt = raw.date ?? null;
+  const date = scheduledAt
+    ? new Date(scheduledAt).toLocaleString("ru-RU", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
   return {
     id: raw.id,
     title: raw.title,
     type: raw.type === "exam" ? "exam" : "lecture",
     date,
+    scheduledAt,
     teacher: raw.teacher || "",
     status,
   };

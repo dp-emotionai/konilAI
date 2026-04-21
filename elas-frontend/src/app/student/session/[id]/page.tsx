@@ -236,6 +236,7 @@ export default function StudentJoinSessionPage() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
+  const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
   const [mlActive, setMlActive] = useState(false);
   const [mlUnavailable, setMlUnavailable] = useState(false);
 
@@ -491,6 +492,14 @@ export default function StudentJoinSessionPage() {
         }
 
         consecutiveFailures = 0;
+        const hasFace = result.face_detected !== false;
+        setMlFaceDetected(hasFace);
+
+        if (!hasFace) {
+          setMlResult(null);
+          return;
+        }
+
         setMlResult(result);
 
         if (sessionId && apiAvailable) {
@@ -525,6 +534,7 @@ export default function StudentJoinSessionPage() {
       hiddenVideo.srcObject = null;
       setMlActive(false);
       setMlResult(null);
+      setMlFaceDetected(null);
       setMlUnavailable(false);
     };
   }, [shouldRunMl, sessionId, apiAvailable, localStream]);
@@ -584,7 +594,7 @@ export default function StudentJoinSessionPage() {
             </button>
           </div>
 
-          <div className="grid flex-1 grid-cols-1 gap-6 items-start lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
             <div className="flex min-w-0 flex-col">
               <div className="shrink-0 space-y-6">
                 <div className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[320px] sm:h-[380px] lg:h-[420px] xl:h-[500px] shrink-0">
@@ -796,20 +806,23 @@ export default function StudentJoinSessionPage() {
               </div>
             </div>
 
-            <div ref={chatSectionRef} className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4 lg:max-h-[calc(100dvh-96px)]">
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[420px] overflow-hidden">
+            <div
+              ref={chatSectionRef}
+              className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4 lg:h-[calc(100dvh-96px)] lg:min-h-0"
+            >
+              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[420px] overflow-hidden lg:min-h-0 lg:flex-1">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                   <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
                     <Users2 size={12} /> {participants.length || 1}
                   </Badge>
                 </div>
-                <div className="flex-1 min-h-0 relative">
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <SessionChatPanel sessionId={roomId} role="student" type={sessionType} />
                 </div>
               </div>
 
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 space-y-6">
+              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 space-y-6 shrink-0">
                 <h3 className="font-bold text-slate-900 text-[16px]">Информация о сессии</h3>
 
                 <div className="space-y-4">
@@ -929,7 +942,13 @@ export default function StudentJoinSessionPage() {
                   </div>
                 )}
 
-                {mlActive && !mlResult && !mlUnavailable && (
+                {mlActive && mlFaceDetected === false && !mlUnavailable && (
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
+                    Лицо не найдено в кадре. Аналитика временно приостановлена, пока лицо не вернется.
+                  </div>
+                )}
+
+                {mlActive && !mlResult && mlFaceDetected !== false && !mlUnavailable && (
                   <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
                     ML-анализ активен. Ожидание первых результатов...
                   </div>

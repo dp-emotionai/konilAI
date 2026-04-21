@@ -862,7 +862,7 @@ export default function TeacherLiveMonitorPage() {
           </Button>
         </header>
 
-        <div className="grid flex-1 grid-cols-1 gap-8 pb-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] 2xl:grid-cols-[minmax(0,1fr)_480px]">
           <div className="flex min-w-0 flex-col">
             {participants.length > 0 && (
               <div className="shrink-0 flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
@@ -1245,10 +1245,10 @@ export default function TeacherLiveMonitorPage() {
           <aside
             ref={chatSectionRef}
             className={cn(
-              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm xl:sticky xl:top-4 xl:flex xl:max-h-[calc(100dvh-96px)] xl:min-h-0 xl:flex-col",
+              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm lg:sticky lg:top-4 lg:flex lg:h-[calc(100dvh-96px)] lg:min-h-0 lg:flex-col",
               chatOpen
-                ? "flex min-h-0 flex-col fixed inset-0 z-50 rounded-none border-none sm:relative sm:inset-auto sm:z-auto"
-                : "hidden xl:flex"
+                ? "fixed inset-0 z-50 flex min-h-0 flex-col rounded-none border-none lg:relative lg:inset-auto lg:z-auto lg:rounded-[32px] lg:border lg:shadow-sm"
+                : "hidden lg:flex"
             )}
           >
             <header className="p-6 pb-4 flex items-center justify-between border-b border-slate-50 shrink-0">
@@ -1268,7 +1268,8 @@ export default function TeacherLiveMonitorPage() {
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col min-h-0">
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
               <div className="p-6 border-b border-slate-50 space-y-6">
                 <div className="flex items-center gap-4 p-4 bg-purple-50/50 rounded-2xl border border-purple-100/50">
                   <div className="w-12 h-12 bg-[#7448FF] rounded-xl flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
@@ -1486,7 +1487,9 @@ export default function TeacherLiveMonitorPage() {
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col min-h-0 bg-slate-50/30">
+              </div>
+
+              <div className="flex min-h-[320px] flex-[0_0_38%] flex-col border-t border-slate-100 bg-slate-50/30 lg:min-h-[340px]">
                 <header className="p-5 border-b border-slate-50 flex items-center justify-between shrink-0">
                   <h3 className="font-extrabold text-slate-900 text-[13px] uppercase tracking-widest flex items-center gap-2">
                     Сообщения
@@ -1495,7 +1498,7 @@ export default function TeacherLiveMonitorPage() {
                     </Badge>
                   </h3>
                 </header>
-                <div className="flex-1 min-h-0 relative">
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <SessionChatPanel sessionId={roomId} role="teacher" type={sessionType} />
                 </div>
               </div>

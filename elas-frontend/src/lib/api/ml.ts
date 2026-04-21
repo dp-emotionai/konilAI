@@ -245,7 +245,7 @@ export function getMlApiBaseUrl(): string {
 
 export type MlAnalyzeResponse = {
   // Variant 2: risk/state
-  state?: "NORMAL" | "SUSPICIOUS" | "POTENTIAL THREAT";
+  state?: "NORMAL" | "SUSPICIOUS" | "POTENTIAL THREAT" | "NO_FACE";
   risk?: number;
   dominant_emotion?: string;
   confidence?: number;

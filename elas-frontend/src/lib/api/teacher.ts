@@ -19,7 +19,9 @@ export type GroupSession = {
   type: "lecture" | "exam";
   status: "live" | "ended" | "upcoming";
   groupId: string;
+  groupName?: string;
   startsAt?: string;
+  createdAt?: string;
 };
 
 export type FullGroup = {
@@ -79,6 +81,7 @@ function mapBackendToGroupSession(raw: {
   teacher?: string;
   startedAt?: string | null;
   endedAt?: string | null;
+  createdAt?: string;
 }): GroupSession {
   const status = raw.status === "active" ? "live" : raw.status === "finished" ? "ended" : "upcoming";
   return {
@@ -87,7 +90,9 @@ function mapBackendToGroupSession(raw: {
     type: raw.type === "exam" ? "exam" : "lecture",
     status,
     groupId: raw.groupId,
+    groupName: raw.groupName,
     startsAt: raw.startedAt || undefined,
+    createdAt: raw.createdAt,
   };
 }
 
@@ -121,7 +126,13 @@ export async function getTeacherAllSessions(): Promise<GroupSession[]> {
   return [];
 }
 
-export type TeacherGroup = { id: string; name: string; teacherId: string; sessionCount?: number };
+export type TeacherGroup = {
+  id: string;
+  name: string;
+  teacherId: string;
+  sessionCount?: number;
+  createdAt?: string;
+};
 
 /** Один запрос: группа с сессиями и участниками (для страницы группы). */
 export type GroupDetailResponse = {

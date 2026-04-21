@@ -27,6 +27,8 @@ const liveMetricsStore = new Map<
   >
 >();
 
+const LIVE_METRICS_TTL_MS = 8000;
+
 function getOrCreateSessionMetrics(
   sessionId: string
 ): Map<
@@ -49,6 +51,38 @@ function getOrCreateSessionMetrics(
     liveMetricsStore.set(sessionId, m);
   }
   return m;
+}
+
+function getFreshSessionMetrics(sessionId: string): Map<
+  string,
+  {
+    emotion: string;
+    confidence: number;
+    risk: number;
+    state: string;
+    dominant_emotion: string;
+    engagement: number | null;
+    stress: number | null;
+    fatigue: number | null;
+    updatedAt: Date;
+  }
+> | null {
+  const metrics = liveMetricsStore.get(sessionId);
+  if (!metrics) return null;
+
+  const now = Date.now();
+  for (const [userId, metric] of metrics.entries()) {
+    if (now - metric.updatedAt.getTime() > LIVE_METRICS_TTL_MS) {
+      metrics.delete(userId);
+    }
+  }
+
+  if (metrics.size === 0) {
+    liveMetricsStore.delete(sessionId);
+    return null;
+  }
+
+  return metrics;
 }
 
 /** Build analytics summary from live metrics and session times. */
@@ -539,7 +573,7 @@ export function registerSessionsRoutes(app: Express) {
         return;
       }
 
-      const metrics = liveMetricsStore.get(sessionId);
+      const metrics = getFreshSessionMetrics(sessionId);
       if (!metrics || metrics.size === 0) {
         return res.json({ participants: [], avgRisk: 0, avgConfidence: 0 });
       }
