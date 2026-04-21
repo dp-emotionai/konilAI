@@ -331,11 +331,11 @@ export default function StudentJoinSessionPage() {
         manager.join(
           auth
             ? {
-                email: auth.email,
-                fullName: auth.fullName || undefined,
-                firstName: auth.firstName || undefined,
-                lastName: auth.lastName || undefined,
-              }
+              email: auth.email,
+              fullName: auth.fullName || undefined,
+              firstName: auth.firstName || undefined,
+              lastName: auth.lastName || undefined,
+            }
             : undefined
         );
 
@@ -439,7 +439,7 @@ export default function StudentJoinSessionPage() {
     hiddenVideo.playsInline = true;
     hiddenVideo.autoplay = true;
     hiddenVideo.srcObject = localStream;
-    hiddenVideo.play().catch(() => {});
+    hiddenVideo.play().catch(() => { });
 
     const timer = setInterval(async () => {
       if (cancelled || inflight) return;
@@ -472,7 +472,7 @@ export default function StudentJoinSessionPage() {
             engagement: result.engagement,
             stress: result.stress,
             fatigue: result.fatigue,
-          }).catch(() => {});
+          }).catch(() => { });
         }
       } catch (err) {
         const e = err as Error & { status?: number };

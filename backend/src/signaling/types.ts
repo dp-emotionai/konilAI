@@ -18,57 +18,57 @@ export type ClientWithSocket = ClientMetadata & {
 // Messages FROM frontend TO backend
 export type ClientMessage =
   | {
-      type: "join";
-      sessionId: SessionId;
-      role: Role;
-    }
+    type: "join";
+    sessionId: SessionId;
+    role: Role;
+  }
   | {
-      type: "leave";
-    }
+    type: "leave";
+  }
   | {
-      type: "webrtc-offer" | "webrtc-answer";
-      to: ClientId;
-      sdp: any;
-    }
+    type: "webrtc-offer" | "webrtc-answer";
+    to: ClientId;
+    sdp: any;
+  }
   | {
-      type: "webrtc-ice";
-      to: ClientId;
-      candidate: any;
-    }
+    type: "webrtc-ice";
+    to: ClientId;
+    candidate: any;
+  }
   | {
-      type: "ping";
-    };
+    type: "ping";
+  };
 
 // Messages FROM backend TO frontend
 export type ServerMessage =
   | {
-      type: "welcome";
-      clientId: ClientId;
-    }
+    type: "welcome";
+    clientId: ClientId;
+  }
   | {
-      type: "joined";
-      self: ClientMetadata;
-      participants: ClientMetadata[];
-    }
+    type: "joined";
+    self: ClientMetadata;
+    participants: ClientMetadata[];
+  }
   | {
-      type: "user-joined" | "user-left";
-      participant: ClientMetadata;
-    }
+    type: "user-joined" | "user-left";
+    participant: ClientMetadata;
+  }
   | {
-      type: "webrtc-offer" | "webrtc-answer";
-      from: ClientId;
-      sdp: any;
-    }
+    type: "webrtc-offer" | "webrtc-answer";
+    from: ClientId;
+    sdp: any;
+  }
   | {
-      type: "webrtc-ice";
-      from: ClientId;
-      candidate: any;
-    }
+    type: "webrtc-ice";
+    from: ClientId;
+    candidate: any;
+  }
   | {
-      type: "pong";
-    }
+    type: "pong";
+  }
   | {
-      type: "error";
-      message: string;
-    };
+    type: "error";
+    message: string;
+  };
 

@@ -22,56 +22,56 @@ export type Participant = {
 
 export type ServerMessage =
   | {
-      type: "welcome";
-      clientId: ClientId;
-    }
+    type: "welcome";
+    clientId: ClientId;
+  }
   | {
-      type: "joined";
-      self: Participant;
-      participants: Participant[];
-    }
+    type: "joined";
+    self: Participant;
+    participants: Participant[];
+  }
   | {
-      type: "user-joined" | "user-left";
-      participant: Participant;
-    }
+    type: "user-joined" | "user-left";
+    participant: Participant;
+  }
   | {
-      type: "webrtc-offer" | "webrtc-answer";
-      from: ClientId;
-      sdp: RTCSessionDescriptionInit;
-    }
+    type: "webrtc-offer" | "webrtc-answer";
+    from: ClientId;
+    sdp: RTCSessionDescriptionInit;
+  }
   | {
-      type: "webrtc-ice";
-      from: ClientId;
-      candidate: RTCIceCandidateInit;
-    }
+    type: "webrtc-ice";
+    from: ClientId;
+    candidate: RTCIceCandidateInit;
+  }
   | {
-      type: "pong";
-    }
+    type: "pong";
+  }
   | {
-      type: "error";
-      message: string;
-    };
+    type: "error";
+    message: string;
+  };
 
 export type ClientMessage =
   | {
-      type: "join";
-      sessionId: SessionId;
-      role: Role;
-      email?: string;
-      firstName?: string;
-      lastName?: string;
-      fullName?: string;
-      avatarUrl?: string;
-    }
+    type: "join";
+    sessionId: SessionId;
+    role: Role;
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    fullName?: string;
+    avatarUrl?: string;
+  }
   | { type: "leave" }
   | { type: "ping" }
   | {
-      type: "webrtc-offer" | "webrtc-answer";
-      to: ClientId;
-      sdp: RTCSessionDescriptionInit;
-    }
+    type: "webrtc-offer" | "webrtc-answer";
+    to: ClientId;
+    sdp: RTCSessionDescriptionInit;
+  }
   | {
-      type: "webrtc-ice";
-      to: ClientId;
-      candidate: RTCIceCandidateInit;
-    };
+    type: "webrtc-ice";
+    to: ClientId;
+    candidate: RTCIceCandidateInit;
+  };

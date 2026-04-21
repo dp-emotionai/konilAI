@@ -161,7 +161,7 @@ export class PeerConnectionManager {
     this.signaling.on("webrtc-ice", (from, candidate) => {
       const pc = this.peers.get(from);
       if (!pc) return;
-      void pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+      void pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => { });
     });
 
     this.signaling.on("close", () => {
