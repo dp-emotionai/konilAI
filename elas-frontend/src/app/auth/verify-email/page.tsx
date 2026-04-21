@@ -69,12 +69,12 @@ function VerifyEmailInner() {
     return () => clearTimeout(timeout);
   }, [timer]);
 
-  const finishLogin = ({ token, role, email, firstName, lastName, fullName, avatarUrl, status }: AuthSession) => {
+  const finishLogin = ({ token, role, email, id, firstName, lastName, fullName, avatarUrl, status }: AuthSession) => {
     setAuth({
       token,
       role,
       email,
-      id: null,
+      id: id ?? null,
       firstName: firstName ?? undefined,
       lastName: lastName ?? undefined,
       fullName: fullName ?? undefined,

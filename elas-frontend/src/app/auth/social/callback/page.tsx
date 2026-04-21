@@ -63,6 +63,7 @@ function SocialCallbackInner() {
       fullName: payload.fullName ?? undefined,
       avatarUrl: payload.avatarUrl ?? undefined,
       status: payload.status ?? null,
+      id: searchParams.get("id") || undefined,
     });
 
     setRole(payload.role);

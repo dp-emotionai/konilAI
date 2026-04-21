@@ -3,24 +3,24 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { GroupMessagesWorkspace, type WorkspaceGroupItem } from "@/components/messages/GroupMessagesWorkspace";
-import { getStudentGroupDetail, getStudentGroups } from "@/lib/api/student";
+import { getGroupById, getTeacherGroups } from "@/lib/api/teacher";
 import type { GroupMessage } from "@/lib/api/teacher";
 
-export default function StudentMessagesPage() {
+export default function TeacherMessagesPage() {
   const [groups, setGroups] = useState<WorkspaceGroupItem[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
 
   useEffect(() => {
-    getStudentGroups()
+    getTeacherGroups()
       .then((list) => {
         setGroups(
           list.map((group) => ({
             id: group.id,
             name: group.name,
-            subtitle: group.teacherFullName
-              ? `Преподаватель: ${group.teacherFullName}`
-              : "Группа без указанного преподавателя",
-            teacherName: group.teacherFullName || null,
+            subtitle:
+              typeof group.sessionCount === "number"
+                ? `Сессий: ${group.sessionCount}`
+                : "Группа преподавателя",
           }))
         );
       })
@@ -29,13 +29,19 @@ export default function StudentMessagesPage() {
   }, []);
 
   const loadParticipantMap = useCallback(async (groupId: string) => {
-    const detail = await getStudentGroupDetail(groupId);
+    const detail = await getGroupById(groupId);
     if (!detail) return {};
 
     const participantMap: Record<string, string> = {};
-    for (const member of detail.members ?? []) {
-      if (member.id) {
-        participantMap[member.id] = member.fullName?.trim() || member.email;
+    if (detail.group.teacher?.id) {
+      participantMap[detail.group.teacher.id] =
+        detail.group.teacher.fullName?.trim() || detail.group.teacher.email;
+    }
+
+    for (const student of detail.group.students ?? []) {
+      if (student.id) {
+        participantMap[student.id] =
+          student.fullName?.trim() || student.email?.trim() || "Студент";
       }
     }
 
@@ -44,7 +50,7 @@ export default function StudentMessagesPage() {
 
   const resolveSenderName = useCallback(
     (
-      group: WorkspaceGroupItem,
+      _group: WorkspaceGroupItem,
       message: GroupMessage,
       participants: Record<string, string>
     ) => {
@@ -53,25 +59,25 @@ export default function StudentMessagesPage() {
       }
 
       if (message.type === "announcement") {
-        return group.teacherName?.trim() || "Преподаватель";
+        return "Преподаватель";
       }
 
-      return group.teacherName?.trim() || "Участник группы";
+      return "Участник группы";
     },
     []
   );
 
   return (
     <GroupMessagesWorkspace
-      role="student"
+      role="teacher"
       title="Сообщения"
-      description="Переписка по группам, объявления преподавателя и общий чат без перехода в live-сессию."
+      description="Рабочее пространство по группам: объявления для студентов и чат по каждой группе."
       groups={groups}
       loadingGroups={loadingGroups}
       loadParticipantMap={loadParticipantMap}
       resolveSenderName={resolveSenderName}
-      emptyGroupsTitle="У вас пока нет доступных групп"
-      emptyGroupsDescription="Когда преподаватель добавит вас в группу, здесь появятся сообщения и объявления."
+      emptyGroupsTitle="У вас пока нет групп"
+      emptyGroupsDescription="Создайте группу или дождитесь привязки студентов, чтобы начать переписку."
     />
   );
 }

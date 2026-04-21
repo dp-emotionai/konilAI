@@ -1,27 +1,22 @@
-/**
- * Information Architecture: Public + role-based nav with dropdowns.
- * Top-level max 4–6 items; rest in dropdowns. Tokens-only UI.
- */
-
 import type { Role } from "./roles";
 
 export type NavLinkItem = { type: "link"; label: string; href: string };
+
 export type NavDropdownChild = NavLinkItem & {
   accent?: boolean;
   badge?: "live";
-  /** Optional subtitle (muted) below title — for card-style dropdown */
   subtitle?: string;
-  /** Lucide icon name for dropdown item (e.g. "LayoutDashboard") */
   icon?: string;
 };
+
 export type NavDropdownItem = {
   type: "dropdown";
   label: string;
   children: NavDropdownChild[];
 };
+
 export type NavItem = NavLinkItem | NavDropdownItem;
 
-/** Public TopBar (logged out): краткое меню без лишних разделов; right: Sign in, Get started */
 export const NAV_PUBLIC_LEFT: NavItem[] = [
   {
     type: "link",
@@ -37,9 +32,27 @@ export const NAV_PUBLIC_LEFT: NavItem[] = [
     type: "dropdown",
     label: "Политики",
     children: [
-      { type: "link", label: "Конфиденциальность", href: "/privacy", subtitle: "Политика конфиденциальности", icon: "Lock" },
-      { type: "link", label: "Этика", href: "/ethics", subtitle: "Этичное использование AI", icon: "Heart" },
-      { type: "link", label: "FAQ", href: "/faq", subtitle: "Частые вопросы", icon: "HelpCircle" },
+      {
+        type: "link",
+        label: "Конфиденциальность",
+        href: "/privacy",
+        subtitle: "Политика конфиденциальности",
+        icon: "Lock",
+      },
+      {
+        type: "link",
+        label: "Этика",
+        href: "/ethics",
+        subtitle: "Этичное использование AI",
+        icon: "Heart",
+      },
+      {
+        type: "link",
+        label: "FAQ",
+        href: "/faq",
+        subtitle: "Частые вопросы",
+        icon: "HelpCircle",
+      },
     ],
   },
 ];
@@ -50,7 +63,6 @@ export const NAV_PUBLIC_RIGHT = {
   demo: { label: "Демо", href: "/demo" },
 };
 
-/** App TopBar (logged in): role-based. Max 3–6 top-level; rest in dropdowns. */
 export type AppNavItem = NavLinkItem | NavDropdownItem;
 
 export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
@@ -83,12 +95,15 @@ export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
       ],
     },
     { type: "link", label: "Группы", href: "/teacher/groups" },
+    { type: "link", label: "Календарь", href: "/teacher/calendar" },
     { type: "link", label: "Отчёты", href: "/teacher/reports" },
     { type: "link", label: "Сравнение", href: "/teacher/compare" },
     {
       type: "dropdown",
       label: "Ресурсы",
       children: [
+        { type: "link", label: "Сообщения", href: "/teacher/messages" },
+        { type: "link", label: "Материалы", href: "/teacher/resources" },
         { type: "link", label: "Документация", href: "/docs" },
         { type: "link", label: "Конфиденциальность", href: "/privacy" },
         { type: "link", label: "Этика", href: "/ethics" },
