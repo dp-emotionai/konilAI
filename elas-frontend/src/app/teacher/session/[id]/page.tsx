@@ -4,11 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { cn } from "@/lib/cn";
-import {
-  AreaChart,
-  Area,
-  ResponsiveContainer,
-} from "recharts";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 
 import {
   getSessionLiveMetrics,
@@ -19,7 +15,7 @@ import {
   type SessionChatPolicy,
   type LiveMetricsParticipant,
 } from "@/lib/api/teacher";
-import { getApiBaseUrl, hasAuth, isRealSessionId } from "@/lib/api/client";
+import { getApiBaseUrl, getStoredAuth, hasAuth, isRealSessionId } from "@/lib/api/client";
 
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
@@ -118,10 +114,29 @@ function emotionColorClass(e?: string | null) {
   return "bg-slate-50 text-slate-700 border-slate-200";
 }
 
-function clamp01(x: number) {
-  const n = x > 1 && x <= 100 ? x / 100 : x;
-  if (Number.isNaN(x)) return 0;
-  return Math.max(0, Math.min(1, n));
+function formatPersonName(input?: {
+  fullName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  role?: string | null;
+  id?: string | null;
+} | null) {
+  if (!input) return "Участник";
+
+  const fullName = input.fullName?.trim();
+  if (fullName) return fullName;
+
+  const first = input.firstName?.trim() || "";
+  const last = input.lastName?.trim() || "";
+  const composed = `${first} ${last}`.trim();
+  if (composed) return composed;
+
+  if (input.email) return input.email;
+  if (input.role === "teacher") return "Преподаватель";
+  if (input.role === "student") return "Студент";
+
+  return "Участник";
 }
 
 function ChecklistItem({
@@ -165,7 +180,14 @@ function StatusPill({ label, value }: { label: string; value: string }) {
 function formatParticipantLabel(p?: Participant | "local" | null) {
   if (p === "local") return "Вы · Teacher";
   if (!p) return "Студент";
-  return p.fullName || p.email || `${p.role} · ${p.id.slice(0, 8)}`;
+  return formatPersonName({
+    fullName: p.fullName,
+    firstName: (p as any).firstName,
+    lastName: (p as any).lastName,
+    email: p.email,
+    role: p.role,
+    id: p.id,
+  });
 }
 
 export default function TeacherLiveMonitorPage() {
@@ -234,7 +256,7 @@ export default function TeacherLiveMonitorPage() {
           }
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [sessionId]);
 
   useEffect(() => {
@@ -298,19 +320,17 @@ export default function TeacherLiveMonitorPage() {
         setIsMicEnabled(true);
         setIsCameraEnabled(true);
 
-        import("@/lib/api/client").then(({ getStoredAuth }) => {
-          const auth = getStoredAuth();
-          manager.join(
-            auth
-              ? {
-                  email: auth.email,
-                  fullName: auth.fullName || undefined,
-                  firstName: auth.firstName || undefined,
-                  lastName: auth.lastName || undefined,
-                }
-              : undefined
-          );
-        });
+        const auth = getStoredAuth();
+        manager.join(
+          auth
+            ? {
+              email: auth.email,
+              fullName: auth.fullName || undefined,
+              firstName: auth.firstName || undefined,
+              lastName: auth.lastName || undefined,
+            }
+            : undefined
+        );
 
         await signaling.waitForOpen(12000);
         setConnectionState("connected");
@@ -350,14 +370,16 @@ export default function TeacherLiveMonitorPage() {
 
   useEffect(() => {
     if (!focusedParticipant && participants.length > 0) {
-      setFocusedParticipant(participants[0]);
+      const firstStudent = participants.find((p) => p.role === "student");
+      setFocusedParticipant(firstStudent ?? participants[0]);
     }
     if (
       focusedParticipant &&
       focusedParticipant !== "local" &&
       !participants.some((p) => p.id === focusedParticipant.id)
     ) {
-      setFocusedParticipant(participants[0] ?? "local");
+      const firstStudent = participants.find((p) => p.role === "student");
+      setFocusedParticipant(firstStudent ?? participants[0] ?? "local");
     }
   }, [participants, focusedParticipant]);
 
@@ -410,26 +432,26 @@ export default function TeacherLiveMonitorPage() {
             data.avgEngagement ??
             (sessionParticipants.length
               ? sessionParticipants.reduce(
-                  (a, p) => a + (typeof p.engagement === "number" ? p.engagement : 0),
-                  0
-                ) /
-                Math.max(
-                  1,
-                  sessionParticipants.filter((p) => typeof p.engagement === "number").length
-                )
+                (a, p) => a + (typeof p.engagement === "number" ? p.engagement : 0),
+                0
+              ) /
+              Math.max(
+                1,
+                sessionParticipants.filter((p) => typeof p.engagement === "number").length
+              )
               : 0);
 
           const sVal =
             data.avgStress ??
             (sessionParticipants.length
               ? sessionParticipants.reduce(
-                  (a, p) => a + (typeof p.stress === "number" ? p.stress : 0),
-                  0
-                ) /
-                Math.max(
-                  1,
-                  sessionParticipants.filter((p) => typeof p.stress === "number").length
-                )
+                (a, p) => a + (typeof p.stress === "number" ? p.stress : 0),
+                0
+              ) /
+              Math.max(
+                1,
+                sessionParticipants.filter((p) => typeof p.stress === "number").length
+              )
               : 0);
 
           const rVal = data.avgRisk ?? 0;
@@ -496,8 +518,6 @@ export default function TeacherLiveMonitorPage() {
     metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].engagement / 100 : 0;
   const avgStress =
     metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].stress / 100 : 0;
-  const avgRisk =
-    metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].risk / 100 : 0;
 
   const gates = { backend: apiAvailable, ws: Boolean(wsUrl), camera: cameraReady };
   const criticalOk = gates.backend && gates.ws && gates.camera;
@@ -557,7 +577,9 @@ export default function TeacherLiveMonitorPage() {
   };
 
   const activeRemoteParticipant =
-    focusedParticipant && focusedParticipant !== "local" ? focusedParticipant : participants[0] ?? null;
+    focusedParticipant && focusedParticipant !== "local"
+      ? focusedParticipant
+      : participants.find((p) => p.role === "student") ?? participants[0] ?? null;
 
   const hasRemoteFocus = !!activeRemoteParticipant && !!remoteStreams[activeRemoteParticipant.id];
 
@@ -570,7 +592,11 @@ export default function TeacherLiveMonitorPage() {
     ? metricsForPeer(activeRemoteParticipant)
     : null;
 
-  const activeEmotion = activeRemoteMetrics?.emotion || null;
+  const activeEmotion =
+    activeRemoteMetrics?.dominant_emotion ||
+    activeRemoteMetrics?.emotion ||
+    null;
+
   const activeConfidence = activeRemoteMetrics?.confidence ?? null;
   const activeRisk = activeRemoteMetrics?.risk ?? null;
   const activeStress = activeRemoteMetrics?.stress ?? null;
@@ -583,7 +609,7 @@ export default function TeacherLiveMonitorPage() {
     const counts: Record<string, number> = {};
 
     mlParticipants.forEach((p) => {
-      const e = p.emotion || "neutral";
+      const e = p.dominant_emotion || p.emotion || "neutral";
       counts[e] = (counts[e] || 0) + 1;
     });
 
@@ -593,6 +619,11 @@ export default function TeacherLiveMonitorPage() {
       tone: emotionTone(name) as keyof typeof EMOTION_COLORS,
     }));
   }, [hasMl, mlParticipants]);
+
+  const studentParticipants = useMemo(
+    () => participants.filter((p) => p.role === "student"),
+    [participants]
+  );
 
   if (phase === "preflight") {
     return (
@@ -653,7 +684,7 @@ export default function TeacherLiveMonitorPage() {
                     </div>
                     <div>
                       <div className="text-[12px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">
-                        Cheklist
+                        Checklist
                       </div>
                       <div className="text-[16px] font-bold text-slate-900 leading-tight">
                         Системные проверки
@@ -753,7 +784,7 @@ export default function TeacherLiveMonitorPage() {
     <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF] z-40 overflow-hidden flex flex-col">
       <div className="mx-auto w-full max-w-[1700px] px-4 sm:px-6 py-6 flex-1 flex flex-col min-h-0">
         <header className="flex items-center justify-between mb-6 shrink-0">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 min-w-0">
             <Link
               href="/teacher/sessions"
               className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all hover:shadow-md shrink-0"
@@ -798,18 +829,22 @@ export default function TeacherLiveMonitorPage() {
           </Button>
         </header>
 
-        <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-8 min-h-0 overflow-hidden pb-4">
+        <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-8 min-h-0 overflow-hidden pb-4">
           <div className="flex flex-col gap-6 min-h-0 overflow-y-auto pr-2 custom-scrollbar">
-            {participants.length > 0 && (
+            {studentParticipants.length > 0 && (
               <div className="flex gap-3 overflow-x-auto shrink-0 pb-2 hide-scrollbar">
-                {participants.map((p) => {
+                {studentParticipants.map((p) => {
                   const isActive = focusedParticipant !== "local" && focusedParticipant?.id === p.id;
+                  const studentMetrics = metricsForPeer(p);
+                  const studentEmotion =
+                    studentMetrics?.dominant_emotion || studentMetrics?.emotion || null;
+
                   return (
                     <button
                       key={p.id}
                       onClick={() => setFocusedParticipant(p)}
                       className={cn(
-                        "px-4 py-2 rounded-2xl border bg-white flex items-center justify-between min-w-[200px] transition text-left shadow-sm shrink-0",
+                        "px-4 py-3 rounded-2xl border bg-white flex items-start justify-between min-w-[240px] transition text-left shadow-sm shrink-0",
                         isActive
                           ? "border-[#7448FF] ring-2 ring-[#7448FF]/20"
                           : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
@@ -823,12 +858,15 @@ export default function TeacherLiveMonitorPage() {
                           {remoteStreams[p.id] ? "Видео потоком" : "Ожидание медиа"}
                         </div>
                       </div>
+
                       <div
                         className={cn(
-                          "shrink-0 w-2 h-2 rounded-full",
-                          remoteStreams[p.id] ? "bg-emerald-500" : "bg-orange-400 animate-pulse"
+                          "px-2 py-1 rounded-xl border text-[10px] font-bold shrink-0",
+                          emotionColorClass(studentEmotion)
                         )}
-                      />
+                      >
+                        {formatEmotionLabel(studentEmotion)}
+                      </div>
                     </button>
                   );
                 })}
@@ -1119,8 +1157,7 @@ export default function TeacherLiveMonitorPage() {
                                 <div
                                   className="w-3 h-3 rounded-full shrink-0"
                                   style={{
-                                    backgroundColor:
-                                      EMOTION_COLORS[e.tone] || COLORS.slate,
+                                    backgroundColor: EMOTION_COLORS[e.tone] || COLORS.slate,
                                   }}
                                 />
                                 <span className="text-[13px] font-bold text-slate-900 truncate">
@@ -1136,8 +1173,7 @@ export default function TeacherLiveMonitorPage() {
                                 className="h-full rounded-full transition-all duration-700"
                                 style={{
                                   width: `${pct}%`,
-                                  backgroundColor:
-                                    EMOTION_COLORS[e.tone] || COLORS.slate,
+                                  backgroundColor: EMOTION_COLORS[e.tone] || COLORS.slate,
                                 }}
                               />
                             </div>
@@ -1150,41 +1186,6 @@ export default function TeacherLiveMonitorPage() {
                       Ожидание выражений лица
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 shrink-0 mt-2">
-              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white">
-                <header className="px-6 pt-6 pb-4">
-                  <h3 className="font-extrabold text-slate-900 text-[14px]">План занятия</h3>
-                </header>
-                <CardContent className="px-6 pb-6 pt-0 space-y-3">
-                  <div className="p-6 text-center text-slate-400 text-[13px] font-medium bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
-                    Модуль плана недоступен
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white">
-                <header className="px-6 pt-6 pb-4">
-                  <h3 className="font-extrabold text-slate-900 text-[14px]">Заметки</h3>
-                </header>
-                <CardContent className="px-6 pb-6 pt-0">
-                  <div className="p-6 text-center text-slate-400 text-[13px] font-medium bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
-                    Панель быстрого доступа пуста
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[32px] border-none shadow-sm overflow-hidden bg-white flex flex-col">
-                <header className="px-6 pt-6 pb-4">
-                  <h3 className="font-extrabold text-slate-900 text-[14px]">Сессионные файлы</h3>
-                </header>
-                <CardContent className="px-6 pb-6 pt-0 flex-1 flex">
-                  <div className="w-full text-center text-slate-400 text-[13px] font-medium bg-slate-50/50 rounded-2xl border border-dashed border-slate-100 flex items-center justify-center">
-                    Нет файлов для сессии
-                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -1257,10 +1258,10 @@ export default function TeacherLiveMonitorPage() {
                       <div className="text-[14px] font-bold text-slate-900">
                         {activeUpdatedAt
                           ? new Date(activeUpdatedAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })
                           : "—"}
                       </div>
                     </div>
@@ -1364,6 +1365,94 @@ export default function TeacherLiveMonitorPage() {
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="p-6 border-b border-slate-50 space-y-4">
+                <div className="text-[12px] font-black uppercase text-slate-400 tracking-widest">
+                  Студенты и их текущие метрики
+                </div>
+
+                <div className="space-y-3">
+                  {studentParticipants.length > 0 ? (
+                    studentParticipants.map((p) => {
+                      const m = metricsForPeer(p);
+                      const emotion = m?.dominant_emotion || m?.emotion || null;
+                      const confidence = m?.confidence ?? null;
+
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setFocusedParticipant(p)}
+                          className={cn(
+                            "w-full text-left rounded-2xl border p-4 transition bg-white",
+                            focusedParticipant !== "local" && focusedParticipant?.id === p.id
+                              ? "border-[#7448FF] ring-2 ring-[#7448FF]/15"
+                              : "border-slate-100 hover:border-slate-200"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[13px] font-bold text-slate-900 truncate">
+                                {formatParticipantLabel(p)}
+                              </div>
+                              <div className="text-[11px] text-slate-400 mt-1">
+                                {m?.updatedAt
+                                  ? `Обновлено ${new Date(m.updatedAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                  })}`
+                                  : "Нет свежих ML-данных"}
+                              </div>
+                            </div>
+
+                            <div
+                              className={cn(
+                                "px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0",
+                                emotionColorClass(emotion)
+                              )}
+                            >
+                              {formatEmotionLabel(emotion)}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-2 mt-3">
+                            <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 text-center">
+                              <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                                Confidence
+                              </div>
+                              <div className="text-[12px] font-bold text-slate-900 mt-1">
+                                {typeof confidence === "number" ? `${Math.round(confidence * 100)}%` : "—"}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 text-center">
+                              <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                                Stress
+                              </div>
+                              <div className="text-[12px] font-bold text-slate-900 mt-1">
+                                {typeof m?.stress === "number" ? `${Math.round(m.stress * 100)}%` : "—"}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl bg-slate-50 border border-slate-100 p-2 text-center">
+                              <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                                Engage
+                              </div>
+                              <div className="text-[12px] font-bold text-slate-900 mt-1">
+                                {typeof m?.engagement === "number" ? `${Math.round(m.engagement * 100)}%` : "—"}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-[12px] font-medium text-slate-400">
+                      Студенты пока не подключились.
+                    </div>
+                  )}
                 </div>
               </div>
 

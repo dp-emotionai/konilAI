@@ -12,6 +12,8 @@ export type AuthPayload = {
   token: string;
   role: UserRole;
   email: string;
+  /** User UUID — same as the backend userId from JWT */
+  id?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -40,6 +42,7 @@ function normalizeAuthPayload(payload: Partial<AuthPayload> & { token: string; e
     token: String(payload.token),
     email: String(payload.email).trim().toLowerCase(),
     role: normalizeRole(payload.role) ?? "student",
+    id: typeof payload.id === "string" && payload.id ? payload.id : null,
     firstName: payload.firstName != null ? String(payload.firstName) : null,
     lastName: payload.lastName != null ? String(payload.lastName) : null,
     fullName: payload.fullName != null ? String(payload.fullName) : null,
@@ -94,6 +97,7 @@ export function getStoredAuth(): AuthPayload | null {
       token: parsed.token,
       email: parsed.email,
       role: parsed.role,
+      id: parsed.id,
       firstName: parsed.firstName,
       lastName: parsed.lastName,
       fullName: parsed.fullName,
