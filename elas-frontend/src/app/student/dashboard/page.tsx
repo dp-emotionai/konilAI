@@ -341,19 +341,9 @@ export default function StudentDashboardPage() {
                  <button className="text-slate-400 hover:text-slate-900"><ChevronRight size={16} /></button>
                </div>
                
-               <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase font-medium text-slate-400 mb-2">
-                 <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
-               </div>
-               
-               <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-slate-600">
-                 {Array.from({ length: dayOffset }).map((_, i) => (
-                   <span key={`prev-${i}`} className="p-1.5 opacity-30"></span>
-                 ))}
-                 {Array.from({ length: daysInMonth }).map((_, i) => (
-                   <span key={i} className={cn("p-1.5 rounded-lg flex items-center justify-center cursor-default hover:bg-slate-100", (i+1) === today.getDate() && "bg-[#7448FF] text-white")}>
-                     {i + 1}
-                   </span>
-                 ))}
+               <div className="py-8 text-center bg-slate-50/50 border border-slate-100 rounded-2xl">
+                 <CalendarDays size={24} className="mx-auto text-slate-300 mb-2" />
+                 <div className="text-[13px] font-medium text-slate-500">Календарь недоступен</div>
                </div>
                
                <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-purple-600">

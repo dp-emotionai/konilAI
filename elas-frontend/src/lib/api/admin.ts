@@ -52,7 +52,6 @@ function metaToRecord(meta: string | null): Record<string, string> {
 export type RawAdminUser = {
   id: string;
   email: string;
-  name: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -65,7 +64,6 @@ export type RawAdminUser = {
 export type AdminUser = {
   id: string;
   email: string;
-  name: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -97,7 +95,6 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
     return arr.map((u) => ({
       id: u.id,
       email: u.email,
-      name: u.fullName || u.name || null,
       firstName: u.firstName || null,
       lastName: u.lastName || null,
       fullName: u.fullName || null,
@@ -116,7 +113,6 @@ export async function approveAdminUser(userId: string): Promise<AdminUser | null
     return {
       id: res.id,
       email: res.email,
-      name: res.fullName || res.name || null,
       firstName: res.firstName || null,
       lastName: res.lastName || null,
       fullName: res.fullName || null,
@@ -142,7 +138,6 @@ export async function updateAdminUser(
     return {
       id: res.id,
       email: res.email,
-      name: res.fullName || res.name || null,
       firstName: res.firstName || null,
       lastName: res.lastName || null,
       fullName: res.fullName || null,
@@ -161,7 +156,6 @@ export async function blockAdminUser(userId: string): Promise<AdminUser | null> 
     return {
       id: res.id,
       email: res.email,
-      name: res.fullName || res.name || null,
       firstName: res.firstName || null,
       lastName: res.lastName || null,
       fullName: res.fullName || null,

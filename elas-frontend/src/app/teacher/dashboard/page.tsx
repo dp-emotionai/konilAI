@@ -11,7 +11,7 @@ import {
   Download, Database
 } from "lucide-react";
 
-type MeRes = { id: string; email: string; role: string; fullName?: string | null; firstName?: string | null; lastName?: string | null; name?: string | null };
+type MeRes = { id: string; email: string; role: string; fullName?: string | null; firstName?: string | null; lastName?: string | null };
 
 function KPI({
   icon: Icon, title, value, subtitle, trend, iconBg, iconColor
@@ -99,7 +99,7 @@ export default function TeacherDashboard() {
   const activeCount = sessions.filter(s => s.status === 'active').length;
   const scheduledCount = sessions.filter(s => s.status === 'draft').length;
   
-  const firstName = me?.firstName || (me?.fullName ? me.fullName.split(" ")[0] : (me?.name ? me.name.split(" ")[0] : "Преподаватель"));
+  const firstName = me?.firstName || (me?.fullName ? me.fullName.split(" ")[0] : "Преподаватель");
 
   const today = new Date();
   const currentMonth = new Intl.DateTimeFormat('ru-RU', { month: 'long' }).format(today);
@@ -227,20 +227,10 @@ export default function TeacherDashboard() {
                  <button className="text-slate-400 hover:text-slate-700 transition-colors"><ChevronRight size={18} /></button>
               </div>
               
-              <div className="grid grid-cols-7 text-center text-[12px] font-semibold text-slate-400 mb-4">
-                 <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div className="text-slate-300">Сб</div><div className="text-slate-300">Вс</div>
-              </div>
-              <div className="grid grid-cols-7 text-center text-[14px] font-medium gap-y-4 text-slate-700">
-                 {/* Visual static mock mapping to reference matching layout */}
-                 <div className="text-slate-300">31</div><div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div>
-                 <div>7</div><div>8</div>
-                 <div className="relative flex justify-center">
-                   <div className="w-8 h-8 bg-slate-900 text-white rounded-xl flex items-center justify-center font-bold shadow-md">9</div>
-                 </div>
-                 <div>10</div><div>11</div><div>12</div><div>13</div>
-                 <div>14</div><div>15</div><div>16</div><div>17</div><div>18</div><div>19</div><div>20</div>
-                 <div>21</div><div>22</div><div>23</div><div>24</div><div>25</div><div>26</div><div>27</div>
-                 <div>28</div><div>29</div><div>30</div><div className="text-slate-300">1</div><div className="text-slate-300">2</div><div className="text-slate-300">3</div><div className="text-slate-300">4</div>
+              <div className="py-10 text-center bg-slate-50/50 border border-slate-100 rounded-2xl">
+                 <CalendarIcon size={24} className="mx-auto text-slate-300 mb-3" />
+                 <div className="text-[13px] font-medium text-slate-500">Полный календарь пока недоступен</div>
+                 <div className="text-[11px] text-slate-400 mt-1">Отображаются только ближайшие сессии</div>
               </div>
 
               <div className="mt-6 flex items-center justify-between p-4 bg-purple-50 rounded-[14px]">
@@ -249,8 +239,8 @@ export default function TeacherDashboard() {
                       <CalendarIcon size={18} />
                     </div>
                     <div>
-                      <div className="text-[14px] font-bold text-[#7448FF]">Сегодня, 9 сентября</div>
-                      <div className="text-[12px] font-medium text-purple-400 mt-0.5">3 сессии · 1 отчет</div>
+                      <div className="text-[14px] font-bold text-[#7448FF]">Запланировано</div>
+                      <div className="text-[12px] font-medium text-purple-400 mt-0.5">{scheduledCount} сессии ожидают начала</div>
                     </div>
                  </div>
                  <ChevronRight size={18} className="text-purple-300" />
@@ -298,37 +288,8 @@ export default function TeacherDashboard() {
               </div>
               
               <div className="space-y-3">
-                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                       <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardList size={18} /></div>
-                       <div>
-                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Еженедельный отчёт</div>
-                         <div className="text-[11px] font-medium text-slate-400 mt-1">8 сентября 2026</div>
-                       </div>
-                    </div>
-                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
-                 </div>
-                 
-                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                       <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0"><Users size={18} /></div>
-                       <div>
-                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Отчёт по успеваемости</div>
-                         <div className="text-[11px] font-medium text-slate-400 mt-1">7 сентября 2026</div>
-                       </div>
-                    </div>
-                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
-                 </div>
-
-                 <div className="bg-white border border-slate-100 rounded-[16px] p-4 flex items-center justify-between shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:border-slate-200 transition-colors cursor-pointer group">
-                    <div className="flex items-center gap-4">
-                       <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><BarChart2 size={18} /></div>
-                       <div>
-                         <div className="text-[13px] font-bold text-slate-900 leading-tight">Анализ эффективности</div>
-                         <div className="text-[11px] font-medium text-slate-400 mt-1">6 сентября 2026</div>
-                       </div>
-                    </div>
-                    <Download size={16} className="text-slate-300 group-hover:text-[#7448FF] transition-colors" />
+                 <div className="text-[13px] text-slate-500 p-4 border border-slate-100 rounded-[16px] text-center bg-white">
+                    Нет недавно сформированных отчетов
                  </div>
               </div>
             </div>

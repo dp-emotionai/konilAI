@@ -163,6 +163,21 @@ export default function StudentJoinSessionPage() {
     void loadJoinInfo();
   }, [loadJoinInfo]);
 
+  useEffect(() => {
+    let timer: number | null = null;
+    const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
+    
+    if (blockReason === "session_not_started") {
+      timer = window.setInterval(() => {
+        void loadJoinInfo();
+      }, 5000);
+    }
+    
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [joinInfo, loadJoinInfo]);
+
   const title = joinInfo?.title ?? "Сессия";
   const sessionType: "lecture" | "exam" =
     joinInfo?.type === "exam" ? "exam" : "lecture";

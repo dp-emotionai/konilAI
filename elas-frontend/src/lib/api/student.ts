@@ -31,7 +31,7 @@ function mapBackendToRow(raw: {
 }
 
 /**
- * Student API: uses real backend when API URL is set and user has token; otherwise mock.
+ * Student API: Uses real backend endpoints.
  */
 export type SessionJoinInfo = {
   title: string;
@@ -57,7 +57,6 @@ export async function recordSessionConsent(sessionId: string): Promise<void> {
 export type RawAdminUser = {
   id: string;
   email: string;
-  name: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;
@@ -110,7 +109,6 @@ export async function sendSessionMetrics(
 export type AdminUser = {
   id: string;
   email: string;
-  name: string | null;
   firstName?: string | null;
   lastName?: string | null;
   fullName?: string | null;

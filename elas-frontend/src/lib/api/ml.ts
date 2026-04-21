@@ -148,68 +148,36 @@ export async function mlStopSession(
   };
 }
 
-/** Fallback mock when backend is unavailable. */
-function mockSessionSummary(sessionId: MlSessionId): MlSessionSummary {
-  return {
-    sessionId,
-    startedAt: new Date().toISOString(),
-    endedAt: new Date().toISOString(),
-    durationSeconds: 45 * 60,
-    metrics: {
-      avgEngagement: 0.68,
-      avgStress: 0.41,
-      avgFatigue: 0.29,
-      stability: 0.82,
-    },
-    dominantEmotion: "neutral",
-    group: {
-      engagement: 0.7,
-      stress: 0.4,
-      fatigue: 0.3,
-      tzState: "stable",
-      groupState: "high_engagement",
-      emotionDistribution: {
-        neutral: 0.5,
-        happy: 0.3,
-        sad: 0.1,
-        fear: 0.1,
-      },
-    },
-    attentionDrops: [
-      { t: 420, duration: 20, severity: "moderate", note: "Mid-lecture drop (mock)" },
-    ],
-  };
-}
 
 /**
  * Fetch summary JSON for a finished session.
- * Uses GET /sessions/{id}/analytics/summary when backend and auth are available; otherwise returns mock.
+ * Uses GET /sessions/{id}/analytics/summary when backend and auth are available.
  */
-export async function mlGetSessionSummary(sessionId: MlSessionId): Promise<MlSessionSummary> {
-  if (typeof window === "undefined") return mockSessionSummary(sessionId);
+export async function mlGetSessionSummary(sessionId: MlSessionId): Promise<MlSessionSummary | null> {
+  if (typeof window === "undefined") return null;
   const { getApiBaseUrl, getToken } = await import("./client");
   const base = getApiBaseUrl();
   const token = getToken();
-  if (!base || !token) return mockSessionSummary(sessionId);
+  if (!base || !token) return null;
   try {
     const res = await fetch(`${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) return mockSessionSummary(sessionId);
+    if (!res.ok) return null;
     const data = (await res.json()) as MlSessionSummary;
     return {
       sessionId: data.sessionId ?? sessionId,
       startedAt: data.startedAt ?? new Date().toISOString(),
       endedAt: data.endedAt ?? new Date().toISOString(),
       durationSeconds: data.durationSeconds ?? 0,
-      metrics: data.metrics ?? mockSessionSummary(sessionId).metrics,
+      metrics: data.metrics,
       dominantEmotion: data.dominantEmotion ?? "neutral",
-      group: data.group ?? mockSessionSummary(sessionId).group,
+      group: data.group,
       attentionDrops: Array.isArray(data.attentionDrops) ? data.attentionDrops : [],
     };
   } catch {
-    return mockSessionSummary(sessionId);
+    return null;
   }
 }
 

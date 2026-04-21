@@ -209,9 +209,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
   }, []);
 
   return (
-    <Card variant="elevated" className="overflow-hidden">
-      <CardContent className="p-0">
-        <div className="rounded-elas-xl border border-[color:var(--border)] bg-surface shadow-md">
+    <div className="rounded-elas-xl border border-[color:var(--border)] bg-surface shadow-md">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border)] px-6 py-5">
             <div className="flex items-start gap-3">
               <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle text-muted">
@@ -277,7 +275,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
                 </div>
               </div>
 
-              <div className="relative aspect-[4/3] bg-black sm:aspect-[16/10]">
+              <div className="relative aspect-video bg-black w-full">
                 <video
                   ref={videoRef}
                   className="h-full w-full object-cover opacity-95"
@@ -429,9 +427,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
               </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 

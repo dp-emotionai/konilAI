@@ -19,6 +19,7 @@ import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { getWsBaseUrl } from "@/lib/env";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
+import { StreamVideo } from "@/components/session/StreamVideo";
 import CameraCheck from "@/components/session/CameraCheck";
 import Modal from "@/components/ui/Modal";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -600,14 +601,14 @@ export default function TeacherLiveMonitorPage() {
             {/* HERO VIDEO MONITOR */}
             <div className="relative aspect-[16/9] min-h-[360px] rounded-[32px] overflow-hidden bg-slate-900 shadow-[0_12px_45px_rgba(0,0,0,0.08)] group border border-slate-100 shrink-0">
                {hasRemoteFocus && activeRemoteParticipant ? (
-                  <video
-                     ref={el => { if(el && remoteStreams[activeRemoteParticipant.id]){ el.srcObject = remoteStreams[activeRemoteParticipant.id]; el.play().catch(()=>{}); } }}
+                  <StreamVideo
+                     stream={remoteStreams[activeRemoteParticipant.id] || null}
                      autoPlay playsInline muted={false}
                      className="w-full h-full object-cover"
                   />
                ) : (
-                  <video
-                     ref={el => { if(el && localStream){ el.srcObject = localStream; el.play().catch(()=>{}); } }}
+                  <StreamVideo
+                     stream={localStream}
                      autoPlay playsInline muted
                      className="w-full h-full object-cover"
                   />
@@ -644,7 +645,7 @@ export default function TeacherLiveMonitorPage() {
                {/* LOCAL PIP INSET */}
                {hasRemoteFocus && (
                  <button onClick={() => setFocusedParticipant("local")} className="absolute bottom-6 right-6 w-48 aspect-video bg-slate-800 rounded-[20px] overflow-hidden border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.4)] z-20 hover:scale-105 transition-transform duration-300 text-left">
-                    <video autoPlay playsInline muted ref={el => { if(el && localStream){ el.srcObject = localStream; el.play().catch(()=>{}); } }} className="w-full h-full object-cover" />
+                    <StreamVideo stream={localStream} autoPlay playsInline muted className="w-full h-full object-cover" />
                     <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] text-white font-bold flex items-center gap-1.5">Вы <div className="w-1.5 h-1.5 rounded-full bg-purple-400" /></div>
                  </button>
                )}

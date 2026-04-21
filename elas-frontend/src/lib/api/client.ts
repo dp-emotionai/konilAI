@@ -123,11 +123,21 @@ export function isRealSessionId(id: string | undefined): boolean {
 /**
  * Resolves an avatar URL against the API base if it's relative.
  */
-export function resolveAvatarUrl(url: string | null | undefined): string | null {
+export function resolveAvatarUrl(url: string | null | undefined, version?: number): string | null {
   if (!url) return null;
-  if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  const base = getApiBaseUrl();
-  return `${base}${url.startsWith("/") ? url : "/" + url}`;
+  
+  let finalUrl = url;
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    const base = getApiBaseUrl();
+    finalUrl = `${base.replace(/\/$/, "")}${url.startsWith("/") ? url : "/" + url}`;
+  }
+
+  if (version) {
+    const sep = finalUrl.includes("?") ? "&" : "?";
+    finalUrl += `${sep}v=${version}`;
+  }
+  
+  return finalUrl;
 }
 
 async function request<T>(

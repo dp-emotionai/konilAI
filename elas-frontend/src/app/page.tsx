@@ -193,7 +193,7 @@ export default function HomePage() {
             Нам доверяют лидеры
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 w-full md:w-auto gap-4 lg:gap-12 opacity-70 grayscale">
-            {["Narxoz University", "KnewIT Academy", "ELAS Lab", "Digital Eng"].map((logo) => (
+            {["Narxoz University", "KnewIT Academy", "KonilAI Lab", "Digital Eng"].map((logo) => (
               <div key={logo} className="text-base font-bold text-fg tracking-tight text-center">
                 {logo}
               </div>

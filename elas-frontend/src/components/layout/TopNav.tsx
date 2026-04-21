@@ -582,7 +582,6 @@ export default function TopNav() {
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle"
                     >
                       <Bell size={18} />
-                      <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-red-400"></span>
                     </button>
                   </Link>
 
@@ -597,7 +596,7 @@ export default function TopNav() {
                     >
                       {state.avatarUrl ? (
                          <Image 
-                           src={resolveAvatarUrl(state.avatarUrl)!} 
+                           src={resolveAvatarUrl(state.avatarUrl, state.avatarVersion)!} 
                            alt={state.fullName || "User"} 
                            width={36} 
                            height={36} 

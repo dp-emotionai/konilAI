@@ -243,9 +243,11 @@ export default function UnifiedProfilePage() {
       
       const newMe = { ...me!, avatarUrl: data.avatarUrl };
       setMe(newMe);
+      const newVersion = Date.now();
       if (stored) {
         setAuth({ ...stored, avatarUrl: data.avatarUrl });
       }
+      ui.setUserInfo({ avatarUrl: data.avatarUrl, avatarVersion: newVersion });
       setProfileMessage({ type: 'success', text: 'Аватар успешно обновлен.' });
     } catch (err) {
       setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : "Ошибка загрузки" });
@@ -316,7 +318,7 @@ export default function UnifiedProfilePage() {
                             || formPhone !== (me?.phone || "")
                             || formOrganization !== (me?.organization || "");
 
-  const displayAvatar = resolveAvatarUrl(me?.avatarUrl);
+  const displayAvatar = resolveAvatarUrl(me?.avatarUrl, ui.state.avatarVersion);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">

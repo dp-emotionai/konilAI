@@ -13,6 +13,7 @@ type UIState = {
   lastName: string | null;
   fullName: string | null;
   avatarUrl: string | null;
+  avatarVersion: number;
 };
 
 const KEY = "elas_ui_state_v1";
@@ -26,6 +27,7 @@ const defaultState: UIState = {
   lastName: null,
   fullName: null,
   avatarUrl: null,
+  avatarVersion: 0,
 };
 
 function normalizeRole(value: unknown): Role | null {
@@ -63,6 +65,7 @@ export function useUIStore() {
           lastName: typeof parsed.lastName === "string" ? parsed.lastName : null,
           fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
           avatarUrl: typeof parsed.avatarUrl === "string" ? parsed.avatarUrl : null,
+          avatarVersion: typeof parsed.avatarVersion === "number" ? parsed.avatarVersion : 0,
         };
 
         if (auth?.token) {
@@ -92,6 +95,7 @@ export function useUIStore() {
           lastName: auth.lastName ?? null,
           fullName: auth.fullName ?? null,
           avatarUrl: auth.avatarUrl ?? null,
+          avatarVersion: 0,
         });
       }
     } catch {
@@ -131,7 +135,7 @@ export function useUIStore() {
         ...s,
         status,
       })),
-    setUserInfo: (info: { firstName?: string; lastName?: string; fullName?: string; avatarUrl?: string }) =>
+    setUserInfo: (info: { firstName?: string; lastName?: string; fullName?: string; avatarUrl?: string; avatarVersion?: number }) =>
       setState((s) => ({
         ...s,
         ...info

@@ -33,7 +33,7 @@ export default function Ethics() {
         <section id="purpose" className="scroll-mt-24">
           <h2 className="text-lg font-semibold text-white mb-2">Purpose</h2>
           <p className="text-sm text-muted leading-relaxed">
-            ELAS is designed to support teaching and learning. We provide aggregated analytics on engagement and
+            KonilAI is designed to support teaching and learning. We provide aggregated analytics on engagement and
             emotional signals so that educators can improve lectures and better support students. Results are
             <strong className="text-muted"> not</strong> used for automatic grading, ranking, or formal assessment.
           </p>

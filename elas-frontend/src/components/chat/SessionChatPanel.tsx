@@ -77,10 +77,16 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
   useEffect(() => {
     if (!realSession) return;
 
-    const client = new ChatClient((event) => {
-      if (event?.event?.scope === "session" && event.event.kind === "message:new") {
-        const msg: SessionMessage = event.event.message;
-        if (msg.sessionId === sessionId && msg.channel === channel) {
+    const client = new ChatClient((rawEvent) => {
+      // Support both `event.event.scope` (wrapped) and `event.scope` (flat) payloads
+      const payload = rawEvent?.event || rawEvent;
+      
+      const isSessionScope = payload?.scope === "session";
+      const isNewMessage = payload?.kind === "message:new" || payload?.type === "message";
+      
+      if (isSessionScope && isNewMessage) {
+        const msg: SessionMessage = payload.message || payload;
+        if (msg && msg.id && msg.sessionId === sessionId && msg.channel === channel) {
           setMessages((prev) => (prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]));
         }
       }
@@ -184,7 +190,7 @@ export function SessionChatPanel({ sessionId, role, type }: Props) {
       </div>
 
       {/* messages — scrollable container */}
-      <div className="min-h-0 max-h-[40vh] flex-1 overflow-y-auto px-4 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-2.5">
         {!realSession && (
           <div className="rounded-2xl border border-dashed border-[color:var(--border)] bg-black/20 px-4 py-4 text-xs text-muted">

@@ -39,7 +39,7 @@ function delay(ms: number) {
 }
 
 /**
- * Teacher API: uses real backend when API URL is set and user has token; otherwise mock.
+ * Teacher API: Uses real backend endpoints.
  */
 
 function mapBackendToSession(raw: {
