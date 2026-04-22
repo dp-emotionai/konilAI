@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Send, Paperclip } from "lucide-react";
+import { Send, Paperclip, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { getStoredAuth, getToken } from "@/lib/api/client";
@@ -136,7 +136,10 @@ export function SessionChatPanel({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
+  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeChannel: "public" | "help" = type === "exam" ? "help" : "public";
   const currentUserId = useMemo(() => {
@@ -220,7 +223,14 @@ export function SessionChatPanel({
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    if ((!text && !selectedAttachment) || sending) return;
+
+    if (selectedAttachment) {
+      setAttachmentNotice(
+        "Вложения для session chat ещё ждут backend-поддержку. Файл выбран, но не будет отправлен, пока backend не примет attachments."
+      );
+      if (!text) return;
+    }
 
     setSending(true);
     try {
@@ -238,12 +248,15 @@ export function SessionChatPanel({
       }
 
       setDraft("");
+      if (selectedAttachment) {
+        setSelectedAttachment(null);
+      }
     } catch (error) {
       console.error("postSessionMessage failed", error);
     } finally {
       setSending(false);
     }
-  }, [activeChannel, appendMessage, draft, loadMessages, sending, sessionId]);
+  }, [activeChannel, appendMessage, draft, loadMessages, selectedAttachment, sending, sessionId]);
 
   const handleKeyDown = useCallback(
     async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -304,6 +317,49 @@ export function SessionChatPanel({
       </div>
 
       <div className="shrink-0 border-t border-slate-100 bg-white px-4 py-3">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            setSelectedAttachment(file);
+            setAttachmentNotice(
+              file
+                ? "Файл выбран. Для реальной отправки вложений нужен backend для attachments в session chat."
+                : null
+            );
+          }}
+        />
+
+        {selectedAttachment && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <div className="min-w-0 truncate font-medium">
+              {selectedAttachment.name}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAttachment(null);
+                setAttachmentNotice(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = "";
+                }
+              }}
+              className="shrink-0 rounded-full p-1 text-amber-700 transition hover:bg-amber-100"
+              aria-label="Clear selected file"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
+
+        {attachmentNotice && (
+          <div className="mb-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+            {attachmentNotice}
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
           <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
             <textarea
@@ -318,8 +374,8 @@ export function SessionChatPanel({
 
           <button
             type="button"
-            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-400"
-            disabled
+            onClick={() => fileInputRef.current?.click()}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
             aria-label="Attach"
           >
             <Paperclip size={16} />
@@ -328,7 +384,7 @@ export function SessionChatPanel({
           <button
             type="button"
             onClick={() => void handleSend()}
-            disabled={!draft.trim() || sending}
+            disabled={(!draft.trim() && !selectedAttachment) || sending}
             className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#7448FF] text-white disabled:opacity-50"
             aria-label="Send"
           >

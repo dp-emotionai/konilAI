@@ -30,6 +30,12 @@ import {
   ML_429_PAUSE_MS,
   type MlAnalyzeResponse,
 } from "@/lib/api/ml";
+import {
+  getSessionContent,
+  getSessionMaterials,
+  type SessionContent,
+  type SessionContentFile,
+} from "@/lib/api/sessionContent";
 
 import CameraCheck from "@/components/session/CameraCheck";
 import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
@@ -160,6 +166,7 @@ export default function StudentJoinSessionPage() {
   const sessionId = params?.id ?? "";
   const { state } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
+  const monitorRef = useRef<HTMLDivElement | null>(null);
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
@@ -169,6 +176,10 @@ export default function StudentJoinSessionPage() {
     "whiteboard"
   );
   const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredAuth>>(null);
+  const [sessionContent, setSessionContent] = useState<SessionContent | null>(null);
+  const [sessionFiles, setSessionFiles] = useState<SessionContentFile[]>([]);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [isMonitorFullscreen, setIsMonitorFullscreen] = useState(false);
 
   const loadJoinInfo = useCallback(async () => {
     if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
@@ -222,6 +233,31 @@ export default function StudentJoinSessionPage() {
   }, [joinInfo, loadJoinInfo]);
 
   const title = joinInfo?.title ?? "Сессия";
+  const loadSessionContent = useCallback(async () => {
+    if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
+      setSessionContent(null);
+      setSessionFiles([]);
+      return;
+    }
+
+    setContentLoading(true);
+    try {
+      const [content, materials] = await Promise.all([
+        getSessionContent(sessionId),
+        getSessionMaterials(sessionId),
+      ]);
+
+      setSessionContent(content);
+      setSessionFiles(materials ?? content?.files ?? []);
+    } finally {
+      setContentLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    void loadSessionContent();
+  }, [loadSessionContent]);
+
   const sessionType: "lecture" | "exam" = joinInfo?.type === "exam" ? "exam" : "lecture";
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
@@ -276,6 +312,29 @@ export default function StudentJoinSessionPage() {
   useEffect(() => {
     setCurrentUser(getStoredAuth());
   }, []);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsMonitorFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleMonitorFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await monitorRef.current?.requestFullscreen();
+    } catch (error) {
+      console.error("monitor fullscreen failed", error);
+    }
+  }, []);
+
   const teacherDisplayName = useMemo(() => {
     const liveParticipantName = formatParticipantLabel(teacherParticipant);
     if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
@@ -594,10 +653,13 @@ export default function StudentJoinSessionPage() {
             </button>
           </div>
 
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,400px)] xl:grid-cols-[minmax(0,1fr)_420px] 2xl:grid-cols-[minmax(0,1fr)_440px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] xl:grid-cols-[minmax(0,1fr)_460px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
             <div className="flex min-w-0 flex-col">
               <div className="shrink-0 space-y-6">
-                <div className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[320px] sm:h-[380px] lg:h-[420px] xl:h-[500px] shrink-0">
+                <div
+                  ref={monitorRef}
+                  className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
+                >
                   {remoteStream ? (
                     <StreamVideo
                       stream={remoteStream}
@@ -616,9 +678,14 @@ export default function StudentJoinSessionPage() {
                     </div>
                   )}
 
-                  <div className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => void toggleMonitorFullscreen()}
+                    className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer"
+                    aria-label={isMonitorFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+                  >
                     <Maximize2 size={16} strokeWidth={2.5} />
-                  </div>
+                  </button>
 
                   {remoteStream && (
                     <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
@@ -629,7 +696,7 @@ export default function StudentJoinSessionPage() {
                     </div>
                   )}
 
-                  <div className="absolute bottom-4 right-4 w-[160px] sm:w-[200px] xl:w-[240px] h-[96px] sm:h-[120px] xl:h-[150px] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
+                  <div className="absolute bottom-4 right-4 w-[170px] sm:w-[220px] xl:w-[260px] h-[108px] sm:h-[132px] xl:h-[164px] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
                     <StreamVideo
                       stream={localStream}
                       className="w-full h-full object-cover"
@@ -776,7 +843,51 @@ export default function StudentJoinSessionPage() {
                       </div>
                     )}
 
-                    {activeBottomTab === "materials" && (
+                    {activeBottomTab === "materials" && (contentLoading || sessionFiles.length > 0) && (
+                      <div className="w-full">
+                        {contentLoading ? (
+                          <div className="text-center text-sm text-slate-400">
+                            Загружаем материалы сессии...
+                          </div>
+                        ) : (
+                          <div className="grid gap-3">
+                            {sessionFiles.map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.url || undefined}
+                                target={file.url ? "_blank" : undefined}
+                                rel={file.url ? "noreferrer" : undefined}
+                                className={cn(
+                                  "rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4 text-left transition",
+                                  file.url ? "hover:bg-slate-50" : "cursor-default"
+                                )}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
+                                    <FileText size={16} />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="truncate font-semibold text-slate-900">
+                                      {file.title}
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                      {file.fileName || "Файл сессии"}
+                                    </div>
+                                    {!file.url && (
+                                      <div className="mt-2 text-xs text-amber-600">
+                                        Backend ещё не вернул ссылку на скачивание.
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {activeBottomTab === "materials" && !contentLoading && sessionFiles.length === 0 && (
                       <div className="text-center w-full">
                         <Reveal>
                           <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
@@ -791,7 +902,96 @@ export default function StudentJoinSessionPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                  {(contentLoading ||
+                    sessionContent?.lessonPlan ||
+                    sessionContent?.keyPoints?.length ||
+                    sessionFiles.length > 0) && (
+                    <div className="grid grid-cols-1 gap-6 mt-6 xl:grid-cols-3">
+                      <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                        <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
+                        {contentLoading ? (
+                          <div className="text-center py-8 text-slate-400">Загружаем план...</div>
+                        ) : sessionContent?.lessonPlan ? (
+                          <div className="whitespace-pre-line leading-7 text-slate-600">
+                            {sessionContent.lessonPlan}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-slate-400">
+                            Backend пока не передал план занятия для этой сессии.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                        <h3 className="font-bold text-slate-900 text-[15px] mb-4">Важные тезисы</h3>
+                        {contentLoading ? (
+                          <div className="text-center py-8 text-slate-400">Загружаем тезисы...</div>
+                        ) : sessionContent?.keyPoints?.length ? (
+                          <ul className="space-y-3">
+                            {sessionContent.keyPoints.map((point, index) => (
+                              <li
+                                key={`${index}-${point}`}
+                                className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-slate-600"
+                              >
+                                {point}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-center py-8 text-slate-400">
+                            Backend пока не передал важные тезисы для этой сессии.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                        <h3 className="font-bold text-slate-900 text-[15px] mb-4">Файлы</h3>
+                        {contentLoading ? (
+                          <div className="text-center py-8 text-slate-400">Загружаем файлы...</div>
+                        ) : sessionFiles.length > 0 ? (
+                          <div className="space-y-3">
+                            {sessionFiles.map((file) => (
+                              <a
+                                key={file.id}
+                                href={file.url || undefined}
+                                target={file.url ? "_blank" : undefined}
+                                rel={file.url ? "noreferrer" : undefined}
+                                className={cn(
+                                  "flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition",
+                                  file.url ? "hover:bg-slate-50" : "cursor-default"
+                                )}
+                              >
+                                <div className="rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
+                                  <FileText size={16} />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="truncate font-semibold text-slate-900">{file.title}</div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {file.fileName || "Файл сессии"}
+                                  </div>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-slate-400">
+                            Backend пока не передал прикреплённые файлы для этой сессии.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div
+                    className={cn(
+                      "grid grid-cols-1 gap-6 mt-6 xl:grid-cols-3",
+                      (contentLoading ||
+                        sessionContent?.lessonPlan ||
+                        sessionContent?.keyPoints?.length ||
+                        sessionFiles.length > 0) &&
+                        "hidden"
+                    )}
+                  >
                     <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
                       <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
                       <div className="text-center py-8 text-slate-400">План не загружен</div>
@@ -810,7 +1010,7 @@ export default function StudentJoinSessionPage() {
               ref={chatSectionRef}
               className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4 lg:h-[calc(100dvh-96px)] lg:min-h-0"
             >
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[420px] overflow-hidden lg:min-h-0 lg:flex-1">
+              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[480px] overflow-hidden lg:min-h-0 lg:flex-[1.2]">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                   <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
@@ -1137,8 +1337,8 @@ export default function StudentJoinSessionPage() {
                 </Card>
               )}
 
-              <div className="grid gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-7">
+              <div className="grid gap-6 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
+                <div>
                   <Card className="overflow-hidden border-slate-100">
                     <CardContent className="space-y-5 p-6 md:p-7">
                       <div className="flex items-start gap-4">
@@ -1184,7 +1384,7 @@ export default function StudentJoinSessionPage() {
                   </Card>
                 </div>
 
-                <div className="lg:col-span-5">
+                <div>
                   <Card className="overflow-hidden border-slate-100 h-full">
                     <CardContent className="space-y-4 p-6 md:p-7 h-full flex flex-col">
                       <div className="flex items-start gap-4">

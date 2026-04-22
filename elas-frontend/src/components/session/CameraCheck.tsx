@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Card, CardContent } from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import {
@@ -60,7 +59,7 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
   const stop = () => {
     stopMonitoring();
 
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
 
     if (videoRef.current) {
@@ -109,9 +108,8 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
   };
 
   const estimateFacePresence = (video: HTMLVideoElement): FaceState => {
-    // Без реальной face model делаем честную эвристику:
-    // если видео реально идёт и есть размеры кадра, считаем preview usable.
-    // Не называем это "точным face detection", а используем как мягкий readiness signal.
+    // Честная эвристика до подключения real face model в pre-join:
+    // если видео идёт и кадр имеет реальные размеры, preview пригоден для старта.
     if (
       video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
       video.videoWidth > 0 &&
@@ -147,8 +145,6 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
   async function start() {
     try {
       setErrorText(null);
-
-      // если уже был stream — сначала чистим
       stop();
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -210,223 +206,225 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
 
   return (
     <div className="rounded-elas-xl border border-[color:var(--border)] bg-surface shadow-md">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border)] px-6 py-5">
-            <div className="flex items-start gap-3">
-              <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle text-muted">
-                <Camera size={18} />
-              </div>
-
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted">
-                  Camera readiness
-                </div>
-                <div className="mt-1 text-lg font-semibold text-fg">
-                  Pre-join check
-                </div>
-                <div className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-                  Мы не сохраняем raw-видео. Для аналитики используются только агрегированные
-                  сигналы и метаданные после согласия.
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
-                FPS {fps}
-              </Badge>
-              <Badge
-                className={
-                  permission === "granted"
-                    ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
-                    : permission === "denied"
-                      ? "border border-red-400/20 bg-red-500/10 text-red-700"
-                      : "border border-[color:var(--border)] bg-surface-subtle text-muted"
-                }
-              >
-                {permission === "granted"
-                  ? "Permission OK"
-                  : permission === "denied"
-                    ? "Denied"
-                    : "Not requested"}
-              </Badge>
-            </div>
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[color:var(--border)] px-6 py-5">
+        <div className="flex items-start gap-3">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle text-muted">
+            <Camera size={18} />
           </div>
 
-          <div className="grid items-start gap-5 p-5 lg:grid-cols-[minmax(0,1.4fr)_340px]">
-            <div className="overflow-hidden rounded-[26px] border border-[color:var(--border)] bg-surface-subtle/50">
-              <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
-                <div className="text-sm font-medium text-muted">Preview</div>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.2em] text-muted">
+              Camera readiness
+            </div>
+            <div className="mt-1 text-lg font-semibold text-fg">Pre-join check</div>
+            <div className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">
+              Мы не сохраняем raw-видео. Для аналитики используются только агрегированные
+              сигналы и метаданные после согласия.
+            </div>
+          </div>
+        </div>
 
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge
-                    ok={face === "detected"}
-                    label={
-                      face === "detected"
-                        ? "Face: detected"
-                        : face === "not_detected"
-                          ? "Face: not detected"
-                          : "Face: checking"
-                    }
-                  />
-                  <StatusBadge
-                    ok={lighting === "good" || lighting === "ok"}
-                    label={`Lighting: ${lighting}`}
-                  />
-                </div>
-              </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="border border-[color:var(--border)] bg-surface-subtle text-muted">
+            FPS {fps}
+          </Badge>
+          <Badge
+            className={
+              permission === "granted"
+                ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-700"
+                : permission === "denied"
+                  ? "border border-red-400/20 bg-red-500/10 text-red-700"
+                  : "border border-[color:var(--border)] bg-surface-subtle text-muted"
+            }
+          >
+            {permission === "granted"
+              ? "Permission OK"
+              : permission === "denied"
+                ? "Denied"
+                : "Not requested"}
+          </Badge>
+        </div>
+      </div>
 
-              <div className="relative aspect-video bg-black w-full">
-                <video
-                  ref={videoRef}
-                  className="h-full w-full object-cover opacity-95"
-                  playsInline
-                  muted
+      <div className="grid items-start gap-5 p-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+        <div className="space-y-5">
+          <div className="overflow-hidden rounded-[30px] border border-[color:var(--border)] bg-surface-subtle/50">
+            <div className="flex items-center justify-between border-b border-[color:var(--border)] px-4 py-3">
+              <div className="text-sm font-medium text-muted">Preview</div>
+
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge
+                  ok={face === "detected"}
+                  label={
+                    face === "detected"
+                      ? "Face: detected"
+                      : face === "not_detected"
+                        ? "Face: not detected"
+                        : "Face: checking"
+                  }
                 />
-
-                <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.4),transparent_24%,transparent_76%,rgba(0,0,0,0.2))]" />
-
-                {!running && (
-                  <div className="absolute inset-0 grid place-items-center">
-                    <div className="rounded-2xl border border-[color:var(--border)] bg-surface/90 px-5 py-3 text-sm text-fg backdrop-blur">
-                      Камера остановлена
-                    </div>
-                  </div>
-                )}
-
-                {running && (
-                  <>
-                    <div className="absolute left-4 top-4 rounded-xl border border-[color:var(--border)]/10 bg-surface-subtle/80 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-muted backdrop-blur">
-                      Live preview
-                    </div>
-
-                    <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
-                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
-                        camera on
-                      </Badge>
-                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
-                        {fps} fps
-                      </Badge>
-                      <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
-                        {previewReady ? "preview ready" : "loading preview"}
-                      </Badge>
-                    </div>
-                  </>
-                )}
+                <StatusBadge
+                  ok={lighting === "good" || lighting === "ok"}
+                  label={`Lighting: ${lighting}`}
+                />
               </div>
             </div>
 
-            <div className="flex flex-col gap-4">
-              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-[rgb(var(--primary))]" />
-                  <div className="text-sm font-semibold text-fg">Readiness</div>
-                </div>
+            <div className="relative aspect-[16/10] min-h-[280px] w-full bg-black sm:min-h-[340px] lg:min-h-[400px] xl:min-h-[460px]">
+              <video
+                ref={videoRef}
+                className="h-full w-full object-cover opacity-95"
+                playsInline
+                muted
+              />
 
-                <div className="mt-4 space-y-3">
-                  <Signal
-                    label="Camera permission"
-                    value={
-                      permission === "granted"
-                        ? "Granted"
-                        : permission === "denied"
-                          ? "Denied"
-                          : "Not requested"
-                    }
-                    ok={permission === "granted"}
-                  />
-                  <Signal
-                    label="Preview"
-                    value={previewReady ? "Ready" : "Not ready"}
-                    ok={previewReady}
-                  />
-                  <Signal
-                    label="Face detection"
-                    value={
-                      face === "detected"
-                        ? "Detected"
-                        : face === "not_detected"
-                          ? "Not detected"
-                          : "Checking"
-                    }
-                    ok={face === "detected" || face === "unknown"}
-                  />
-                  <Signal
-                    label="Lighting"
-                    value={lighting}
-                    ok={lighting === "good" || lighting === "ok"}
-                  />
-                  <Signal label="FPS target" value={`${fps} fps`} ok />
-                </div>
-              </div>
+              <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.4),transparent_24%,transparent_76%,rgba(0,0,0,0.2))]" />
 
-              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={16} className="text-[rgb(var(--success))]" />
-                  <div className="text-sm font-semibold text-fg">Privacy note</div>
-                </div>
-
-                <div className="mt-3 text-sm leading-relaxed text-muted">
-                  Передача идёт только после вашего действия. Для live-аналитики не
-                  сохраняется исходное видео, а только агрегированные сигналы.
-                </div>
-              </div>
-
-              {errorText && (
-                <div className="rounded-[20px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
-                  {errorText}
+              {!running && (
+                <div className="absolute inset-0 grid place-items-center">
+                  <div className="rounded-2xl border border-[color:var(--border)] bg-surface/90 px-5 py-3 text-sm text-fg backdrop-blur">
+                    Камера остановлена
+                  </div>
                 </div>
               )}
 
-              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
-                <div className="flex flex-wrap gap-2">
-                  {!running ? (
-                    <Button onClick={start} className="gap-2">
-                      <Play size={16} />
-                      Start camera
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={stop}
-                      className="gap-2 border-[color:var(--border)] bg-surface-subtle text-muted hover:bg-surface-subtle/80"
-                    >
-                      <Square size={16} />
-                      Stop camera
-                    </Button>
-                  )}
+              {running && (
+                <>
+                  <div className="absolute left-4 top-4 rounded-xl border border-[color:var(--border)]/10 bg-surface-subtle/80 px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-muted backdrop-blur">
+                    Live preview
+                  </div>
 
-                  <Button
-                    onClick={() => {
-                      if (ready) onStart?.();
-                    }}
-                    disabled={!ready}
-                    className="gap-2"
-                  >
-                    <ArrowRight size={16} />
-                    Continue to live
-                  </Button>
-                </div>
-
-                <div className="mt-3 text-xs text-muted">
-                  Continue станет доступна, когда камера запущена, preview готов и
-                  освещение не слишком плохое.
-                </div>
-              </div>
-
-              <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
-                <div className="flex items-center gap-2">
-                  <MonitorUp size={16} className="text-sky-500" />
-                  <div className="text-sm font-semibold text-fg">Before join</div>
-                </div>
-
-                <ul className="mt-3 space-y-2 text-sm text-muted">
-                  <li>Сядьте напротив источника света.</li>
-                  <li>Держите лицо в центре кадра.</li>
-                  <li>Проверьте, что браузер не блокирует доступ к камере.</li>
-                </ul>
-              </div>
+                  <div className="absolute bottom-4 left-4 flex flex-wrap gap-2">
+                    <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
+                      camera on
+                    </Badge>
+                    <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
+                      {fps} fps
+                    </Badge>
+                    <Badge className="border border-[color:var(--border)] bg-surface-subtle/80 text-muted">
+                      {previewReady ? "preview ready" : "loading preview"}
+                    </Badge>
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="text-[rgb(var(--success))]" />
+                <div className="text-sm font-semibold text-fg">Privacy note</div>
+              </div>
+
+              <div className="mt-3 text-sm leading-relaxed text-muted">
+                Передача идёт только после вашего действия. Для live-аналитики не
+                сохраняется исходное видео, а только агрегированные сигналы.
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
+              <div className="flex items-center gap-2">
+                <MonitorUp size={16} className="text-sky-500" />
+                <div className="text-sm font-semibold text-fg">Before join</div>
+              </div>
+
+              <ul className="mt-3 space-y-2 text-sm text-muted">
+                <li>Сядьте напротив источника света.</li>
+                <li>Держите лицо в центре кадра.</li>
+                <li>Проверьте, что браузер не блокирует доступ к камере.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-[rgb(var(--primary))]" />
+              <div className="text-sm font-semibold text-fg">Readiness</div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <Signal
+                label="Camera permission"
+                value={
+                  permission === "granted"
+                    ? "Granted"
+                    : permission === "denied"
+                      ? "Denied"
+                      : "Not requested"
+                }
+                ok={permission === "granted"}
+              />
+              <Signal
+                label="Preview"
+                value={previewReady ? "Ready" : "Not ready"}
+                ok={previewReady}
+              />
+              <Signal
+                label="Face detection"
+                value={
+                  face === "detected"
+                    ? "Detected"
+                    : face === "not_detected"
+                      ? "Not detected"
+                      : "Checking"
+                }
+                ok={face === "detected" || face === "unknown"}
+              />
+              <Signal
+                label="Lighting"
+                value={lighting}
+                ok={lighting === "good" || lighting === "ok"}
+              />
+              <Signal label="FPS target" value={`${fps} fps`} ok />
+            </div>
+          </div>
+
+          {errorText && (
+            <div className="rounded-[20px] border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-700">
+              {errorText}
+            </div>
+          )}
+
+          <div className="rounded-[24px] border border-[color:var(--border)] bg-surface-subtle/50 p-4">
+            <div className="flex flex-wrap gap-2">
+              {!running ? (
+                <Button onClick={start} className="gap-2">
+                  <Play size={16} />
+                  Start camera
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={stop}
+                  className="gap-2 border-[color:var(--border)] bg-surface-subtle text-muted hover:bg-surface-subtle/80"
+                >
+                  <Square size={16} />
+                  Stop camera
+                </Button>
+              )}
+
+              <Button
+                onClick={() => {
+                  if (ready) onStart?.();
+                }}
+                disabled={!ready}
+                className="gap-2"
+              >
+                <ArrowRight size={16} />
+                Continue to live
+              </Button>
+            </div>
+
+            <div className="mt-3 text-xs text-muted">
+              Continue станет доступна, когда камера запущена, preview готов и
+              освещение не слишком плохое.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

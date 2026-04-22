@@ -70,6 +70,12 @@ export default function UnifiedProfilePage() {
   // Security Form State
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
 
   // Notifications State
   const [notifSettings, setNotifSettings] = useState<any>(null);
@@ -82,6 +88,8 @@ export default function UnifiedProfilePage() {
   // Integrations State
   const [integrations, setIntegrations] = useState<any[]>([]);
   const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [authSessions, setAuthSessions] = useState<any[] | null>(null);
+  const [loadingAuthSessions, setLoadingAuthSessions] = useState(false);
 
   const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
   const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
@@ -181,6 +189,18 @@ export default function UnifiedProfilePage() {
     }
   }, [activeTab, integrations.length]);
 
+  useEffect(() => {
+    if (activeTab !== "active_sessions" || authSessions || !isApiAvailable()) return;
+    setLoadingAuthSessions(true);
+    api.get<any>("auth/sessions")
+      .then((data) => {
+        const list = Array.isArray(data) ? data : Array.isArray(data?.sessions) ? data.sessions : [];
+        setAuthSessions(list);
+      })
+      .catch(() => setAuthSessions([]))
+      .finally(() => setLoadingAuthSessions(false));
+  }, [activeTab, authSessions]);
+
   async function handleSaveProfile() {
       if (!isApiAvailable()) {
           setProfileMessage({ type: 'error', text: 'Нет подключения к API.' });
@@ -245,20 +265,151 @@ export default function UnifiedProfilePage() {
       });
 
       if (!res.ok) throw new Error("Ошибка загрузки аватара");
-      const data = await res.json();
-      
-      const newMe = { ...me!, avatarUrl: data.avatarUrl };
-      setMe(newMe);
+      const refreshed = await api.get<MeRes>("auth/me");
+      const avatarUrl = refreshed.avatarUrl || "/auth/avatar";
+      setMe(refreshed);
       const newVersion = Date.now();
       if (stored) {
-        setAuth({ ...stored, avatarUrl: data.avatarUrl });
+        setAuth({
+          ...stored,
+          avatarUrl,
+          firstName: refreshed.firstName ?? stored.firstName,
+          lastName: refreshed.lastName ?? stored.lastName,
+          fullName: refreshed.fullName ?? stored.fullName,
+        });
       }
-      ui.setUserInfo({ avatarUrl: data.avatarUrl, avatarVersion: newVersion });
+      ui.setUserInfo({
+        avatarUrl,
+        avatarVersion: newVersion,
+        firstName: refreshed.firstName ?? undefined,
+        lastName: refreshed.lastName ?? undefined,
+        fullName: refreshed.fullName ?? undefined,
+      });
       setProfileMessage({ type: 'success', text: 'Аватар успешно обновлен.' });
     } catch (err) {
       setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : "Ошибка загрузки" });
     } finally {
       setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!isApiAvailable()) {
+      setPasswordMessage({ type: "error", text: "Нет подключения к API." });
+      return;
+    }
+
+    const currentPasswordValue = currentPassword.trim() || window.prompt("Введите текущий пароль")?.trim() || "";
+    const newPasswordValue = newPassword.trim() || window.prompt("Введите новый пароль")?.trim() || "";
+    const confirmPasswordValue =
+      confirmNewPassword.trim() || window.prompt("Повторите новый пароль")?.trim() || "";
+
+    if (!currentPasswordValue || !newPasswordValue) {
+      setPasswordMessage({ type: "error", text: "Введите текущий и новый пароль." });
+      return;
+    }
+
+    if (newPasswordValue.length < 6) {
+      setPasswordMessage({ type: "error", text: "Новый пароль должен быть не менее 6 символов." });
+      return;
+    }
+
+    if (newPasswordValue !== confirmPasswordValue) {
+      setPasswordMessage({ type: "error", text: "Подтверждение пароля не совпадает." });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordMessage(null);
+    try {
+      const res = await api.put<{ message?: string }>("auth/change-password", {
+        currentPassword: currentPasswordValue,
+        newPassword: newPasswordValue,
+      });
+      setPasswordMessage({
+        type: "success",
+        text: res?.message || "Пароль успешно обновлён.",
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось изменить пароль.",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
+  async function handleLogoutAllSessions() {
+    if (!isApiAvailable()) return;
+    setIsLoggingOutAll(true);
+    try {
+      await api.post("auth/logout-all", {});
+      signOut();
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось завершить все сессии.",
+      });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!isApiAvailable()) {
+      setPasswordMessage({ type: "error", text: "Нет подключения к API." });
+      return;
+    }
+
+    const deletePasswordValue = deletePassword.trim() || window.prompt("Введите пароль для удаления аккаунта")?.trim() || "";
+
+    if (!deletePasswordValue) {
+      setPasswordMessage({ type: "error", text: "Введите пароль для удаления аккаунта." });
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const token = (await import("@/lib/api/client")).getToken();
+      const res = await fetch(`${(await import("@/lib/api/client")).getApiBaseUrl()}/auth/delete-account`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: deletePasswordValue }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || "Не удалось удалить аккаунт.");
+      }
+
+      signOut();
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось удалить аккаунт.",
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
+  async function handleTerminateSession(sessionId: string) {
+    if (!isApiAvailable()) return;
+    try {
+      await api.delete(`auth/sessions/${sessionId}`);
+      setAuthSessions((prev) => (prev || []).filter((session) => session.id !== sessionId));
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось завершить сессию.",
+      });
     }
   }
 
@@ -548,7 +699,7 @@ export default function UnifiedProfilePage() {
                               <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
                            </button>
 
-                           <button onClick={() => handleActionStub('Log Out All', 'auth/sessions/close-all')} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                           <button onClick={() => void handleLogoutAllSessions()} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
                               <div className="flex items-center gap-3">
                                 <Laptop size={16} className="text-[#7448FF]" />
                                 <div>
@@ -577,7 +728,7 @@ export default function UnifiedProfilePage() {
                                setIsChangingPassword(true);
                                setPasswordMessage(null);
                                try {
-                                   await api.post("auth/change-password", {});
+                                   await handleChangePassword();
                                } catch (e) {
                                    setPasswordMessage({ type: 'error', text: `API Endpoint Missing: POST /auth/change-password не поддержан.` });
                                } finally {
