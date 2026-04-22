@@ -16,6 +16,11 @@ export type SessionContent = {
   files: SessionContentFile[];
 };
 
+const unsupportedRoutes = {
+  content: false,
+  materials: false,
+};
+
 function normalizeFile(raw: any): SessionContentFile | null {
   const id = raw?.id ?? raw?.materialId ?? raw?.fileId;
   const title = raw?.title ?? raw?.name ?? raw?.fileName;
@@ -33,6 +38,7 @@ function normalizeFile(raw: any): SessionContentFile | null {
 
 export async function getSessionContent(sessionId: string): Promise<SessionContent | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
+  if (unsupportedRoutes.content) return null;
 
   try {
     const raw = await api.get<any>(`sessions/${sessionId}/content`);
@@ -61,19 +67,26 @@ export async function getSessionContent(sessionId: string): Promise<SessionConte
         .filter(Boolean),
       files: filesRaw.map(normalizeFile).filter((item: SessionContentFile | null): item is SessionContentFile => Boolean(item)),
     };
-  } catch {
+  } catch (error: any) {
+    if (error?.message?.includes("404")) {
+      unsupportedRoutes.content = true;
+    }
     return null;
   }
 }
 
 export async function getSessionMaterials(sessionId: string): Promise<SessionContentFile[] | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
+  if (unsupportedRoutes.materials) return null;
 
   try {
     const raw = await api.get<any[]>(`sessions/${sessionId}/materials`);
     if (!Array.isArray(raw)) return [];
     return raw.map(normalizeFile).filter((item: SessionContentFile | null): item is SessionContentFile => Boolean(item));
-  } catch {
+  } catch (error: any) {
+    if (error?.message?.includes("404")) {
+      unsupportedRoutes.materials = true;
+    }
     return null;
   }
 }

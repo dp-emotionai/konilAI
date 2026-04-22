@@ -35,6 +35,7 @@ type MeRes = {
   bio?: string | null; 
   phone?: string | null;
   organization?: string | null;
+  createdAt?: string;
 };
 type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
 
@@ -469,6 +470,17 @@ export default function UnifiedProfilePage() {
 
   const roleLabel = me?.role === 'teacher' ? 'Преподаватель' : me?.role === 'admin' ? 'Администратор' : 'Студент';
   
+  const accountStatusLabel =
+    me?.status === "APPROVED" || me?.status === "approved"
+      ? "Подтверждённый доступ"
+      : me?.status === "PENDING" || me?.status === "pending"
+        ? "Ожидает одобрения"
+        : me?.status === "LIMITED" || me?.status === "limited"
+          ? "Ограниченный доступ"
+          : me?.status === "BLOCKED" || me?.status === "blocked"
+            ? "Аккаунт заблокирован"
+            : "Статус не указан";
+
   const hasProfileChanges = formFirstName !== (me?.firstName || "") 
                             || formLastName !== (me?.lastName || "") 
                             || formBio !== (me?.bio || "")
@@ -476,6 +488,9 @@ export default function UnifiedProfilePage() {
                             || formOrganization !== (me?.organization || "");
 
   const displayAvatar = resolveAvatarUrl(me?.avatarUrl, ui.state.avatarVersion);
+  const memberSince = me?.createdAt
+    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(me.createdAt))
+    : "—";
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">
@@ -662,6 +677,14 @@ export default function UnifiedProfilePage() {
                    <div className="space-y-6">
                      <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
                         <h2 className="text-[15px] font-bold text-slate-900 mb-6">Статистика активности</h2>
+                        <div className="mb-4 rounded-2xl bg-purple-50 px-4 py-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7448FF]/70">
+                            Статус доступа
+                          </div>
+                          <div className="mt-1 text-[14px] font-semibold text-[#7448FF]">
+                            {accountStatusLabel}
+                          </div>
+                        </div>
                         <div className="space-y-5">
                           <div className="flex justify-between items-center text-[13px]">
                             <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> С нами с</div>
@@ -730,7 +753,7 @@ export default function UnifiedProfilePage() {
                                try {
                                    await handleChangePassword();
                                } catch (e) {
-                                   setPasswordMessage({ type: 'error', text: `API Endpoint Missing: POST /auth/change-password не поддержан.` });
+                                    setPasswordMessage({ type: 'error', text: e instanceof Error ? e.message : 'Не удалось изменить пароль.' });
                                } finally {
                                    setIsChangingPassword(false);
                                }
@@ -782,7 +805,7 @@ export default function UnifiedProfilePage() {
                       <div className="font-semibold text-[15px] text-slate-900 mb-1">Завершение сессий (безопасность)</div>
                       <div className="flex items-center justify-between mt-4">
                          <div className="text-[13px] text-slate-500 max-w-sm">Завершив все сессии, вы автоматически разлогините ваш аккаунт со всех устройств.</div>
-                         <button onClick={() => handleActionStub('Log Out Sessions', 'auth/sessions/close-all')} className="text-[13px] font-medium px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors">Выйти глобально</button>
+                         <button onClick={() => void handleLogoutAllSessions()} disabled={isLoggingOutAll} className="text-[13px] font-medium px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-60">{isLoggingOutAll ? 'Выходим...' : 'Выйти глобально'}</button>
                       </div>
                    </div>
 
@@ -793,12 +816,21 @@ export default function UnifiedProfilePage() {
                             <div className="text-[13px] text-slate-500 max-w-sm">Удалите свой аккаунт и все связанные данные без возможности восстановления. Осторожно.</div>
                          </div>
                          <button onClick={() => {
-                             if(confirm("Вы уверены? Это необратимо.")) {
-                                 handleActionStub('Delete Account', 'auth/me');
-                             }
-                         }} className="text-[13px] font-semibold px-5 py-2.5 bg-rose-500 text-white rounded-xl shadow-sm hover:bg-rose-600 transition-colors">Удалить аккаунт</button>
-                      </div>
-                   </div>
+                              if(confirm("Вы уверены? Это необратимо.")) {
+                                  void handleDeleteAccount();
+                              }
+                          }} disabled={isDeletingAccount} className="text-[13px] font-semibold px-5 py-2.5 bg-rose-500 text-white rounded-xl shadow-sm hover:bg-rose-600 transition-colors disabled:opacity-60">{isDeletingAccount ? 'Удаляем...' : 'Удалить аккаунт'}</button>
+                       </div>
+                       <div className="mt-4 max-w-sm">
+                         <input
+                           type="password"
+                           value={deletePassword}
+                           onChange={(e) => setDeletePassword(e.target.value)}
+                           placeholder="Пароль для подтверждения удаления"
+                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-rose-400 transition-colors"
+                         />
+                       </div>
+                    </div>
 
                 </div>
              )}
@@ -966,7 +998,64 @@ export default function UnifiedProfilePage() {
                 </div>
              )}
 
-             {["subscription", "active_sessions"].includes(activeTab) && (
+             {activeTab === "active_sessions" && (
+                <div className="max-w-4xl space-y-6">
+                   <div>
+                     <h2 className="text-[20px] font-bold text-slate-900 mb-2">Активные сессии</h2>
+                     <p className="text-[14px] text-slate-500">Устройства и браузеры, где ваш аккаунт сейчас авторизован.</p>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
+                     {loadingAuthSessions ? (
+                       <div className="flex items-center justify-center py-8 text-slate-400">
+                         <Loader2 className="h-6 w-6 animate-spin" />
+                       </div>
+                     ) : !authSessions?.length ? (
+                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                         Нет активных сессий для отображения.
+                       </div>
+                     ) : (
+                       authSessions.map((session) => (
+                         <div
+                           key={session.id}
+                           className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:flex-row md:items-center md:justify-between"
+                         >
+                           <div className="min-w-0">
+                             <div className="flex flex-wrap items-center gap-2">
+                               <div className="font-semibold text-slate-900">
+                                 {session.device || session.userAgent || "Текущее устройство"}
+                               </div>
+                               {session.isCurrent && (
+                                 <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                                   Текущая
+                                 </span>
+                               )}
+                             </div>
+                             <div className="mt-1 text-sm text-slate-500">
+                               {session.location || "Локация не определена"}
+                             </div>
+                             <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-400">
+                               <span>Создана: {session.createdAtFormatted || "—"}</span>
+                               <span>Последняя активность: {session.lastUsedAtFormatted || "—"}</span>
+                               <span>Истекает: {session.expiresAtFormatted || "—"}</span>
+                             </div>
+                           </div>
+                           {!session.isCurrent && (
+                             <button
+                               onClick={() => void handleTerminateSession(session.id)}
+                               className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                             >
+                               Завершить
+                             </button>
+                           )}
+                         </div>
+                       ))
+                     )}
+                   </div>
+                </div>
+             )}
+
+             {activeTab === "subscription" && (
                 <div className="p-8 h-full min-h-[500px] flex flex-col items-center justify-center text-center">
                    <Blocks size={64} className="text-slate-200 mb-6" strokeWidth={1} />
                    <h2 className="text-xl font-bold text-slate-900 mb-2">Раздел в разработке</h2>

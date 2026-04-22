@@ -1,10 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Github, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { api } from "@/lib/api/client";
-import { extractAuthSession, type AuthApiResponse, type AuthSession } from "@/lib/auth/authSession";
+import {
+  extractAuthSession,
+  type AuthApiResponse,
+  type AuthSession,
+} from "@/lib/auth/authSession";
 import { cn } from "@/lib/cn";
 
 declare global {
@@ -39,19 +43,9 @@ const DEFAULT_GOOGLE_CLIENT_ID =
   "759710816012-1p8dt2svf2kmboe4idlrl4gi3skoqjo8.apps.googleusercontent.com";
 
 function getGoogleClientId() {
-  return (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID).trim();
-}
-
-function buildGithubStartUrl(role?: "student" | "teacher" | null): string | null {
-  if (typeof window === "undefined") return null;
-
-  const explicit = process.env.NEXT_PUBLIC_GITHUB_AUTH_START_URL?.trim();
-  if (!explicit) return null;
-
-  const url = new URL(explicit);
-  if (role) url.searchParams.set("role", role);
-  url.searchParams.set("returnTo", `${window.location.origin}/auth/social/callback`);
-  return url.toString();
+  return (
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID
+  ).trim();
 }
 
 export function SocialAuthButtons({
@@ -62,13 +56,19 @@ export function SocialAuthButtons({
   className,
 }: SocialAuthButtonsProps) {
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleInitializedRef = useRef(false);
+  const successRef = useRef(onSuccess);
+  const errorRef = useRef(onError);
   const googleClientId = getGoogleClientId();
   const [googleReady, setGoogleReady] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
-  const [githubBusy, setGithubBusy] = useState(false);
 
   const roleRequiredButMissing = mode === "register" && !role;
-  const githubStartUrl = useMemo(() => buildGithubStartUrl(role), [role]);
+
+  useEffect(() => {
+    successRef.current = onSuccess;
+    errorRef.current = onError;
+  }, [onError, onSuccess]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !googleClientId) return;
@@ -82,7 +82,7 @@ export function SocialAuthButtons({
     script.async = true;
     script.defer = true;
     script.onload = () => setGoogleReady(true);
-    script.onerror = () => onError("Не удалось загрузить Google Sign-In.");
+    script.onerror = () => errorRef.current("Не удалось загрузить Google Sign-In.");
     document.head.appendChild(script);
 
     return () => {
@@ -98,37 +98,42 @@ export function SocialAuthButtons({
 
     googleButtonRef.current.innerHTML = "";
 
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      ux_mode: "popup",
-      callback: async ({ credential }) => {
-        if (!credential) {
-          onError("Google не вернул credential.");
-          return;
-        }
+    if (!googleInitializedRef.current) {
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        ux_mode: "popup",
+        callback: async ({ credential }) => {
+          if (!credential) {
+            errorRef.current("Google не вернул credential.");
+            return;
+          }
 
-        if (roleRequiredButMissing) {
-          onError("Сначала выберите роль для регистрации.");
-          return;
-        }
+          if (roleRequiredButMissing) {
+            errorRef.current("Сначала выберите роль для регистрации.");
+            return;
+          }
 
-        setGoogleBusy(true);
-        onError("");
+          setGoogleBusy(true);
+          errorRef.current("");
 
-        try {
-          const data = await api.post<AuthApiResponse>("auth/google", {
-            credential,
-            role: role ?? "student",
-          });
+          try {
+            const data = await api.post<AuthApiResponse>("auth/google", {
+              credential,
+              role: role ?? "student",
+            });
 
-          onSuccess(extractAuthSession(data));
-        } catch (error) {
-          onError(error instanceof Error ? error.message : "Google вход не удался.");
-        } finally {
-          setGoogleBusy(false);
-        }
-      },
-    });
+            successRef.current(extractAuthSession(data));
+          } catch (error) {
+            errorRef.current(
+              error instanceof Error ? error.message : "Google вход не удался."
+            );
+          } finally {
+            setGoogleBusy(false);
+          }
+        },
+      });
+      googleInitializedRef.current = true;
+    }
 
     window.google.accounts.id.renderButton(googleButtonRef.current, {
       theme: "outline",
@@ -138,22 +143,7 @@ export function SocialAuthButtons({
       text: mode === "register" ? "signup_with" : "continue_with",
       logo_alignment: "left",
     });
-  }, [googleClientId, googleReady, mode, onError, onSuccess, role, roleRequiredButMissing]);
-
-  const handleGithubClick = () => {
-    if (roleRequiredButMissing) {
-      onError("Сначала выберите роль для регистрации.");
-      return;
-    }
-
-    if (!githubStartUrl) {
-      onError("GitHub вход пока не настроен на backend. Нужен route /auth/github/start.");
-      return;
-    }
-
-    setGithubBusy(true);
-    window.location.assign(githubStartUrl);
-  };
+  }, [googleClientId, googleReady, mode, role, roleRequiredButMissing]);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -161,38 +151,26 @@ export function SocialAuthButtons({
         {mode === "register" ? "Создать аккаунт через" : "Продолжить через"}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div
-          className={cn(
-            "min-h-[44px] min-w-[220px]",
-            roleRequiredButMissing && "pointer-events-none opacity-50"
-          )}
-        >
-          {googleBusy ? (
-            <div className="flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-medium text-slate-500">
-              <Loader2 size={16} className="mr-2 animate-spin" />
-              Подключаем Google...
-            </div>
-          ) : (
-            <div ref={googleButtonRef} />
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={handleGithubClick}
-          disabled={githubBusy || roleRequiredButMissing}
-          className={cn(
-            "inline-flex h-11 min-w-[220px] items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          )}
-        >
-          {githubBusy ? <Loader2 size={16} className="animate-spin" /> : <Github size={16} />}
-          GitHub
-        </button>
+      <div
+        className={cn(
+          "min-h-[44px] min-w-[220px]",
+          roleRequiredButMissing && "pointer-events-none opacity-50"
+        )}
+      >
+        {googleBusy ? (
+          <div className="flex h-11 items-center justify-center rounded-full border border-slate-200 bg-white text-sm font-medium text-slate-500">
+            <Loader2 size={16} className="mr-2 animate-spin" />
+            Подключаем Google...
+          </div>
+        ) : (
+          <div ref={googleButtonRef} />
+        )}
       </div>
 
       {mode === "register" && roleRequiredButMissing && (
-        <p className="text-xs text-slate-400">Для social-регистрации сначала выберите роль.</p>
+        <p className="text-xs text-slate-400">
+          Для регистрации через Google сначала выберите роль.
+        </p>
       )}
     </div>
   );

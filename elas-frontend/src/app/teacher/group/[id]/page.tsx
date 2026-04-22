@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
@@ -12,7 +12,7 @@ import Modal from "@/components/ui/Modal";
 import { Card, CardContent } from "@/components/ui/Card";
 import Input from "@/components/ui/Input";
 import { cn } from "@/lib/cn";
-import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
+import { getApiBaseUrl, getToken, hasAuth } from "@/lib/api/client";
 import {
   createInvitations,
   getGroupById as getGroupByIdApi,
@@ -257,6 +257,8 @@ export default function TeacherGroupDetailPage() {
   const [editingDesc, setEditingDesc] = useState(false);
   const [localName, setLocalName] = useState("");
   const [localDescription, setLocalDescription] = useState("");
+  const [groupImageMessage, setGroupImageMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
+  const [uploadingGroupImage, setUploadingGroupImage] = useState(false);
 
   const [groupInvitations, setGroupInvitations] = useState<GroupInvitationRow[]>([]);
   const [groupMembers, setGroupMembers] = useState<GroupMemberRow[]>([]);
@@ -283,6 +285,7 @@ export default function TeacherGroupDetailPage() {
     memberId: string;
     memberName: string;
   } | null>(null);
+  const groupImageInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!apiAvailable || !id) {
@@ -311,6 +314,57 @@ export default function TeacherGroupDetailPage() {
   const pendingCount = groupInvitations.filter((i) => i.status === "pending").length;
 
   const refetchGroup = () => setTick((x) => x + 1);
+
+  const handleGroupImageUpload = async (file?: File | null) => {
+    if (!file) return;
+
+    if (!apiAvailable) {
+      setGroupImageMessage({
+        type: "error",
+        text: "Backend недоступен. Загрузка фото группы станет активной после подключения API.",
+      });
+      return;
+    }
+
+    setUploadingGroupImage(true);
+    setGroupImageMessage(null);
+
+    try {
+      const base = getApiBaseUrl();
+      const token = getToken();
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await fetch(`${base}/groups/${id}/image`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const message = response.status === 404 || response.status === 405
+          ? "Backend ещё не поддерживает upload фото группы. Нужен endpoint POST /groups/:id/image."
+          : "Не удалось загрузить фото группы.";
+        throw new Error(message);
+      }
+
+      setGroupImageMessage({
+        type: "success",
+        text: "Фото группы обновлено. Если backend вернул новый imageUrl, карточка обновится сразу.",
+      });
+      refetchGroup();
+    } catch (error) {
+      setGroupImageMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Не удалось загрузить фото группы.",
+      });
+    } finally {
+      setUploadingGroupImage(false);
+      if (groupImageInputRef.current) {
+        groupImageInputRef.current.value = "";
+      }
+    }
+  };
 
   const openInviteModal = () => {
     setInviteOpen(true);
@@ -470,6 +524,14 @@ export default function TeacherGroupDetailPage() {
           <CardContent className="relative -mt-16 px-6 pb-6 md:-mt-20 md:px-8 md:pb-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
               <div className="flex min-w-0 items-end gap-4">
+                <input
+                  ref={groupImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => void handleGroupImageUpload(event.target.files?.[0] ?? null)}
+                  disabled={uploadingGroupImage}
+                />
                 {groupImageUrl ? (
                   <div className="relative group/avatar">
                     <div
@@ -543,10 +605,30 @@ export default function TeacherGroupDetailPage() {
                     {group.program} · {membersCount} студентов
                     {apiAvailable && pendingCount > 0 && ` · ${pendingCount} приглашений`}
                   </p>
+                  {groupImageMessage && (
+                    <p
+                      className={cn(
+                        "mt-2 text-xs font-medium",
+                        groupImageMessage.type === "error" ? "text-rose-500" : "text-emerald-600"
+                      )}
+                    >
+                      {groupImageMessage.text}
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="sm:ml-auto flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 rounded-xl"
+                  onClick={() => groupImageInputRef.current?.click()}
+                  disabled={uploadingGroupImage}
+                >
+                  <ImagePlus size={16} />
+                  {uploadingGroupImage ? "Загрузка..." : "Фото группы"}
+                </Button>
                 {apiAvailable && (
                   <Button
                     size="sm"

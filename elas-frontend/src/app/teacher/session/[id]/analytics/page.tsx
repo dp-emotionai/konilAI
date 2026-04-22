@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { useParams } from "next/navigation";
 import {
@@ -59,6 +59,12 @@ const ENGAGEMENT_COLOR = "rgb(var(--primary))";
 const STRESS_COLOR = "rgb(239, 68, 68)";
 
 function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    setChartReady(true);
+  }, []);
+
   if (!data?.length) {
     return (
       <Card variant="elevated" className="overflow-hidden">
@@ -90,7 +96,8 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
         <div className="mb-4 text-sm font-medium uppercase tracking-wider text-muted">
           Вовлечённость и стресс по времени
         </div>
-        <div className="mt-4 h-52">
+        <div className="mt-4 h-52 min-w-0">
+          {chartReady ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={chartData}
@@ -143,6 +150,11 @@ function TimelineChart({ data }: { data: SessionAnalytics["timeline"] }) {
               )}
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="flex h-full items-center justify-center rounded-2xl border border-[color:var(--border)] bg-surface-subtle/30 text-sm text-muted">
+              Готовим график…
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

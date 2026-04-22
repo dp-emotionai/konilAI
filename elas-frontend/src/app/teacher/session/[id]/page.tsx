@@ -289,9 +289,14 @@ export default function TeacherLiveMonitorPage() {
   const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
   const [activeTab, setActiveTab] = useState<"board" | "materials" | "notes">("board");
   const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
+  const [chartReady, setChartReady] = useState(false);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const wsUrl = getWsBaseUrl();
+
+  useEffect(() => {
+    setChartReady(true);
+  }, []);
   const roomId = sessionId;
   const isLive = phase === "live";
 
@@ -1141,6 +1146,7 @@ export default function TeacherLiveMonitorPage() {
                   <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col">
                     {hasMl && metricsHistory.length > 0 ? (
                       <div className="relative h-[180px] min-h-[180px] w-full min-w-0 overflow-hidden">
+                        {chartReady ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={metricsHistory}>
                             <defs>
@@ -1174,6 +1180,11 @@ export default function TeacherLiveMonitorPage() {
                             />
                           </AreaChart>
                         </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[13px] font-bold text-slate-300">
+                            Готовим график...
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex-1 flex items-center justify-center text-[13px] font-bold text-slate-300">

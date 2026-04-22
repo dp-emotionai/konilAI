@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -18,6 +18,11 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
     { revalidateOnFocus: false }
   );
   const [exporting, setExporting] = useState(false);
+  const [chartReady, setChartReady] = useState(false);
+
+  useEffect(() => {
+    setChartReady(true);
+  }, []);
 
   const loading = isLoading;
   const hasError = Boolean(error);
@@ -77,7 +82,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                 </div>
               </div>
 
-              {data.engagementTrend && data.engagementTrend.length > 0 ? (
+              {chartReady && data.engagementTrend && data.engagementTrend.length > 0 ? (
                 <div className="rounded-2xl border border-[color:var(--border)]/20 dark:border-[color:var(--border)] bg-surface-subtle/20 dark:bg-surface-subtle/50 p-4 md:p-6">
                   <div className="text-sm font-medium uppercase tracking-wider text-muted mb-4">Динамика вовлечённости</div>
                   <div className="h-56">

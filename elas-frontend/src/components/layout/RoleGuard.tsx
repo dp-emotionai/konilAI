@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useUI } from "@/components/layout/Providers";
 import type { Role } from "@/lib/roles";
 import { getStoredAuth, type UserStatus } from "@/lib/api/client";
@@ -66,7 +66,11 @@ export default function RoleGuard({
     return rules.find((r) => safePathname.startsWith(r.prefix)) ?? null;
   }, [safePathname]);
 
-  const storedAuth = useMemo(() => getStoredAuth(), []);
+  const [storedAuth, setStoredAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
+
+  useEffect(() => {
+    setStoredAuth(getStoredAuth());
+  }, []);
   const effectiveLoggedIn = state.loggedIn || Boolean(storedAuth?.token);
   const effectiveRole = normalizeRole(state.role) ?? normalizeRole(storedAuth?.role);
   const effectiveStatus =

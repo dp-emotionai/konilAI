@@ -89,7 +89,7 @@ export function GroupMessagesWorkspace({
   emptyGroupsTitle,
   emptyGroupsDescription,
 }: GroupMessagesWorkspaceProps) {
-  const auth = useMemo(() => getStoredAuth(), []);
+  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
   const [search, setSearch] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<MessagesTab>("chat");
@@ -110,6 +110,10 @@ export function GroupMessagesWorkspace({
       return haystack.includes(query);
     });
   }, [groups, search]);
+
+  useEffect(() => {
+    setAuth(getStoredAuth());
+  }, []);
 
   useEffect(() => {
     if (!filteredGroups.length) {
