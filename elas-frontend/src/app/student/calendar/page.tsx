@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getStudentSessionsList, type StudentSessionRow } from "@/lib/api/student";
+import { getCalendarEvents, type CalendarEvent } from "@/lib/api/calendar";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 import {
   buildMonthCells,
@@ -38,14 +38,24 @@ const MONTHS = [
 
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-function statusLabel(status: StudentSessionRow["status"]) {
+function statusLabel(status: string) {
+  const v = typeof status === "string" ? status.trim().toLowerCase() : "";
+  if (!v) return "Событие";
+  if (v === "session") return "Сессия";
+  return status;
   if (status === "live") return "Активная";
   if (status === "ended") return "Завершена";
   return "Запланирована";
 }
 
+function eventLabel(event: CalendarEvent) {
+  if (event.sessionId) return "Сессия";
+  if (typeof event.kind === "string" && event.kind.trim()) return event.kind;
+  return "Событие";
+}
+
 export default function StudentCalendarPage() {
-  const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -61,9 +71,9 @@ export default function StudentCalendarPage() {
       return;
     }
 
-    getStudentSessionsList()
-      .then(setSessions)
-      .catch(() => setSessions([]))
+    getCalendarEvents()
+      .then(setEvents)
+      .catch(() => setEvents([]))
       .finally(() => setLoading(false));
   }, [apiAvailable]);
 
@@ -71,26 +81,26 @@ export default function StudentCalendarPage() {
 
   const scheduledSessions = useMemo(
     () =>
-      sessions
-        .map((session) => ({
-          session,
-          scheduledAt: parseSessionTimestamp(session.scheduledAt ?? session.date),
+      events
+        .map((event) => ({
+          event,
+          scheduledAt: parseSessionTimestamp(event.startsAt),
         }))
         .filter(
           (
             item
           ): item is {
-            session: StudentSessionRow;
+            event: CalendarEvent;
             scheduledAt: Date;
           } => Boolean(item.scheduledAt)
         )
         .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime()),
-    [sessions]
+    [events]
   );
 
   const unscheduledSessions = useMemo(
-    () => sessions.filter((session) => !parseSessionTimestamp(session.scheduledAt ?? session.date)),
-    [sessions]
+    () => events.filter((event) => !parseSessionTimestamp(event.startsAt)),
+    [events]
   );
 
   const selectedDaySessions = useMemo(
@@ -229,12 +239,12 @@ export default function StudentCalendarPage() {
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      {daySessions.slice(0, 2).map(({ session, scheduledAt }) => (
+                      {daySessions.slice(0, 2).map(({ event, scheduledAt }) => (
                         <div
-                          key={session.id}
+                          key={event.id}
                           className="truncate rounded-xl bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 shadow-sm"
                         >
-                          <div className="truncate text-slate-900">{session.title}</div>
+                          <div className="truncate text-slate-900">{event.title}</div>
                           <div className="mt-0.5 text-slate-400">
                             {formatSessionTime(scheduledAt.toISOString())}
                           </div>
@@ -280,32 +290,31 @@ export default function StudentCalendarPage() {
                     Загрузка календаря...
                   </div>
                 ) : selectedDaySessions.length > 0 ? (
-                  selectedDaySessions.map(({ session, scheduledAt }) => (
+                  selectedDaySessions.map(({ event, scheduledAt }) => (
                     <Link
-                      key={session.id}
-                      href={`/student/session/${session.id}`}
+                      key={event.id}
+                      href={event.sessionId ? `/student/session/${event.sessionId}` : "#"}
+                      onClick={(e) => {
+                        if (!event.sessionId) e.preventDefault();
+                      }}
                       className="block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate font-semibold text-slate-900">
-                            {session.title}
+                            {event.title}
                           </div>
                           <div className="mt-1 text-sm text-slate-500">
-                            {session.teacher || "Преподаватель не указан"}
+                            {event.sessionId ? `Session: ${event.sessionId}` : event.kind || "Событие"}
                           </div>
                         </div>
                         <span
                           className={cn(
                             "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                            session.status === "live"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : session.status === "ended"
-                              ? "bg-slate-100 text-slate-500"
-                              : "bg-amber-50 text-amber-600"
+                            event.sessionId ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
                           )}
                         >
-                          {statusLabel(session.status)}
+                          {event.sessionId ? "Сессия" : statusLabel(event.kind || "")}
                         </span>
                       </div>
 
@@ -316,7 +325,7 @@ export default function StudentCalendarPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <VideoIcon size={14} className="text-slate-400" />
-                          {session.type === "exam" ? "Экзамен" : "Лекция"}
+                          {eventLabel(event)}
                         </span>
                       </div>
                     </Link>
@@ -350,14 +359,14 @@ export default function StudentCalendarPage() {
 
               <div className="mt-4 space-y-3">
                 {unscheduledSessions.length > 0 ? (
-                  unscheduledSessions.map((session) => (
+                  unscheduledSessions.map((event) => (
                     <div
-                      key={session.id}
+                      key={event.id}
                       className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4"
                     >
-                      <div className="font-medium text-slate-900">{session.title}</div>
+                      <div className="font-medium text-slate-900">{event.title}</div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {session.teacher || "Преподаватель не указан"}
+                        {event.kind || "Событие"}
                       </div>
                     </div>
                   ))

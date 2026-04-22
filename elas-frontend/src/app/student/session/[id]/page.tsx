@@ -36,6 +36,13 @@ import {
   type SessionContent,
   type SessionContentFile,
 } from "@/lib/api/sessionContent";
+import { getMaterialDownload, resolveDownloadUrl } from "@/lib/api/materials";
+import {
+  getSessionPresence,
+  joinSessionPresence,
+  leaveSessionPresence,
+  type SessionPresenceRow,
+} from "@/lib/api/presence";
 
 import CameraCheck from "@/components/session/CameraCheck";
 import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
@@ -268,8 +275,40 @@ export default function StudentJoinSessionPage() {
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
 
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!apiAvailable || !sessionId || !live) {
+      setPresence([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    let closed = false;
+
+    void joinSessionPresence(sessionId, { signal: controller.signal }).catch(() => {});
+
+    const load = async () => {
+      try {
+        const list = await getSessionPresence(sessionId, { signal: controller.signal });
+        if (!closed) setPresence(Array.isArray(list) ? list : []);
+      } catch {
+        if (!closed) setPresence([]);
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 5000);
+
+    return () => {
+      closed = true;
+      window.clearInterval(interval);
+      controller.abort();
+      void leaveSessionPresence(sessionId).catch(() => {});
+    };
+  }, [apiAvailable, live, sessionId]);
 
   const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
   const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
@@ -852,14 +891,25 @@ export default function StudentJoinSessionPage() {
                         ) : (
                           <div className="grid gap-3">
                             {sessionFiles.map((file) => (
-                              <a
+                              <button
                                 key={file.id}
-                                href={file.url || undefined}
-                                target={file.url ? "_blank" : undefined}
-                                rel={file.url ? "noreferrer" : undefined}
+                                type="button"
+                                onClick={async () => {
+                                  const direct = file.url?.trim();
+                                  if (direct) {
+                                    window.open(direct, "_blank", "noreferrer");
+                                    return;
+                                  }
+
+                                  const info = await getMaterialDownload(file.id);
+                                  const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                  if (url) {
+                                    window.open(url, "_blank", "noreferrer");
+                                  }
+                                }}
                                 className={cn(
                                   "rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4 text-left transition",
-                                  file.url ? "hover:bg-slate-50" : "cursor-default"
+                                  "hover:bg-slate-50"
                                 )}
                               >
                                 <div className="flex items-start gap-3">
@@ -873,14 +923,14 @@ export default function StudentJoinSessionPage() {
                                     <div className="mt-1 text-xs text-slate-500">
                                       {file.fileName || "Файл сессии"}
                                     </div>
-                                    {!file.url && (
+                                    {false && (
                                       <div className="mt-2 text-xs text-amber-600">
                                         Backend ещё не вернул ссылку на скачивание.
                                       </div>
                                     )}
                                   </div>
                                 </div>
-                              </a>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -951,14 +1001,25 @@ export default function StudentJoinSessionPage() {
                         ) : sessionFiles.length > 0 ? (
                           <div className="space-y-3">
                             {sessionFiles.map((file) => (
-                              <a
+                              <button
                                 key={file.id}
-                                href={file.url || undefined}
-                                target={file.url ? "_blank" : undefined}
-                                rel={file.url ? "noreferrer" : undefined}
+                                type="button"
+                                onClick={async () => {
+                                  const direct = file.url?.trim();
+                                  if (direct) {
+                                    window.open(direct, "_blank", "noreferrer");
+                                    return;
+                                  }
+
+                                  const info = await getMaterialDownload(file.id);
+                                  const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                  if (url) {
+                                    window.open(url, "_blank", "noreferrer");
+                                  }
+                                }}
                                 className={cn(
                                   "flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition",
-                                  file.url ? "hover:bg-slate-50" : "cursor-default"
+                                  "hover:bg-slate-50"
                                 )}
                               >
                                 <div className="rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
@@ -970,7 +1031,7 @@ export default function StudentJoinSessionPage() {
                                     {file.fileName || "Файл сессии"}
                                   </div>
                                 </div>
-                              </a>
+                              </button>
                             ))}
                           </div>
                         ) : (
@@ -1042,6 +1103,36 @@ export default function StudentJoinSessionPage() {
                   <div>
                     <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
                     <div className="flex flex-col gap-3">
+                      {presence.length > 0 && (
+                        <div className="space-y-2">
+                          {presence.map((p) => (
+                            <div
+                              key={p.userId}
+                              className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate text-[13px] font-semibold text-slate-900">
+                                  {p.fullName || p.email || p.userId}
+                                </div>
+                                <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                  {p.email || ""}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                <span
+                                  className={cn(
+                                    "h-2 w-2 rounded-full",
+                                    p.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                                  )}
+                                />
+                                <span className={p.status === "online" ? "text-emerald-600" : "text-slate-500"}>
+                                  {p.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
                         <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
                           👩🏻‍🏫

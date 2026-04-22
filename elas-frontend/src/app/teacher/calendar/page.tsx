@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, VideoIcon } from "lucide-react";
 
-import { getTeacherAllSessions, type GroupSession } from "@/lib/api/teacher";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Modal from "@/components/ui/Modal";
+
+import { getTeacherGroups, type TeacherGroup } from "@/lib/api/teacher";
+import { createCalendarEvent, deleteCalendarEvent, getCalendarEvents, type CalendarEvent } from "@/lib/api/calendar";
 import {
   buildMonthCells,
   formatSessionDateTime,
@@ -32,20 +37,29 @@ const MONTHS = [
 
 const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-function statusLabel(status: GroupSession["status"]) {
+function statusLabel(value: string) {
+  const status = value;
   if (status === "live") return "Активная";
   if (status === "ended") return "Завершена";
   return "Запланирована";
 }
 
-function sessionHref(session: GroupSession) {
-  return session.status === "ended"
-    ? `/teacher/session/${session.id}/analytics`
-    : `/teacher/session/${session.id}`;
+function eventHref(event: CalendarEvent) {
+  return event.sessionId ? `/teacher/session/${event.sessionId}` : "#";
 }
 
 export default function TeacherCalendarPage() {
-  const [sessions, setSessions] = useState<GroupSession[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [groups, setGroups] = useState<TeacherGroup[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    title: "",
+    kind: "session",
+    groupId: "",
+    sessionId: "",
+    startsAt: "",
+    endsAt: "",
+  });
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -54,36 +68,53 @@ export default function TeacherCalendarPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getTeacherAllSessions()
-      .then(setSessions)
-      .catch(() => setSessions([]))
-      .finally(() => setLoading(false));
+    let mounted = true;
+    setLoading(true);
+
+    Promise.all([getCalendarEvents(), getTeacherGroups()])
+      .then(([ev, gr]) => {
+        if (!mounted) return;
+        setEvents(Array.isArray(ev) ? ev : []);
+        setGroups(Array.isArray(gr) ? gr : []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setEvents([]);
+        setGroups([]);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const monthCells = useMemo(() => buildMonthCells(currentDate), [currentDate]);
 
   const scheduledSessions = useMemo(
     () =>
-      sessions
-        .map((session) => ({
-          session,
-          scheduledAt: parseSessionTimestamp(session.startsAt ?? session.createdAt ?? null),
+      events
+        .map((event) => ({
+          event,
+          scheduledAt: parseSessionTimestamp(event.startsAt),
         }))
         .filter(
           (
             item
           ): item is {
-            session: GroupSession;
+            event: CalendarEvent;
             scheduledAt: Date;
           } => Boolean(item.scheduledAt)
         )
         .sort((left, right) => left.scheduledAt.getTime() - right.scheduledAt.getTime()),
-    [sessions]
+    [events]
   );
 
   const unscheduledSessions = useMemo(
-    () => sessions.filter((session) => !parseSessionTimestamp(session.startsAt ?? session.createdAt ?? null)),
-    [sessions]
+    () => events.filter((event) => !parseSessionTimestamp(event.startsAt)),
+    [events]
   );
 
   const selectedDaySessions = useMemo(
@@ -101,6 +132,33 @@ export default function TeacherCalendarPage() {
       ),
     [currentDate, scheduledSessions]
   );
+
+  const reloadEvents = useCallback(async () => {
+    try {
+      const list = await getCalendarEvents();
+      setEvents(Array.isArray(list) ? list : []);
+    } catch {
+      setEvents([]);
+    }
+  }, []);
+
+  const handleCreate = useCallback(async () => {
+    const title = createForm.title.trim();
+    if (!title || !createForm.startsAt) return;
+
+    await createCalendarEvent({
+      title,
+      kind: createForm.kind?.trim() || "session",
+      groupId: createForm.groupId?.trim() ? createForm.groupId.trim() : null,
+      sessionId: createForm.sessionId?.trim() ? createForm.sessionId.trim() : null,
+      startsAt: new Date(createForm.startsAt).toISOString(),
+      endsAt: createForm.endsAt ? new Date(createForm.endsAt).toISOString() : null,
+    });
+
+    setCreateOpen(false);
+    setCreateForm({ title: "", kind: "session", groupId: "", sessionId: "", startsAt: "", endsAt: "" });
+    await reloadEvents();
+  }, [createForm, reloadEvents]);
 
   return (
     <div className="min-h-screen bg-[#FAFAFB]">
@@ -124,6 +182,7 @@ export default function TeacherCalendarPage() {
             >
               Сегодня
             </button>
+            <Button onClick={() => setCreateOpen(true)}>Создать событие</Button>
             <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
               <button
                 onClick={() => setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
@@ -201,12 +260,12 @@ export default function TeacherCalendarPage() {
                     </div>
 
                     <div className="mt-3 space-y-2">
-                      {daySessions.slice(0, 2).map(({ session, scheduledAt }) => (
+                      {daySessions.slice(0, 2).map(({ event, scheduledAt }) => (
                         <div
-                          key={session.id}
+                          key={event.id}
                           className="truncate rounded-xl bg-white px-2.5 py-2 text-[11px] font-medium text-slate-600 shadow-sm"
                         >
-                          <div className="truncate text-slate-900">{session.title}</div>
+                          <div className="truncate text-slate-900">{event.title}</div>
                           <div className="mt-0.5 text-slate-400">
                             {formatSessionTime(scheduledAt.toISOString())}
                           </div>
@@ -250,31 +309,48 @@ export default function TeacherCalendarPage() {
                     Загружаем календарь...
                   </div>
                 ) : selectedDaySessions.length > 0 ? (
-                  selectedDaySessions.map(({ session, scheduledAt }) => (
+                  selectedDaySessions.map(({ event, scheduledAt }) => (
                     <Link
-                      key={session.id}
-                      href={sessionHref(session)}
+                      key={event.id}
+                      href={eventHref(event)}
+                      onClick={(e) => {
+                        if (!event.sessionId) e.preventDefault();
+                      }}
                       className="block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate font-semibold text-slate-900">{session.title}</div>
+                          <div className="truncate font-semibold text-slate-900">{event.title}</div>
                           <div className="mt-1 text-sm text-slate-500">
-                            {session.groupName || "Группа не указана"}
+                            {event.groupId ? `Group: ${event.groupId}` : "Группа не указана"}
                           </div>
                         </div>
-                        <span
-                          className={cn(
-                            "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
-                            session.status === "live"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : session.status === "ended"
-                              ? "bg-slate-100 text-slate-500"
-                              : "bg-amber-50 text-amber-600"
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                              event.sessionId ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-500"
+                            )}
+                          >
+                            {event.sessionId ? "Сессия" : statusLabel(event.kind || "")}
+                          </span>
+
+                          {!event.sessionId && (
+                            <button
+                              type="button"
+                              className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-500 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                              onClick={async (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!confirm("Удалить событие?")) return;
+                                await deleteCalendarEvent(event.id);
+                                await reloadEvents();
+                              }}
+                            >
+                              Удалить
+                            </button>
                           )}
-                        >
-                          {statusLabel(session.status)}
-                        </span>
+                        </div>
                       </div>
 
                       <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-slate-500">
@@ -284,7 +360,7 @@ export default function TeacherCalendarPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <VideoIcon size={14} className="text-slate-400" />
-                          {session.type === "exam" ? "Экзамен" : "Лекция"}
+                          {statusLabel(event.kind || "")}
                         </span>
                       </div>
                     </Link>
@@ -316,15 +392,18 @@ export default function TeacherCalendarPage() {
 
               <div className="mt-4 space-y-3">
                 {unscheduledSessions.length > 0 ? (
-                  unscheduledSessions.map((session) => (
+                  unscheduledSessions.map((event) => (
                     <Link
-                      key={session.id}
-                      href={sessionHref(session)}
+                      key={event.id}
+                      href={eventHref(event)}
+                      onClick={(e) => {
+                        if (!event.sessionId) e.preventDefault();
+                      }}
                       className="block rounded-2xl border border-slate-100 bg-slate-50/60 p-4 transition-colors hover:bg-slate-50"
                     >
-                      <div className="font-medium text-slate-900">{session.title}</div>
+                      <div className="font-medium text-slate-900">{event.title}</div>
                       <div className="mt-1 text-sm text-slate-500">
-                        {session.groupName || "Группа не указана"}
+                        {event.groupId ? `Group: ${event.groupId}` : "Группа не указана"}
                       </div>
                     </Link>
                   ))
@@ -337,6 +416,76 @@ export default function TeacherCalendarPage() {
             </div>
           </div>
         </div>
+
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Создать событие"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Отмена
+            </Button>
+            <Button onClick={() => void handleCreate()} disabled={!createForm.title.trim() || !createForm.startsAt}>
+              Создать
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Input
+            placeholder="Название"
+            value={createForm.title}
+            onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
+          />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              placeholder="kind (например: session)"
+              value={createForm.kind}
+              onChange={(e) => setCreateForm((p) => ({ ...p, kind: e.target.value }))}
+            />
+            <select
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm shadow-sm"
+              value={createForm.groupId}
+              onChange={(e) => setCreateForm((p) => ({ ...p, groupId: e.target.value }))}
+            >
+              <option value="">Группа (опц.)</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Input
+            placeholder="sessionId (опц.)"
+            value={createForm.sessionId}
+            onChange={(e) => setCreateForm((p) => ({ ...p, sessionId: e.target.value }))}
+          />
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-slate-500">startsAt</div>
+              <Input
+                type="datetime-local"
+                value={createForm.startsAt}
+                onChange={(e) => setCreateForm((p) => ({ ...p, startsAt: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs font-semibold text-slate-500">endsAt (опц.)</div>
+              <Input
+                type="datetime-local"
+                value={createForm.endsAt}
+                onChange={(e) => setCreateForm((p) => ({ ...p, endsAt: e.target.value }))}
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       </div>
     </div>
   );

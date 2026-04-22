@@ -53,7 +53,27 @@ function normalizeAuthPayload(payload: Partial<AuthPayload> & { token: string; e
 
 export function getApiBaseUrl(): string {
   if (typeof window === "undefined") return "";
-  return (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+
+  const explicit = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (!base) return "";
+
+  const trimmed = base.replace(/\/$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
+/**
+ * Backend origin (no `/api` suffix). Useful for resolving `/uploads/*` urls.
+ */
+export function getApiOriginUrl(): string {
+  if (typeof window === "undefined") return "";
+
+  const explicit = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!explicit) return "";
+
+  return explicit.replace(/\/$/, "").replace(/\/api$/, "");
 }
 
 export function getToken(): string | null {

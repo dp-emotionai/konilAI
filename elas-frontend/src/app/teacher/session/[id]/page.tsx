@@ -16,6 +16,12 @@ import {
   type LiveMetricsParticipant,
 } from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, isRealSessionId, getStoredAuth } from "@/lib/api/client";
+import {
+  getSessionPresence,
+  joinSessionPresence,
+  leaveSessionPresence,
+  type SessionPresenceRow,
+} from "@/lib/api/presence";
 
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
@@ -253,6 +259,7 @@ export default function TeacherLiveMonitorPage() {
   const [phase, setPhase] = useState<SessionPhase>("preflight");
   const [liveSeconds, setLiveSeconds] = useState(0);
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
@@ -299,6 +306,37 @@ export default function TeacherLiveMonitorPage() {
   }, []);
   const roomId = sessionId;
   const isLive = phase === "live";
+
+  useEffect(() => {
+    if (!isLive || !apiAvailable || !roomId) {
+      setPresence([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    let closed = false;
+
+    void joinSessionPresence(roomId, { signal: controller.signal }).catch(() => {});
+
+    const load = async () => {
+      try {
+        const list = await getSessionPresence(roomId, { signal: controller.signal });
+        if (!closed) setPresence(Array.isArray(list) ? list : []);
+      } catch {
+        if (!closed) setPresence([]);
+      }
+    };
+
+    void load();
+    const interval = window.setInterval(load, 5000);
+
+    return () => {
+      closed = true;
+      window.clearInterval(interval);
+      controller.abort();
+      void leaveSessionPresence(roomId).catch(() => {});
+    };
+  }, [apiAvailable, isLive, roomId]);
 
   const teacherDisplayName = useMemo(
     () =>

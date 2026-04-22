@@ -1,4 +1,5 @@
 import { api, getApiBaseUrl, hasAuth } from "@/lib/api/client";
+import { getSessionMaterials as getSessionMaterialsApi } from "@/lib/api/materials";
 
 export type SessionContentFile = {
   id: string;
@@ -80,9 +81,21 @@ export async function getSessionMaterials(sessionId: string): Promise<SessionCon
   if (unsupportedRoutes.materials) return null;
 
   try {
-    const raw = await api.get<any[]>(`sessions/${sessionId}/materials`);
+    const raw = await getSessionMaterialsApi(sessionId);
     if (!Array.isArray(raw)) return [];
-    return raw.map(normalizeFile).filter((item: SessionContentFile | null): item is SessionContentFile => Boolean(item));
+
+    return raw
+      .map((item) =>
+        normalizeFile({
+          id: item.materialId,
+          title: item.title,
+          fileName: item.fileName,
+          mimeType: item.mimeType,
+          size: item.size,
+          url: null,
+        })
+      )
+      .filter((f: SessionContentFile | null): f is SessionContentFile => Boolean(f));
   } catch (error: any) {
     if (error?.message?.includes("404")) {
       unsupportedRoutes.materials = true;

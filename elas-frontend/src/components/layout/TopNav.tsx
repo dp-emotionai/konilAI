@@ -41,6 +41,7 @@ import {
 import { useUI } from "./Providers";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
+import { getNotifications, markNotificationRead, type NotificationRow } from "@/lib/api/notifications";
 
 const DROPDOWN_PANEL =
   "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
@@ -330,6 +331,8 @@ export default function TopNav() {
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -338,6 +341,19 @@ export default function TopNav() {
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
   const appNavItems = useMemo(() => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []), [safeRole]);
   const consentRequired = Boolean(state.loggedIn && !state.consent);
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
+
+  const loadNotifications = useCallback(async (signal?: AbortSignal) => {
+    setNotificationsLoading(true);
+    try {
+      const list = await getNotifications({ signal });
+      setNotifications(Array.isArray(list) ? list : []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
@@ -355,6 +371,22 @@ export default function TopNav() {
 
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen, notifOpen]);
+
+  useEffect(() => {
+    if (!state.loggedIn || !notifOpen) return;
+
+    const controller = new AbortController();
+    void loadNotifications(controller.signal);
+
+    const interval = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [loadNotifications, notifOpen, state.loggedIn]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -422,7 +454,14 @@ export default function TopNav() {
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
                     aria-label="Уведомления"
                   >
-                    <Bell size={18} />
+                    <span className="relative inline-flex">
+                      <Bell size={18} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </span>
                   </button>
 
                   {notifOpen && (
@@ -430,12 +469,91 @@ export default function TopNav() {
                       <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
                         Уведомления
                       </div>
-                      <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+
+                      {notificationsLoading ? (
+                        <div className="py-6 text-center text-[13px] font-medium text-slate-500">
+                          Р—Р°РіСЂСѓР¶Р°РµРј...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                          <Bell className="mb-2 text-slate-300" size={24} />
+                          <div className="text-[13px] font-medium leading-relaxed">
+                            РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ РЅРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                          {notifications.slice(0, 20).map((n) => {
+                            const sessionId =
+                              n.data && typeof (n.data as any).sessionId === "string"
+                                ? String((n.data as any).sessionId)
+                                : null;
+
+                            return (
+                              <button
+                                key={n.id}
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    if (!n.isRead) {
+                                      await markNotificationRead(n.id);
+                                      setNotifications((prev) =>
+                                        prev.map((x) =>
+                                          x.id === n.id
+                                            ? { ...x, isRead: true, readAt: new Date().toISOString() }
+                                            : x
+                                        )
+                                      );
+                                    }
+                                  } catch {}
+
+                                  if (sessionId) {
+                                    const prefix =
+                                      safeRole === "teacher" ? "/teacher/session/" : "/student/session/";
+                                    router.push(`${prefix}${sessionId}`);
+                                    setNotifOpen(false);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
+                                  n.isRead
+                                    ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
+                                    : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-[13px] font-bold text-slate-900">{n.title}</div>
+                                    {n.body && (
+                                      <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
+                                        {n.body}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!n.isRead && (
+                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
+                                  )}
+                                </div>
+                                <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                                  {new Date(n.createdAt).toLocaleString("ru-RU", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {false && (<div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
                         <Bell className="mb-2 text-slate-300" size={24} />
                         <div className="text-[13px] font-medium leading-relaxed">
                           У вас пока нет новых уведомлений
                         </div>
-                      </div>
+                      </div>)}
                     </div>
                   )}
                 </div>
