@@ -142,19 +142,96 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
     }, 800);
   };
 
+  function describeGetUserMediaError(err: unknown): { permission: PermissionState; message: string } {
+    const anyErr = err as any;
+    const name = typeof anyErr?.name === "string" ? anyErr.name : "";
+    const message = typeof anyErr?.message === "string" ? anyErr.message : "";
+
+    if (message === "getUserMedia_unavailable") {
+      return {
+        permission: "denied",
+        message: "Ваш браузер не поддерживает доступ к камере (getUserMedia). Попробуйте обновить браузер.",
+      };
+    }
+
+    if (name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError") {
+      return {
+        permission: "denied",
+        message:
+          "Доступ к камере запрещён. Проверьте разрешения для сайта и убедитесь, что страница открыта по HTTPS.",
+      };
+    }
+
+    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+      return {
+        permission: "granted",
+        message: "Камера не найдена. Подключите камеру или выберите другое устройство в настройках браузера.",
+      };
+    }
+
+    if (name === "NotReadableError" || name === "TrackStartError") {
+      return {
+        permission: "granted",
+        message:
+          "Камера занята другим приложением или вкладкой. Закройте приложения, которые используют камеру (Zoom/Telegram/Meet) и попробуйте снова.",
+      };
+    }
+
+    if (name === "OverconstrainedError") {
+      return {
+        permission: "granted",
+        message: "Выбранная камера не поддерживает текущие настройки. Попробуйте переключить устройство камеры.",
+      };
+    }
+
+    if (name === "AbortError") {
+      return {
+        permission: "granted",
+        message: "Запрос к камере был прерван. Попробуйте ещё раз.",
+      };
+    }
+
+    const suffix = name || message ? ` (${[name, message].filter(Boolean).join(": ")})` : "";
+    return {
+      permission: "granted",
+      message: `Не удалось запустить камеру. Откройте Console и пришлите ошибку name/message${suffix}.`,
+    };
+  }
+
   async function start() {
     try {
       setErrorText(null);
       stop();
 
-      const stream = await navigator.mediaDevices.getUserMedia({
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error("getUserMedia_unavailable");
+      }
+
+      const primaryConstraints: MediaStreamConstraints = {
         video: {
           facingMode: "user",
           width: { ideal: 1280 },
           height: { ideal: 720 },
         },
         audio: false,
-      });
+      };
+
+      const fallbackConstraints: MediaStreamConstraints = {
+        video: true,
+        audio: false,
+      };
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
+      } catch (err: any) {
+        const name = typeof err?.name === "string" ? err.name : "";
+        if (name === "OverconstrainedError" || name === "NotReadableError") {
+          stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+        } else {
+          throw err;
+        }
+      }
 
       streamRef.current = stream;
 
@@ -186,15 +263,16 @@ export default function CameraCheck({ onReadyChange, onStart }: Props) {
       setLighting("ok");
 
       startMonitoring();
-    } catch {
-      setPermission("denied");
+    } catch (err: any) {
+      console.error("[CameraCheck] getUserMedia failed", err);
+      const info = describeGetUserMediaError(err);
+
+      setPermission(info.permission);
       setRunning(false);
       setPreviewReady(false);
-      setFace("not_detected");
-      setLighting("poor");
-      setErrorText(
-        "Не удалось получить доступ к камере. Проверьте разрешения браузера."
-      );
+      setFace("unknown");
+      setLighting("ok");
+      setErrorText(info.message);
     }
   }
 

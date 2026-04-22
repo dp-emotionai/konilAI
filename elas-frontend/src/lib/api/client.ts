@@ -152,8 +152,8 @@ export function resolveAvatarUrl(url: string | null | undefined, version?: numbe
   
   let finalUrl = url;
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    const base = getApiBaseUrl();
-    finalUrl = `${base.replace(/\/$/, "")}${url.startsWith("/") ? url : "/" + url}`;
+    const origin = getApiOriginUrl();
+    finalUrl = `${origin.replace(/\/$/, "")}${url.startsWith("/") ? url : "/" + url}`;
   }
 
   if (version) {
@@ -187,6 +187,9 @@ async function request<T>(
 
   const res = await fetch(`${base}${safePath.startsWith("/") ? safePath : "/" + safePath}`, {
     ...fetchOptions,
+    // Many deployments use httpOnly cookies for auth on a different origin (e.g. onrender.com).
+    // `include` keeps those working, while still allowing Bearer tokens when present.
+    credentials: fetchOptions.credentials ?? "include",
     headers,
   });
 
