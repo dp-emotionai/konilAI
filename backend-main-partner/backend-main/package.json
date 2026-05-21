@@ -1,0 +1,44 @@
+{
+  "name": "elas-backend",
+  "version": "1.0.0",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/server.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "cloudinary": "^1.41.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dns": "^0.2.2",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.0",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
+    "node-fetch": "^3.3.2",
+    "node-mailjet": "^6.0.11",
+    "nodemailer": "^8.0.2",
+    "nodemon": "^3.1.13",
+    "pdfkit": "^0.17.2",
+    "resend": "^6.9.3",
+    "socket.io": "^4.8.3",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0",
+    "prisma-erd-generator": "^2.4.2"
+  }
+}

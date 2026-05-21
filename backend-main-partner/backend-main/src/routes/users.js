@@ -1,0 +1,56 @@
+import express from "express";
+import prisma from "../utils/prisma.js";
+import authMiddleware from "../middleware/authMiddleware.js";
+
+const router = express.Router();
+
+// получить пользователя по id
+router.get("/:id", authMiddleware, async (req, res) => {
+    const user = await prisma.user.findUnique({
+        where: { id: req.params.id },
+        select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            bio: true,
+            phone: true,
+            createdAt: true
+        }
+    });
+
+    if (!user) {
+        return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({
+        ...user,
+        fullName: [user.firstName, user.lastName].filter(Boolean).join(" ")
+    });
+});
+
+// обновить пользователя
+router.put("/update", authMiddleware, async (req, res) => {
+    const { email } = req.body;
+
+    const updatedUser = await prisma.user.update({
+        where: { id: req.user.id },
+        data: { email },
+        select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            bio: true,
+            phone: true,
+            createdAt: true
+        }
+    });
+
+    res.json({
+        ...updatedUser,
+        fullName: [updatedUser.firstName, updatedUser.lastName].filter(Boolean).join(" ")
+    });
+});
+
+export default router;

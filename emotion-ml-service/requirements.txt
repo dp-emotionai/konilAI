@@ -1,0 +1,16 @@
+# ELAS — Emotion-Aware Learning Analytics System
+# Python 3.10+
+
+# ML & Vision
+opencv-python>=4.8.0
+numpy>=1.24.0
+tensorflow>=2.13.0
+
+# Детекция лиц: MediaPipe (опционально, для detector="mediapipe")
+# Раскомментируйте для более точной детекции при поворотах головы:
+# mediapipe>=0.10.0
+
+# Backend API
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+pydantic>=2.0.0

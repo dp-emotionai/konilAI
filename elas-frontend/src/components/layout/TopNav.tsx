@@ -1,0 +1,792 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  NAV_PUBLIC_LEFT,
+  NAV_PUBLIC_RIGHT,
+  NAV_APP_BY_ROLE,
+} from "@/lib/nav";
+import type { NavDropdownItem, NavItem } from "@/lib/nav";
+import type { Role } from "@/lib/roles";
+import { clearAuth, resolveAvatarUrl } from "@/lib/api/client";
+import Button from "@/components/ui/Button";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Briefcase,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  GraduationCap,
+  Heart,
+  HelpCircle,
+  LayoutDashboard,
+  Lock,
+  LogOut,
+  Menu,
+  Newspaper,
+  Settings,
+  Shield,
+  ShieldCheck,
+  User,
+  Users,
+  Video,
+  X,
+  Code,
+} from "lucide-react";
+import { useUI } from "./Providers";
+import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
+import { cn } from "@/lib/cn";
+import { getNotifications, markNotificationRead, type NotificationRow } from "@/lib/api/notifications";
+
+const DROPDOWN_PANEL =
+  "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
+  "bg-surface backdrop-blur-xl p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
+
+const DROPDOWN_ITEM =
+  "rounded-lg px-3 py-2 transition-all duration-150 text-fg hover:bg-surface-subtle";
+
+const PUBLIC_ICONS: Record<
+  string,
+  React.ComponentType<{ size?: number; className?: string }>
+> = {
+  LayoutDashboard,
+  Video,
+  BarChart3,
+  ShieldCheck,
+  Code,
+  GraduationCap,
+  Users,
+  BookOpen,
+  Briefcase,
+  FileText,
+  Newspaper,
+  Shield,
+  Lock,
+  Heart,
+  Activity,
+  HelpCircle,
+};
+
+function KonilAILogoIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <path
+        d="M6 4v16h2.5V12l5.5 8h2.5l-5.5-7.5 5.5-8h-2.5L8.5 12V4H6z"
+        fill="currentColor"
+        className="text-[rgb(var(--primary))]"
+      />
+    </svg>
+  );
+}
+
+function Logo({ href = "/" }: { href?: string }) {
+  const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
+
+  return (
+    <Link
+      href={safeHref}
+      className="flex shrink-0 items-center gap-2.5 rounded-elas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+    >
+      <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25">
+        <KonilAILogoIcon className="h-5 w-5" />
+      </span>
+      <span className="font-semibold tracking-wide text-fg">KonilAI</span>
+    </Link>
+  );
+}
+
+function NavLink({
+  href,
+  label,
+  active,
+  className,
+}: {
+  href: string;
+  label: string;
+  active?: boolean;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "rounded-full px-3 py-2 text-sm font-medium transition-[background-color,color] duration-150",
+        active
+          ? "bg-surface-subtle/80 text-fg"
+          : "text-muted hover:bg-surface-subtle/60 hover:text-fg",
+        className
+      )}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function PublicNavItem({ item }: { item: NavItem }) {
+  const path = usePathname();
+  const safePath = typeof path === "string" ? path : "";
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    if (open) document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (item.type === "link" || !open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, item.type]);
+
+  if (item.type === "link") {
+    return <NavLink href={item.href} label={item.label} active={safePath === item.href} />;
+  }
+
+  const dropdown = item as NavDropdownItem;
+  const children = Array.isArray(dropdown.children) ? dropdown.children : [];
+  const hasCardStyle = children.some((c) => Boolean(c.subtitle ?? c.icon));
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+          open
+            ? "bg-surface-subtle/80 text-fg"
+            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
+        )}
+      >
+        {dropdown.label}
+        <ChevronDown size={14} className={cn("transition-transform duration-200", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div
+          className={cn(
+            "absolute left-0 top-full z-50 mt-2 py-2",
+            hasCardStyle ? "min-w-[280px]" : "min-w-[200px]",
+            DROPDOWN_PANEL
+          )}
+        >
+          {children.map((child) => {
+            const IconComp = child.icon ? PUBLIC_ICONS[child.icon] : null;
+
+            return (
+              <Link
+                key={child.href}
+                href={child.href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
+                  hasCardStyle ? "px-4 py-3" : "px-3 py-2"
+                )}
+              >
+                {IconComp && (
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted/60 text-[rgb(var(--primary))]">
+                    <IconComp size={18} />
+                  </span>
+                )}
+
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-medium text-fg">{child.label}</div>
+                  {child.subtitle && <div className="mt-0.5 truncate text-xs text-muted">{child.subtitle}</div>}
+                </div>
+
+                <ChevronRight size={16} className="shrink-0 text-muted" />
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AppNavItem({
+  item,
+  liveSessionId,
+}: {
+  item: import("@/lib/nav").AppNavItem;
+  liveSessionId: string | null;
+}) {
+  const path = usePathname();
+  const safePath = typeof path === "string" ? path : "";
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    if (open) document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (item.type === "link") {
+    const active =
+      !!safePath &&
+      (safePath === item.href ||
+        safePath.startsWith(`${item.href}/`) ||
+        (safePath.startsWith("/teacher/session/") && item.href.includes("filter=live")));
+
+    return (
+      <NavLink
+        href={item.href}
+        label={item.label}
+        active={active}
+        className={"badge" in item && item.badge === "live" && liveSessionId ? "text-[rgb(var(--primary))]" : undefined}
+      />
+    );
+  }
+
+  const dropdown = item as NavDropdownItem;
+  const children = Array.isArray(dropdown.children) ? dropdown.children : [];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+          open
+            ? "bg-surface-subtle/80 text-fg"
+            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
+        )}
+      >
+        {dropdown.label}
+        <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className={cn("absolute left-0 top-full z-50 mt-2 min-w-[220px]", DROPDOWN_PANEL)}>
+          {children.map((child) => (
+            <Link
+              key={child.href}
+              href={child.href}
+              onClick={() => setOpen(false)}
+              className={cn(
+                "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
+                child.accent ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70" : ""
+              )}
+            >
+              <span className="truncate">{child.label}</span>
+              {child.badge === "live" && liveSessionId ? (
+                <span className="text-[10px] uppercase text-[rgb(var(--primary))]">Live</span>
+              ) : !child.accent ? (
+                <ChevronRight size={14} className="shrink-0 text-muted" />
+              ) : null}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function TopNav() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const safePathname = typeof pathname === "string" ? pathname : "/";
+
+  const { state, setLoggedIn, setConsent, setRole, setStatus } = useUI();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+
+  const profileRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const safeRole: Role | null = state.role ?? null;
+  const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
+  const appNavItems = useMemo(() => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []), [safeRole]);
+  const consentRequired = Boolean(state.loggedIn && !state.consent);
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
+
+  const loadNotifications = useCallback(async (signal?: AbortSignal) => {
+    setNotificationsLoading(true);
+    try {
+      const list = await getNotifications({ signal });
+      setNotifications(Array.isArray(list) ? list : []);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+
+    if (profileOpen || notifOpen) {
+      document.addEventListener("mousedown", onOutside);
+    }
+
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, [profileOpen, notifOpen]);
+
+  useEffect(() => {
+    if (!state.loggedIn || !notifOpen) return;
+
+    const controller = new AbortController();
+    void loadNotifications(controller.signal);
+
+    const interval = window.setInterval(() => {
+      void loadNotifications();
+    }, 30000);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(interval);
+    };
+  }, [loadNotifications, notifOpen, state.loggedIn]);
+
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setProfileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [profileOpen]);
+
+  const handleLogout = useCallback(() => {
+    clearAuth();
+    setLoggedIn(false);
+    setConsent(false);
+    setRole(null);
+    setStatus(null);
+    setProfileOpen(false);
+    setMobileOpen(false);
+    router.push("/");
+  }, [router, setConsent, setLoggedIn, setRole, setStatus]);
+
+  return (
+    <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3 flex-1 lg:flex-none">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
+            <Logo href="/" />
+          </div>
+
+          <nav className="hidden max-w-2xl flex-1 items-center justify-center gap-0.5 lg:flex">
+            {!state.loggedIn &&
+              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
+                <PublicNavItem key={item.type === "dropdown" ? item.label : item.href} item={item} />
+              ))}
+
+            {state.loggedIn &&
+              appNavItems.map((item) => (
+                <AppNavItem
+                  key={item.type === "dropdown" ? item.label : item.href}
+                  item={item}
+                  liveSessionId={liveSession?.id ?? null}
+                />
+              ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {state.loggedIn && safeRole === "teacher" && liveSession && (
+              <Link
+                href={`/teacher/session/${liveSession.id}`}
+                className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
+              >
+                LIVE •{" "}
+                {typeof liveSession.title === "string" && liveSession.title.length > 18
+                  ? `${liveSession.title.slice(0, 18)}…`
+                  : liveSession.title}
+              </Link>
+            )}
+
+            {state.loggedIn && (
+              <>
+                <div className="relative hidden md:inline-flex" ref={notifRef}>
+                  <button
+                    type="button"
+                    onClick={() => setNotifOpen((value) => !value)}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
+                    aria-label="Уведомления"
+                  >
+                    <span className="relative inline-flex">
+                      <Bell size={18} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+                          {unreadCount > 9 ? "9+" : unreadCount}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+
+                  {notifOpen && (
+                    <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5">
+                      <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
+                        Уведомления
+                      </div>
+
+                      {notificationsLoading ? (
+                        <div className="py-6 text-center text-[13px] font-medium text-slate-500">
+                          Р—Р°РіСЂСѓР¶Р°РµРј...
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                          <Bell className="mb-2 text-slate-300" size={24} />
+                          <div className="text-[13px] font-medium leading-relaxed">
+                            РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ РЅРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                          {notifications.slice(0, 20).map((n) => {
+                            const sessionId =
+                              n.data && typeof (n.data as any).sessionId === "string"
+                                ? String((n.data as any).sessionId)
+                                : null;
+
+                            return (
+                              <button
+                                key={n.id}
+                                type="button"
+                                onClick={async () => {
+                                  try {
+                                    if (!n.isRead) {
+                                      await markNotificationRead(n.id);
+                                      setNotifications((prev) =>
+                                        prev.map((x) =>
+                                          x.id === n.id
+                                            ? { ...x, isRead: true, readAt: new Date().toISOString() }
+                                            : x
+                                        )
+                                      );
+                                    }
+                                  } catch {}
+
+                                  if (sessionId) {
+                                    const prefix =
+                                      safeRole === "teacher" ? "/teacher/session/" : "/student/session/";
+                                    router.push(`${prefix}${sessionId}`);
+                                    setNotifOpen(false);
+                                  }
+                                }}
+                                className={cn(
+                                  "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
+                                  n.isRead
+                                    ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
+                                    : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-[13px] font-bold text-slate-900">{n.title}</div>
+                                    {n.body && (
+                                      <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
+                                        {n.body}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!n.isRead && (
+                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
+                                  )}
+                                </div>
+                                <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                                  {new Date(n.createdAt).toLocaleString("ru-RU", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {false && (<div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                        <Bell className="mb-2 text-slate-300" size={24} />
+                        <div className="text-[13px] font-medium leading-relaxed">
+                          У вас пока нет новых уведомлений
+                        </div>
+                      </div>)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" ref={profileRef}>
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen((value) => !value)}
+                    aria-expanded={profileOpen}
+                    aria-haspopup="true"
+                    className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                    aria-label="Меню аккаунта"
+                  >
+                    {state.avatarUrl ? (
+                      <img
+                        src={resolveAvatarUrl(state.avatarUrl, state.avatarVersion)!}
+                        alt={state.fullName || "User"}
+                        className="h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <User size={18} />
+                    )}
+                  </button>
+
+                  {profileOpen && (
+                    <div className={cn("absolute right-0 top-full z-50 mt-2 min-w-[220px] p-2", DROPDOWN_PANEL)}>
+                      {state.fullName && (
+                        <div className="px-3 py-1 text-[13px] font-bold text-fg truncate">{state.fullName}</div>
+                      )}
+
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all", DROPDOWN_ITEM)}
+                      >
+                        <User size={16} />
+                        Профиль
+                      </Link>
+
+                      <Link
+                        href="/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden", DROPDOWN_ITEM)}
+                      >
+                        <Settings size={16} />
+                        Настройки
+                      </Link>
+
+                      <Link
+                        href="/docs"
+                        onClick={() => setProfileOpen(false)}
+                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all", DROPDOWN_ITEM)}
+                      >
+                        <HelpCircle size={16} />
+                        Помощь
+                      </Link>
+
+                      {consentRequired && (
+                        <Link
+                          href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
+                          onClick={() => setProfileOpen(false)}
+                          className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all", DROPDOWN_ITEM)}
+                        >
+                          <ShieldCheck size={16} />
+                          Нужно согласие
+                        </Link>
+                      )}
+
+                      <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
+
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all", DROPDOWN_ITEM)}
+                      >
+                        <LogOut size={16} />
+                        Выйти
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {!state.loggedIn && (
+              <div className="flex items-center gap-2">
+                {NAV_PUBLIC_RIGHT?.signIn?.href && (
+                  <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
+                    <Button variant="outline" size="sm">
+                      {NAV_PUBLIC_RIGHT.signIn.label}
+                    </Button>
+                  </Link>
+                )}
+
+                {NAV_PUBLIC_RIGHT?.getStarted?.href && (
+                  <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
+                    <Button size="sm">{NAV_PUBLIC_RIGHT.getStarted.label}</Button>
+                  </Link>
+                )}
+              </div>
+            )}
+
+            <button
+              type="button"
+              aria-label="Открыть меню"
+              onClick={() => setMobileOpen((value) => !value)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {mobileOpen && (
+        <div className="border-b border-[color:var(--border)] bg-white/[0.97] shadow-elevated backdrop-blur-xl lg:hidden">
+          <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
+            {!state.loggedIn &&
+              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
+                <div key={item.type === "dropdown" ? item.label : item.href}>
+                  {item.type === "link" ? (
+                    <Link
+                      href={typeof item.href === "string" ? item.href : "/"}
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-2 text-fg"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <div className="py-2">
+                      <div className="text-sm font-medium text-muted">{(item as NavDropdownItem).label}</div>
+                      <div className="mt-1 space-y-1 pl-3">
+                        {((item as NavDropdownItem).children ?? []).map((child) => (
+                          <Link
+                            key={child.href}
+                            href={typeof child.href === "string" ? child.href : "/"}
+                            onClick={() => setMobileOpen(false)}
+                            className="block py-1.5 text-sm text-fg"
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+            {state.loggedIn && (
+              <>
+                <div className="pt-1">
+                  <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+                    Навигация
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {appNavItems.map((item) => (
+                      <div key={item.type === "dropdown" ? item.label : item.href}>
+                        {item.type === "link" ? (
+                          <Link
+                            href={typeof item.href === "string" ? item.href : "/"}
+                            onClick={() => setMobileOpen(false)}
+                            className="block py-2 text-fg"
+                          >
+                            {item.label}
+                          </Link>
+                        ) : (
+                          <div className="py-2">
+                            <div className="text-sm font-medium text-muted">{(item as NavDropdownItem).label}</div>
+                            <div className="mt-1 space-y-1 pl-3">
+                              {((item as NavDropdownItem).children ?? []).map((child) => (
+                                <Link
+                                  key={child.href}
+                                  href={typeof child.href === "string" ? child.href : "/"}
+                                  onClick={() => setMobileOpen(false)}
+                                  className="block py-1.5 text-sm text-fg"
+                                >
+                                  {child.label}
+                                </Link>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border/40 pt-2">
+                  <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+                    Аккаунт
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    <Link
+                      href="/profile"
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-2 text-fg"
+                    >
+                      Профиль
+                    </Link>
+
+                    <Link
+                      href="/settings"
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-2 text-fg"
+                    >
+                      Настройки
+                    </Link>
+
+                    {consentRequired && (
+                      <Link
+                        href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
+                        onClick={() => setMobileOpen(false)}
+                        className="block py-2 text-warning"
+                      >
+                        Нужно согласие
+                      </Link>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="block w-full py-2 text-left text-fg"
+                    >
+                      Выйти
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </header>
+  );
+}

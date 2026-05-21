@@ -1,0 +1,509 @@
+generator client {
+  provider = "prisma-client-js"
+}
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "./ERD.svg"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String?
+  role         Role
+
+  firstName String
+  lastName  String
+  bio       String?
+  phone     String?
+
+  status       String   @default("APPROVED")
+  organization String?
+  inviteCode   String?
+
+  avatar    Bytes?
+  avatarMimeType String?
+  avatarUpdatedAt DateTime?
+  externalAvatarUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens          RefreshToken[]
+  notes                  Note[]
+  documents              Document[]
+  analytics              Analytics[]
+  passwordResetTokens    PasswordResetToken[]
+  sessionEmotionSamples  SessionEmotionSample[]
+
+  groupsAsTeacher     Group[]
+  groupMemberships    GroupMember[]
+  invitationsReceived Invitation[] @relation("InvitationInvitee")
+
+  sessionsAsTeacher Session[]
+  consentRecords    ConsentRecord[]
+
+  groupMessages    GroupMessage[]   @relation("GroupMessageSender")
+  sessionMessages  SessionMessage[] @relation("SessionMessageSender")
+  sessionNotes SessionNote[]
+  messageReads     MessageRead[]
+  chatMutesCreated ChatMute[] @relation("ChatMuteCreator")
+
+  notificationSettings UserNotificationSettings?
+  preferences          UserPreference?
+  integrations         UserIntegration[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  device    String?
+  location  String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  pinned    Boolean  @default(false)
+  order     Int      @default(0)
+  blocks    Json?
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  attachments Document[]
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Document {
+  id        String   @id @default(uuid())
+  filename  String
+  url       String
+  type      String?
+  size      Int?
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  noteId    String?
+  note      Note? @relation(fields: [noteId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Group {
+  id        String   @id @default(uuid())
+  name      String
+  teacherId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  teacher     User @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+
+  sessions    Session[]
+  members     GroupMember[]
+  invitations Invitation[]
+
+  messages       GroupMessage[]
+  chatSettings   GroupChatSettings?
+
+  @@index([teacherId])
+}
+
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  userId    String
+
+  role      String   @default("student")
+  status    String   @default("active")
+
+  addedAt   DateTime @default(now())
+  removedAt DateTime?
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+}
+
+model Invitation {
+  id            String   @id @default(uuid())
+  groupId       String
+  inviteeEmail  String
+  inviteeUserId String?
+
+  status String @default("pending")
+  token  String?
+
+  createdAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  user  User? @relation("InvitationInvitee", fields: [inviteeUserId], references: [id])
+
+  @@unique([groupId, inviteeEmail])
+  @@index([groupId])
+  @@index([inviteeEmail])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  title       String
+  type        String
+  status      String   @default("draft")
+  code        String   @unique
+
+  groupId     String
+  createdById String
+
+  startedAt   DateTime?
+  endedAt     DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  group   Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  teacher User  @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  consents ConsentRecord[]
+
+  messages   SessionMessage[]
+  chatPolicy SessionChatPolicy?
+  notes SessionNote[]
+
+  emotionSamples SessionEmotionSample[]
+  summary        SessionSummary?
+  timeline       SessionTimelineBucket[]
+
+  @@index([groupId])
+}
+
+model SessionEmotionSample {
+  id              String   @id @default(uuid())
+  sessionId       String
+  userId          String
+  timestamp       DateTime @default(now())
+
+  emotion         String
+  confidence      Float
+  risk            Float
+  state           String
+  dominantEmotion String
+  engagement      Float?
+  stress          Float?
+  fatigue         Float?
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, userId, timestamp])
+}
+
+model SessionSummary {
+  sessionId       String   @id
+  session         Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  avgEngagement   Float
+  attentionDrops  Int
+  quality         String
+  avgStress       Float?
+  durationMinutes Float?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model SessionTimelineBucket {
+  id            String   @id @default(uuid())
+  sessionId     String
+  session       Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  index         Int
+  fromSec       Int
+  toSec         Int
+
+  avgEngagement Float
+  avgStress     Float
+  avgRisk       Float
+
+  @@index([sessionId, index])
+}
+
+model ConsentRecord {
+  id        String   @id @default(uuid())
+
+  userId    String
+  sessionId String
+
+  consentedAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sessionId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String?
+  meta       String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType])
+  @@index([createdAt])
+}
+
+model EmailCode {
+  id         String   @id @default(uuid())
+  email      String
+  code       String
+  purpose    String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  @@index([email])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Analytics {
+  id        String   @id @default(uuid())
+
+  userId    String
+  user      User @relation(fields: [userId], references: [id])
+
+  score     Float
+  emotion   String?
+
+  createdAt DateTime @default(now())
+}
+
+model GroupMessage {
+  id        String   @id @default(uuid())
+
+  groupId   String
+  senderId  String
+
+  type      String
+  text      String
+
+  replyToId String?
+  qaStatus  String?
+
+  pinnedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  group  Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  sender User  @relation("GroupMessageSender", fields: [senderId], references: [id])
+
+  reads MessageRead[]
+
+  @@index([groupId, createdAt, id])
+}
+
+model SessionMessage {
+  id        String   @id @default(uuid())
+
+  sessionId String
+  senderId  String
+
+  type      String
+  text      String
+
+  channel   String   @default("public")
+
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  sender  User @relation("SessionMessageSender", fields: [senderId], references: [id])
+
+  @@index([sessionId, createdAt])
+}
+
+model MessageRead {
+  id             String   @id @default(uuid())
+
+  groupMessageId String
+  userId         String
+
+  readAt DateTime @default(now())
+
+  announcement GroupMessage @relation(fields: [groupMessageId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupMessageId, userId])
+  @@index([groupMessageId])
+  @@index([userId])
+}
+
+model ChatMute {
+  id           String   @id @default(uuid())
+
+  scope        String
+  scopeId      String
+
+  targetUserId String
+
+  mutedUntil   DateTime
+
+  createdById  String
+
+  createdAt    DateTime @default(now())
+
+  creator User @relation("ChatMuteCreator", fields: [createdById], references: [id])
+}
+
+model GroupChatSettings {
+  groupId String  @id
+
+  chatEnabled Boolean @default(true)
+
+  slowmodeSec Int @default(0)
+
+  group Group @relation(fields: [groupId], references: [id])
+}
+
+model SessionChatPolicy {
+  sessionId String @id
+
+  mode String @default("lecture_open")
+
+  slowmodeSec Int @default(0)
+
+  updatedAt DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id])
+}
+
+model SessionNote {
+  id        String   @id @default(uuid())
+
+  sessionId String
+  userId    String
+
+  text      String
+  pinned    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([userId])
+}
+
+model UserNotificationSettings {
+  id String @id @default(uuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+  dailyDigestEnabled Boolean @default(false)
+  dailyDigestTime    String?
+
+  quietHoursEnabled Boolean @default(false)
+  quietHoursStart   String?
+  quietHoursEnd     String?
+
+  scheduleNotifications    Boolean @default(true)
+  assignmentNotifications  Boolean @default(true)
+  messageNotifications     Boolean @default(true)
+  groupNotifications       Boolean @default(true)
+  systemNotifications      Boolean @default(true)
+  reportNotifications      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserPreference {
+  id String @id @default(uuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  language            String? @default("ru")
+  region              String?
+  timezone            String?
+  preferredDateFormat String?
+  weekStartsOn        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserIntegration {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider          String
+  connected         Boolean  @default(false)
+  connectedAt       DateTime?
+  externalAccountId String?
+  metadata          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider])
+  @@index([userId])
+}

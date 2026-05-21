@@ -1,0 +1,76 @@
+import express from "express";
+import multer from "multer";
+import cloudinary from "../utils/cloudinary.js";
+import authMiddleware from "../middleware/authMiddleware.js";
+import prisma from "../utils/prisma.js";
+
+const router = express.Router();
+
+const storage = multer.memoryStorage();
+
+const upload = multer({
+    storage,
+    limits: {
+        fileSize: 50 * 1024 * 1024
+    }
+});
+
+router.post("/", authMiddleware, upload.single("file"), async (req, res) => {
+    try {
+        const { noteId } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({
+                message: "No file uploaded"
+            });
+        }
+
+        if (noteId) {
+            const note = await prisma.note.findFirst({
+                where: {
+                    id: String(noteId),
+                    userId: req.user.id
+                }
+            });
+
+            if (!note) {
+                return res.status(404).json({
+                    message: "Note not found"
+                });
+            }
+        }
+
+        const file = req.file;
+
+        const base64 = file.buffer.toString("base64");
+
+        const result = await cloudinary.uploader.upload(
+            `data:${file.mimetype};base64,${base64}`,
+            {
+                folder: "notes",
+                resource_type: "auto"
+            }
+        );
+
+        const document = await prisma.document.create({
+            data: {
+                filename: file.originalname,
+                url: result.secure_url,
+                type: file.mimetype,
+                size: file.size,
+                userId: req.user.id,
+                noteId: noteId ? String(noteId) : null
+            }
+        });
+
+        res.json(document);
+    } catch (error) {
+        console.error("NOTE UPLOAD ERROR:", error);
+
+        res.status(500).json({
+            error: "Upload failed"
+        });
+    }
+});
+
+export default router;
