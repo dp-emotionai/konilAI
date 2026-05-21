@@ -1,0 +1,1074 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { cn } from "@/lib/cn";
+import Image from "next/image";
+import { useUI } from "@/components/layout/Providers";
+import {
+  api,
+  clearAuth,
+  getStoredAuth,
+  hasAuth,
+  isApiAvailable,
+  setAuth,
+  resolveAvatarUrl
+} from "@/lib/api/client";
+
+import {
+  User, ShieldCheck, Bell, Blocks, Globe, CreditCard, Laptop, Camera, LogOut,
+  ChevronRight, Info, CheckCircle2, Trash2, Lock, Smartphone, Mail, ChevronDown,
+  Loader2, AlertCircle, Briefcase
+} from "lucide-react";
+
+type Role = "student" | "teacher" | "admin";
+type MeRes = { 
+  id: string; 
+  email: string; 
+  role: Role; 
+  firstName?: string | null;
+  lastName?: string | null;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+  status?: string | null; 
+  bio?: string | null; 
+  phone?: string | null;
+  organization?: string | null;
+  createdAt?: string;
+};
+type PermissionStateLite = "granted" | "denied" | "prompt" | "unsupported";
+
+const TABS = [
+  { id: "profile", label: "Профиль", icon: User },
+  { id: "security", label: "Безопасность", icon: ShieldCheck },
+  { id: "devices", label: "Устройства и Сеть", icon: Laptop },
+  { id: "notifications", label: "Уведомления", icon: Bell },
+  { id: "integrations", label: "Интеграции", icon: Blocks },
+  { id: "language", label: "Язык и регион", icon: Globe },
+  { id: "subscription", label: "Подписка", icon: CreditCard },
+  { id: "active_sessions", label: "Активные сессии", icon: Smartphone },
+];
+
+export default function UnifiedProfilePage() {
+  const router = useRouter();
+  const ui = useUI();
+  const [activeTab, setActiveTab] = useState("profile");
+
+  const [me, setMe] = useState<MeRes | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Profile Form State
+  const [formFirstName, setFormFirstName] = useState("");
+  const [formLastName, setFormLastName] = useState("");
+  const [formBio, setFormBio] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formOrganization, setFormOrganization] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+
+  // Security Form State
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{type: 'error' | 'success', text: string} | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Notifications State
+  const [notifSettings, setNotifSettings] = useState<any>(null);
+  const [isSavingNotif, setIsSavingNotif] = useState(false);
+
+  // Preferences State
+  const [preferences, setPreferences] = useState<any>(null);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
+
+  // Integrations State
+  const [integrations, setIntegrations] = useState<any[]>([]);
+  const [loadingIntegrations, setLoadingIntegrations] = useState(false);
+  const [authSessions, setAuthSessions] = useState<any[] | null>(null);
+  const [loadingAuthSessions, setLoadingAuthSessions] = useState(false);
+
+  const [camPerm, setCamPerm] = useState<PermissionStateLite>("prompt");
+  const [micPerm, setMicPerm] = useState<PermissionStateLite>("prompt");
+  const [netMs, setNetMs] = useState<number | null>(null);
+  const [netStatus, setNetStatus] = useState<"idle" | "checking" | "ok" | "fail">("idle");
+  const [previewOn, setPreviewOn] = useState(false);
+  
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const stored = useMemo(() => getStoredAuth(), []);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadMe() {
+      setLoading(true);
+      if (!hasAuth()) {
+        router.push("/auth/login");
+        return;
+      }
+      if (!isApiAvailable()) {
+        if (mounted && stored) {
+            setMe({ 
+              id: "local", 
+              email: stored.email, 
+              role: stored.role as Role, 
+              firstName: stored.firstName,
+              lastName: stored.lastName,
+              fullName: stored.fullName,
+              avatarUrl: stored.avatarUrl
+            });
+            setFormFirstName(stored.firstName || "");
+            setFormLastName(stored.lastName || "");
+        }
+        setLoading(false);
+        return;
+      }
+      try {
+         const data = await api.get<MeRes>("auth/me");
+         if (mounted) {
+             setMe(data);
+             setFormFirstName(data.firstName || "");
+             setFormLastName(data.lastName || "");
+             setFormBio(data.bio || "");
+             setFormPhone(data.phone || "");
+             setFormOrganization(data.organization || "");
+         }
+      } catch (e) {
+         setMe(null);
+      } finally {
+         if (mounted) setLoading(false);
+      }
+    }
+    loadMe();
+    return () => { mounted = false; };
+  }, [router, stored]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function queryPerms() {
+      const perms = (navigator as any)?.permissions;
+      if (!perms?.query) return;
+      try {
+        const cam = await perms.query({ name: "camera" });
+        if (!cancelled) setCamPerm((cam.state as PermissionStateLite) || "prompt");
+      } catch {}
+      try {
+        const mic = await perms.query({ name: "microphone" });
+        if (!cancelled) setMicPerm((mic.state as PermissionStateLite) || "prompt");
+      } catch {}
+    }
+    queryPerms();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch Notifications
+  useEffect(() => {
+    if (activeTab === "notifications" && !notifSettings && isApiAvailable()) {
+      api.get("user/notifications/settings").then(setNotifSettings).catch(console.error);
+    }
+  }, [activeTab, notifSettings]);
+
+  // Fetch Preferences
+  useEffect(() => {
+    if (activeTab === "language" && !preferences && isApiAvailable()) {
+      api.get("user/preferences").then(setPreferences).catch(console.error);
+    }
+  }, [activeTab, preferences]);
+
+  // Fetch Integrations
+  useEffect(() => {
+    if (activeTab === "integrations" && !integrations.length && isApiAvailable()) {
+      setLoadingIntegrations(true);
+      api.get<any[]>("user/integrations")
+        .then(setIntegrations)
+        .catch(console.error)
+        .finally(() => setLoadingIntegrations(false));
+    }
+  }, [activeTab, integrations.length]);
+
+  useEffect(() => {
+    if (activeTab !== "active_sessions" || authSessions || !isApiAvailable()) return;
+    setLoadingAuthSessions(true);
+    api.get<any>("auth/sessions")
+      .then((data) => {
+        const list = Array.isArray(data) ? data : Array.isArray(data?.sessions) ? data.sessions : [];
+        setAuthSessions(list);
+      })
+      .catch(() => setAuthSessions([]))
+      .finally(() => setLoadingAuthSessions(false));
+  }, [activeTab, authSessions]);
+
+  async function handleSaveProfile() {
+      if (!isApiAvailable()) {
+          setProfileMessage({ type: 'error', text: 'Нет подключения к API.' });
+          return;
+      }
+      setIsSavingProfile(true);
+      setProfileMessage(null);
+      try {
+          const payload = { 
+            firstName: formFirstName.trim(), 
+            lastName: formLastName.trim(), 
+            bio: formBio.trim(),
+            phone: formPhone.trim(),
+            organization: formOrganization.trim()
+          };
+          const updated = await api.put<MeRes>("auth/me", payload);
+          setProfileMessage({ type: 'success', text: 'Профиль успешно сохранен.' });
+          
+          setMe(updated);
+          ui.setUserInfo({
+            firstName: updated.firstName ?? undefined,
+            lastName: updated.lastName ?? undefined,
+            fullName: updated.fullName ?? undefined,
+            avatarUrl: updated.avatarUrl ?? undefined,
+          });
+
+          if (stored) {
+            setAuth({ 
+              ...stored, 
+              firstName: updated.firstName, 
+              lastName: updated.lastName, 
+              fullName: updated.fullName,
+              avatarUrl: updated.avatarUrl
+            });
+          }
+      } catch (e) {
+          setProfileMessage({ type: 'error', text: `Ошибка сохранения: ${e instanceof Error ? e.message : 'Unknown'}` });
+      } finally {
+          setIsSavingProfile(false);
+      }
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !isApiAvailable()) return;
+
+    setIsUploadingAvatar(true);
+    setProfileMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+
+      // We need a helper for multipart since shared api.post uses JSON.stringify
+      const token = (await import("@/lib/api/client")).getToken();
+      const res = await fetch(`${(await import("@/lib/api/client")).getApiBaseUrl()}/auth/avatar`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!res.ok) throw new Error("Ошибка загрузки аватара");
+      const refreshed = await api.get<MeRes>("auth/me");
+      const avatarUrl = refreshed.avatarUrl || "/auth/avatar";
+      setMe(refreshed);
+      const newVersion = Date.now();
+      if (stored) {
+        setAuth({
+          ...stored,
+          avatarUrl,
+          firstName: refreshed.firstName ?? stored.firstName,
+          lastName: refreshed.lastName ?? stored.lastName,
+          fullName: refreshed.fullName ?? stored.fullName,
+        });
+      }
+      ui.setUserInfo({
+        avatarUrl,
+        avatarVersion: newVersion,
+        firstName: refreshed.firstName ?? undefined,
+        lastName: refreshed.lastName ?? undefined,
+        fullName: refreshed.fullName ?? undefined,
+      });
+      setProfileMessage({ type: 'success', text: 'Аватар успешно обновлен.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : "Ошибка загрузки" });
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    if (!isApiAvailable()) {
+      setPasswordMessage({ type: "error", text: "Нет подключения к API." });
+      return;
+    }
+
+    const currentPasswordValue = currentPassword.trim() || window.prompt("Введите текущий пароль")?.trim() || "";
+    const newPasswordValue = newPassword.trim() || window.prompt("Введите новый пароль")?.trim() || "";
+    const confirmPasswordValue =
+      confirmNewPassword.trim() || window.prompt("Повторите новый пароль")?.trim() || "";
+
+    if (!currentPasswordValue || !newPasswordValue) {
+      setPasswordMessage({ type: "error", text: "Введите текущий и новый пароль." });
+      return;
+    }
+
+    if (newPasswordValue.length < 6) {
+      setPasswordMessage({ type: "error", text: "Новый пароль должен быть не менее 6 символов." });
+      return;
+    }
+
+    if (newPasswordValue !== confirmPasswordValue) {
+      setPasswordMessage({ type: "error", text: "Подтверждение пароля не совпадает." });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    setPasswordMessage(null);
+    try {
+      const res = await api.put<{ message?: string }>("auth/change-password", {
+        currentPassword: currentPasswordValue,
+        newPassword: newPasswordValue,
+      });
+      setPasswordMessage({
+        type: "success",
+        text: res?.message || "Пароль успешно обновлён.",
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось изменить пароль.",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
+
+  async function handleLogoutAllSessions() {
+    if (!isApiAvailable()) return;
+    setIsLoggingOutAll(true);
+    try {
+      await api.post("auth/logout-all", {});
+      signOut();
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось завершить все сессии.",
+      });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (!isApiAvailable()) {
+      setPasswordMessage({ type: "error", text: "Нет подключения к API." });
+      return;
+    }
+
+    const deletePasswordValue = deletePassword.trim() || window.prompt("Введите пароль для удаления аккаунта")?.trim() || "";
+
+    if (!deletePasswordValue) {
+      setPasswordMessage({ type: "error", text: "Введите пароль для удаления аккаунта." });
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const token = (await import("@/lib/api/client")).getToken();
+      const res = await fetch(`${(await import("@/lib/api/client")).getApiBaseUrl()}/auth/delete-account`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: deletePasswordValue }),
+      });
+
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(body || "Не удалось удалить аккаунт.");
+      }
+
+      signOut();
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось удалить аккаунт.",
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }
+
+  async function handleTerminateSession(sessionId: string) {
+    if (!isApiAvailable()) return;
+    try {
+      await api.delete(`auth/sessions/${sessionId}`);
+      setAuthSessions((prev) => (prev || []).filter((session) => session.id !== sessionId));
+    } catch (e) {
+      setPasswordMessage({
+        type: "error",
+        text: e instanceof Error ? e.message : "Не удалось завершить сессию.",
+      });
+    }
+  }
+
+  async function handleActionStub(actionName: string, endpoint: string) {
+      if (!isApiAvailable()) return alert('Нет подключения к API.');
+      try {
+          await api.post(endpoint, {});
+          alert('Действие выполнено.');
+      } catch (e) {
+          alert(`API Endpoint Missing: ${endpoint} не реализован на бэкенде.`);
+      }
+  }
+
+  async function runNetworkCheck() {
+    if (!isApiAvailable()) return;
+    setNetStatus("checking");
+    const t0 = performance.now();
+    try {
+      await api.get("health");
+      setNetMs(Math.round(performance.now() - t0));
+      setNetStatus("ok");
+    } catch {
+      setNetStatus("fail");
+    }
+  }
+
+  async function startPreview() {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) return;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setPreviewOn(true);
+    } catch {
+      setPreviewOn(false);
+    }
+  }
+
+  function stopPreview() {
+    try {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    } catch {}
+    setPreviewOn(false);
+  }
+
+  function signOut() {
+    clearAuth();
+    ui.setLoggedIn(false);
+    ui.setConsent(false);
+    router.push("/");
+  }
+
+  const roleLabel = me?.role === 'teacher' ? 'Преподаватель' : me?.role === 'admin' ? 'Администратор' : 'Студент';
+  
+  const accountStatusLabel =
+    me?.status === "APPROVED" || me?.status === "approved"
+      ? "Подтверждённый доступ"
+      : me?.status === "PENDING" || me?.status === "pending"
+        ? "Ожидает одобрения"
+        : me?.status === "LIMITED" || me?.status === "limited"
+          ? "Ограниченный доступ"
+          : me?.status === "BLOCKED" || me?.status === "blocked"
+            ? "Аккаунт заблокирован"
+            : "Статус не указан";
+
+  const hasProfileChanges = formFirstName !== (me?.firstName || "") 
+                            || formLastName !== (me?.lastName || "") 
+                            || formBio !== (me?.bio || "")
+                            || formPhone !== (me?.phone || "")
+                            || formOrganization !== (me?.organization || "");
+
+  const displayAvatar = resolveAvatarUrl(me?.avatarUrl, ui.state.avatarVersion);
+  const memberSince = me?.createdAt
+    ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(me.createdAt))
+    : "—";
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] bg-[#FAFAFB] pt-8 md:pt-12">
+      <div className="mx-auto max-w-[1240px] px-4 md:px-8 pb-16">
+        
+        <div className="mb-8">
+          <h1 className="text-[28px] font-bold tracking-tight text-slate-900">Мой аккаунт</h1>
+          <p className="mt-1 text-[15px] text-slate-500">Управляйте своими данными и настройками аккаунта</p>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-8 items-start">
+          
+          <div className="w-full md:w-[260px] shrink-0 sticky top-24">
+            <nav className="space-y-1">
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 text-[14px] font-medium rounded-[14px] transition-all",
+                      isActive 
+                        ? "bg-purple-50 text-[#7448FF]" 
+                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                  >
+                    <Icon size={18} className={cn(isActive ? "text-[#7448FF]" : "text-slate-400")} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          <div className="flex-1 w-full min-h-[500px]">
+             
+             {activeTab === "profile" && (
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                   <div className="xl:col-span-2 space-y-6">
+                     
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Профильная информация</h2>
+                        
+                        <div className="flex flex-col sm:flex-row gap-8 items-start">
+                            <div className="flex flex-col items-center gap-4 shrink-0">
+                              <div className="w-[120px] h-[120px] rounded-full bg-slate-100 flex items-center justify-center relative shadow-inner overflow-hidden border border-slate-200">
+                                {displayAvatar ? (
+                                  <img src={displayAvatar} alt={me?.fullName || "Avatar"} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <span className="text-4xl font-bold text-slate-300">
+                                     {me?.fullName ? me.fullName[0].toUpperCase() : me?.email?.[0].toUpperCase() ?? "U"}
+                                  </span>
+                                )}
+                                <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#7448FF] hover:bg-[#623ce6] text-white flex items-center justify-center transition-colors border-2 border-white z-10 cursor-pointer shadow-sm">
+                                  <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploadingAvatar} />
+                                  {isUploadingAvatar ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                                </label>
+                              </div>
+                              <span className="text-xs text-slate-400 font-medium tracking-wide">JPG, PNG не более 5 МБ</span>
+                            </div>
+
+                           <div className="flex-1 space-y-5 w-full">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                 <div>
+                                   <label className="text-xs font-semibold text-slate-500 mb-2 block">Имя</label>
+                                   <input type="text" value={formFirstName} onChange={e => setFormFirstName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                 </div>
+                                 <div>
+                                   <label className="text-xs font-semibold text-slate-500 mb-2 block">Фамилия</label>
+                                   <input type="text" value={formLastName} onChange={e => setFormLastName(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                 </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Email (Обратитесь в поддержку для изменения)</label>
+                                <input type="text" readOnly value={me?.email || ""} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[14px] text-slate-500 outline-none cursor-not-allowed" />
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div>
+                                  <label className="text-xs font-semibold text-slate-500 mb-2 block">Телефон</label>
+                                  <input type="text" value={formPhone} onChange={e => setFormPhone(e.target.value)} disabled={isSavingProfile} placeholder="+7 ..." className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                </div>
+                                <div>
+                                  <label className="text-xs font-semibold text-slate-500 mb-2 block">Организация</label>
+                                  <input type="text" value={formOrganization} onChange={e => setFormOrganization(e.target.value)} disabled={isSavingProfile} placeholder="Название вуза или компании" className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">Роль</label>
+                                <div className="relative">
+                                  <input type="text" readOnly value={roleLabel} className="w-full pl-4 pr-10 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[14px] text-slate-500 outline-none cursor-not-allowed" />
+                                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-xs font-semibold text-slate-500 mb-2 block">О себе</label>
+                                <textarea rows={3} value={formBio} onChange={e => setFormBio(e.target.value)} disabled={isSavingProfile} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none resize-none focus:border-[#7448FF] transition-colors"></textarea>
+                                <div className="text-right text-[10px] text-slate-400 font-medium mt-1">{formBio.length}/200</div>
+                              </div>
+                              
+                              {profileMessage && (
+                                <div className={cn("text-[13px] p-3 rounded-lg flex items-start gap-2", profileMessage.type === 'error' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600")}>
+                                   <AlertCircle size={16} className="shrink-0 mt-0.5" /> {profileMessage.text}
+                                </div>
+                              )}
+
+                              <div className="pt-2 flex justify-end">
+                                <button onClick={handleSaveProfile} disabled={!hasProfileChanges || isSavingProfile} className="px-6 py-2.5 bg-[#7448FF] hover:bg-[#623ce6] text-white font-medium rounded-xl text-[14px] transition-colors disabled:opacity-50 shadow-sm flex items-center gap-2">
+                                  {isSavingProfile && <Loader2 size={16} className="animate-spin" />}
+                                  Сохранить изменения
+                                </button>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Двухфакторная аутентификация (2FA)</h2>
+                        <div className="space-y-4">
+                           <div className="flex items-center justify-between pb-4 border-b border-slate-50">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                 <ShieldCheck size={18} />
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Защита аккаунта 2FA</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Дополнительная защита аккаунта</div>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-4">
+                               <span className="text-[13px] text-slate-400 font-medium">Выключено</span>
+                               <button onClick={() => handleActionStub('Enable 2FA', 'auth/2fa/enable')} className="text-[13px] font-semibold text-[#7448FF] hover:underline">Включить</button>
+                             </div>
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                                 <Lock size={18} />
+                               </div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Резервные коды</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Используйте для входа при недоступности 2FA</div>
+                               </div>
+                             </div>
+                             <button onClick={() => handleActionStub('Show Codes', 'auth/2fa/recovery-codes')} className="text-[13px] font-medium px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">Показать коды</button>
+                           </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[17px] font-bold text-slate-900 mb-6">Интеграции</h2>
+                        <div className="space-y-4">
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">G</div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">Google</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">{me?.email || "Не подключено"}</div>
+                               </div>
+                             </div>
+                             <div className="flex items-center gap-4">
+                               <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-1 bg-emerald-50 text-emerald-600 rounded">Подключено</span>
+                               <button onClick={() => handleActionStub('Disconnect Google', 'user/integrations/google/disconnect')} className="text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+                             </div>
+                           </div>
+
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-4">
+                               <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700">Git</div>
+                               <div>
+                                 <div className="font-semibold text-[14px] text-slate-900">GitHub</div>
+                                 <div className="text-[12px] text-slate-500 mt-0.5">Не подключено</div>
+                               </div>
+                             </div>
+                             <button onClick={() => handleActionStub('Connect GitHub', 'user/integrations/github/connect')} className="text-[13px] font-medium px-4 py-2 bg-purple-50 text-[#7448FF] rounded-lg hover:bg-purple-100 transition-colors">Подключить</button>
+                           </div>
+
+                        </div>
+                     </div>
+                   </div>
+
+                   <div className="space-y-6">
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[15px] font-bold text-slate-900 mb-6">Статистика активности</h2>
+                        <div className="mb-4 rounded-2xl bg-purple-50 px-4 py-3">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7448FF]/70">
+                            Статус доступа
+                          </div>
+                          <div className="mt-1 text-[14px] font-semibold text-[#7448FF]">
+                            {accountStatusLabel}
+                          </div>
+                        </div>
+                        <div className="space-y-5">
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> С нами с</div>
+                            <div className="font-medium text-slate-900">10 марта 2026</div> {/* In real impl: derive from user.createdAt */}
+                          </div>
+                          <div className="flex justify-between items-center text-[13px]">
+                            <div className="flex items-center gap-3 text-slate-600"><Globe size={14} className="text-[#7448FF]" /> Текущий IP статус</div>
+                            <div className="font-medium text-slate-900">Авторизован</div>
+                          </div>
+                        </div>
+                     </div>
+
+                     <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                        <h2 className="text-[15px] font-bold text-slate-900 mb-6">Быстрые действия</h2>
+                        <div className="gap-2 flex flex-col">
+                           <button onClick={() => setActiveTab("security")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <ShieldCheck size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Изменить пароль</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Вкладка "Безопасность"</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+
+                           <button onClick={() => setActiveTab("notifications")} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <Bell size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Настроить уведомления</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Вкладка "Уведомления"</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+
+                           <button onClick={() => void handleLogoutAllSessions()} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 transition-colors group text-left">
+                              <div className="flex items-center gap-3">
+                                <Laptop size={16} className="text-[#7448FF]" />
+                                <div>
+                                  <div className="text-[13px] font-semibold text-slate-900">Завершить все сессии</div>
+                                  <div className="text-[11px] text-slate-500 mt-0.5">Разлогинить все устройства</div>
+                                </div>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                           </button>
+                        </div>
+                     </div>
+                   </div>
+                </div>
+             )}
+
+             {activeTab === "security" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Безопасность</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройки безопасности и защита вашего аккаунта</p>
+                   
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                      <div className="pb-6 border-b border-slate-50">
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Пароль</div>
+                           <button onClick={async () => {
+                               setIsChangingPassword(true);
+                               setPasswordMessage(null);
+                               try {
+                                   await handleChangePassword();
+                               } catch (e) {
+                                    setPasswordMessage({ type: 'error', text: e instanceof Error ? e.message : 'Не удалось изменить пароль.' });
+                               } finally {
+                                   setIsChangingPassword(false);
+                               }
+                           }} disabled={isChangingPassword} className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[#7448FF] font-semibold hover:bg-slate-100 transition-colors disabled:opacity-50">Изменить пароль</button>
+                        </div>
+                        <div className="text-[13px] text-slate-500 mb-4">Используйте надежный пароль для защиты вашего аккаунта.</div>
+                        <div className="flex gap-16 text-[13px] text-slate-500 font-medium">
+                          <span className="tracking-widest">••••••••••••••••</span>
+                        </div>
+                        {passwordMessage && (
+                            <div className={cn("text-[13px] p-3 rounded-lg flex items-start gap-2 mt-4", passwordMessage.type === 'error' ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600")}>
+                                <AlertCircle size={16} className="shrink-0 mt-0.5" /> {passwordMessage.text}
+                            </div>
+                        )}
+                      </div>
+
+                      <div className="pb-6 border-b border-slate-50">
+                        <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Двухфакторная аутентификация (2FA)</div>
+                           <button onClick={() => handleActionStub('Enable 2FA', 'auth/2fa/enable')} className="text-[13px] font-medium px-5 py-2.5 bg-[#7448FF] text-white rounded-xl font-semibold hover:bg-[#623ce6] transition-colors shadow-sm">Включить 2FA</button>
+                        </div>
+                        <div className="text-[13px] text-slate-500 mb-4">Дополнительный уровень защиты вашего аккаунта.</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><ShieldCheck size={18}/></div>
+                          <div>
+                            <div className="text-[11px] text-slate-400 font-semibold tracking-wide uppercase">Статус</div>
+                            <div className="text-[14px] text-slate-900 font-medium">Выключено</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                         <div className="flex items-center justify-between mb-2">
+                           <div className="font-semibold text-[15px] text-slate-900">Резервные коды</div>
+                           <button onClick={() => handleActionStub('Show codes', 'auth/2fa/recovery-codes')} className="text-[13px] font-medium px-5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-medium hover:bg-slate-100 transition-colors">Показать коды</button>
+                        </div>
+                        <div className="text-[13px] text-slate-500 mb-4">Используйте резервные коды для входа при недоступности 2FA.</div>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400"><Lock size={18}/></div>
+                          <div>
+                            <div className="text-[11px] text-slate-400 font-semibold tracking-wide uppercase">Резервные коды</div>
+                            <div className="text-[14px] text-slate-900 font-medium">0 кодов создано</div>
+                          </div>
+                        </div>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                      <div className="font-semibold text-[15px] text-slate-900 mb-1">Завершение сессий (безопасность)</div>
+                      <div className="flex items-center justify-between mt-4">
+                         <div className="text-[13px] text-slate-500 max-w-sm">Завершив все сессии, вы автоматически разлогините ваш аккаунт со всех устройств.</div>
+                         <button onClick={() => void handleLogoutAllSessions()} disabled={isLoggingOutAll} className="text-[13px] font-medium px-5 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors disabled:opacity-60">{isLoggingOutAll ? 'Выходим...' : 'Выйти глобально'}</button>
+                      </div>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
+                      <div className="flex items-center justify-between">
+                         <div>
+                            <div className="font-semibold text-[15px] text-slate-900 mb-1">Удаление аккаунта</div>
+                            <div className="text-[13px] text-slate-500 max-w-sm">Удалите свой аккаунт и все связанные данные без возможности восстановления. Осторожно.</div>
+                         </div>
+                         <button onClick={() => {
+                              if(confirm("Вы уверены? Это необратимо.")) {
+                                  void handleDeleteAccount();
+                              }
+                          }} disabled={isDeletingAccount} className="text-[13px] font-semibold px-5 py-2.5 bg-rose-500 text-white rounded-xl shadow-sm hover:bg-rose-600 transition-colors disabled:opacity-60">{isDeletingAccount ? 'Удаляем...' : 'Удалить аккаунт'}</button>
+                       </div>
+                       <div className="mt-4 max-w-sm">
+                         <input
+                           type="password"
+                           value={deletePassword}
+                           onChange={(e) => setDeletePassword(e.target.value)}
+                           placeholder="Пароль для подтверждения удаления"
+                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-rose-400 transition-colors"
+                         />
+                       </div>
+                    </div>
+
+                </div>
+             )}
+
+             {activeTab === "notifications" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Уведомления</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройте, какие уведомления вы хотите получать</p>
+                   
+                   {!notifSettings ? (
+                     <div className="p-12 text-center bg-white border border-slate-100 rounded-[20px] shadow-sm">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#7448FF] mb-4" />
+                        <p className="text-slate-500">Загрузка настроек...</p>
+                     </div>
+                   ) : (
+                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-8">
+                       <div className="grid gap-6">
+                          {[
+                            { id: 'emailNotifications', label: 'Email уведомления', icon: Mail, desc: me?.email },
+                            { id: 'pushNotifications', label: 'Push уведомления', icon: Smartphone, desc: 'Браузерные уведомления' },
+                            { id: 'dailyDigestEnabled', label: 'Дневной дайджест', icon: Bell, desc: 'Краткое содержание за день' },
+                            { id: 'assignmentNotifications', label: 'Задания', icon: Briefcase, desc: 'Новые задания и сроки' },
+                            { id: 'messageNotifications', label: 'Сообщения', icon: Mail, desc: 'Личные сообщения и чаты' },
+                            { id: 'groupNotifications', label: 'Группы', icon: ShieldCheck, desc: 'Активность в ваших группах' },
+                            { id: 'systemNotifications', label: 'Системные', icon: ShieldCheck, desc: 'Важные обновления платформы' },
+                          ].map(item => (
+                            <div key={item.id} className="flex items-center justify-between py-2">
+                               <div className="flex items-center gap-4">
+                                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-[#7448FF] flex items-center justify-center shrink-0"><item.icon size={18} /></div>
+                                  <div>
+                                    <div className="text-[14px] font-semibold text-slate-900">{item.label}</div>
+                                    <div className="text-[12px] text-slate-500 mt-0.5">{item.desc}</div>
+                                  </div>
+                               </div>
+                               <button 
+                                onClick={async () => {
+                                  const newVal = !notifSettings[item.id];
+                                  setNotifSettings({ ...notifSettings, [item.id]: newVal });
+                                  try {
+                                    await api.patch("user/notifications/settings", { [item.id]: newVal });
+                                  } catch (e) {
+                                    console.error(e);
+                                    setNotifSettings(notifSettings); // Rollback
+                                  }
+                                }} 
+                                className={cn("w-12 h-6 rounded-full p-1 flex items-center transition-colors cursor-pointer", notifSettings[item.id] ? "bg-[#7448FF] justify-end" : "bg-slate-200 justify-start")}>
+                                  <div className="w-4 h-4 bg-white rounded-full shadow-sm"></div>
+                               </button>
+                            </div>
+                          ))}
+                       </div>
+                    </div>
+                   )}
+                </div>
+             )}
+
+             {activeTab === "language" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Язык и регион</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Настройте локализацию интерфейса и часовой пояс</p>
+                   
+                   {!preferences ? (
+                     <div className="p-12 text-center bg-white border border-slate-100 rounded-[20px] shadow-sm">
+                        <Loader2 className="w-8 h-8 animate-spin mx-auto text-[#7448FF] mb-4" />
+                        <p className="text-slate-500">Загрузка предпочтений...</p>
+                     </div>
+                   ) : (
+                    <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label className="text-xs font-semibold text-slate-500 mb-2 block uppercase tracking-wider">Язык интерфейса</label>
+                            <select 
+                              value={preferences.language} 
+                              onChange={async (e) => {
+                                const v = e.target.value;
+                                setPreferences({...preferences, language: v});
+                                try { await api.patch("user/preferences", { language: v }); } catch {}
+                              }}
+                              className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors"
+                            >
+                              <option value="ru">Русский</option>
+                              <option value="en">English</option>
+                              <option value="de">Deutsch</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-semibold text-slate-500 mb-2 block uppercase tracking-wider">Часовой пояс</label>
+                            <select 
+                              value={preferences.timezone} 
+                              onChange={async (e) => {
+                                const v = e.target.value;
+                                setPreferences({...preferences, timezone: v});
+                                try { await api.patch("user/preferences", { timezone: v }); } catch {}
+                              }}
+                              className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[14px] text-slate-900 outline-none focus:border-[#7448FF] transition-colors"
+                            >
+                              <option value="UTC+5">Астана / Ташкент (UTC+5)</option>
+                              <option value="UTC+3">Москва / Стамбул (UTC+3)</option>
+                              <option value="UTC+0">London / Lisbon (UTC+0)</option>
+                            </select>
+                          </div>
+                       </div>
+                    </div>
+                   )}
+                </div>
+             )}
+
+             {activeTab === "integrations" && (
+                <div className="max-w-4xl space-y-6">
+                   <h2 className="text-[20px] font-bold text-slate-900 mb-2">Интеграции</h2>
+                   <p className="text-[14px] text-slate-500 mb-8">Свяжите ваш аккаунт с внешними сервисами</p>
+                   
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+                      {loadingIntegrations ? (
+                        <div className="flex items-center justify-center py-4"><Loader2 className="animate-spin text-slate-300" /></div>
+                      ) : (
+                        <div className="space-y-4">
+                          {[
+                            { id: 'google', name: 'Google', icon: 'G' },
+                            { id: 'github', name: 'GitHub', icon: 'Git' }
+                          ].map(provider => {
+                            const isConnected = integrations.some(i => i.provider === provider.id);
+                            return (
+                              <div key={provider.id} className="flex items-center justify-between p-4 border border-slate-50 rounded-2xl hover:bg-slate-50/50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center shrink-0 font-bold text-lg text-slate-700 shadow-sm">{provider.icon}</div>
+                                  <div>
+                                    <div className="font-semibold text-[15px] text-slate-900">{provider.name}</div>
+                                    <div className="text-[12px] text-slate-500 mt-0.5">{isConnected ? "Подключено" : "Не подключено"}</div>
+                                  </div>
+                                </div>
+                                {isConnected ? (
+                                  <button 
+                                    onClick={async () => {
+                                      if(!confirm(`Отключить ${provider.name}?`)) return;
+                                      try {
+                                        await api.delete(`user/integrations/${provider.id}`);
+                                        setIntegrations(integrations.filter(i => i.provider !== provider.id));
+                                      } catch(e) { alert(e); }
+                                    }}
+                                    className="px-4 py-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors text-sm font-bold"
+                                  >
+                                    Отключить
+                                  </button>
+                                ) : (
+                                  <button 
+                                    onClick={async () => {
+                                      try {
+                                        const res = await api.post<any>(`user/integrations/${provider.id}/connect`);
+                                        if(res?.url) window.location.href = res.url;
+                                        else alert("OAuth URL не предоставлен бэкендом.");
+                                      } catch(e) { alert(e); }
+                                    }}
+                                    className="px-4 py-2 bg-purple-50 text-[#7448FF] hover:bg-purple-100 rounded-lg transition-colors text-sm font-bold"
+                                  >
+                                    Подключить
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                   </div>
+                </div>
+             )}
+
+             {activeTab === "active_sessions" && (
+                <div className="max-w-4xl space-y-6">
+                   <div>
+                     <h2 className="text-[20px] font-bold text-slate-900 mb-2">Активные сессии</h2>
+                     <p className="text-[14px] text-slate-500">Устройства и браузеры, где ваш аккаунт сейчас авторизован.</p>
+                   </div>
+
+                   <div className="p-8 bg-white border border-slate-100 rounded-[20px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
+                     {loadingAuthSessions ? (
+                       <div className="flex items-center justify-center py-8 text-slate-400">
+                         <Loader2 className="h-6 w-6 animate-spin" />
+                       </div>
+                     ) : !authSessions?.length ? (
+                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                         Нет активных сессий для отображения.
+                       </div>
+                     ) : (
+                       authSessions.map((session) => (
+                         <div
+                           key={session.id}
+                           className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-5 md:flex-row md:items-center md:justify-between"
+                         >
+                           <div className="min-w-0">
+                             <div className="flex flex-wrap items-center gap-2">
+                               <div className="font-semibold text-slate-900">
+                                 {session.device || session.userAgent || "Текущее устройство"}
+                               </div>
+                               {session.isCurrent && (
+                                 <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                                   Текущая
+                                 </span>
+                               )}
+                             </div>
+                             <div className="mt-1 text-sm text-slate-500">
+                               {session.location || "Локация не определена"}
+                             </div>
+                             <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-400">
+                               <span>Создана: {session.createdAtFormatted || "—"}</span>
+                               <span>Последняя активность: {session.lastUsedAtFormatted || "—"}</span>
+                               <span>Истекает: {session.expiresAtFormatted || "—"}</span>
+                             </div>
+                           </div>
+                           {!session.isCurrent && (
+                             <button
+                               onClick={() => void handleTerminateSession(session.id)}
+                               className="rounded-xl border border-rose-200 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
+                             >
+                               Завершить
+                             </button>
+                           )}
+                         </div>
+                       ))
+                     )}
+                   </div>
+                </div>
+             )}
+
+             {activeTab === "subscription" && (
+                <div className="p-8 h-full min-h-[500px] flex flex-col items-center justify-center text-center">
+                   <Blocks size={64} className="text-slate-200 mb-6" strokeWidth={1} />
+                   <h2 className="text-xl font-bold text-slate-900 mb-2">Раздел в разработке</h2>
+                   <p className="text-[15px] text-slate-500 max-w-sm">
+                     Настройки данного раздела ({TABS.find(t => t.id === activeTab)?.label}) будут доступны в ближайшем обновлении KonilAI.
+                   </p>
+                </div>
+             )}
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
