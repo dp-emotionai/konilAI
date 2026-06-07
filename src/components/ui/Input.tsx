@@ -1,7 +1,8 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "prefix"> {
   suffix?: React.ReactNode;
   prefix?: React.ReactNode;
   error?: string;
