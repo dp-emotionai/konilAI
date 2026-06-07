@@ -219,22 +219,20 @@ export default function TeacherGroupsPage() {
               />
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-50 pt-4">
-  <Button
-    type="button"
-    variant="outline"
-    onClick={() => setShowCreate(false)}
-  >
-    Отмена
-  </Button>
-
-  <Button
-    type="button"
-    onClick={handleCreateGroup}
-    disabled={creating || !newGroupName.trim()}
-  >
-    {creating ? "Создание..." : "Добавить"}
-  </Button>
-</div>
+              <button
+                onClick={() => setShowCreate(false)}
+                className="rounded-xl bg-slate-50 px-5 py-2.5 text-[14px] font-bold text-slate-600 transition-colors hover:bg-slate-100"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateGroup}
+                disabled={creating || !newGroupName.trim()}
+                className="rounded-xl bg-[#7448FF] px-5 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#623ce6] disabled:opacity-50"
+              >
+                {creating ? "Создание..." : "Добавить"}
+              </button>
+            </div>
           </div>
         </div>
       </Modal>
