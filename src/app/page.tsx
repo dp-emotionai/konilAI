@@ -33,7 +33,7 @@ function getHomeHref(
   if (!isLoggedIn || !role) return "/";
   if (role === "teacher") return "/teacher/dashboard";
   if (role === "student") return "/student/dashboard";
-  return "/admin";
+  return "/admin/dashboard";
 }
 
 export default function HomePage() {
