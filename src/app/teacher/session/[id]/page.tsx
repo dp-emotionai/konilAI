@@ -301,7 +301,7 @@ export default function TeacherLiveMonitorPage() {
   const [chartReady, setChartReady] = useState(false);
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
-  const wsUrl = getWsBaseUrl();
+  const wsUrl = getWsBaseUrl().replace(/^ws/, "http");
 
   useEffect(() => {
     setChartReady(true);
@@ -385,13 +385,6 @@ export default function TeacherLiveMonitorPage() {
     setConnectionState("connecting");
     setConnectionError(null);
     setMediaError(null);
-
-    if (!wsUrl?.startsWith("ws")) {
-      setConnectionError("Не настроен адрес сервера эфира (WS). Проверьте NEXT_PUBLIC_WS_BASE_URL.");
-      setConnectionState("error");
-      setPhase("preflight");
-      return;
-    }
 
     const signaling = new SignalingClient([`${wsUrl}/api/ws`, `${wsUrl}/ws`]);
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {

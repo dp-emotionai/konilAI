@@ -1,7 +1,4 @@
-/**
- * API client for ELAS backend.
- * Uses NEXT_PUBLIC_API_URL and token from auth storage (localStorage).
- */
+
 
 const AUTH_KEY = "elas_auth_v1";
 
@@ -12,7 +9,6 @@ export type AuthPayload = {
   token: string;
   role: UserRole;
   email: string;
-  /** User UUID — same as the backend userId from JWT */
   id?: string | null;
   firstName?: string | null;
   lastName?: string | null;
@@ -64,9 +60,7 @@ export function getApiBaseUrl(): string {
   return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
 }
 
-/**
- * Backend origin (no `/api` suffix). Useful for resolving `/uploads/*` urls.
- */
+
 export function getApiOriginUrl(): string {
   if (typeof window === "undefined") return "";
 
@@ -187,8 +181,6 @@ async function request<T>(
 
   const res = await fetch(`${base}${safePath.startsWith("/") ? safePath : "/" + safePath}`, {
     ...fetchOptions,
-    // Many deployments use httpOnly cookies for auth on a different origin (e.g. onrender.com).
-    // `include` keeps those working, while still allowing Bearer tokens when present.
     credentials: fetchOptions.credentials ?? "include",
     headers,
   });

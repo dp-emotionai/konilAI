@@ -36,7 +36,6 @@ export function registerInvitationsRoutes(app: Express) {
     }
   });
 
-  // POST /invitations/:id/accept — студент принимает
   app.post("/invitations/:id/accept", authMiddleware, requireRole("student"), async (req, res) => {
     const user = getUser(req);
     try {
@@ -73,7 +72,6 @@ export function registerInvitationsRoutes(app: Express) {
     }
   });
 
-  // POST /invitations/:id/decline
   app.post("/invitations/:id/decline", authMiddleware, requireRole("student"), async (req, res) => {
     const user = getUser(req);
     try {

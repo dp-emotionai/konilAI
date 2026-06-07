@@ -3,23 +3,18 @@
 import * as React from "react";
 import { cn } from "@/lib/cn";
 
-type TableProps = React.TableHTMLAttributes<HTMLTableElement>;
-type SectionProps = React.HTMLAttributes<
-  HTMLTableSectionElement | HTMLTableRowElement | HTMLTableCellElement
->;
-type TCellProps = React.TdHTMLAttributes<HTMLTableCellElement>;
+type TableProps    = React.TableHTMLAttributes<HTMLTableElement>;
+type SectionProps  = React.HTMLAttributes<HTMLTableSectionElement | HTMLTableRowElement | HTMLTableCellElement>;
+type TCellProps    = React.TdHTMLAttributes<HTMLTableCellElement>;
 type THeadCellProps = React.ThHTMLAttributes<HTMLTableCellElement>;
-
-const tableWrapClass =
-  "w-full overflow-x-auto rounded-elas-lg border border-[color:var(--border)] bg-surface shadow-sm";
-
-const cellBaseClass =
-  "px-4 py-3 text-sm align-middle border-b border-[color:var(--border)] last:border-b-0";
 
 export default function Table({ className, children, ...props }: TableProps) {
   return (
-    <div className={tableWrapClass}>
-      <table className={cn("w-full border-collapse text-left", className)} {...props}>
+    <div className="w-full overflow-x-auto rounded-elas-lg border border-border bg-surface shadow-soft">
+      <table
+        className={cn("w-full border-collapse text-left", className)}
+        {...props}
+      >
         {children}
       </table>
     </div>
@@ -30,10 +25,11 @@ export function THead({ className, children, ...props }: SectionProps) {
   return (
     <thead
       className={cn(
-        "bg-surface-subtle text-xs uppercase tracking-wider text-muted font-medium",
+        "bg-surface-subtle border-b border-border",
+        "text-xs uppercase tracking-wider text-muted font-medium",
         className
       )}
-      {...props}
+      {...(props as React.HTMLAttributes<HTMLTableSectionElement>)}
     >
       {children}
     </thead>
@@ -42,7 +38,10 @@ export function THead({ className, children, ...props }: SectionProps) {
 
 export function TBody({ className, children, ...props }: SectionProps) {
   return (
-    <tbody className={cn("text-fg", className)} {...props}>
+    <tbody
+      className={cn("text-fg divide-y divide-border", className)}
+      {...(props as React.HTMLAttributes<HTMLTableSectionElement>)}
+    >
       {children}
     </tbody>
   );
@@ -52,11 +51,11 @@ export function TRow({ className, children, ...props }: SectionProps) {
   return (
     <tr
       className={cn(
-        "transition-colors hover:bg-surface-subtle/50",
+        "transition-colors hover:bg-surface-subtle/60",
         "[&:last-child_td]:border-b-0 [&:last-child_th]:border-b-0",
         className
       )}
-      {...props}
+      {...(props as React.HTMLAttributes<HTMLTableRowElement>)}
     >
       {children}
     </tr>
@@ -67,8 +66,9 @@ export function TH({ className, children, ...props }: THeadCellProps) {
   return (
     <th
       className={cn(
-        cellBaseClass,
-        "font-semibold text-muted first:pl-5 last:pr-5",
+        "px-4 py-3 text-sm align-middle",
+        "font-semibold text-muted",
+        "first:pl-5 last:pr-5",
         className
       )}
       {...props}
@@ -82,8 +82,8 @@ export function TCell({ className, children, ...props }: TCellProps) {
   return (
     <td
       className={cn(
-        cellBaseClass,
-        "text-fg first:pl-5 last:pr-5",
+        "px-4 py-3 text-sm align-middle text-fg",
+        "first:pl-5 last:pr-5",
         className
       )}
       {...props}
@@ -99,8 +99,25 @@ export function TMuted({
   ...props
 }: React.HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span className={cn("text-sm text-muted", className)} {...props}>
+    <span className={cn("text-sm text-muted-2", className)} {...props}>
       {children}
     </span>
+  );
+}
+
+/** Строка-заглушка когда нет данных */
+export function TEmpty({
+  colSpan,
+  message = "Нет данных",
+}: {
+  colSpan: number;
+  message?: string;
+}) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-5 py-10 text-center text-sm text-muted-2">
+        {message}
+      </td>
+    </tr>
   );
 }

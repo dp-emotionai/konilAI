@@ -411,14 +411,7 @@ export default function StudentJoinSessionPage() {
     setConnectionState("connecting");
     setConnectionError(null);
 
-    const wsBase = getWsBaseUrl();
-    if (!wsBase?.startsWith("ws")) {
-      setConnectionError("Не настроен адрес сервера эфира (WS). Обратитесь к администратору.");
-      setConnectionState("error");
-      setLive(false);
-      return;
-    }
-
+    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
     const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
     const manager = new PeerConnectionManager(signaling, roomId, "student", {
       onRemoteStream: (_peerId, stream) => {
@@ -1511,16 +1504,6 @@ export default function StudentJoinSessionPage() {
                 </div>
               </div>
             </Reveal>
-          )}
-
-          {!live && !getWsBaseUrl()?.startsWith("ws") && (
-            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-100 p-4 shadow-sm">
-              <AlertTriangle className="mt-0.5 text-amber-600" size={18} />
-              <div className="text-sm font-semibold text-amber-800">
-                WS base URL не настроен. Проверь конфигурацию{" "}
-                <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_WS_BASE_URL</code>.
-              </div>
-            </div>
           )}
 
           {!live && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { io } from "socket.io-client";
 import { Eraser, Loader2, RotateCcw } from "lucide-react";
 
 import Button from "@/components/ui/Button";
@@ -133,22 +134,29 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
     const wsBase = getWsBaseUrl();
     if (!token || !wsBase || !sessionId) return;
 
-    const ws = new WebSocket(`${wsBase}/ws-chat`);
-
-    ws.addEventListener("open", () => {
-      ws.send(JSON.stringify({ type: "auth", token }));
+    const socket = io(wsBase.replace(/\/$/, ""), {
+      transports: ["websocket"],
+      reconnection: true,
+      auth: { token },
     });
 
-    ws.addEventListener("message", (event) => {
-      let payload: any = null;
-      try {
-        payload = JSON.parse(String(event.data));
-      } catch {
-        return;
-      }
+    socket.on("connect", () => {
+      socket.emit("auth", { token });
+      socket.emit("subscribe", { scope: "session", sessionId });
+    });
+
+    socket.on("auth-ok", () => {
+      socket.emit("subscribe", { scope: "session", sessionId });
+    });
+
+    socket.onAny((eventName, eventPayload) => {
+      const payload =
+        eventPayload && typeof eventPayload === "object"
+          ? { type: eventName, ...eventPayload }
+          : { type: eventName, event: eventPayload };
 
       if (payload?.type === "auth-ok") {
-        ws.send(JSON.stringify({ type: "subscribe", scope: "session", sessionId }));
+        socket.emit("subscribe", { scope: "session", sessionId });
         return;
       }
 
@@ -167,7 +175,11 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
       }
     });
 
-    return () => ws.close();
+    return () => {
+      socket.removeAllListeners();
+      socket.offAny();
+      socket.disconnect();
+    };
   }, [sessionId, syncElements]);
 
   const persist = useCallback(
@@ -286,4 +298,3 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
     </div>
   );
 }
-

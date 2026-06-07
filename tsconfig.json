@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "_archive__backend",
+    "_archive__backend-main-partner",
+    "_archive__elas-frontend",
+    "_archive__emotion-ml-service"
+  ]
 }

@@ -1,3 +1,4 @@
+import { io, type Socket } from "socket.io-client";
 import { getWsBaseUrl } from "@/lib/env";
 import { getToken } from "@/lib/api/client";
 
@@ -11,27 +12,30 @@ type ChatServerPacket =
   | { type?: string; [key: string]: unknown }
   | null;
 
-function unique(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
+const REALTIME_EVENT_TYPES = new Set([
+  "message.new",
+  "notification.new",
+  "calendar.event.created",
+  "calendar.event.updated",
+  "calendar.event.deleted",
+  "material.assigned",
+  "material.unassigned",
+  "material.created",
+  "material.updated",
+  "material.deleted",
+]);
 
-function buildCandidateUrls() {
-  const base = getWsBaseUrl().replace(/\/$/, "");
-  return unique([`${base}/ws-chat`, `${base}/api/ws-chat`]);
-}
+const READY_EVENT_TYPES = new Set(["auth-ok", "auth_ok", "ready", "connect"]);
+const SUBSCRIBED_EVENT_TYPES = new Set(["subscribed", "subscribe-ok"]);
 
 export class ChatClient {
-  private socket: WebSocket | null = null;
+  private socket: Socket | null = null;
   private token: string | null = null;
-  private reconnectTimer: number | null = null;
   private onEvent: ChatEventHandler | null = null;
-  private reconnectAttempts = 0;
   private manuallyClosed = false;
   private authenticated = false;
   private pendingSubscriptions: Subscription[] = [];
   private subscribedKeys = new Set<string>();
-  private urlCandidates = buildCandidateUrls();
-  private urlIndex = 0;
 
   constructor(onEvent?: ChatEventHandler) {
     if (onEvent) this.onEvent = onEvent;
@@ -41,10 +45,6 @@ export class ChatClient {
     this.onEvent = handler;
   }
 
-  private get currentUrl() {
-    return this.urlCandidates[this.urlIndex] ?? this.urlCandidates[0] ?? "";
-  }
-
   private makeSubscriptionKey(subscription: Subscription) {
     if (subscription.scope === "session") return `session:${subscription.sessionId}`;
     if (subscription.scope === "group") return `group:${subscription.groupId}`;
@@ -52,8 +52,13 @@ export class ChatClient {
   }
 
   private send(packet: Record<string, unknown>) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
-    this.socket.send(JSON.stringify(packet));
+    if (!this.socket || !this.socket.connected) return;
+
+    const type = typeof packet.type === "string" ? packet.type : "";
+    if (!type) return;
+
+    const { type: _type, ...payload } = packet;
+    this.socket.emit(type, payload);
   }
 
   private flushSubscriptions() {
@@ -86,14 +91,52 @@ export class ChatClient {
     }
   }
 
+  private toServerPacket(eventName: string, payload: unknown): ChatServerPacket {
+    if (payload && typeof payload === "object") {
+      const packet = payload as Record<string, unknown>;
+      return {
+        ...packet,
+        type: typeof packet.type === "string" ? packet.type : eventName,
+      };
+    }
+
+    return { type: eventName, payload };
+  }
+
+  private handleServerPacket(packet: ChatServerPacket) {
+    if (!packet || typeof packet !== "object") return;
+
+    const type = typeof packet.type === "string" ? packet.type : "";
+
+    if (READY_EVENT_TYPES.has(type)) {
+      this.authenticated = true;
+      this.flushSubscriptions();
+      return;
+    }
+
+    if (REALTIME_EVENT_TYPES.has(type)) {
+      this.onEvent?.(packet);
+      return;
+    }
+
+    if (SUBSCRIBED_EVENT_TYPES.has(type)) {
+      return;
+    }
+
+    if (type === "error") {
+      const message =
+        typeof packet.message === "string" ? packet.message.toLowerCase() : "";
+
+      if (message.includes("auth")) {
+        this.authenticated = false;
+      }
+    }
+  }
+
   connect() {
     if (this.manuallyClosed) return;
 
-    if (
-      this.socket &&
-      (this.socket.readyState === WebSocket.OPEN ||
-        this.socket.readyState === WebSocket.CONNECTING)
-    ) {
+    if (this.socket?.connected || this.socket?.active) {
       return;
     }
 
@@ -103,94 +146,41 @@ export class ChatClient {
     this.manuallyClosed = false;
     this.authenticated = false;
 
-    try {
-      this.socket = new WebSocket(this.currentUrl);
-    } catch {
-      this.rotateUrlCandidate();
-      return;
-    }
+    const base = getWsBaseUrl().replace(/\/$/, "");
+    if (!base) return;
 
-    this.socket.onopen = () => {
-      this.reconnectAttempts = 0;
-      this.authenticated = false;
+    this.socket = io(base, {
+      transports: ["websocket"],
+      reconnection: true,
+      auth: { token },
+    });
+
+    this.socket.on("connect", () => {
+      this.authenticated = true;
       this.subscribedKeys.clear();
 
       if (this.token) {
         this.send({ type: "auth", token: this.token });
       }
-    };
+      this.flushSubscriptions();
+    });
 
-    this.socket.onmessage = (event) => {
-      try {
-        const packet = JSON.parse(event.data) as ChatServerPacket;
-        if (!packet || typeof packet !== "object") return;
+    this.socket.onAny((eventName, payload) => {
+      this.handleServerPacket(this.toServerPacket(eventName, payload));
+    });
 
-        const type = typeof packet.type === "string" ? packet.type : "";
-
-        if (type === "auth-ok" || type === "auth_ok" || type === "ready") {
-          this.authenticated = true;
-          this.flushSubscriptions();
-          return;
-        }
-
-        if (
-          type === "message.new" ||
-          type === "notification.new" ||
-          type === "calendar.event.created" ||
-          type === "calendar.event.updated" ||
-          type === "calendar.event.deleted" ||
-          type === "material.assigned" ||
-          type === "material.unassigned" ||
-          type === "material.created" ||
-          type === "material.updated" ||
-          type === "material.deleted"
-        ) {
-          this.onEvent?.(packet);
-          return;
-        }
-
-        if (type === "subscribed" || type === "subscribe-ok") {
-          return;
-        }
-
-        if (type === "error") {
-          const message =
-            typeof packet.message === "string" ? packet.message.toLowerCase() : "";
-
-          if (message.includes("auth")) {
-            this.authenticated = false;
-          }
-        }
-      } catch {
-        // ignore malformed packets
-      }
-    };
-
-    this.socket.onclose = () => {
-      this.socket = null;
+    this.socket.on("disconnect", () => {
       this.authenticated = false;
       this.subscribedKeys.clear();
 
-      if (this.manuallyClosed) return;
-      if (this.reconnectAttempts >= 6) return;
-      if (this.reconnectTimer !== null) return;
+      if (this.manuallyClosed) {
+        this.socket = null;
+      }
+    });
 
-      this.reconnectAttempts += 1;
-      this.rotateUrlCandidate();
-      this.reconnectTimer = window.setTimeout(() => {
-        this.reconnectTimer = null;
-        this.connect();
-      }, 1500);
-    };
-
-    this.socket.onerror = () => {
-      // onclose handles reconnect
-    };
-  }
-
-  private rotateUrlCandidate() {
-    if (this.urlCandidates.length <= 1) return;
-    this.urlIndex = (this.urlIndex + 1) % this.urlCandidates.length;
+    this.socket.on("connect_error", () => {
+      this.authenticated = false;
+    });
   }
 
   disconnect() {
@@ -198,12 +188,9 @@ export class ChatClient {
     this.authenticated = false;
     this.subscribedKeys.clear();
 
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-
-    this.socket?.close();
+    this.socket?.removeAllListeners();
+    this.socket?.offAny();
+    this.socket?.disconnect();
     this.socket = null;
   }
 

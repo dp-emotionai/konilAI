@@ -1,3 +1,4 @@
+import { io, type Socket } from "socket.io-client";
 import { getToken } from "@/lib/api/client";
 import type {
   ClientMessage,
@@ -22,10 +23,26 @@ type EventHandlers = {
 
 type PartialHandlers = Partial<EventHandlers>;
 
+function normalizeSocketIoUrl(rawUrl: string) {
+  const withHttpProtocol = rawUrl
+    .replace(/^wss:\/\//i, "https://")
+    .replace(/^ws:\/\//i, "http://");
+
+  try {
+    const url = new URL(withHttpProtocol);
+    return url.origin;
+  } catch {
+    return withHttpProtocol
+      .replace(/\/api\/ws\/?$/i, "")
+      .replace(/\/ws\/?$/i, "")
+      .replace(/\/$/, "");
+  }
+}
+
 export class SignalingClient {
   private urls: string[];
   private urlIndex = 0;
-  private socket: WebSocket | null = null;
+  private socket: Socket | null = null;
   private isOpen = false;
   private openedInCurrentConnection = false;
   private failedCandidatesInCycle = 0;
@@ -38,7 +55,13 @@ export class SignalingClient {
 
   constructor(url: string | string[]) {
     const urls = Array.isArray(url) ? url : [url];
-    this.urls = Array.from(new Set(urls.map((u) => String(u || "").trim()).filter(Boolean)));
+    this.urls = Array.from(
+      new Set(
+        urls
+          .map((u) => normalizeSocketIoUrl(String(u || "").trim()))
+          .filter(Boolean)
+      )
+    );
   }
 
   private get currentUrl() {
@@ -50,45 +73,32 @@ export class SignalingClient {
     this.urlIndex = (this.urlIndex + 1) % this.urls.length;
   }
 
-  private buildUrlWithToken() {
-    const token = getToken();
-    if (!token) return this.currentUrl;
-
-    const hasQuery = this.currentUrl.includes("?");
-    const separator = hasQuery ? "&" : "?";
-    return `${this.currentUrl}${separator}token=${encodeURIComponent(token)}`;
-  }
-
   connect() {
     if (this.closedManually) return;
 
-    if (
-      this.socket &&
-      (this.socket.readyState === WebSocket.OPEN ||
-        this.socket.readyState === WebSocket.CONNECTING)
-    ) {
+    if (this.socket?.connected || this.socket?.active) {
       return;
     }
 
     this.closedManually = false;
     this.openedInCurrentConnection = false;
 
-    try {
-      this.socket = new WebSocket(this.buildUrlWithToken());
-    } catch (error) {
-      if (this.urls.length > 1 && this.failedCandidatesInCycle < this.urls.length - 1) {
-        this.failedCandidatesInCycle += 1;
-        this.rotateUrlCandidate();
-        this.connect();
-        return;
-      }
-      this.rejectOpen?.(error);
+    const url = this.currentUrl;
+    if (!url) {
+      this.rejectOpen?.(new Error("Signaling Socket.IO URL is not configured"));
       this.rejectOpen = undefined;
       this.resolveOpen = undefined;
       return;
     }
 
-    this.socket.onopen = () => {
+    const token = getToken();
+    this.socket = io(url, {
+      transports: ["websocket"],
+      reconnection: true,
+      auth: token ? { token } : undefined,
+    });
+
+    this.socket.on("connect", () => {
       this.isOpen = true;
       this.openedInCurrentConnection = true;
       this.failedCandidatesInCycle = 0;
@@ -103,40 +113,41 @@ export class SignalingClient {
       this.resolveOpen?.();
       this.resolveOpen = undefined;
       this.rejectOpen = undefined;
-    };
+    });
 
-    this.socket.onmessage = (event) => {
-      try {
-        const msg: ServerMessage = JSON.parse(event.data);
-        this.handleServerMessage(msg);
-      } catch {
-        // ignore malformed packets
-      }
-    };
+    this.socket.onAny((eventName, payload) => {
+      this.handleServerMessage(this.toServerMessage(eventName, payload));
+    });
 
-    this.socket.onerror = () => {
+    this.socket.on("connect_error", (error) => {
       this.handlers.error?.("Ошибка соединения с signaling server.");
-    };
-
-    this.socket.onclose = () => {
-      this.isOpen = false;
-      this.socket = null;
-
-      if (this.openTimer) {
-        window.clearTimeout(this.openTimer);
-        this.openTimer = null;
-      }
 
       if (
-        !this.closedManually &&
         !this.openedInCurrentConnection &&
         this.urls.length > 1 &&
         this.failedCandidatesInCycle < this.urls.length - 1
       ) {
         this.failedCandidatesInCycle += 1;
         this.rotateUrlCandidate();
+        this.socket?.removeAllListeners();
+        this.socket?.offAny();
+        this.socket?.disconnect();
+        this.socket = null;
         this.connect();
         return;
+      }
+
+      this.rejectOpen?.(error);
+      this.rejectOpen = undefined;
+      this.resolveOpen = undefined;
+    });
+
+    this.socket.on("disconnect", () => {
+      this.isOpen = false;
+
+      if (this.openTimer) {
+        window.clearTimeout(this.openTimer);
+        this.openTimer = null;
       }
 
       this.rejectOpen?.(new Error("Signaling socket closed"));
@@ -145,12 +156,14 @@ export class SignalingClient {
 
       if (!this.closedManually) {
         this.handlers.close?.();
+      } else {
+        this.socket = null;
       }
-    };
+    });
   }
 
   waitForOpen(timeoutMs = 10000): Promise<void> {
-    if (this.isOpen && this.socket?.readyState === WebSocket.OPEN) {
+    if (this.isOpen && this.socket?.connected) {
       return Promise.resolve();
     }
 
@@ -166,7 +179,7 @@ export class SignalingClient {
         if (this.resolveOpen === resolve) {
           this.resolveOpen = undefined;
           this.rejectOpen = undefined;
-          reject(new Error("Signaling WebSocket timeout"));
+          reject(new Error("Signaling Socket.IO timeout"));
         }
       }, timeoutMs);
 
@@ -196,11 +209,13 @@ export class SignalingClient {
   leave() {
     this.closedManually = true;
 
-    if (this.isOpen && this.socket?.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify({ type: "leave" satisfies ClientMessage["type"] }));
+    if (this.isOpen && this.socket?.connected) {
+      this.emitMessage({ type: "leave" satisfies ClientMessage["type"] });
     }
 
-    this.socket?.close();
+    this.socket?.removeAllListeners();
+    this.socket?.offAny();
+    this.socket?.disconnect();
     this.socket = null;
     this.isOpen = false;
     this.queue = [];
@@ -221,25 +236,44 @@ export class SignalingClient {
   private send(msg: ClientMessage) {
     if (this.closedManually) return;
 
-    if (!this.socket || !this.isOpen || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || !this.isOpen || !this.socket.connected) {
       this.queue.push(msg);
       this.connect();
       return;
     }
 
-    this.socket.send(JSON.stringify(msg));
+    this.emitMessage(msg);
   }
 
   private flushQueue() {
-    if (!this.socket || !this.isOpen || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || !this.isOpen || !this.socket.connected) {
       return;
     }
 
     for (const msg of this.queue) {
-      this.socket.send(JSON.stringify(msg));
+      this.emitMessage(msg);
     }
 
     this.queue = [];
+  }
+
+  private emitMessage(msg: ClientMessage) {
+    if (!this.socket?.connected) return;
+
+    const { type, ...payload } = msg;
+    this.socket.emit(type, payload);
+  }
+
+  private toServerMessage(eventName: string, payload: unknown): ServerMessage {
+    if (payload && typeof payload === "object") {
+      const packet = payload as Record<string, unknown>;
+      return {
+        ...packet,
+        type: typeof packet.type === "string" ? packet.type : eventName,
+      } as ServerMessage;
+    }
+
+    return { type: eventName } as ServerMessage;
   }
 
   private handleServerMessage(msg: ServerMessage) {

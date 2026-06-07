@@ -3,25 +3,42 @@ import { cn } from "@/lib/cn";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   suffix?: React.ReactNode;
+  prefix?: React.ReactNode;
+  error?: string;
+  label?: string;
   containerClassName?: string;
 }
 
 export default function Input({
   className,
   suffix,
+  prefix,
+  error,
+  label,
   containerClassName,
+  id,
   ...props
 }: InputProps) {
+  const inputId = id ?? React.useId();
+
   const inputEl = (
     <input
+      id={inputId}
       className={cn(
-        "h-10 w-full px-4 rounded-xl text-sm",
-        "bg-white text-slate-900 placeholder:text-slate-400 whitespace-nowrap",
-        "border border-slate-200 shadow-sm",
-        "transition-all duration-200 ease-out",
-        "hover:border-slate-300",
-        "focus:outline-none focus:ring-2 focus:ring-[#7448FF] focus:border-transparent",
-        "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500",
+        "h-10 w-full text-sm",
+        "bg-surface text-fg placeholder:text-muted-2",
+        "border rounded-elas shadow-soft",
+        "transition-all duration-150 ease-out",
+        // border states
+        error
+          ? "border-error focus:ring-error/30 focus:border-error"
+          : "border-border hover:border-border-strong focus:border-primary/50 focus:ring-primary/20",
+        // focus ring
+        "focus:outline-none focus:ring-2",
+        // disabled
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-surface-subtle",
+        // padding учитывает prefix/suffix
+        prefix ? "pl-10 pr-4" : "px-4",
         suffix && "pr-10",
         className
       )}
@@ -29,14 +46,39 @@ export default function Input({
     />
   );
 
-  if (!suffix) return inputEl;
+  const wrapped = (
+    <div className={cn("relative w-full", containerClassName)}>
+      {prefix && (
+        <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-2 flex items-center">
+          {prefix}
+        </div>
+      )}
+      {inputEl}
+      {suffix && (
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-2 flex items-center">
+          {suffix}
+        </div>
+      )}
+    </div>
+  );
+
+  if (!label && !error) return suffix || prefix ? wrapped : inputEl;
 
   return (
-    <div className={cn("relative w-full", containerClassName)}>
-      {inputEl}
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 flex items-center">
-        {suffix}
-      </div>
+    <div className="flex flex-col gap-1.5 w-full">
+      {label && (
+        <label htmlFor={inputId} className="label-sm text-fg">
+          {label}
+        </label>
+      )}
+      {suffix || prefix ? wrapped : (
+        <div className={cn("relative w-full", containerClassName)}>
+          {inputEl}
+        </div>
+      )}
+      {error && (
+        <p className="text-xs text-error">{error}</p>
+      )}
     </div>
   );
 }

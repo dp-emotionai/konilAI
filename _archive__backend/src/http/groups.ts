@@ -216,7 +216,7 @@ export function registerGroupsRoutes(app: Express) {
     }
   });
 
-  // GET /groups/:id/invitations — список приглашений группы (teacher/admin)
+
   app.get("/groups/:id/invitations", authMiddleware, requireRole("teacher", "admin"), async (req, res) => {
     const user = getUser(req);
     try {
@@ -249,7 +249,6 @@ export function registerGroupsRoutes(app: Express) {
     }
   });
 
-  // POST /groups/:id/invitations — пригласить по email (teacher или admin)
   app.post("/groups/:id/invitations", authMiddleware, requireRole("teacher", "admin"), async (req, res) => {
     const user = getUser(req);
     try {
