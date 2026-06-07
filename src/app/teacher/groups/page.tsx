@@ -7,7 +7,7 @@ import { getTeacherGroups, createGroup, type TeacherGroup } from "@/lib/api/teac
 import { hasAuth, getApiBaseUrl } from "@/lib/api/client";
 import { Users, Plus, Search, LayoutGrid, List, CalendarDays } from "lucide-react";
 import Modal from "@/components/ui/Modal";
-
+import Button from "@/components/ui/Button";
 export default function TeacherGroupsPage() {
   const [q, setQ] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -71,7 +71,7 @@ export default function TeacherGroupsPage() {
 
           <button
             onClick={() => setShowCreate(true)}
-            className="mb-1 inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-[#7448FF] px-5 py-2.5 text-[14px] font-bold text-white shadow-sm transition-colors hover:bg-[#623ce6] md:self-auto"
+            className="rounded-xl bg-[#7448FF] px-5 py-2.5 text-[14px] font-bold text-white shadow-md ring-1 ring-[#7448FF]/30 transition-colors hover:bg-[#623ce6] hover:shadow-lg disabled:cursor-not-allowed disabled:bg-[#8B6CFF] disabled:text-white disabled:shadow-sm disabled:hover:bg-[#8B6CFF]"
           >
             <Plus size={18} /> Добавить группу
           </button>
@@ -219,20 +219,22 @@ export default function TeacherGroupsPage() {
               />
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-50 pt-4">
-              <button
-                onClick={() => setShowCreate(false)}
-                className="rounded-xl bg-slate-50 px-5 py-2.5 text-[14px] font-bold text-slate-600 transition-colors hover:bg-slate-100"
-              >
-                Отмена
-              </button>
-              <button
-                onClick={handleCreateGroup}
-                disabled={creating || !newGroupName.trim()}
-                className="rounded-xl bg-[#7448FF] px-5 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[#623ce6] disabled:opacity-50"
-              >
-                {creating ? "Создание..." : "Добавить"}
-              </button>
-            </div>
+  <Button
+    type="button"
+    variant="outline"
+    onClick={() => setShowCreate(false)}
+  >
+    Отмена
+  </Button>
+
+  <Button
+    type="button"
+    onClick={handleCreateGroup}
+    disabled={creating || !newGroupName.trim()}
+  >
+    {creating ? "Создание..." : "Добавить"}
+  </Button>
+</div>
           </div>
         </div>
       </Modal>
