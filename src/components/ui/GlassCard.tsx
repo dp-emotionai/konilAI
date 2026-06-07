@@ -12,8 +12,7 @@ export default function GlassCard({
       className={cn(
         "rounded-elas-lg",
         "border border-[color:var(--border)]",
-        "bg-surface/80 shadow-sm",
-        "backdrop-blur-xl",
+        "bg-surface shadow-sm",
         "transition-shadow transition-colors",
         "hover:shadow-md hover:border-[color:var(--border-strong)]",
         className
