@@ -536,167 +536,241 @@ export default function TeacherGroupDetailPage() {
       </Section>
 
       <Section spacing="none">
-        <Card
-  variant="elevated"
-  className="overflow-hidden rounded-[32px] border border-white/10 bg-white dark:bg-zinc-900 shadow-[0_20px_80px_rgba(0,0,0,.08)]"
->
-  {/* HERO */}
-  <div
-    className="relative h-[190px] md:h-[220px]"
-    style={
-      groupImageUrl
-        ? {
-            backgroundImage: `url(${groupImageUrl})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }
-        : {
-            background:
-              "linear-gradient(135deg,#7C3AED 0%,#8B5CF6 45%,#6366F1 100%)",
-          }
-    }
-  >
-    <div
-      className="absolute inset-0 opacity-20"
-      style={{
-        backgroundImage:
-          "radial-gradient(circle, rgba(255,255,255,.7) 1px, transparent 1px)",
-        backgroundSize: "22px 22px",
-      }}
-    />
+        <Card variant="elevated" className="overflow-hidden">
+          <div
+            className="relative h-36 w-full bg-gradient-to-br from-primary-muted/40 to-primary-muted/10 md:h-44"
+            style={
+              groupImageUrl
+                ? {
+                    backgroundImage: `url(${groupImageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          </div>
 
-    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/10 to-transparent" />
-  </div>
+          <CardContent className="relative -mt-16 px-6 pb-6 md:-mt-20 md:px-8 md:pb-8">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+              <div className="flex min-w-0 items-end gap-4">
+                <input
+                  ref={groupImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => void handleGroupImageUpload(event.target.files?.[0] ?? null)}
+                  disabled={uploadingGroupImage}
+                />
+                {groupImageUrl ? (
+                  <div className="relative group/avatar">
+                    <div
+                      className="h-24 w-24 shrink-0 rounded-3xl bg-surface-subtle bg-cover bg-center shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28"
+                      style={{ backgroundImage: `url(${groupImageUrl})` }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => groupImageInputRef.current?.click()}
+                      className="absolute inset-0 flex items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                      title="Сменить фото (скоро)"
+                    >
+                      <ImagePlus size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative group/avatar">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-muted to-primary-muted/60 text-3xl font-bold text-[rgb(var(--primary))] shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28 md:text-4xl">
+                      {group.name.slice(0, 2).toUpperCase()}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => groupImageInputRef.current?.click()}
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
+                      title="Добавить фото группы (скоро)"
+                    >
+                      <ImagePlus size={18} />
+                      <span>Фото</span>
+                    </button>
+                  </div>
+                )}
 
-  <CardContent className="relative -mt-24 px-8 pb-8">
-    <div className="flex flex-col gap-6 lg:flex-row lg:items-end">
-      <div className="flex items-end gap-5">
-        <input
-          ref={groupImageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) =>
-            void handleGroupImageUpload(e.target.files?.[0] ?? null)
-          }
-        />
+                <div className="min-w-0 pb-1">
+                  {editingName ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        value={localName}
+                        onChange={(e) => setLocalName(e.target.value)}
+                        className="max-w-xs rounded-xl text-lg font-semibold"
+                        autoFocus
+                      />
+                      <Button size="sm" onClick={() => setEditingName(false)}>
+                        Сохранить
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setLocalName(group.name);
+                          setEditingName(false);
+                        }}
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <h1 className="truncate text-2xl font-bold text-fg md:text-3xl">
+                        {localName || group.name}
+                      </h1>
+                      <button
+                        type="button"
+                        onClick={() => setEditingName(true)}
+                        className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
+                        aria-label="Редактировать название"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                    </div>
+                  )}
 
-        {/* AVATAR */}
-        <div className="relative group">
-          {groupImageUrl ? (
-            <div
-              className="h-32 w-32 rounded-[28px] bg-cover bg-center shadow-2xl ring-4 ring-white dark:ring-zinc-900"
-              style={{ backgroundImage: `url(${groupImageUrl})` }}
-            />
-          ) : (
-            <div className="flex h-32 w-32 items-center justify-center rounded-[28px] bg-white text-4xl font-bold text-violet-700 shadow-2xl ring-4 ring-white dark:ring-zinc-900">
-              {group.name.slice(0, 2).toUpperCase()}
+                  <p className="mt-1 text-sm text-muted">
+                    {group.program} · {membersCount} студентов
+                    {apiAvailable && pendingCount > 0 && ` · ${pendingCount} приглашений`}
+                  </p>
+                  {groupImageMessage && (
+                    <p
+                      className={cn(
+                        "mt-2 text-xs font-medium",
+                        groupImageMessage.type === "error" ? "text-rose-500" : "text-emerald-600"
+                      )}
+                    >
+                      {groupImageMessage.text}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="sm:ml-auto flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 rounded-xl"
+                  onClick={() => groupImageInputRef.current?.click()}
+                  disabled={uploadingGroupImage}
+                >
+                  <ImagePlus size={16} />
+                  {uploadingGroupImage ? "Загрузка..." : "Фото группы"}
+                </Button>
+                {groupImageUrl && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={() => void handleGroupImageDelete()}
+                    disabled={uploadingGroupImage}
+                  >
+                    Удалить фото
+                  </Button>
+                )}
+                {apiAvailable && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 rounded-xl"
+                    onClick={openInviteModal}
+                  >
+                    <UserPlus size={16} />
+                    Пригласить
+                  </Button>
+                )}
+                <ToneBadge tone={group.status === "active" ? "success" : "neutral"}>
+                  {group.status === "active" ? "Активна" : "В архиве"}
+                </ToneBadge>
+                <Badge className="bg-surface-subtle text-muted">{group.id}</Badge>
+              </div>
             </div>
-          )}
 
-          <button
-            onClick={() => groupImageInputRef.current?.click()}
-            className="absolute inset-0 rounded-[28px] bg-black/50 opacity-0 transition group-hover:opacity-100"
-          />
-        </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <StatTile
+                label="Преподаватель"
+                value={group.teacher.fullName}
+                icon={<Users size={15} className="text-muted" />}
+              />
+              <StatTile
+                label="Студентов"
+                value={`${membersCount}`}
+                icon={<GraduationCap size={15} className="text-muted" />}
+              />
+              <StatTile
+                label="Сессий"
+                value={`${sessions.length}`}
+                icon={<CalendarDays size={15} className="text-muted" />}
+              />
+              <StatTile
+                label="Программа"
+                value={group.program}
+                icon={<BookOpen size={15} className="text-muted" />}
+              />
+            </div>
 
-        {/* TITLE */}
-        <div className="pb-3">
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold md:text-4xl">
-              {localName || group.name}
-            </h1>
-
-            <button
-              onClick={() => setEditingName(true)}
-              className="rounded-lg p-2 hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <Edit3 size={16} />
-            </button>
-          </div>
-
-          <p className="mt-2 text-sm text-muted">
-            {group.program} • {membersCount} студентов
-          </p>
-        </div>
-      </div>
-
-      <div className="lg:ml-auto flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => groupImageInputRef.current?.click()}
-        >
-          Фото группы
-        </Button>
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={openInviteModal}
-        >
-          Пригласить
-        </Button>
-
-        <ToneBadge tone="success">
-          Активна
-        </ToneBadge>
-      </div>
-    </div>
-
-    {/* KPI */}
-    <div className="mt-8 overflow-hidden rounded-[24px] border border-black/5 dark:border-white/5 bg-white dark:bg-zinc-950">
-      <div className="grid md:grid-cols-4">
-        <div className="p-6">
-          <div className="text-xs uppercase text-muted">
-            Преподаватель
-          </div>
-          <div className="mt-2 font-semibold">
-            {group.teacher.fullName}
-          </div>
-        </div>
-
-        <div className="border-l border-black/5 dark:border-white/5 p-6">
-          <div className="text-xs uppercase text-muted">
-            Студентов
-          </div>
-          <div className="mt-2 text-3xl font-bold">
-            {membersCount}
-          </div>
-        </div>
-
-        <div className="border-l border-black/5 dark:border-white/5 p-6">
-          <div className="text-xs uppercase text-muted">
-            Сессий
-          </div>
-          <div className="mt-2 text-3xl font-bold">
-            {sessions.length}
-          </div>
-        </div>
-
-        <div className="border-l border-black/5 dark:border-white/5 p-6">
-          <div className="text-xs uppercase text-muted">
-            Программа
-          </div>
-          <div className="mt-2 font-semibold">
-            {group.program}
-          </div>
-        </div>
-      </div>
-    </div>
-  </CardContent>
-</Card>
+            <div className="mt-5 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4">
+              {editingDesc ? (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted">Описание группы</label>
+                  <Input
+                    value={localDescription}
+                    onChange={(e) => setLocalDescription(e.target.value)}
+                    placeholder="Краткое описание курса или группы…"
+                    className="rounded-xl"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => setEditingDesc(false)}>
+                      Сохранить
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setLocalDescription(groupDescriptionValue);
+                        setEditingDesc(false);
+                      }}
+                    >
+                      Отмена
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-3">
+                  <div className="flex-1">
+                    <div className="text-xs uppercase tracking-wide text-muted">Описание</div>
+                    <p className="mt-2 text-sm leading-relaxed text-muted">
+                      {localDescription ||
+                        groupDescriptionValue ||
+                        "Добавьте короткое описание группы, чтобы преподавателю и студентам было проще ориентироваться."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingDesc(true)}
+                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
+                    aria-label="Редактировать описание"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </Section>
 
-      <Card variant="elevated" className="rounded-[28px]">
-  <CardContent className="p-8">
-    <h2 className="mb-6 text-xl font-semibold">
-      Аналитика группы
-    </h2>
+      {id && (
+        <Section>
+          <GroupAnalyticsSection groupId={id} />
+        </Section>
+      )}
 
-    <GroupAnalyticsSection groupId={id} />
-  </CardContent>
-</Card>
       <Section>
         <div className="mb-5 flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3">
           <TabButton
