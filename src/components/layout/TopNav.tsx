@@ -41,8 +41,14 @@ import {
 import { useUI } from "./Providers";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
-import { getNotifications, markNotificationRead, type NotificationRow } from "@/lib/api/notifications";
+import {
+  getNotifications,
+  markNotificationRead,
+  type NotificationRow,
+} from "@/lib/api/notifications";
 import { ChatClient } from "@/lib/ws/chatClient";
+
+// ─── Стили ───────────────────────────────────────────────────────────────────
 
 const DROPDOWN_PANEL =
   "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
@@ -73,6 +79,8 @@ const PUBLIC_ICONS: Record<
   HelpCircle,
 };
 
+// ─── Иконка логотипа ──────────────────────────────────────────────────────────
+
 function KonilAILogoIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -91,6 +99,8 @@ function KonilAILogoIcon({ className }: { className?: string }) {
   );
 }
 
+// ─── Логотип ──────────────────────────────────────────────────────────────────
+
 function Logo({ href = "/" }: { href?: string }) {
   const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
 
@@ -106,6 +116,8 @@ function Logo({ href = "/" }: { href?: string }) {
     </Link>
   );
 }
+
+// ─── Ссылка навигации ─────────────────────────────────────────────────────────
 
 function NavLink({
   href,
@@ -134,34 +146,40 @@ function NavLink({
   );
 }
 
+// ─── Публичный пункт навигации ────────────────────────────────────────────────
+
 function PublicNavItem({ item }: { item: NavItem }) {
   const path = usePathname();
   const safePath = typeof path === "string" ? path : "";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // FIX: объединили два useEffect в один для readability
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
-
-    if (open) document.addEventListener("mousedown", onOutside);
-    return () => document.removeEventListener("mousedown", onOutside);
-  }, [open]);
-
-  useEffect(() => {
-    if (item.type === "link" || !open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    if (open) {
+      document.addEventListener("mousedown", onOutside);
+      if (item.type !== "link") window.addEventListener("keydown", onKey);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, item.type]);
 
   if (item.type === "link") {
-    return <NavLink href={item.href} label={item.label} active={safePath === item.href} />;
+    return (
+      <NavLink href={item.href} label={item.label} active={safePath === item.href} />
+    );
   }
 
   const dropdown = item as NavDropdownItem;
@@ -172,7 +190,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="true"
         className={cn(
@@ -184,7 +202,10 @@ function PublicNavItem({ item }: { item: NavItem }) {
         )}
       >
         {dropdown.label}
-        <ChevronDown size={14} className={cn("transition-transform duration-200", open && "rotate-180")} />
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform duration-200", open && "rotate-180")}
+        />
       </button>
 
       {open && (
@@ -204,7 +225,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                 href={child.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
+                  "flex items-center gap-3 rounded-lg text-sm text-fg transition-all hover:bg-black/[0.04]",
                   hasCardStyle ? "px-4 py-3" : "px-3 py-2"
                 )}
               >
@@ -213,12 +234,14 @@ function PublicNavItem({ item }: { item: NavItem }) {
                     <IconComp size={18} />
                   </span>
                 )}
-
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-fg">{child.label}</div>
-                  {child.subtitle && <div className="mt-0.5 truncate text-xs text-muted">{child.subtitle}</div>}
+                  {child.subtitle && (
+                    <div className="mt-0.5 truncate text-xs text-muted">
+                      {child.subtitle}
+                    </div>
+                  )}
                 </div>
-
                 <ChevronRight size={16} className="shrink-0 text-muted" />
               </Link>
             );
@@ -228,6 +251,8 @@ function PublicNavItem({ item }: { item: NavItem }) {
     </div>
   );
 }
+
+// ─── Пункт навигации приложения ───────────────────────────────────────────────
 
 function AppNavItem({
   item,
@@ -247,18 +272,19 @@ function AppNavItem({
         setOpen(false);
       }
     };
-
-    if (open) document.addEventListener("mousedown", onOutside);
-    return () => document.removeEventListener("mousedown", onOutside);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+
+    if (open) {
+      document.addEventListener("mousedown", onOutside);
+      window.addEventListener("keydown", onKey);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", onOutside);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   if (item.type === "link") {
@@ -266,14 +292,19 @@ function AppNavItem({
       !!safePath &&
       (safePath === item.href ||
         safePath.startsWith(`${item.href}/`) ||
-        (safePath.startsWith("/teacher/session/") && item.href.includes("filter=live")));
+        (safePath.startsWith("/teacher/session/") &&
+          item.href.includes("filter=live")));
 
     return (
       <NavLink
         href={item.href}
         label={item.label}
         active={active}
-        className={"badge" in item && item.badge === "live" && liveSessionId ? "text-[rgb(var(--primary))]" : undefined}
+        className={
+          "badge" in item && item.badge === "live" && liveSessionId
+            ? "text-[rgb(var(--primary))]"
+            : undefined
+        }
       />
     );
   }
@@ -285,16 +316,22 @@ function AppNavItem({
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="true"
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40",
           open
             ? "bg-surface-subtle/80 text-fg"
             : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
         )}
       >
         {dropdown.label}
-        <ChevronDown size={14} className={cn("transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", open && "rotate-180")}
+        />
       </button>
 
       {open && (
@@ -306,12 +343,16 @@ function AppNavItem({
               onClick={() => setOpen(false)}
               className={cn(
                 "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
-                child.accent ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70" : ""
+                child.accent
+                  ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70"
+                  : ""
               )}
             >
               <span className="truncate">{child.label}</span>
               {child.badge === "live" && liveSessionId ? (
-                <span className="text-[10px] uppercase text-[rgb(var(--primary))]">Live</span>
+                <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
+                  Live
+                </span>
               ) : !child.accent ? (
                 <ChevronRight size={14} className="shrink-0 text-muted" />
               ) : null}
@@ -322,6 +363,8 @@ function AppNavItem({
     </div>
   );
 }
+
+// ─── Главный компонент ────────────────────────────────────────────────────────
 
 export default function TopNav() {
   const router = useRouter();
@@ -340,25 +383,36 @@ export default function TopNav() {
 
   const safeRole: Role | null = state.role ?? null;
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
-  const appNavItems = useMemo(() => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []), [safeRole]);
+  const appNavItems = useMemo(
+    () => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []),
+    [safeRole]
+  );
   const consentRequired = Boolean(state.loggedIn && !state.consent);
-  const unreadCount = useMemo(() => notifications.filter((n) => !n.isRead).length, [notifications]);
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
 
+  // FIX: одна функция загрузки уведомлений
   const loadNotifications = useCallback(async (signal?: AbortSignal) => {
     setNotificationsLoading(true);
     try {
       const list = await getNotifications({ signal });
       setNotifications(Array.isArray(list) ? list : []);
     } catch {
-      setNotifications([]);
+      // Игнорируем ошибки (включая AbortError при размонтировании)
     } finally {
       setNotificationsLoading(false);
     }
   }, []);
 
+  // FIX: закрытие dropdown по клику снаружи
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
-      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(e.target as Node)
+      ) {
         setProfileOpen(false);
       }
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -373,22 +427,8 @@ export default function TopNav() {
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen, notifOpen]);
 
-  useEffect(() => {
-    if (!state.loggedIn || !notifOpen) return;
-
-    const controller = new AbortController();
-    void loadNotifications(controller.signal);
-
-    const interval = window.setInterval(() => {
-      void loadNotifications();
-    }, 30000);
-
-    return () => {
-      controller.abort();
-      window.clearInterval(interval);
-    };
-  }, [loadNotifications, notifOpen, state.loggedIn]);
-
+  // FIX: один useEffect для периодической загрузки уведомлений (каждые 60 сек)
+  // При открытии панели — немедленный рефреш без дублирующего интервала
   useEffect(() => {
     if (!state.loggedIn) {
       setNotifications([]);
@@ -397,9 +437,10 @@ export default function TopNav() {
 
     const controller = new AbortController();
     void loadNotifications(controller.signal);
+
     const interval = window.setInterval(() => {
       void loadNotifications();
-    }, 60000);
+    }, 60_000);
 
     return () => {
       controller.abort();
@@ -407,12 +448,22 @@ export default function TopNav() {
     };
   }, [loadNotifications, state.loggedIn]);
 
+  // FIX: при открытии панели — разовый немедленный рефреш (без отдельного интервала)
+  useEffect(() => {
+    if (!state.loggedIn || !notifOpen) return;
+    void loadNotifications();
+  }, [loadNotifications, notifOpen, state.loggedIn]);
+
+  // WebSocket уведомления в реальном времени
   useEffect(() => {
     if (!state.loggedIn) return;
 
     const client = new ChatClient((packet) => {
       if (!packet || typeof packet !== "object") return;
-      const payload = packet as { type?: string; event?: Partial<NotificationRow> };
+      const payload = packet as {
+        type?: string;
+        event?: Partial<NotificationRow>;
+      };
       if (payload.type !== "notification.new" || !payload.event?.id) return;
 
       const event = payload.event;
@@ -440,6 +491,7 @@ export default function TopNav() {
     return () => client.disconnect();
   }, [state.loggedIn]);
 
+  // FIX: Escape для профиля
   useEffect(() => {
     if (!profileOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -462,298 +514,364 @@ export default function TopNav() {
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
+      {/*
+        FIX: Правильная трёхколоночная структура навбара.
+        Было: [div.flex-1 { лого + nav + bell + avatar }] [div { bell + avatar }]
+        Стало: [лого] [nav по центру] [правые кнопки]
+        justify-between + flex-1 на nav гарантируют реальное центрирование.
+      */}
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex items-center justify-between gap-3 flex-1 lg:flex-none">
-          <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-            <Logo href="/" />
-          </div>
 
-          <nav className="hidden max-w-2xl flex-1 items-center justify-center gap-0.5 lg:flex">
-            {!state.loggedIn &&
-              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
-                <PublicNavItem key={item.type === "dropdown" ? item.label : item.href} item={item} />
-              ))}
+        {/* Левая часть — только логотип */}
+        <div className="flex shrink-0 items-center">
+          <Logo href="/" />
+        </div>
 
-            {state.loggedIn &&
-              appNavItems.map((item) => (
-                <AppNavItem
+        {/* Центральная навигация — реально по центру через flex-1 */}
+        <nav className="hidden flex-1 items-center justify-center gap-0.5 lg:flex">
+          {!state.loggedIn &&
+            (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
+              (item) => (
+                <PublicNavItem
                   key={item.type === "dropdown" ? item.label : item.href}
                   item={item}
-                  liveSessionId={liveSession?.id ?? null}
                 />
-              ))}
-          </nav>
-
-          <div className="flex shrink-0 items-center gap-2">
-            {state.loggedIn && safeRole === "teacher" && liveSession && (
-              <Link
-                href={`/teacher/session/${liveSession.id}`}
-                className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
-              >
-                LIVE •{" "}
-                {typeof liveSession.title === "string" && liveSession.title.length > 18
-                  ? `${liveSession.title.slice(0, 18)}…`
-                  : liveSession.title}
-              </Link>
+              )
             )}
 
-            {state.loggedIn && (
-              <>
-                <div className="relative hidden md:inline-flex" ref={notifRef}>
-                  <button
-                    type="button"
-                    onClick={() => setNotifOpen((value) => !value)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
-                    aria-label="Уведомления"
-                  >
-                    <span className="relative inline-flex">
-                      <Bell size={18} />
-                      {unreadCount > 0 && (
-                        <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
-                          {unreadCount > 9 ? "9+" : unreadCount}
-                        </span>
-                      )}
-                    </span>
-                  </button>
+          {state.loggedIn &&
+            appNavItems.map((item) => (
+              <AppNavItem
+                key={item.type === "dropdown" ? item.label : item.href}
+                item={item}
+                liveSessionId={liveSession?.id ?? null}
+              />
+            ))}
+        </nav>
 
-                  {notifOpen && (
-                    <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5">
-                      <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
-                        Уведомления
+        {/* Правая часть — live-badge, bell, avatar, mobile-меню */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Live session badge */}
+          {state.loggedIn && safeRole === "teacher" && liveSession && (
+            <Link
+              href={`/teacher/session/${liveSession.id}`}
+              className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
+            >
+              LIVE •{" "}
+              {typeof liveSession.title === "string" &&
+              liveSession.title.length > 18
+                ? `${liveSession.title.slice(0, 18)}…`
+                : liveSession.title}
+            </Link>
+          )}
+
+          {state.loggedIn && (
+            <>
+              {/* Колокольчик уведомлений */}
+              <div className="relative hidden md:inline-flex" ref={notifRef}>
+                <button
+                  type="button"
+                  onClick={() => setNotifOpen((v) => !v)}
+                  aria-expanded={notifOpen}
+                  aria-haspopup="true"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
+                  aria-label="Уведомления"
+                >
+                  <span className="relative inline-flex">
+                    <Bell size={18} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </span>
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5">
+                    <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
+                      Уведомления
+                    </div>
+
+                    {notificationsLoading ? (
+                      <div className="py-6 text-center text-[13px] font-medium text-slate-500">
+                        Загружаем...
                       </div>
-
-                      {notificationsLoading ? (
-                        <div className="py-6 text-center text-[13px] font-medium text-slate-500">
-                          Р—Р°РіСЂСѓР¶Р°РµРј...
-                        </div>
-                      ) : notifications.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
-                          <Bell className="mb-2 text-slate-300" size={24} />
-                          <div className="text-[13px] font-medium leading-relaxed">
-                            РЈ РІР°СЃ РїРѕРєР° РЅРµС‚ РЅРѕРІС‹С… СѓРІРµРґРѕРјР»РµРЅРёР№
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-                          {notifications.slice(0, 20).map((n) => {
-                            const sessionId =
-                              n.data && typeof (n.data as any).sessionId === "string"
-                                ? String((n.data as any).sessionId)
-                                : null;
-
-                            return (
-                              <button
-                                key={n.id}
-                                type="button"
-                                onClick={async () => {
-                                  try {
-                                    if (!n.isRead) {
-                                      await markNotificationRead(n.id);
-                                      setNotifications((prev) =>
-                                        prev.map((x) =>
-                                          x.id === n.id
-                                            ? { ...x, isRead: true, readAt: new Date().toISOString() }
-                                            : x
-                                        )
-                                      );
-                                    }
-                                  } catch {}
-
-                                  if (sessionId) {
-                                    const prefix =
-                                      safeRole === "teacher" ? "/teacher/session/" : "/student/session/";
-                                    router.push(`${prefix}${sessionId}`);
-                                    setNotifOpen(false);
-                                  }
-                                }}
-                                className={cn(
-                                  "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
-                                  n.isRead
-                                    ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
-                                    : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
-                                )}
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="truncate text-[13px] font-bold text-slate-900">{n.title}</div>
-                                    {n.body && (
-                                      <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
-                                        {n.body}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {!n.isRead && (
-                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
-                                  )}
-                                </div>
-                                <div className="mt-2 text-[11px] font-semibold text-slate-400">
-                                  {new Date(n.createdAt).toLocaleString("ru-RU", {
-                                    day: "2-digit",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {false && (<div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                    ) : notifications.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
                         <Bell className="mb-2 text-slate-300" size={24} />
                         <div className="text-[13px] font-medium leading-relaxed">
                           У вас пока нет новых уведомлений
                         </div>
-                      </div>)}
-                    </div>
-                  )}
-                </div>
-
-                <div className="relative" ref={profileRef}>
-                  <button
-                    type="button"
-                    onClick={() => setProfileOpen((value) => !value)}
-                    aria-expanded={profileOpen}
-                    aria-haspopup="true"
-                    className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
-                    aria-label="Меню аккаунта"
-                  >
-                    {state.avatarUrl ? (
-                      <img
-                        src={resolveAvatarUrl(state.avatarUrl, state.avatarVersion)!}
-                        alt={state.fullName || "User"}
-                        className="h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
+                      </div>
                     ) : (
-                      <User size={18} />
+                      <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                        {notifications.slice(0, 20).map((n) => {
+                          const sessionId =
+                            n.data &&
+                            typeof (n.data as Record<string, unknown>)
+                              .sessionId === "string"
+                              ? String(
+                                  (n.data as Record<string, unknown>).sessionId
+                                )
+                              : null;
+
+                          return (
+                            <button
+                              key={n.id}
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  if (!n.isRead) {
+                                    await markNotificationRead(n.id);
+                                    setNotifications((prev) =>
+                                      prev.map((x) =>
+                                        x.id === n.id
+                                          ? {
+                                              ...x,
+                                              isRead: true,
+                                              readAt: new Date().toISOString(),
+                                            }
+                                          : x
+                                      )
+                                    );
+                                  }
+                                } catch {
+                                  // silently ignore
+                                }
+
+                                if (sessionId) {
+                                  const prefix =
+                                    safeRole === "teacher"
+                                      ? "/teacher/session/"
+                                      : "/student/session/";
+                                  router.push(`${prefix}${sessionId}`);
+                                  setNotifOpen(false);
+                                }
+                              }}
+                              className={cn(
+                                "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
+                                n.isRead
+                                  ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
+                                  : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
+                              )}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-[13px] font-bold text-slate-900">
+                                    {n.title}
+                                  </div>
+                                  {n.body && (
+                                    <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
+                                      {n.body}
+                                    </div>
+                                  )}
+                                </div>
+                                {!n.isRead && (
+                                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
+                                )}
+                              </div>
+                              <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                                {new Date(n.createdAt).toLocaleString("ru-RU", {
+                                  day: "2-digit",
+                                  month: "short",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </button>
-
-                  {profileOpen && (
-                    <div className={cn("absolute right-0 top-full z-50 mt-2 min-w-[220px] p-2", DROPDOWN_PANEL)}>
-                      {state.fullName && (
-                        <div className="px-3 py-1 text-[13px] font-bold text-fg truncate">{state.fullName}</div>
-                      )}
-
-                      <Link
-                        href="/profile"
-                        onClick={() => setProfileOpen(false)}
-                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all", DROPDOWN_ITEM)}
-                      >
-                        <User size={16} />
-                        Профиль
-                      </Link>
-
-                      <Link
-                        href="/settings"
-                        onClick={() => setProfileOpen(false)}
-                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden", DROPDOWN_ITEM)}
-                      >
-                        <Settings size={16} />
-                        Настройки
-                      </Link>
-
-                      <Link
-                        href="/docs"
-                        onClick={() => setProfileOpen(false)}
-                        className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all", DROPDOWN_ITEM)}
-                      >
-                        <HelpCircle size={16} />
-                        Помощь
-                      </Link>
-
-                      {consentRequired && (
-                        <Link
-                          href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
-                          onClick={() => setProfileOpen(false)}
-                          className={cn("flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all", DROPDOWN_ITEM)}
-                        >
-                          <ShieldCheck size={16} />
-                          Нужно согласие
-                        </Link>
-                      )}
-
-                      <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
-
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all", DROPDOWN_ITEM)}
-                      >
-                        <LogOut size={16} />
-                        Выйти
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {!state.loggedIn && (
-              <div className="flex items-center gap-2">
-                {NAV_PUBLIC_RIGHT?.signIn?.href && (
-                  <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
-                    <Button variant="outline" size="sm">
-                      {NAV_PUBLIC_RIGHT.signIn.label}
-                    </Button>
-                  </Link>
-                )}
-
-                {NAV_PUBLIC_RIGHT?.getStarted?.href && (
-                  <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
-                    <Button size="sm">{NAV_PUBLIC_RIGHT.getStarted.label}</Button>
-                  </Link>
+                  </div>
                 )}
               </div>
-            )}
 
-            <button
-              type="button"
-              aria-label="Открыть меню"
-              onClick={() => setMobileOpen((value) => !value)}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
-            >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          </div>
+              {/* Аватар / профиль */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((v) => !v)}
+                  aria-expanded={profileOpen}
+                  aria-haspopup="true"
+                  className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                  aria-label="Меню аккаунта"
+                >
+                  {state.avatarUrl ? (
+                    <img
+                      src={resolveAvatarUrl(
+                        state.avatarUrl,
+                        state.avatarVersion
+                      )!}
+                      alt={state.fullName || "User"}
+                      className="h-full w-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <User size={18} />
+                  )}
+                </button>
+
+                {profileOpen && (
+                  <div
+                    className={cn(
+                      "absolute right-0 top-full z-50 mt-2 min-w-[220px] p-2",
+                      DROPDOWN_PANEL
+                    )}
+                  >
+                    {state.fullName && (
+                      <div className="truncate px-3 py-1 text-[13px] font-bold text-fg">
+                        {state.fullName}
+                      </div>
+                    )}
+
+                    <Link
+                      href="/profile"
+                      onClick={() => setProfileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                        DROPDOWN_ITEM
+                      )}
+                    >
+                      <User size={16} />
+                      Профиль
+                    </Link>
+
+                    <Link
+                      href="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden",
+                        DROPDOWN_ITEM
+                      )}
+                    >
+                      <Settings size={16} />
+                      Настройки
+                    </Link>
+
+                    <Link
+                      href="/docs"
+                      onClick={() => setProfileOpen(false)}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                        DROPDOWN_ITEM
+                      )}
+                    >
+                      <HelpCircle size={16} />
+                      Помощь
+                    </Link>
+
+                    {consentRequired && (
+                      <Link
+                        href={`/consent?next=${encodeURIComponent(
+                          safePathname || "/"
+                        )}`}
+                        onClick={() => setProfileOpen(false)}
+                        className={cn(
+                          "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all",
+                          DROPDOWN_ITEM
+                        )}
+                      >
+                        <ShieldCheck size={16} />
+                        Нужно согласие
+                      </Link>
+                    )}
+
+                    <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
+
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all",
+                        DROPDOWN_ITEM
+                      )}
+                    >
+                      <LogOut size={16} />
+                      Выйти
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Кнопки для незалогиненных */}
+          {!state.loggedIn && (
+            <div className="flex items-center gap-2">
+              {NAV_PUBLIC_RIGHT?.signIn?.href && (
+                <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
+                  <Button variant="outline" size="sm">
+                    {NAV_PUBLIC_RIGHT.signIn.label}
+                  </Button>
+                </Link>
+              )}
+
+              {NAV_PUBLIC_RIGHT?.getStarted?.href && (
+                <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
+                  <Button size="sm">{NAV_PUBLIC_RIGHT.getStarted.label}</Button>
+                </Link>
+              )}
+            </div>
+          )}
+
+          {/* Бургер — только на мобильных */}
+          <button
+            type="button"
+            aria-label={mobileOpen ? "Закрыть меню" : "Открыть меню"}
+            onClick={() => setMobileOpen((v) => !v)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
+          >
+            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
       </div>
 
+      {/* Мобильное меню */}
       {mobileOpen && (
         <div className="border-b border-[color:var(--border)] bg-white/[0.97] shadow-elevated backdrop-blur-xl lg:hidden">
           <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
             {!state.loggedIn &&
-              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map((item) => (
-                <div key={item.type === "dropdown" ? item.label : item.href}>
-                  {item.type === "link" ? (
-                    <Link
-                      href={typeof item.href === "string" ? item.href : "/"}
-                      onClick={() => setMobileOpen(false)}
-                      className="block py-2 text-fg"
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <div className="py-2">
-                      <div className="text-sm font-medium text-muted">{(item as NavDropdownItem).label}</div>
-                      <div className="mt-1 space-y-1 pl-3">
-                        {((item as NavDropdownItem).children ?? []).map((child) => (
-                          <Link
-                            key={child.href}
-                            href={typeof child.href === "string" ? child.href : "/"}
-                            onClick={() => setMobileOpen(false)}
-                            className="block py-1.5 text-sm text-fg"
-                          >
-                            {child.label}
-                          </Link>
-                        ))}
+              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
+                (item) => (
+                  <div key={item.type === "dropdown" ? item.label : item.href}>
+                    {item.type === "link" ? (
+                      <Link
+                        href={typeof item.href === "string" ? item.href : "/"}
+                        onClick={() => setMobileOpen(false)}
+                        className="block py-2 text-fg"
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <div className="py-2">
+                        <div className="text-sm font-medium text-muted">
+                          {(item as NavDropdownItem).label}
+                        </div>
+                        <div className="mt-1 space-y-1 pl-3">
+                          {((item as NavDropdownItem).children ?? []).map(
+                            (child) => (
+                              <Link
+                                key={child.href}
+                                href={
+                                  typeof child.href === "string"
+                                    ? child.href
+                                    : "/"
+                                }
+                                onClick={() => setMobileOpen(false)}
+                                className="block py-1.5 text-sm text-fg"
+                              >
+                                {child.label}
+                              </Link>
+                            )
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                )
+              )}
 
             {state.loggedIn && (
               <>
@@ -763,10 +881,14 @@ export default function TopNav() {
                   </div>
                   <div className="mt-2 space-y-1">
                     {appNavItems.map((item) => (
-                      <div key={item.type === "dropdown" ? item.label : item.href}>
+                      <div
+                        key={item.type === "dropdown" ? item.label : item.href}
+                      >
                         {item.type === "link" ? (
                           <Link
-                            href={typeof item.href === "string" ? item.href : "/"}
+                            href={
+                              typeof item.href === "string" ? item.href : "/"
+                            }
                             onClick={() => setMobileOpen(false)}
                             className="block py-2 text-fg"
                           >
@@ -774,18 +896,26 @@ export default function TopNav() {
                           </Link>
                         ) : (
                           <div className="py-2">
-                            <div className="text-sm font-medium text-muted">{(item as NavDropdownItem).label}</div>
+                            <div className="text-sm font-medium text-muted">
+                              {(item as NavDropdownItem).label}
+                            </div>
                             <div className="mt-1 space-y-1 pl-3">
-                              {((item as NavDropdownItem).children ?? []).map((child) => (
-                                <Link
-                                  key={child.href}
-                                  href={typeof child.href === "string" ? child.href : "/"}
-                                  onClick={() => setMobileOpen(false)}
-                                  className="block py-1.5 text-sm text-fg"
-                                >
-                                  {child.label}
-                                </Link>
-                              ))}
+                              {((item as NavDropdownItem).children ?? []).map(
+                                (child) => (
+                                  <Link
+                                    key={child.href}
+                                    href={
+                                      typeof child.href === "string"
+                                        ? child.href
+                                        : "/"
+                                    }
+                                    onClick={() => setMobileOpen(false)}
+                                    className="block py-1.5 text-sm text-fg"
+                                  >
+                                    {child.label}
+                                  </Link>
+                                )
+                              )}
                             </div>
                           </div>
                         )}
@@ -817,7 +947,9 @@ export default function TopNav() {
 
                     {consentRequired && (
                       <Link
-                        href={`/consent?next=${encodeURIComponent(safePathname || "/")}`}
+                        href={`/consent?next=${encodeURIComponent(
+                          safePathname || "/"
+                        )}`}
                         onClick={() => setMobileOpen(false)}
                         className="block py-2 text-warning"
                       >
