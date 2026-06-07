@@ -52,7 +52,7 @@ import { ChatClient } from "@/lib/ws/chatClient";
 
 const DROPDOWN_PANEL =
   "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
-  "bg-surface backdrop-blur-xl p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
+  "bg-white p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
 
 const DROPDOWN_ITEM =
   "rounded-lg px-3 py-2 transition-all duration-150 text-fg hover:bg-surface-subtle";
@@ -830,7 +830,7 @@ export default function TopNav() {
 
       {/* Мобильное меню */}
       {mobileOpen && (
-        <div className="border-b border-[color:var(--border)] bg-white/[0.97] shadow-elevated backdrop-blur-xl lg:hidden">
+        <div className="border-b border-[color:var(--border)] bg-white shadow-elevated lg:hidden">
           <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
             {!state.loggedIn &&
               (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
