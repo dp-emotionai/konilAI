@@ -70,6 +70,7 @@ export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
     { type: "link", label: "Дашборд", href: "/student/dashboard" },
     { type: "link", label: "Сессии", href: "/student/sessions" },
     { type: "link", label: "Группы", href: "/student/groups" },
+    { type: "link", label: "Задачи", href: "/student/tasks" },
     { type: "link", label: "Календарь", href: "/student/calendar" },
     {
       type: "dropdown",
@@ -95,6 +96,7 @@ export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
       ],
     },
     { type: "link", label: "Группы", href: "/teacher/groups" },
+    { type: "link", label: "Задачи", href: "/teacher/tasks" },
     { type: "link", label: "Календарь", href: "/teacher/calendar" },
     { type: "link", label: "Отчёты", href: "/teacher/reports" },
     { type: "link", label: "Сравнение", href: "/teacher/compare" },
