@@ -507,13 +507,13 @@ export default function TopNav() {
     let objectUrl: string | null = null;
 
     async function loadNavAvatar() {
-      setNavAvatarUrl(null);
+  setNavAvatarUrl(null);
 
-      if (!state.loggedIn || !state.avatarUrl) return;
+  if (!state.loggedIn) return;
 
-      const token = getToken();
+  const token = getToken();
 
-      if (!token) return;
+  if (!token) return;
 
       try {
         const res = await fetch(
@@ -556,7 +556,7 @@ export default function TopNav() {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [state.loggedIn, state.avatarUrl, state.avatarVersion]);
+}, [state.loggedIn, state.avatarVersion]);
 
   const handleLogout = useCallback(() => {
     clearAuth();
