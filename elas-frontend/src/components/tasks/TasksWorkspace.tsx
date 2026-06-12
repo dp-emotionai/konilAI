@@ -6,6 +6,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  type InputHTMLAttributes,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -23,21 +24,13 @@ import {
   Paperclip,
   Plus,
   RefreshCw,
-  Send,
   Star,
   Upload,
   X,
 } from "lucide-react";
 
-import {
-  getStudentGroupDetail,
-  getStudentGroups,
-} from "@/lib/api/student";
-
-import {
-  getGroupById,
-  getTeacherGroups,
-} from "@/lib/api/teacher";
+import { getStudentGroupDetail, getStudentGroups } from "@/lib/api/student";
+import { getGroupById, getTeacherGroups } from "@/lib/api/teacher";
 
 import {
   buildTaskAttachmentUrl,
@@ -97,17 +90,34 @@ const TYPE_LABELS: Record<TaskType, string> = {
   text_answer: "Ответ",
 };
 
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  draft: "Черновик",
-  published: "Опубликовано",
-  closed: "Закрыто",
-  archived: "Архив",
+type ApiGroupLike = {
+  id?: string | number | null;
+  name?: string | null;
+  group?: ApiGroupLike | null;
 };
 
-function getSafeGroup(row: any): GroupOption | null {
-  const source = row?.group || row;
+type ApiSessionLike = {
+  id?: string | number | null;
+  title?: string | null;
+  name?: string | null;
+  status?: string | null;
+  type?: string | null;
+};
 
-  if (!source?.id) return null;
+type ApiGroupDetailLike = {
+  sessions?: unknown;
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getSafeGroup(row: unknown): GroupOption | null {
+  if (!isObject(row)) return null;
+
+  const source = isObject(row.group) ? row.group : row;
+
+  if (!source.id) return null;
 
   return {
     id: String(source.id),
@@ -115,11 +125,11 @@ function getSafeGroup(row: any): GroupOption | null {
   };
 }
 
-function getSafeSessions(list: any): SessionOption[] {
+function getSafeSessions(list: unknown): SessionOption[] {
   if (!Array.isArray(list)) return [];
 
   return list
-      .filter((item) => item?.id)
+      .filter((item): item is ApiSessionLike => isObject(item) && Boolean(item.id))
       .map((item) => ({
         id: String(item.id),
         title: String(item.title || item.name || "Урок"),
@@ -202,13 +212,6 @@ function typeBoxClass(type: TaskType) {
   return "bg-emerald-50 text-emerald-600";
 }
 
-function typeTextClass(type: TaskType) {
-  if (type === "test") return "text-violet-600";
-  if (type === "file_upload") return "text-blue-600";
-  if (type === "text_answer") return "text-emerald-600";
-  return "text-emerald-600";
-}
-
 function studentStatusLabel(task: Task) {
   if (task.type === "test") {
     return task.myTestSubmission ? "Выполнено" : "Не выполнено";
@@ -235,15 +238,22 @@ function ModalShell({
                       description,
                       children,
                       onClose,
+                      size = "normal",
                     }: {
   title: string;
   description?: string;
   children: ReactNode;
   onClose: () => void;
+  size?: "normal" | "wide";
 }) {
   return (
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8">
-        <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+        <div
+            className={[
+              "max-h-[90vh] w-full overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl",
+              size === "wide" ? "max-w-6xl" : "max-w-4xl",
+            ].join(" ")}
+        >
           <div className="flex items-start justify-between border-b border-slate-200 px-8 py-6">
             <div>
               <h2 className="text-xl font-bold text-slate-900">{title}</h2>
@@ -303,7 +313,7 @@ function SelectField({
   );
 }
 
-function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return (
       <input
           {...props}
@@ -350,6 +360,8 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [createChoiceOpen, setCreateChoiceOpen] = useState(false);
 
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -436,10 +448,10 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     try {
       if (role === "student") {
         const detail = await getStudentGroupDetail(selectedGroupId);
-        setSessions(getSafeSessions((detail as any)?.sessions));
+        setSessions(getSafeSessions((detail as ApiGroupDetailLike | null)?.sessions));
       } else {
         const detail = await getGroupById(selectedGroupId);
-        setSessions(getSafeSessions((detail as any)?.sessions));
+        setSessions(getSafeSessions((detail as ApiGroupDetailLike | null)?.sessions));
       }
 
       setSelectedSessionId("");
@@ -494,9 +506,22 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     setSelectedSessionId("");
   }
 
-  function openCreateModal() {
+  function openCreateChoice() {
+    setCreateChoiceOpen(true);
+  }
+
+  function openCreateModal(type: TaskType = "homework") {
+    setCreateChoiceOpen(false);
     setEditingTask(null);
-    setForm(EMPTY_FORM);
+
+    setForm({
+      ...EMPTY_FORM,
+      type,
+      title: "",
+      description: "",
+      testId: "",
+    });
+
     setTaskModalOpen(true);
   }
 
@@ -667,7 +692,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
             {role === "teacher" && (
                 <button
                     type="button"
-                    onClick={openCreateModal}
+                    onClick={openCreateChoice}
                     className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
                 >
                   <Plus size={18} />
@@ -993,6 +1018,79 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
             </main>
           </div>
         </div>
+
+        {createChoiceOpen && (
+            <ModalShell
+                title="Создать задачу"
+                description="Выберите тип задачи, чтобы перейти к созданию"
+                onClose={() => setCreateChoiceOpen(false)}
+                size="wide"
+            >
+              <div className="grid gap-6 lg:grid-cols-[1fr_1fr_300px]">
+                <button
+                    type="button"
+                    onClick={() => openCreateModal("test")}
+                    className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:border-violet-200 hover:shadow-xl"
+                >
+                  <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition group-hover:scale-105">
+                    <ClipboardList size={58} />
+                  </div>
+
+                  <h3 className="mt-8 text-2xl font-extrabold text-slate-950">Тест</h3>
+
+                  <p className="mx-auto mt-4 max-w-xs text-base font-medium leading-7 text-slate-500">
+                    Вопросы, варианты ответов и автоматическая проверка
+                  </p>
+
+                  <div className="mt-10 inline-flex h-12 w-full max-w-xs items-center justify-center gap-3 rounded-xl bg-violet-600 px-6 text-sm font-extrabold text-white shadow-lg shadow-violet-100 transition group-hover:bg-violet-700">
+                    Создать тест
+                    <span className="text-xl">→</span>
+                  </div>
+
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 rounded-b-3xl bg-gradient-to-t from-violet-50 to-transparent" />
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => openCreateModal("homework")}
+                    className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
+                >
+                  <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition group-hover:scale-105">
+                    <FileText size={58} />
+                  </div>
+
+                  <h3 className="mt-8 text-2xl font-extrabold text-slate-950">Домашнее задание</h3>
+
+                  <p className="mx-auto mt-4 max-w-xs text-base font-medium leading-7 text-slate-500">
+                    Текстовый ответ, файл или ссылка, проверка учителем
+                  </p>
+
+                  <div className="mt-10 inline-flex h-12 w-full max-w-xs items-center justify-center gap-3 rounded-xl bg-violet-600 px-6 text-sm font-extrabold text-white shadow-lg shadow-violet-100 transition group-hover:bg-violet-700">
+                    Создать домашку
+                    <span className="text-xl">→</span>
+                  </div>
+
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 rounded-b-3xl bg-gradient-to-t from-blue-50 to-transparent" />
+                </button>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                    <HelpCircle size={28} />
+                  </div>
+
+                  <h3 className="mt-6 text-xl font-extrabold text-violet-600">Как это работает?</h3>
+
+                  <p className="mt-4 text-base font-medium leading-7 text-slate-500">
+                    После выбора типа задачи откроется форма создания, где можно настроить параметры, дедлайн, баллы и опубликовать задание для учеников.
+                  </p>
+
+                  <div className="mt-6 rounded-2xl bg-violet-50 px-4 py-3 text-sm font-semibold leading-6 text-violet-700">
+                    Тест — для автоматической проверки. Домашка — для файла или текстового ответа.
+                  </div>
+                </div>
+              </div>
+            </ModalShell>
+        )}
 
         {taskModalOpen && (
             <ModalShell
