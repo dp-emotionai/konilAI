@@ -231,3 +231,12 @@ export async function gradeTaskSubmission(
 ): Promise<TaskSubmission> {
   return api.patch<TaskSubmission>(`tasks/${taskId}/submissions/${submissionId}/grade`, body);
 }
+
+export async function getTaskAttachmentDownloadUrl(submissionId: string): Promise<{
+  url: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+}> {
+  return api.get(`tasks/submissions/${submissionId}/attachment-url`);
+}
