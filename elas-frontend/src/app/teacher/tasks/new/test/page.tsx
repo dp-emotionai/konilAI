@@ -747,18 +747,6 @@ function CreateTestContent() {
                             >
                                 Вопросы
                             </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    document
-                                        .getElementById("test-settings")
-                                        ?.scrollIntoView({ behavior: "smooth" })
-                                }
-                                className="px-2 py-2 text-sm font-extrabold text-slate-500 transition hover:text-violet-600"
-                            >
-                                Настройки
-                            </button>
                         </nav>
                     </div>
 
