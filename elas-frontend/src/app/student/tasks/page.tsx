@@ -1,4 +1,4 @@
-import TasksWorkspace from "@/components/session/tasks/TasksWorkspace";
+import TasksWorkspace from "@/components/tasks/TasksWorkspace";
 
 export default function StudentTasksPage() {
   return <TasksWorkspace role="student" />;
