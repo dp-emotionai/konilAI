@@ -1,49 +1,48 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
-  BookOpenCheck,
-  Clock3,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
   Download,
-  Eye,
-  FileUp,
+  FileText,
+  Grid3X3,
+  HelpCircle,
+  List,
   Loader2,
-  Pencil,
+  MoreVertical,
+  Paperclip,
   Plus,
   RefreshCw,
   Send,
-  Trash2,
+  Star,
+  Upload,
+  X,
 } from "lucide-react";
-
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Section from "@/components/common/Section";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-import Input from "@/components/ui/Input";
-import Modal from "@/components/ui/Modal";
-import { Card, CardContent } from "@/components/ui/Card";
 
 import {
   getStudentGroupDetail,
   getStudentGroups,
-  type StudentGroupDetail,
-  type StudentGroupRow,
 } from "@/lib/api/student";
 
 import {
   getGroupById,
   getTeacherGroups,
-  type TeacherGroup,
 } from "@/lib/api/teacher";
 
 import {
   buildTaskAttachmentUrl,
   createTask,
   deleteTask,
-  getTaskAttachmentDownloadUrl,
   getTaskSubmissions,
   getTasks,
   gradeTaskSubmission,
@@ -57,6 +56,7 @@ import {
 } from "@/lib/api/tasks";
 
 type RoleMode = "student" | "teacher";
+type ViewMode = "list" | "grid";
 
 type GroupOption = {
   id: string;
@@ -92,9 +92,9 @@ const EMPTY_FORM: TaskForm = {
 
 const TYPE_LABELS: Record<TaskType, string> = {
   test: "Тест",
-  homework: "Домашка",
+  homework: "Задание",
   file_upload: "Файл",
-  text_answer: "Текст",
+  text_answer: "Ответ",
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -104,22 +104,45 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   archived: "Архив",
 };
 
+function getSafeGroup(row: any): GroupOption | null {
+  const source = row?.group || row;
+
+  if (!source?.id) return null;
+
+  return {
+    id: String(source.id),
+    name: String(source.name || "Без названия"),
+  };
+}
+
+function getSafeSessions(list: any): SessionOption[] {
+  if (!Array.isArray(list)) return [];
+
+  return list
+      .filter((item) => item?.id)
+      .map((item) => ({
+        id: String(item.id),
+        title: String(item.title || item.name || "Урок"),
+        status: item.status || null,
+        type: item.type || null,
+      }));
+}
+
 function formatDate(value?: string | null) {
-  if (!value) return "—";
+  if (!value) return "Без дедлайна";
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleString("ru-RU", {
     day: "2-digit",
-    month: "short",
-    year: "numeric",
+    month: "long",
     hour: "2-digit",
     minute: "2-digit",
   });
 }
 
-function formatForInput(value?: string | null) {
+function formatDateForInput(value?: string | null) {
   if (!value) return "";
 
   const date = new Date(value);
@@ -128,7 +151,7 @@ function formatForInput(value?: string | null) {
   const pad = (num: number) => String(num).padStart(2, "0");
 
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours()
+      date.getHours()
   )}:${pad(date.getMinutes())}`;
 }
 
@@ -159,71 +182,158 @@ function getStudentName(submission: TaskSubmission | LinkedTestSubmission) {
   if (!user) return "Студент";
 
   return (
-    user.fullName ||
-    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-    user.email ||
-    "Студент"
+      user.fullName ||
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      user.email ||
+      "Студент"
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">
-      {children}
-    </div>
-  );
+function typeIcon(type: TaskType): ReactNode {
+  if (type === "test") return <HelpCircle size={28} />;
+  if (type === "file_upload") return <Paperclip size={28} />;
+  return <FileText size={28} />;
 }
 
-function SelectBox({
-  value,
-  onChange,
-  disabled,
-  children,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  children: React.ReactNode;
+function typeBoxClass(type: TaskType) {
+  if (type === "test") return "bg-violet-50 text-violet-600";
+  if (type === "file_upload") return "bg-blue-50 text-blue-600";
+  if (type === "text_answer") return "bg-emerald-50 text-emerald-600";
+  return "bg-emerald-50 text-emerald-600";
+}
+
+function typeTextClass(type: TaskType) {
+  if (type === "test") return "text-violet-600";
+  if (type === "file_upload") return "text-blue-600";
+  if (type === "text_answer") return "text-emerald-600";
+  return "text-emerald-600";
+}
+
+function studentStatusLabel(task: Task) {
+  if (task.type === "test") {
+    return task.myTestSubmission ? "Выполнено" : "Не выполнено";
+  }
+
+  return task.mySubmission ? "Сдано" : "Не сдано";
+}
+
+function studentStatusClass(task: Task) {
+  const done = task.type === "test" ? Boolean(task.myTestSubmission) : Boolean(task.mySubmission);
+  return done ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700";
+}
+
+function taskActionLabel(task: Task, role: RoleMode) {
+  if (role === "teacher") return "Ответы";
+
+  if (task.type === "test") return "Пройти тест";
+  if (task.type === "file_upload") return "Загрузить файл";
+  return "Сдать задание";
+}
+
+function ModalShell({
+                      title,
+                      description,
+                      children,
+                      onClose,
+                    }: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  onClose: () => void;
 }) {
   return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-elas border border-border bg-surface px-3 text-sm text-fg shadow-soft outline-none transition focus:border-primary/50 focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-    >
-      {children}
-    </select>
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8">
+        <div className="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl">
+          <div className="flex items-start justify-between border-b border-slate-200 px-8 py-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+              {description && <p className="mt-2 text-sm text-slate-500">{description}</p>}
+            </div>
+
+            <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X size={22} />
+            </button>
+          </div>
+
+          <div className="p-8">{children}</div>
+        </div>
+      </div>
+  );
+}
+
+function Field({
+                 label,
+                 children,
+               }: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+      <label className="block">
+        <span className="mb-2 block text-sm font-semibold text-slate-500">{label}</span>
+        {children}
+      </label>
+  );
+}
+
+function SelectField({
+                       value,
+                       onChange,
+                       children,
+                       disabled,
+                     }: {
+  value: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+      <select
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:opacity-50"
+      >
+        {children}
+      </select>
+  );
+}
+
+function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+      <input
+          {...props}
+          className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+      />
   );
 }
 
 function TextArea({
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-}: {
+                    value,
+                    onChange,
+                    placeholder,
+                    rows = 4,
+                  }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   rows?: number;
 }) {
   return (
-    <textarea
-      value={value}
-      rows={rows}
-      placeholder={placeholder}
-      onChange={(event) => onChange(event.target.value)}
-      className="w-full rounded-elas border border-border bg-surface px-4 py-3 text-sm text-fg shadow-soft outline-none transition placeholder:text-muted-2 focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
-    />
+      <textarea
+          value={value}
+          rows={rows}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+      />
   );
 }
 
-function TaskIcon({ type }: { type: TaskType }) {
-  if (type === "test") return <BookOpenCheck size={16} />;
-  if (type === "file_upload") return <FileUp size={16} />;
-  return <Send size={16} />;
-}
 function TasksWorkspace({ role }: { role: RoleMode }) {
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
@@ -232,10 +342,13 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState("");
 
+  const [typeFilter, setTypeFilter] = useState<"all" | TaskType>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | TaskStatus>("all");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingTasks, setLoadingTasks] = useState(false);
-
   const [error, setError] = useState<string | null>(null);
 
   const [taskModalOpen, setTaskModalOpen] = useState(false);
@@ -257,6 +370,36 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
   const [gradeScore, setGradeScore] = useState("");
   const [gradeFeedback, setGradeFeedback] = useState("");
 
+  const selectedGroup = useMemo(
+      () => groups.find((group) => group.id === selectedGroupId) || null,
+      [groups, selectedGroupId]
+  );
+
+  const selectedSession = useMemo(
+      () => sessions.find((session) => session.id === selectedSessionId) || null,
+      [sessions, selectedSessionId]
+  );
+
+  const sessionCounts = useMemo(() => {
+    const map = new Map<string, number>();
+
+    tasks.forEach((task) => {
+      if (!task.sessionId) return;
+      map.set(task.sessionId, (map.get(task.sessionId) || 0) + 1);
+    });
+
+    return map;
+  }, [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    return tasks.filter((task) => {
+      if (selectedSessionId && task.sessionId !== selectedSessionId) return false;
+      if (typeFilter !== "all" && task.type !== typeFilter) return false;
+      if (statusFilter !== "all" && task.status !== statusFilter) return false;
+      return true;
+    });
+  }, [tasks, selectedSessionId, typeFilter, statusFilter]);
+
   const loadGroups = useCallback(async () => {
     setLoadingGroups(true);
     setError(null);
@@ -264,10 +407,9 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     try {
       const result = role === "student" ? await getStudentGroups() : await getTeacherGroups();
 
-      const normalized = (result as Array<StudentGroupRow | TeacherGroup>).map((group) => ({
-        id: group.id,
-        name: group.name,
-      }));
+      const normalized = (Array.isArray(result) ? result : [])
+          .map(getSafeGroup)
+          .filter(Boolean) as GroupOption[];
 
       setGroups(normalized);
 
@@ -293,31 +435,16 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
 
     try {
       if (role === "student") {
-        const detail: StudentGroupDetail | null = await getStudentGroupDetail(selectedGroupId);
-
-        setSessions(
-          (detail?.sessions || []).map((session) => ({
-            id: session.id,
-            title: session.title,
-            status: session.status,
-            type: session.type,
-          }))
-        );
+        const detail = await getStudentGroupDetail(selectedGroupId);
+        setSessions(getSafeSessions((detail as any)?.sessions));
       } else {
         const detail = await getGroupById(selectedGroupId);
-
-        setSessions(
-          (detail?.sessions || []).map((session) => ({
-            id: session.id,
-            title: session.title,
-            status: session.status,
-            type: session.type,
-          }))
-        );
+        setSessions(getSafeSessions((detail as any)?.sessions));
       }
 
       setSelectedSessionId("");
     } catch (err) {
+      setSessions([]);
       setError(err instanceof Error ? err.message : "Не удалось загрузить уроки");
     } finally {
       setLoadingSessions(false);
@@ -336,17 +463,18 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     try {
       const result = await getTasks({
         groupId: selectedGroupId,
-        sessionId: selectedSessionId || null,
+        type: typeFilter === "all" ? null : typeFilter,
+        status: statusFilter === "all" ? null : statusFilter,
       });
 
-      setTasks(result);
+      setTasks(Array.isArray(result) ? result : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить задачи");
       setTasks([]);
+      setError(err instanceof Error ? err.message : "Не удалось загрузить задачи");
     } finally {
       setLoadingTasks(false);
     }
-  }, [selectedGroupId, selectedSessionId]);
+  }, [selectedGroupId, typeFilter, statusFilter]);
 
   useEffect(() => {
     void loadGroups();
@@ -359,6 +487,12 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
   useEffect(() => {
     void loadTasks();
   }, [loadTasks]);
+
+  function resetFilters() {
+    setTypeFilter("all");
+    setStatusFilter("all");
+    setSelectedSessionId("");
+  }
 
   function openCreateModal() {
     setEditingTask(null);
@@ -374,7 +508,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
       description: task.description || "",
       type: task.type,
       status: task.status,
-      deadline: formatForInput(task.deadline),
+      deadline: formatDateForInput(task.deadline),
       points: String(task.points || 0),
       testId: task.testId || "",
     });
@@ -385,12 +519,12 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
   async function handleSaveTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const title = form.title.trim();
-
     if (!selectedGroupId) {
       setError("Сначала выберите группу");
       return;
     }
+
+    const title = form.title.trim();
 
     if (!title) {
       setError("Название задачи обязательно");
@@ -486,7 +620,6 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
 
     try {
       const result = await getTaskSubmissions(task.id);
-
       setSubmissionsType(result.type);
       setSubmissions(Array.isArray(result.submissions) ? result.submissions : []);
     } catch (err) {
@@ -522,510 +655,633 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     }
   }
 
-async function handleDownloadAttachment(submission: TaskSubmission) {
-  try {
-    const result = await getTaskAttachmentDownloadUrl(submission.id);
-    window.open(result.url, "_blank", "noopener,noreferrer");
-  } catch (err) {
-    setError(err instanceof Error ? err.message : "Не удалось открыть файл");
-  }
-}
-
   const canSubmitText = submitTaskItem?.type === "text_answer" || submitTaskItem?.type === "homework";
   const canSubmitFile = submitTaskItem?.type === "file_upload" || submitTaskItem?.type === "homework";
 
   return (
-    <div className="space-y-10 pb-16">
-      <Breadcrumbs
-        items={[
-          {
-            label: role === "student" ? "Студент" : "Преподаватель",
-            href: role === "student" ? "/student/dashboard" : "/teacher/dashboard",
-          },
-          { label: "Задачи" },
-        ]}
-      />
+      <div className="min-h-screen bg-[#fbfbff] px-6 py-8 text-slate-900">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <h1 className="text-4xl font-extrabold tracking-tight text-slate-950">Задачи</h1>
 
-      <PageHero
-        title="Задачи"
-        subtitle={
-          role === "student"
-            ? "Выберите группу и урок, чтобы увидеть тесты, домашние задания и загрузки файлов."
-            : "Создавайте задачи, привязывайте их к группе или уроку и проверяйте ответы студентов."
-        }
-      />
+            {role === "teacher" && (
+                <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 text-sm font-bold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700"
+                >
+                  <Plus size={18} />
+                  Создать задачу
+                </button>
+            )}
+          </div>
 
-      <Section>
-        <Card>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
-              <div>
-                <FieldLabel>Группа</FieldLabel>
-
-                <SelectBox
+          <div className="grid gap-4 md:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+            <Field label="Группа">
+              <SelectField
                   value={selectedGroupId}
                   disabled={loadingGroups || groups.length === 0}
                   onChange={setSelectedGroupId}
-                >
-                  {groups.length === 0 ? (
+              >
+                {groups.length === 0 ? (
                     <option value="">Групп нет</option>
-                  ) : (
+                ) : (
                     groups.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
                     ))
-                  )}
-                </SelectBox>
-              </div>
+                )}
+              </SelectField>
+            </Field>
 
-              <div>
-                <FieldLabel>Урок</FieldLabel>
-
-                <SelectBox
+            <Field label="Сессия (урок)">
+              <SelectField
                   value={selectedSessionId}
                   disabled={!selectedGroupId || loadingSessions}
                   onChange={setSelectedSessionId}
-                >
-                  <option value="">Все задачи группы</option>
-
-                  {sessions.map((session) => (
+              >
+                <option value="">Все уроки</option>
+                {sessions.map((session) => (
                     <option key={session.id} value={session.id}>
                       {session.title}
                     </option>
-                  ))}
-                </SelectBox>
-              </div>
+                ))}
+              </SelectField>
+            </Field>
 
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" onClick={() => void loadTasks()}>
-                  <RefreshCw size={16} />
-                  Обновить
-                </Button>
+            <Field label="Тип">
+              <SelectField value={typeFilter} onChange={(value) => setTypeFilter(value as "all" | TaskType)}>
+                <option value="all">Все типы</option>
+                <option value="test">Тест</option>
+                <option value="homework">Задание</option>
+                <option value="file_upload">Файл</option>
+                <option value="text_answer">Ответ</option>
+              </SelectField>
+            </Field>
 
-                {role === "teacher" && (
-                  <Button type="button" onClick={openCreateModal}>
-                    <Plus size={16} />
-                    Создать
-                  </Button>
-                )}
-              </div>
+            <Field label="Статус">
+              <SelectField
+                  value={statusFilter}
+                  onChange={(value) => setStatusFilter(value as "all" | TaskStatus)}
+              >
+                <option value="all">Все статусы</option>
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликовано</option>
+                <option value="closed">Закрыто</option>
+                <option value="archived">Архив</option>
+              </SelectField>
+            </Field>
+
+            <div className="flex items-end">
+              <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 text-sm font-bold text-slate-600 shadow-sm transition hover:bg-slate-50"
+              >
+                <RefreshCw size={17} />
+                Сбросить
+              </button>
             </div>
+          </div>
 
-            {error && (
-              <div className="flex gap-2 rounded-2xl border border-error/20 bg-error/8 px-4 py-3 text-sm text-error">
-                <AlertCircle size={17} />
+          {error && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-medium text-red-700">
                 {error}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </Section>
+          )}
 
-      <Section>
-        {loadingTasks ? (
-          <Card>
-            <CardContent className="flex items-center justify-center gap-2 py-12 text-muted">
-              <Loader2 className="animate-spin" size={20} />
-              Загрузка задач...
-            </CardContent>
-          </Card>
-        ) : tasks.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted">
-              Задач пока нет
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {tasks.map((task) => {
-              const deadlinePassed = isDeadlinePassed(task.deadline);
-              const submitted = Boolean(task.mySubmission || task.myTestSubmission);
+          <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+            <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h2 className="mb-5 text-xl font-bold text-slate-950">Уроки</h2>
 
-              return (
-                <Card key={task.id} interactive>
-                  <CardContent className="space-y-4">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <div className="mb-2 flex flex-wrap gap-2">
-                          <Badge variant={task.type === "test" ? "primary" : "secondary"}>
-                            <TaskIcon type={task.type} />
-                            {TYPE_LABELS[task.type]}
-                          </Badge>
-
-                          <Badge variant={task.status === "published" ? "success" : "outline"}>
-                            {STATUS_LABELS[task.status]}
-                          </Badge>
-
-                          {deadlinePassed && task.status === "published" && (
-                            <Badge variant="danger">Deadline өтті</Badge>
-                          )}
-                        </div>
-
-                        <h3 className="text-lg font-semibold text-fg">{task.title}</h3>
-
-                        {task.description && (
-                          <p className="mt-1 text-sm leading-6 text-muted">
-                            {task.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border border-border bg-surface-subtle px-4 py-3 text-sm">
-                        <div className="flex items-center gap-2 text-muted">
-                          <Clock3 size={15} />
-                          {formatDate(task.deadline)}
-                        </div>
-
-                        <div className="mt-1 font-semibold text-fg">
-                          {task.points || 0} балл
-                        </div>
-                      </div>
+              <div className="space-y-2">
+                {sessions.length === 0 ? (
+                    <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                      Уроков пока нет
                     </div>
+                ) : (
+                    sessions.slice(0, 6).map((session) => {
+                      const active = selectedSessionId === session.id;
+                      const count = sessionCounts.get(session.id) || 0;
 
-                    <div className="grid gap-3 text-sm md:grid-cols-3">
-                      <div className="rounded-2xl bg-surface-subtle px-4 py-3">
-                        <div className="text-xs text-muted">Группа</div>
-                        <div className="mt-1 font-medium text-fg">
-                          {task.group?.name || "—"}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-surface-subtle px-4 py-3">
-                        <div className="text-xs text-muted">Урок</div>
-                        <div className="mt-1 font-medium text-fg">
-                          {task.session?.title || "Общая задача"}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl bg-surface-subtle px-4 py-3">
-                        <div className="text-xs text-muted">Статус</div>
-                        <div className="mt-1 font-medium text-fg">
-                          {role === "student"
-                            ? submitted
-                              ? "Сдано"
-                              : "Не сдано"
-                            : `${task.submissionCount || 0} ответов`}
-                        </div>
-                      </div>
-                    </div>
-
-                    {role === "student" && task.mySubmission?.feedback && (
-                      <div className="rounded-2xl border border-success/20 bg-success/8 px-4 py-3 text-sm">
-                        <div className="font-semibold text-success">
-                          Score: {task.mySubmission.score ?? "—"} / {task.points || "—"}
-                        </div>
-                        <div className="mt-1 text-muted">
-                          Feedback: {task.mySubmission.feedback}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
-                      {role === "student" ? (
-                        task.type === "test" ? (
-                          <Link
-                            href={getTestHref(role, task.testId)}
-                            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#7448FF] px-5 text-sm font-semibold text-white shadow-md transition hover:bg-[#623ce6]"
+                      return (
+                          <button
+                              key={session.id}
+                              type="button"
+                              onClick={() => setSelectedSessionId(session.id)}
+                              className={[
+                                "flex w-full items-center justify-between rounded-xl px-4 py-4 text-left transition",
+                                active ? "bg-violet-50 text-violet-700" : "hover:bg-slate-50",
+                              ].join(" ")}
                           >
-                            <Eye size={16} />
-                            Открыть тест
-                          </Link>
-                        ) : (
-                          <Button
-                            type="button"
-                            onClick={() => openSubmitModal(task)}
-                            disabled={task.status !== "published" || deadlinePassed}
-                          >
-                            <Send size={16} />
-                            {submitted ? "Пересдать" : "Сдать"}
-                          </Button>
-                        )
-                      ) : (
-                        <>
-                          <Button type="button" variant="outline" onClick={() => void openSubmissions(task)}>
-                            <Eye size={16} />
-                            Ответы
-                          </Button>
+                            <div>
+                              <div className="font-bold">{session.title}</div>
+                              <div className="mt-1 text-xs text-slate-500">{count} задачи</div>
+                            </div>
 
-                          <Button type="button" variant="outline" onClick={() => openEditModal(task)}>
-                            <Pencil size={16} />
-                            Edit
-                          </Button>
+                            <span
+                                className={[
+                                  "h-3 w-3 rounded-full",
+                                  active ? "bg-violet-600" : "bg-slate-300",
+                                ].join(" ")}
+                            />
+                          </button>
+                      );
+                    })
+                )}
+              </div>
 
-                          <Button type="button" variant="danger" onClick={() => void handleDeleteTask(task)}>
-                            <Trash2 size={16} />
-                            Delete
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </Section>
-
-      <Modal
-        open={taskModalOpen}
-        onClose={() => setTaskModalOpen(false)}
-        title={editingTask ? "Редактировать задачу" : "Создать задачу"}
-        description="Задача будет привязана к выбранной группе и уроку."
-        size="lg"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setTaskModalOpen(false)}>
-              Отмена
-            </Button>
-
-            <Button type="submit" form="task-form" disabled={savingTask}>
-              {savingTask && <Loader2 size={16} className="animate-spin" />}
-              Сохранить
-            </Button>
-          </div>
-        }
-      >
-        <form id="task-form" className="space-y-4" onSubmit={handleSaveTask}>
-          <Input
-            label="Название"
-            value={form.title}
-            onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="Домашнее задание №1"
-          />
-
-          <div>
-            <FieldLabel>Описание</FieldLabel>
-            <TextArea
-              value={form.description}
-              onChange={(value) => setForm((prev) => ({ ...prev, description: value }))}
-              placeholder="Что нужно сделать студенту?"
-            />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <FieldLabel>Тип</FieldLabel>
-              <SelectBox
-                value={form.type}
-                onChange={(value) => setForm((prev) => ({ ...prev, type: value as TaskType }))}
+              <button
+                  type="button"
+                  onClick={() => setSelectedSessionId("")}
+                  className="mt-6 h-11 w-full rounded-xl border border-slate-200 bg-white text-sm font-bold text-violet-600 transition hover:bg-violet-50"
               >
-                <option value="homework">homework</option>
-                <option value="text_answer">text_answer</option>
-                <option value="file_upload">file_upload</option>
-                <option value="test">test</option>
-              </SelectBox>
-            </div>
+                Показать все уроки
+              </button>
+            </aside>
 
-            <div>
-              <FieldLabel>Status</FieldLabel>
-              <SelectBox
-                value={form.status}
-                onChange={(value) => setForm((prev) => ({ ...prev, status: value as TaskStatus }))}
-              >
-                <option value="draft">draft</option>
-                <option value="published">published</option>
-                <option value="closed">closed</option>
-                <option value="archived">archived</option>
-              </SelectBox>
-            </div>
-          </div>
+            <main className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-extrabold text-slate-950">
+                    {selectedSession?.title || selectedGroup?.name || "Задачи"}
+                  </h2>
+                  <p className="mt-1 text-sm font-medium text-slate-500">
+                    {filteredTasks.length} задачи
+                  </p>
+                </div>
 
-          {form.type === "test" && (
-            <Input
-              label="testId"
-              value={form.testId}
-              onChange={(event) => setForm((prev) => ({ ...prev, testId: event.target.value }))}
-              placeholder="ID существующего теста"
-            />
-          )}
+                <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                  <button
+                      type="button"
+                      onClick={() => setViewMode("list")}
+                      className={[
+                        "rounded-lg p-2 transition",
+                        viewMode === "list" ? "bg-violet-50 text-violet-600" : "text-slate-400 hover:text-slate-700",
+                      ].join(" ")}
+                  >
+                    <List size={20} />
+                  </button>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Input
-              label="Deadline"
-              type="datetime-local"
-              value={form.deadline}
-              onChange={(event) => setForm((prev) => ({ ...prev, deadline: event.target.value }))}
-            />
+                  <button
+                      type="button"
+                      onClick={() => setViewMode("grid")}
+                      className={[
+                        "rounded-lg p-2 transition",
+                        viewMode === "grid" ? "bg-violet-50 text-violet-600" : "text-slate-400 hover:text-slate-700",
+                      ].join(" ")}
+                  >
+                    <Grid3X3 size={20} />
+                  </button>
+                </div>
+              </div>
 
-            <Input
-              label="Points"
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.points}
-              onChange={(event) => setForm((prev) => ({ ...prev, points: event.target.value }))}
-            />
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={Boolean(submitTaskItem)}
-        onClose={() => setSubmitTaskItem(null)}
-        title={submitTaskItem ? `Сдать: ${submitTaskItem.title}` : "Сдать задачу"}
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setSubmitTaskItem(null)}>
-              Отмена
-            </Button>
-
-            <Button type="submit" form="submit-task-form" disabled={submitting}>
-              {submitting && <Loader2 size={16} className="animate-spin" />}
-              Отправить
-            </Button>
-          </div>
-        }
-      >
-        <form id="submit-task-form" className="space-y-4" onSubmit={handleSubmitTask}>
-          {canSubmitText && (
-            <div>
-              <FieldLabel>Текстовый ответ</FieldLabel>
-              <TextArea
-                value={textAnswer}
-                onChange={setTextAnswer}
-                placeholder="Напишите ответ..."
-                rows={6}
-              />
-            </div>
-          )}
-
-          {canSubmitFile && (
-            <div>
-              <FieldLabel>Файл</FieldLabel>
-              <input
-                type="file"
-                onChange={(event) => setAttachment(event.target.files?.[0] || null)}
-                className="block w-full rounded-elas border border-border bg-surface px-4 py-2 text-sm text-fg shadow-soft"
-              />
-            </div>
-          )}
-        </form>
-      </Modal>
-
-      <Modal
-        open={Boolean(submissionsTask)}
-        onClose={() => setSubmissionsTask(null)}
-        title={submissionsTask ? `Ответы: ${submissionsTask.title}` : "Ответы"}
-        description={
-          submissionsType === "test"
-            ? "Это ответы теста. Оценивание идёт через модуль тестов."
-            : "Проверьте ответы студентов и поставьте score/feedback."
-        }
-        size="xl"
-      >
-        {loadingSubmissions ? (
-          <div className="flex justify-center gap-2 py-10 text-muted">
-            <Loader2 className="animate-spin" size={20} />
-            Загрузка...
-          </div>
-        ) : submissions.length === 0 ? (
-          <div className="py-10 text-center text-muted">Ответов пока нет</div>
-        ) : (
-          <div className="space-y-3">
-            {submissions.map((submission) => {
-              const isTaskSubmission = submissionsType === "task";
-              const taskSubmission = submission as TaskSubmission;
-              const testSubmission = submission as LinkedTestSubmission;
-
-              return (
-                <div key={submission.id} className="rounded-2xl border border-border bg-surface-subtle p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-fg">{getStudentName(submission)}</div>
-
-                      <div className="mt-1 text-xs text-muted">
-                        Сдано:{" "}
-                        {formatDate(
-                          isTaskSubmission ? taskSubmission.submittedAt : testSubmission.submittedAt
-                        )}
-                      </div>
-
-                      {isTaskSubmission && taskSubmission.textAnswer && (
-                        <div className="mt-3 whitespace-pre-wrap rounded-xl bg-surface px-3 py-2 text-sm">
-                          {taskSubmission.textAnswer}
-                        </div>
-                      )}
-
-                      {isTaskSubmission && taskSubmission.attachmentFileName && (
-                        <button
-                            type="button"
-                            onClick={() => void handleDownloadAttachment(taskSubmission)}
-                            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-primary shadow-soft hover:bg-surface-subtle"
-                        >
-                            <Download size={16} />
-                            Скачать файл: {taskSubmission.attachmentFileName}
-                        </button>
-                      )}
-
-                      {isTaskSubmission && taskSubmission.feedback && (
-                        <div className="mt-2 text-sm text-muted">
-                          Feedback: {taskSubmission.feedback}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="rounded-2xl bg-surface px-4 py-3 text-sm">
-                      <div className="text-xs text-muted">Score</div>
-                      <div className="mt-1 font-semibold text-fg">
-                        {isTaskSubmission
-                          ? taskSubmission.score ?? "—"
-                          : testSubmission.score ?? "—"}
-                      </div>
+              {loadingTasks ? (
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 py-16 text-slate-500">
+                    <Loader2 className="animate-spin" size={20} />
+                    Загрузка задач...
+                  </div>
+              ) : filteredTasks.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-center">
+                    <ClipboardList className="mx-auto mb-3 text-slate-400" size={34} />
+                    <div className="font-bold text-slate-800">Задач пока нет</div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      {role === "teacher"
+                          ? "Нажмите “Создать задачу”, чтобы добавить первую задачу."
+                          : "Когда преподаватель добавит задачу, она появится здесь."}
                     </div>
                   </div>
+              ) : (
+                  <div className={viewMode === "grid" ? "grid gap-4 md:grid-cols-2" : "space-y-4"}>
+                    {filteredTasks.map((task) => {
+                      const deadlinePassed = isDeadlinePassed(task.deadline);
+                      const studentDone =
+                          task.type === "test" ? Boolean(task.myTestSubmission) : Boolean(task.mySubmission);
 
-                  {isTaskSubmission && gradingId === taskSubmission.id ? (
-                    <div className="mt-4 grid gap-3 rounded-2xl border border-border bg-surface p-3 md:grid-cols-[140px_1fr_auto] md:items-end">
-                      <Input
-                        label="Score"
+                      return (
+                          <article
+                              key={task.id}
+                              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-violet-200 hover:shadow-md"
+                          >
+                            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                              <div
+                                  className={[
+                                    "flex h-24 w-24 shrink-0 flex-col items-center justify-center rounded-xl",
+                                    typeBoxClass(task.type),
+                                  ].join(" ")}
+                              >
+                                {typeIcon(task.type)}
+                                <span className="mt-2 text-sm font-extrabold">{TYPE_LABELS[task.type]}</span>
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-lg font-extrabold text-slate-950">{task.title}</h3>
+
+                                {task.description && (
+                                    <p className="mt-2 line-clamp-2 text-sm font-medium leading-6 text-slate-500">
+                                      {task.description}
+                                    </p>
+                                )}
+
+                                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-slate-500">
+                            <span className="inline-flex items-center gap-1">
+                              <Star size={15} />
+                              {task.points || 0} баллов
+                            </span>
+
+                                  <span className="inline-flex items-center gap-1">
+                              <CalendarDays size={15} />
+                              Дедлайн: {formatDate(task.deadline)}
+                            </span>
+
+                                  <span className="inline-flex items-center gap-1">
+                              <Star size={15} />
+                                    {task.session?.title || selectedSession?.title || "Общая задача"}
+                            </span>
+                                </div>
+
+                                {deadlinePassed && task.status === "published" && (
+                                    <div className="mt-3 text-xs font-bold text-red-600">Дедлайн өтті</div>
+                                )}
+                              </div>
+
+                              <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
+                                {role === "student" ? (
+                                    <span
+                                        className={[
+                                          "rounded-lg px-3 py-2 text-sm font-extrabold",
+                                          studentStatusClass(task),
+                                        ].join(" ")}
+                                    >
+                              {studentStatusLabel(task)}
+                            </span>
+                                ) : (
+                                    <span className="rounded-lg bg-violet-50 px-3 py-2 text-sm font-extrabold text-violet-700">
+                              {task.submissionCount || 0} ответов
+                            </span>
+                                )}
+
+                                <div className="flex items-center gap-2">
+                                  {role === "student" ? (
+                                      task.type === "test" ? (
+                                          <Link
+                                              href={getTestHref(role, task.testId)}
+                                              className="inline-flex h-11 items-center justify-center rounded-xl bg-violet-600 px-5 text-sm font-extrabold text-white shadow-lg shadow-violet-100 transition hover:bg-violet-700"
+                                          >
+                                            {taskActionLabel(task, role)}
+                                          </Link>
+                                      ) : (
+                                          <button
+                                              type="button"
+                                              disabled={task.status !== "published" || deadlinePassed}
+                                              onClick={() => openSubmitModal(task)}
+                                              className="inline-flex h-11 items-center justify-center rounded-xl border border-violet-300 bg-white px-5 text-sm font-extrabold text-violet-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                          >
+                                            {taskActionLabel(task, role)}
+                                          </button>
+                                      )
+                                  ) : (
+                                      <>
+                                        <button
+                                            type="button"
+                                            onClick={() => void openSubmissions(task)}
+                                            className="inline-flex h-11 items-center justify-center rounded-xl bg-violet-600 px-5 text-sm font-extrabold text-white shadow-lg shadow-violet-100 transition hover:bg-violet-700"
+                                        >
+                                          Ответы
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => openEditModal(task)}
+                                            className="rounded-xl border border-slate-200 p-3 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                                            title="Редактировать"
+                                        >
+                                          <MoreVertical size={18} />
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => void handleDeleteTask(task)}
+                                            className="rounded-xl border border-red-100 p-3 text-red-500 transition hover:bg-red-50"
+                                            title="Удалить"
+                                        >
+                                          <X size={18} />
+                                        </button>
+                                      </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                      );
+                    })}
+                  </div>
+              )}
+
+              <div className="mt-6 rounded-2xl bg-violet-50 px-5 py-4 text-violet-900">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="mt-0.5 shrink-0 text-violet-600" size={22} />
+                  <div>
+                    <div className="font-extrabold">Как выполнять задания?</div>
+                    <p className="mt-1 text-sm font-medium leading-6 text-violet-900/70">
+                      Выберите задачу и нажмите соответствующую кнопку действий. После выполнения вы сможете увидеть результат и обратную связь от преподавателя.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+
+        {taskModalOpen && (
+            <ModalShell
+                title={editingTask ? "Редактировать задачу" : "Создать задачу"}
+                description="Задача будет привязана к выбранной группе и уроку."
+                onClose={() => setTaskModalOpen(false)}
+            >
+              <form className="space-y-5" onSubmit={handleSaveTask}>
+                <Field label="Название">
+                  <TextInput
+                      value={form.title}
+                      onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
+                      placeholder="Например: 5 есеп шығару"
+                  />
+                </Field>
+
+                <Field label="Описание">
+                  <TextArea
+                      value={form.description}
+                      onChange={(value) => setForm((prev) => ({ ...prev, description: value }))}
+                      placeholder="Что нужно сделать студенту?"
+                  />
+                </Field>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Тип">
+                    <SelectField
+                        value={form.type}
+                        onChange={(value) => setForm((prev) => ({ ...prev, type: value as TaskType }))}
+                    >
+                      <option value="homework">Задание</option>
+                      <option value="text_answer">Текстовый ответ</option>
+                      <option value="file_upload">Файл</option>
+                      <option value="test">Тест</option>
+                    </SelectField>
+                  </Field>
+
+                  <Field label="Статус">
+                    <SelectField
+                        value={form.status}
+                        onChange={(value) => setForm((prev) => ({ ...prev, status: value as TaskStatus }))}
+                    >
+                      <option value="draft">Черновик</option>
+                      <option value="published">Опубликовано</option>
+                      <option value="closed">Закрыто</option>
+                      <option value="archived">Архив</option>
+                    </SelectField>
+                  </Field>
+                </div>
+
+                {form.type === "test" && (
+                    <Field label="testId">
+                      <TextInput
+                          value={form.testId}
+                          onChange={(event) => setForm((prev) => ({ ...prev, testId: event.target.value }))}
+                          placeholder="ID существующего теста"
+                      />
+                    </Field>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field label="Deadline">
+                    <TextInput
+                        type="datetime-local"
+                        value={form.deadline}
+                        onChange={(event) => setForm((prev) => ({ ...prev, deadline: event.target.value }))}
+                    />
+                  </Field>
+
+                  <Field label="Points">
+                    <TextInput
                         type="number"
                         min="0"
                         step="0.5"
-                        value={gradeScore}
-                        onChange={(event) => setGradeScore(event.target.value)}
-                      />
-
-                      <Input
-                        label="Feedback"
-                        value={gradeFeedback}
-                        onChange={(event) => setGradeFeedback(event.target.value)}
-                      />
-
-                      <div className="flex gap-2">
-                        <Button type="button" size="sm" onClick={() => void handleGrade()}>
-                          OK
-                        </Button>
-
-                        <Button type="button" size="sm" variant="ghost" onClick={() => setGradingId(null)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  ) : isTaskSubmission ? (
-                    <div className="mt-4 flex justify-end">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setGradingId(taskSubmission.id);
-                          setGradeScore(taskSubmission.score == null ? "" : String(taskSubmission.score));
-                          setGradeFeedback(taskSubmission.feedback || "");
-                        }}
-                      >
-                        Поставить оценку
-                      </Button>
-                    </div>
-                  ) : null}
+                        value={form.points}
+                        onChange={(event) => setForm((prev) => ({ ...prev, points: event.target.value }))}
+                    />
+                  </Field>
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                      type="button"
+                      onClick={() => setTaskModalOpen(false)}
+                      className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+
+                  <button
+                      type="submit"
+                      disabled={savingTask}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {savingTask && <Loader2 className="animate-spin" size={17} />}
+                    Сохранить
+                  </button>
+                </div>
+              </form>
+            </ModalShell>
         )}
-      </Modal>
-    </div>
+
+        {submitTaskItem && (
+            <ModalShell
+                title={`Сдать: ${submitTaskItem.title}`}
+                description="Отправьте текстовый ответ или загрузите файл."
+                onClose={() => setSubmitTaskItem(null)}
+            >
+              <form className="space-y-5" onSubmit={handleSubmitTask}>
+                {canSubmitText && (
+                    <Field label="Текстовый ответ">
+                      <TextArea
+                          value={textAnswer}
+                          onChange={setTextAnswer}
+                          placeholder="Напишите ответ..."
+                          rows={6}
+                      />
+                    </Field>
+                )}
+
+                {canSubmitFile && (
+                    <Field label="Файл">
+                      <input
+                          type="file"
+                          onChange={(event) => setAttachment(event.target.files?.[0] || null)}
+                          className="block w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm file:mr-4 file:rounded-lg file:border-0 file:bg-violet-50 file:px-4 file:py-2 file:font-bold file:text-violet-600"
+                      />
+                    </Field>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <button
+                      type="button"
+                      onClick={() => setSubmitTaskItem(null)}
+                      className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 hover:bg-slate-50"
+                  >
+                    Отмена
+                  </button>
+
+                  <button
+                      type="submit"
+                      disabled={submitting}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 text-sm font-bold text-white hover:bg-violet-700 disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" size={17} /> : <Upload size={17} />}
+                    Отправить
+                  </button>
+                </div>
+              </form>
+            </ModalShell>
+        )}
+
+        {submissionsTask && (
+            <ModalShell
+                title={`Ответы: ${submissionsTask.title}`}
+                description={
+                  submissionsType === "test"
+                      ? "Это ответы теста. Оценивание идёт через модуль тестов."
+                      : "Проверьте ответы студентов и поставьте score/feedback."
+                }
+                onClose={() => setSubmissionsTask(null)}
+            >
+              {loadingSubmissions ? (
+                  <div className="flex items-center justify-center gap-2 py-12 text-slate-500">
+                    <Loader2 className="animate-spin" size={20} />
+                    Загрузка...
+                  </div>
+              ) : submissions.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 py-12 text-center text-slate-500">
+                    Ответов пока нет
+                  </div>
+              ) : (
+                  <div className="space-y-4">
+                    {submissions.map((submission) => {
+                      const isTaskSubmission = submissionsType === "task";
+                      const taskSubmission = submission as TaskSubmission;
+                      const testSubmission = submission as LinkedTestSubmission;
+
+                      return (
+                          <div key={submission.id} className="rounded-2xl border border-slate-200 bg-white p-5">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="text-lg font-extrabold text-slate-950">
+                                  {getStudentName(submission)}
+                                </div>
+
+                                <div className="mt-1 text-sm font-medium text-slate-500">
+                                  Сдано:{" "}
+                                  {formatDate(
+                                      isTaskSubmission ? taskSubmission.submittedAt : testSubmission.submittedAt
+                                  )}
+                                </div>
+
+                                {isTaskSubmission && taskSubmission.textAnswer && (
+                                    <div className="mt-4 whitespace-pre-wrap rounded-xl bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+                                      {taskSubmission.textAnswer}
+                                    </div>
+                                )}
+
+                                {isTaskSubmission && taskSubmission.attachmentFileName && (
+                                    <a
+                                        href={buildTaskAttachmentUrl(taskSubmission.id)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-violet-600 shadow-sm hover:bg-violet-50"
+                                    >
+                                      <Download size={17} />
+                                      {taskSubmission.attachmentFileName}
+                                    </a>
+                                )}
+
+                                {isTaskSubmission && taskSubmission.feedback && (
+                                    <div className="mt-3 text-sm font-medium text-slate-500">
+                                      Feedback: {taskSubmission.feedback}
+                                    </div>
+                                )}
+                              </div>
+
+                              <div className="rounded-xl bg-slate-50 px-5 py-4 text-sm">
+                                <div className="text-slate-500">Score</div>
+                                <div className="mt-1 text-xl font-extrabold text-slate-950">
+                                  {isTaskSubmission
+                                      ? taskSubmission.score ?? "—"
+                                      : testSubmission.score ?? "—"}
+                                </div>
+                              </div>
+                            </div>
+
+                            {isTaskSubmission && gradingId === taskSubmission.id ? (
+                                <div className="mt-5 grid gap-3 rounded-2xl bg-slate-50 p-4 md:grid-cols-[140px_1fr_auto] md:items-end">
+                                  <Field label="Score">
+                                    <TextInput
+                                        type="number"
+                                        min="0"
+                                        step="0.5"
+                                        value={gradeScore}
+                                        onChange={(event) => setGradeScore(event.target.value)}
+                                    />
+                                  </Field>
+
+                                  <Field label="Feedback">
+                                    <TextInput
+                                        value={gradeFeedback}
+                                        onChange={(event) => setGradeFeedback(event.target.value)}
+                                        placeholder="Комментарий"
+                                    />
+                                  </Field>
+
+                                  <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleGrade()}
+                                        className="h-11 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white hover:bg-violet-700"
+                                    >
+                                      OK
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setGradingId(null)}
+                                        className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 hover:bg-white"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                            ) : isTaskSubmission ? (
+                                <div className="mt-5 flex justify-end">
+                                  <button
+                                      type="button"
+                                      onClick={() => {
+                                        setGradingId(taskSubmission.id);
+                                        setGradeScore(taskSubmission.score == null ? "" : String(taskSubmission.score));
+                                        setGradeFeedback(taskSubmission.feedback || "");
+                                      }}
+                                      className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                                  >
+                                    Поставить оценку
+                                  </button>
+                                </div>
+                            ) : null}
+                          </div>
+                      );
+                    })}
+                  </div>
+              )}
+            </ModalShell>
+        )}
+      </div>
   );
 }
 
