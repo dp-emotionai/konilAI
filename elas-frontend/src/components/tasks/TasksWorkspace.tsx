@@ -31,6 +31,7 @@ import {
 
 import { getStudentGroupDetail, getStudentGroups } from "@/lib/api/student";
 import { getGroupById, getTeacherGroups } from "@/lib/api/teacher";
+import { useRouter } from "next/navigation";
 
 import {
   buildTaskAttachmentUrl,
@@ -88,12 +89,6 @@ const TYPE_LABELS: Record<TaskType, string> = {
   homework: "Задание",
   file_upload: "Файл",
   text_answer: "Ответ",
-};
-
-type ApiGroupLike = {
-  id?: string | number | null;
-  name?: string | null;
-  group?: ApiGroupLike | null;
 };
 
 type ApiSessionLike = {
@@ -247,7 +242,7 @@ function ModalShell({
   size?: "normal" | "wide";
 }) {
   return (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 px-4 py-8">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4 py-8">
         <div
             className={[
               "max-h-[90vh] w-full overflow-auto rounded-3xl border border-slate-200 bg-white shadow-2xl",
@@ -345,6 +340,17 @@ function TextArea({
 }
 
 function TasksWorkspace({ role }: { role: RoleMode }) {
+  const router = useRouter();
+
+  function goToCreatePage(type: "test" | "homework") {
+    const params = new URLSearchParams();
+
+    if (selectedGroupId) params.set("groupId", selectedGroupId);
+    if (selectedSessionId) params.set("sessionId", selectedSessionId);
+
+    router.push(`/teacher/tasks/new/${type}?${params.toString()}`);
+  }
+
   const [groups, setGroups] = useState<GroupOption[]>([]);
   const [sessions, setSessions] = useState<SessionOption[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -508,21 +514,6 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
 
   function openCreateChoice() {
     setCreateChoiceOpen(true);
-  }
-
-  function openCreateModal(type: TaskType = "homework") {
-    setCreateChoiceOpen(false);
-    setEditingTask(null);
-
-    setForm({
-      ...EMPTY_FORM,
-      type,
-      title: "",
-      description: "",
-      testId: "",
-    });
-
-    setTaskModalOpen(true);
   }
 
   function openEditModal(task: Task) {
@@ -881,8 +872,6 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                   <div className={viewMode === "grid" ? "grid gap-4 md:grid-cols-2" : "space-y-4"}>
                     {filteredTasks.map((task) => {
                       const deadlinePassed = isDeadlinePassed(task.deadline);
-                      const studentDone =
-                          task.type === "test" ? Boolean(task.myTestSubmission) : Boolean(task.mySubmission);
 
                       return (
                           <article
@@ -1029,7 +1018,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
               <div className="grid gap-6 lg:grid-cols-[1fr_1fr_300px]">
                 <button
                     type="button"
-                    onClick={() => openCreateModal("test")}
+                    onClick={() => goToCreatePage("test")}
                     className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:border-violet-200 hover:shadow-xl"
                 >
                   <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition group-hover:scale-105">
@@ -1052,7 +1041,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
 
                 <button
                     type="button"
-                    onClick={() => openCreateModal("homework")}
+                    onClick={() => goToCreatePage("homework")}
                     className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm transition hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl"
                 >
                   <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition group-hover:scale-105">
