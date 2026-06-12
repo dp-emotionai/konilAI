@@ -267,6 +267,7 @@ export default function UnifiedProfilePage() {
 
       if (!res.ok) throw new Error("Ошибка загрузки аватара");
       const refreshed = await api.get<MeRes>("auth/me");
+      console.log("avatarUrl from backend:", refreshed.avatarUrl);
       const avatarUrl = refreshed.avatarUrl || "/auth/avatar";
       setMe(refreshed);
       const newVersion = Date.now();
