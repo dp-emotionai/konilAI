@@ -43,6 +43,7 @@ import {
   buildTaskAttachmentUrl,
   createTask,
   deleteTask,
+  getTaskAttachmentDownloadUrl,
   getTaskSubmissions,
   getTasks,
   gradeTaskSubmission,
@@ -521,6 +522,15 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
     }
   }
 
+async function handleDownloadAttachment(submission: TaskSubmission) {
+  try {
+    const result = await getTaskAttachmentDownloadUrl(submission.id);
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Не удалось открыть файл");
+  }
+}
+
   const canSubmitText = submitTaskItem?.type === "text_answer" || submitTaskItem?.type === "homework";
   const canSubmitFile = submitTaskItem?.type === "file_upload" || submitTaskItem?.type === "homework";
 
@@ -939,15 +949,14 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                       )}
 
                       {isTaskSubmission && taskSubmission.attachmentFileName && (
-                        <a
-                          href={buildTaskAttachmentUrl(taskSubmission.id)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                        <button
+                            type="button"
+                            onClick={() => void handleDownloadAttachment(taskSubmission)}
+                            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-primary shadow-soft hover:bg-surface-subtle"
                         >
-                          <Download size={16} />
-                          {taskSubmission.attachmentFileName}
-                        </a>
+                            <Download size={16} />
+                            Скачать файл: {taskSubmission.attachmentFileName}
+                        </button>
                       )}
 
                       {isTaskSubmission && taskSubmission.feedback && (
