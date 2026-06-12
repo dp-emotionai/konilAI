@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,7 +10,7 @@ import {
 } from "@/lib/nav";
 import type { NavDropdownItem, NavItem } from "@/lib/nav";
 import type { Role } from "@/lib/roles";
-import { clearAuth, resolveAvatarUrl } from "@/lib/api/client";
+import { clearAuth, getToken } from "@/lib/api/client";
 import Button from "@/components/ui/Button";
 import {
   Activity,
@@ -48,8 +48,6 @@ import {
 } from "@/lib/api/notifications";
 import { ChatClient } from "@/lib/ws/chatClient";
 
-// ─── Стили ───────────────────────────────────────────────────────────────────
-
 const DROPDOWN_PANEL =
   "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
   "bg-white p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
@@ -79,8 +77,6 @@ const PUBLIC_ICONS: Record<
   HelpCircle,
 };
 
-// ─── Иконка логотипа ──────────────────────────────────────────────────────────
-
 function KonilAILogoIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -99,8 +95,6 @@ function KonilAILogoIcon({ className }: { className?: string }) {
   );
 }
 
-// ─── Логотип ──────────────────────────────────────────────────────────────────
-
 function Logo({ href = "/" }: { href?: string }) {
   const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
 
@@ -116,8 +110,6 @@ function Logo({ href = "/" }: { href?: string }) {
     </Link>
   );
 }
-
-// ─── Ссылка навигации ─────────────────────────────────────────────────────────
 
 function NavLink({
   href,
@@ -146,21 +138,19 @@ function NavLink({
   );
 }
 
-// ─── Публичный пункт навигации ────────────────────────────────────────────────
-
 function PublicNavItem({ item }: { item: NavItem }) {
   const path = usePathname();
   const safePath = typeof path === "string" ? path : "";
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // FIX: объединили два useEffect в один для readability
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
       }
     };
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
@@ -234,6 +224,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                     <IconComp size={18} />
                   </span>
                 )}
+
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-fg">{child.label}</div>
                   {child.subtitle && (
@@ -242,6 +233,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
                     </div>
                   )}
                 </div>
+
                 <ChevronRight size={16} className="shrink-0 text-muted" />
               </Link>
             );
@@ -251,8 +243,6 @@ function PublicNavItem({ item }: { item: NavItem }) {
     </div>
   );
 }
-
-// ─── Пункт навигации приложения ───────────────────────────────────────────────
 
 function AppNavItem({
   item,
@@ -272,6 +262,7 @@ function AppNavItem({
         setOpen(false);
       }
     };
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
@@ -335,7 +326,12 @@ function AppNavItem({
       </button>
 
       {open && (
-        <div className={cn("absolute left-0 top-full z-50 mt-2 min-w-[220px]", DROPDOWN_PANEL)}>
+        <div
+          className={cn(
+            "absolute left-0 top-full z-50 mt-2 min-w-[220px]",
+            DROPDOWN_PANEL
+          )}
+        >
           {children.map((child) => (
             <Link
               key={child.href}
@@ -349,6 +345,7 @@ function AppNavItem({
               )}
             >
               <span className="truncate">{child.label}</span>
+
               {child.badge === "live" && liveSessionId ? (
                 <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
                   Live
@@ -364,57 +361,57 @@ function AppNavItem({
   );
 }
 
-// ─── Главный компонент ────────────────────────────────────────────────────────
-
 export default function TopNav() {
   const router = useRouter();
   const pathname = usePathname();
   const safePathname = typeof pathname === "string" ? pathname : "/";
 
   const { state, setLoggedIn, setConsent, setRole, setStatus } = useUI();
+
   const [profileOpen, setProfileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [navAvatarUrl, setNavAvatarUrl] = useState<string | null>(null);
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const safeRole: Role | null = state.role ?? null;
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
+
   const appNavItems = useMemo(
     () => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []),
     [safeRole]
   );
+
   const consentRequired = Boolean(state.loggedIn && !state.consent);
+
   const unreadCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
     [notifications]
   );
 
-  // FIX: одна функция загрузки уведомлений
   const loadNotifications = useCallback(async (signal?: AbortSignal) => {
     setNotificationsLoading(true);
+
     try {
       const list = await getNotifications({ signal });
       setNotifications(Array.isArray(list) ? list : []);
     } catch {
-      // Игнорируем ошибки (включая AbortError при размонтировании)
+      // ignore
     } finally {
       setNotificationsLoading(false);
     }
   }, []);
 
-  // FIX: закрытие dropdown по клику снаружи
   useEffect(() => {
     const onOutside = (e: MouseEvent) => {
-      if (
-        profileRef.current &&
-        !profileRef.current.contains(e.target as Node)
-      ) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
       }
+
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setNotifOpen(false);
       }
@@ -427,8 +424,6 @@ export default function TopNav() {
     return () => document.removeEventListener("mousedown", onOutside);
   }, [profileOpen, notifOpen]);
 
-  // FIX: один useEffect для периодической загрузки уведомлений (каждые 60 сек)
-  // При открытии панели — немедленный рефреш без дублирующего интервала
   useEffect(() => {
     if (!state.loggedIn) {
       setNotifications([]);
@@ -436,6 +431,7 @@ export default function TopNav() {
     }
 
     const controller = new AbortController();
+
     void loadNotifications(controller.signal);
 
     const interval = window.setInterval(() => {
@@ -448,27 +444,30 @@ export default function TopNav() {
     };
   }, [loadNotifications, state.loggedIn]);
 
-  // FIX: при открытии панели — разовый немедленный рефреш (без отдельного интервала)
   useEffect(() => {
     if (!state.loggedIn || !notifOpen) return;
+
     void loadNotifications();
   }, [loadNotifications, notifOpen, state.loggedIn]);
 
-  // WebSocket уведомления в реальном времени
   useEffect(() => {
     if (!state.loggedIn) return;
 
     const client = new ChatClient((packet) => {
       if (!packet || typeof packet !== "object") return;
+
       const payload = packet as {
         type?: string;
         event?: Partial<NotificationRow>;
       };
+
       if (payload.type !== "notification.new" || !payload.event?.id) return;
 
       const event = payload.event;
+
       setNotifications((prev) => {
         if (prev.some((item) => item.id === event.id)) return prev;
+
         return [
           {
             id: String(event.id),
@@ -491,15 +490,73 @@ export default function TopNav() {
     return () => client.disconnect();
   }, [state.loggedIn]);
 
-  // FIX: Escape для профиля
   useEffect(() => {
     if (!profileOpen) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setProfileOpen(false);
     };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
   }, [profileOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    async function loadNavAvatar() {
+      setNavAvatarUrl(null);
+
+      if (!state.loggedIn || !state.avatarUrl) return;
+
+      const token = getToken();
+
+      if (!token) return;
+
+      try {
+        const res = await fetch(
+          `/api/avatar-proxy?v=${state.avatarVersion ?? Date.now()}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        if (!res.ok) {
+          throw new Error(`Navbar avatar request failed: ${res.status}`);
+        }
+
+        const blob = await res.blob();
+        const nextObjectUrl = URL.createObjectURL(blob);
+
+        if (cancelled) {
+          URL.revokeObjectURL(nextObjectUrl);
+          return;
+        }
+
+        objectUrl = nextObjectUrl;
+        setNavAvatarUrl(nextObjectUrl);
+      } catch (err) {
+        console.error("Navbar avatar load failed:", err);
+        if (!cancelled) setNavAvatarUrl(null);
+      }
+    }
+
+    void loadNavAvatar();
+
+    return () => {
+      cancelled = true;
+
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [state.loggedIn, state.avatarUrl, state.avatarVersion]);
 
   const handleLogout = useCallback(() => {
     clearAuth();
@@ -514,20 +571,11 @@ export default function TopNav() {
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
-      {/*
-        FIX: Правильная трёхколоночная структура навбара.
-        Было: [div.flex-1 { лого + nav + bell + avatar }] [div { bell + avatar }]
-        Стало: [лого] [nav по центру] [правые кнопки]
-        justify-between + flex-1 на nav гарантируют реальное центрирование.
-      */}
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
-
-        {/* Левая часть — только логотип */}
         <div className="flex shrink-0 items-center">
           <Logo href="/" />
         </div>
 
-        {/* Центральная навигация — реально по центру через flex-1 */}
         <nav className="hidden flex-1 items-center justify-center gap-0.5 lg:flex">
           {!state.loggedIn &&
             (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
@@ -549,9 +597,7 @@ export default function TopNav() {
             ))}
         </nav>
 
-        {/* Правая часть — live-badge, bell, avatar, mobile-меню */}
         <div className="flex shrink-0 items-center gap-2">
-          {/* Live session badge */}
           {state.loggedIn && safeRole === "teacher" && liveSession && (
             <Link
               href={`/teacher/session/${liveSession.id}`}
@@ -567,7 +613,6 @@ export default function TopNav() {
 
           {state.loggedIn && (
             <>
-              {/* Колокольчик уведомлений */}
               <div className="relative hidden md:inline-flex" ref={notifRef}>
                 <button
                   type="button"
@@ -637,7 +682,7 @@ export default function TopNav() {
                                     );
                                   }
                                 } catch {
-                                  // silently ignore
+                                  // ignore
                                 }
 
                                 if (sessionId) {
@@ -645,6 +690,7 @@ export default function TopNav() {
                                     safeRole === "teacher"
                                       ? "/teacher/session/"
                                       : "/student/session/";
+
                                   router.push(`${prefix}${sessionId}`);
                                   setNotifOpen(false);
                                 }
@@ -661,16 +707,19 @@ export default function TopNav() {
                                   <div className="truncate text-[13px] font-bold text-slate-900">
                                     {n.title}
                                   </div>
+
                                   {n.body && (
                                     <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
                                       {n.body}
                                     </div>
                                   )}
                                 </div>
+
                                 {!n.isRead && (
                                   <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
                                 )}
                               </div>
+
                               <div className="mt-2 text-[11px] font-semibold text-slate-400">
                                 {new Date(n.createdAt).toLocaleString("ru-RU", {
                                   day: "2-digit",
@@ -688,7 +737,6 @@ export default function TopNav() {
                 )}
               </div>
 
-              {/* Аватар / профиль */}
               <div className="relative" ref={profileRef}>
                 <button
                   type="button"
@@ -698,12 +746,9 @@ export default function TopNav() {
                   className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
                   aria-label="Меню аккаунта"
                 >
-                  {state.avatarUrl ? (
+                  {navAvatarUrl ? (
                     <img
-                      src={resolveAvatarUrl(
-                        state.avatarUrl,
-                        state.avatarVersion
-                      )!}
+                      src={navAvatarUrl}
                       alt={state.fullName || "User"}
                       className="h-full w-full object-cover"
                       referrerPolicy="no-referrer"
@@ -797,7 +842,6 @@ export default function TopNav() {
             </>
           )}
 
-          {/* Кнопки для незалогиненных */}
           {!state.loggedIn && (
             <div className="flex items-center gap-2">
               {NAV_PUBLIC_RIGHT?.signIn?.href && (
@@ -816,7 +860,6 @@ export default function TopNav() {
             </div>
           )}
 
-          {/* Бургер — только на мобильных */}
           <button
             type="button"
             aria-label={mobileOpen ? "Закрыть меню" : "Открыть меню"}
@@ -828,7 +871,6 @@ export default function TopNav() {
         </div>
       </div>
 
-      {/* Мобильное меню */}
       {mobileOpen && (
         <div className="border-b border-[color:var(--border)] bg-white shadow-elevated lg:hidden">
           <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
@@ -849,6 +891,7 @@ export default function TopNav() {
                         <div className="text-sm font-medium text-muted">
                           {(item as NavDropdownItem).label}
                         </div>
+
                         <div className="mt-1 space-y-1 pl-3">
                           {((item as NavDropdownItem).children ?? []).map(
                             (child) => (
@@ -879,6 +922,7 @@ export default function TopNav() {
                   <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
                     Навигация
                   </div>
+
                   <div className="mt-2 space-y-1">
                     {appNavItems.map((item) => (
                       <div
@@ -899,6 +943,7 @@ export default function TopNav() {
                             <div className="text-sm font-medium text-muted">
                               {(item as NavDropdownItem).label}
                             </div>
+
                             <div className="mt-1 space-y-1 pl-3">
                               {((item as NavDropdownItem).children ?? []).map(
                                 (child) => (
@@ -928,6 +973,7 @@ export default function TopNav() {
                   <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
                     Аккаунт
                   </div>
+
                   <div className="mt-2 space-y-1">
                     <Link
                       href="/profile"
