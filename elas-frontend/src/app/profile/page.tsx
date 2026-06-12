@@ -61,33 +61,25 @@ function getApiOriginUrl() {
   }
 }
 
-function buildAvatarImageUrl(avatarUrl?: string | null, avatarVersion?: number) {
+function buildAvatarUrl(avatarUrl?: string | null) {
   if (!avatarUrl) return null;
 
-  const token = getToken();
   const apiBaseUrl = getApiBaseUrl();
   const apiOriginUrl = getApiOriginUrl();
 
-  let url: string;
-
   if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
-    url = avatarUrl;
-  } else if (avatarUrl.startsWith("/api/")) {
-    url = `${apiOriginUrl}${avatarUrl}`;
-  } else if (avatarUrl.startsWith("/")) {
-    url = `${apiBaseUrl}${avatarUrl}`;
-  } else {
-    url = `${apiBaseUrl}/${avatarUrl}`;
+    return avatarUrl;
   }
 
-  if (url.includes("/api/auth/avatar") && token) {
-    const imageUrl = new URL(url);
-    imageUrl.searchParams.set("t", token);
-    imageUrl.searchParams.set("v", String(avatarVersion ?? Date.now()));
-    return imageUrl.toString();
+  if (avatarUrl.startsWith("/api/")) {
+    return `${apiOriginUrl}${avatarUrl}`;
   }
 
-  return url;
+  if (avatarUrl.startsWith("/")) {
+    return `${apiBaseUrl}${avatarUrl}`;
+  }
+
+  return `${apiBaseUrl}/${avatarUrl}`;
 }
 
 export default function UnifiedProfilePage() {
@@ -141,6 +133,7 @@ export default function UnifiedProfilePage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const stored = useMemo(() => getStoredAuth(), []);
+  const [displayAvatar, setDisplayAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -241,6 +234,63 @@ export default function UnifiedProfilePage() {
       .catch(() => setAuthSessions([]))
       .finally(() => setLoadingAuthSessions(false));
   }, [activeTab, authSessions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    async function loadAvatar() {
+      setDisplayAvatar(null);
+
+      const avatarUrl = buildAvatarUrl(me?.avatarUrl);
+      if (!avatarUrl) return;
+
+      const token = getToken();
+
+      if (avatarUrl.includes("/api/auth/avatar") && token) {
+        try {
+          const res = await fetch(avatarUrl, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          });
+
+          if (!res.ok) {
+            throw new Error(`Avatar request failed: ${res.status}`);
+          }
+
+          const blob = await res.blob();
+          const nextObjectUrl = URL.createObjectURL(blob);
+
+          if (cancelled) {
+            URL.revokeObjectURL(nextObjectUrl);
+            return;
+          }
+
+          objectUrl = nextObjectUrl;
+          setDisplayAvatar(nextObjectUrl);
+        } catch (err) {
+          console.error("Avatar load failed:", err);
+          if (!cancelled) setDisplayAvatar(null);
+        }
+
+        return;
+      }
+
+      setDisplayAvatar(avatarUrl);
+    }
+
+    loadAvatar();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [me?.avatarUrl, ui.state.avatarVersion]);
 
   async function handleSaveProfile() {
       if (!isApiAvailable()) {
@@ -528,9 +578,6 @@ export default function UnifiedProfilePage() {
                             || formPhone !== (me?.phone || "")
                             || formOrganization !== (me?.organization || "");
 
-  const displayAvatar = useMemo(() => {
-    return buildAvatarImageUrl(me?.avatarUrl, ui.state.avatarVersion);
-  }, [me?.avatarUrl, ui.state.avatarVersion]);
   const memberSince = me?.createdAt
     ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(me.createdAt))
     : "—";
@@ -731,7 +778,7 @@ export default function UnifiedProfilePage() {
                         <div className="space-y-5">
                           <div className="flex justify-between items-center text-[13px]">
                             <div className="flex items-center gap-3 text-slate-600"><User size={14} className="text-[#7448FF]" /> С нами с</div>
-                            <div className="font-medium text-slate-900">10 марта 2026</div> {/* In real impl: derive from user.createdAt */}
+                            <div className="font-medium text-slate-900">{memberSince}</div>
                           </div>
                           <div className="flex justify-between items-center text-[13px]">
                             <div className="flex items-center gap-3 text-slate-600"><Globe size={14} className="text-[#7448FF]" /> Текущий IP статус</div>
