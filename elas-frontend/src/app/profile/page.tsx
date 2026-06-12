@@ -249,13 +249,16 @@ export default function UnifiedProfilePage() {
 
       if (avatarUrl.includes("/api/auth/avatar") && token) {
         try {
-          const res = await fetch(avatarUrl, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            cache: "no-store",
-          });
+          const res = await fetch(
+  `/api/avatar-proxy?v=${ui.state.avatarVersion ?? Date.now()}`,
+  {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  }
+);
 
           if (!res.ok) {
             throw new Error(`Avatar request failed: ${res.status}`);
