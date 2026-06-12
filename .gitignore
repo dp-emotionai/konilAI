@@ -59,3 +59,13 @@ __pycache__/
 .env
 .env.local
 >>>>>>> 8db4ec18aefb8e34300dcf28d51b227c9723c29a
+emotion-ml-service/training/data/
+*.h5
+emotion-ml-service/venv/
+emotion-ml-service/training/data/
+*.h5
+emotion-ml-service/venv/
+
+emotion-ml-service/events_log*.csv
+emotion-ml-service/session_*.json
+emotion-ml-service/session_report_*.txt
