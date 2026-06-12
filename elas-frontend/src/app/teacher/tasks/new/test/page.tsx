@@ -14,6 +14,7 @@ import {
     Copy,
     Eye,
     GripVertical,
+    ImagePlus,
     Loader2,
     Plus,
     RotateCcw,
@@ -23,7 +24,11 @@ import {
     X,
 } from "lucide-react";
 
-import { api } from "@/lib/api/client";
+import {
+    api,
+    getApiBaseUrl,
+    getToken,
+} from "@/lib/api/client";
 import {
     getGroupById,
     getTeacherGroups,
@@ -38,6 +43,9 @@ type BuilderOption = {
     clientId: string;
     text: string;
     isCorrect: boolean;
+    imageStorageKey: string | null;
+    imagePreviewUrl: string | null;
+    imageUploading: boolean;
 };
 
 type BuilderQuestion = {
@@ -46,6 +54,9 @@ type BuilderQuestion = {
     text: string;
     points: string;
     explanation: string;
+    imageStorageKey: string | null;
+    imagePreviewUrl: string | null;
+    imageUploading: boolean;
     options: BuilderOption[];
 };
 
@@ -57,6 +68,13 @@ type CreatedTest = {
 
 type CreatedQuestion = {
     id: string;
+};
+
+type UploadedTestImage = {
+    storageKey: string;
+    fileName: string;
+    mimeType: string;
+    size: number;
 };
 
 function makeClientId(prefix: string) {
@@ -78,6 +96,9 @@ function createOption(
         clientId: id || makeClientId("option"),
         text,
         isCorrect,
+        imageStorageKey: null,
+        imagePreviewUrl: null,
+        imageUploading: false,
     };
 }
 
@@ -88,11 +109,14 @@ function createQuestion(id?: string): BuilderQuestion {
         text: "",
         points: "1",
         explanation: "",
+        imageStorageKey: null,
+        imagePreviewUrl: null,
+        imageUploading: false,
         options: [
             createOption("", true),
-            createOption(""),
-            createOption(""),
-            createOption(""),
+            createOption(),
+            createOption(),
+            createOption(),
         ],
     };
 }
@@ -104,6 +128,9 @@ function createInitialQuestion(): BuilderQuestion {
         text: "",
         points: "1",
         explanation: "",
+        imageStorageKey: null,
+        imagePreviewUrl: null,
+        imageUploading: false,
         options: [
             createOption("", true, "initial-option-1"),
             createOption("", false, "initial-option-2"),
@@ -117,16 +144,53 @@ function toIsoDate(value: string): string | null {
     if (!value) return null;
 
     const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-
-    return date.toISOString();
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
+}
+
+async function uploadTestImage(file: File): Promise<UploadedTestImage> {
+    const baseUrl = getApiBaseUrl();
+    const token = getToken();
+
+    if (!baseUrl) {
+        throw new Error("API URL не настроен");
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const response = await fetch(`${baseUrl}/tests/upload-image`, {
+        method: "POST",
+        credentials: "include",
+        headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+            }
+            : undefined,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        let message = body;
+
+        try {
+            const parsed = JSON.parse(body) as {
+                error?: string;
+                message?: string;
+            };
+            message = parsed.error || parsed.message || body;
+        } catch {
+            // Сервер вернул не JSON.
+        }
+
+        throw new Error(message || "Не удалось загрузить изображение");
+    }
+
+    return response.json() as Promise<UploadedTestImage>;
 }
 
 function Toggle({
@@ -160,6 +224,36 @@ function Toggle({
     );
 }
 
+function ImagePreview({
+                          src,
+                          alt,
+                          imageClassName,
+                          onRemove,
+                      }: {
+    src: string;
+    alt: string;
+    imageClassName: string;
+    onRemove?: () => void;
+}) {
+    return (
+        <div className="relative mt-3 w-fit overflow-hidden rounded-xl border border-slate-200 bg-white p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={src} alt={alt} className={imageClassName} />
+
+            {onRemove && (
+                <button
+                    type="button"
+                    onClick={onRemove}
+                    className="absolute right-2 top-2 rounded-full bg-white p-1.5 text-red-500 shadow-md transition hover:bg-red-50"
+                    aria-label="Удалить изображение"
+                >
+                    <X size={14} />
+                </button>
+            )}
+        </div>
+    );
+}
+
 function CreateTestContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -169,16 +263,13 @@ function CreateTestContent() {
 
     const [groups, setGroups] = useState<TeacherGroup[]>([]);
     const [sessions, setSessions] = useState<GroupSession[]>([]);
-
     const [selectedGroupId, setSelectedGroupId] = useState("");
     const [selectedSessionId, setSelectedSessionId] = useState("");
-
     const [loadingGroups, setLoadingGroups] = useState(true);
     const [loadingSessions, setLoadingSessions] = useState(false);
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
-
     const [questions, setQuestions] = useState<BuilderQuestion[]>([
         createInitialQuestion(),
     ]);
@@ -187,13 +278,11 @@ function CreateTestContent() {
     const [attemptsAllowed, setAttemptsAllowed] = useState("1");
     const [startsAt, setStartsAt] = useState("");
     const [endsAt, setEndsAt] = useState("");
-
     const [shuffleQuestions, setShuffleQuestions] = useState(false);
     const [shuffleOptions, setShuffleOptions] = useState(false);
 
     const [previewOpen, setPreviewOpen] = useState(false);
     const [saving, setSaving] = useState(false);
-
     const [error, setError] = useState<string | null>(null);
 
     const totalPoints = useMemo(() => {
@@ -211,11 +300,9 @@ function CreateTestContent() {
 
             try {
                 const result = await getTeacherGroups();
-
                 if (!active) return;
 
                 const list = Array.isArray(result) ? result : [];
-
                 setGroups(list);
 
                 const initialExists = list.some(
@@ -227,17 +314,11 @@ function CreateTestContent() {
                 );
             } catch (requestError) {
                 if (!active) return;
-
                 setError(
-                    getErrorMessage(
-                        requestError,
-                        "Не удалось загрузить группы"
-                    )
+                    getErrorMessage(requestError, "Не удалось загрузить группы")
                 );
             } finally {
-                if (active) {
-                    setLoadingGroups(false);
-                }
+                if (active) setLoadingGroups(false);
             }
         }
 
@@ -262,13 +343,9 @@ function CreateTestContent() {
 
             try {
                 const detail = await getGroupById(selectedGroupId);
-
                 if (!active) return;
 
-                const list = Array.isArray(detail?.sessions)
-                    ? detail.sessions
-                    : [];
-
+                const list = Array.isArray(detail?.sessions) ? detail.sessions : [];
                 setSessions(list);
 
                 setSelectedSessionId((current) => {
@@ -284,19 +361,13 @@ function CreateTestContent() {
                 });
             } catch (requestError) {
                 if (!active) return;
-
                 setSessions([]);
                 setSelectedSessionId("");
                 setError(
-                    getErrorMessage(
-                        requestError,
-                        "Не удалось загрузить уроки"
-                    )
+                    getErrorMessage(requestError, "Не удалось загрузить уроки")
                 );
             } finally {
-                if (active) {
-                    setLoadingSessions(false);
-                }
+                if (active) setLoadingSessions(false);
             }
         }
 
@@ -327,9 +398,7 @@ function CreateTestContent() {
     ) {
         setQuestions((current) =>
             current.map((question) => {
-                if (question.clientId !== questionId) {
-                    return question;
-                }
+                if (question.clientId !== questionId) return question;
 
                 return {
                     ...question,
@@ -343,15 +412,137 @@ function CreateTestContent() {
         );
     }
 
-    function changeQuestionType(
+    async function uploadQuestionImage(questionId: string, file: File) {
+        if (!file.type.startsWith("image/")) {
+            setError("Можно загружать только изображения");
+            return;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+
+        updateQuestion(questionId, {
+            imagePreviewUrl: previewUrl,
+            imageUploading: true,
+        });
+
+        try {
+            const uploaded = await uploadTestImage(file);
+
+            updateQuestion(questionId, {
+                imageStorageKey: uploaded.storageKey,
+                imagePreviewUrl: previewUrl,
+                imageUploading: false,
+            });
+        } catch (requestError) {
+            URL.revokeObjectURL(previewUrl);
+
+            updateQuestion(questionId, {
+                imageStorageKey: null,
+                imagePreviewUrl: null,
+                imageUploading: false,
+            });
+
+            setError(
+                getErrorMessage(
+                    requestError,
+                    "Не удалось загрузить изображение вопроса"
+                )
+            );
+        }
+    }
+
+    async function uploadOptionImage(
         questionId: string,
-        type: QuestionType
+        optionId: string,
+        file: File
     ) {
+        if (!file.type.startsWith("image/")) {
+            setError("Можно загружать только изображения");
+            return;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+
+        updateOption(questionId, optionId, {
+            imagePreviewUrl: previewUrl,
+            imageUploading: true,
+        });
+
+        try {
+            const uploaded = await uploadTestImage(file);
+
+            updateOption(questionId, optionId, {
+                imageStorageKey: uploaded.storageKey,
+                imagePreviewUrl: previewUrl,
+                imageUploading: false,
+            });
+        } catch (requestError) {
+            URL.revokeObjectURL(previewUrl);
+
+            updateOption(questionId, optionId, {
+                imageStorageKey: null,
+                imagePreviewUrl: null,
+                imageUploading: false,
+            });
+
+            setError(
+                getErrorMessage(
+                    requestError,
+                    "Не удалось загрузить изображение ответа"
+                )
+            );
+        }
+    }
+
+    function removeQuestionImage(questionId: string) {
         setQuestions((current) =>
             current.map((question) => {
-                if (question.clientId !== questionId) {
-                    return question;
+                if (question.clientId !== questionId) return question;
+
+                if (question.imagePreviewUrl?.startsWith("blob:")) {
+                    URL.revokeObjectURL(question.imagePreviewUrl);
                 }
+
+                return {
+                    ...question,
+                    imageStorageKey: null,
+                    imagePreviewUrl: null,
+                    imageUploading: false,
+                };
+            })
+        );
+    }
+
+    function removeOptionImage(questionId: string, optionId: string) {
+        setQuestions((current) =>
+            current.map((question) => {
+                if (question.clientId !== questionId) return question;
+
+                return {
+                    ...question,
+                    options: question.options.map((option) => {
+                        if (option.clientId !== optionId) return option;
+
+                        if (option.imagePreviewUrl?.startsWith("blob:")) {
+                            URL.revokeObjectURL(option.imagePreviewUrl);
+                        }
+
+                        return {
+                            ...option,
+                            imageStorageKey: null,
+                            imagePreviewUrl: null,
+                            imageUploading: false,
+                        };
+                    }),
+                };
+            })
+        );
+    }
+
+    function changeQuestionType(questionId: string, type: QuestionType) {
+        setQuestions((current) =>
+            current.map((question) => {
+                if (question.clientId !== questionId) return question;
 
                 if (type === "single_choice") {
                     const firstCorrectIndex = question.options.findIndex(
@@ -371,23 +562,15 @@ function CreateTestContent() {
                     };
                 }
 
-                return {
-                    ...question,
-                    type,
-                };
+                return { ...question, type };
             })
         );
     }
 
-    function toggleCorrectOption(
-        questionId: string,
-        optionId: string
-    ) {
+    function toggleCorrectOption(questionId: string, optionId: string) {
         setQuestions((current) =>
             current.map((question) => {
-                if (question.clientId !== questionId) {
-                    return question;
-                }
+                if (question.clientId !== questionId) return question;
 
                 if (question.type === "single_choice") {
                     return {
@@ -428,9 +611,7 @@ function CreateTestContent() {
                 (question) => question.clientId === questionId
             );
 
-            if (!source) {
-                return current;
-            }
+            if (!source) return current;
 
             const duplicate: BuilderQuestion = {
                 ...source,
@@ -444,10 +625,8 @@ function CreateTestContent() {
             const index = current.findIndex(
                 (question) => question.clientId === questionId
             );
-
             const next = [...current];
             next.splice(index + 1, 0, duplicate);
-
             return next;
         });
     }
@@ -459,40 +638,28 @@ function CreateTestContent() {
         }
 
         setQuestions((current) =>
-            current.filter(
-                (question) => question.clientId !== questionId
-            )
+            current.filter((question) => question.clientId !== questionId)
         );
     }
 
     function addOption(questionId: string) {
         setQuestions((current) =>
-            current.map((question) => {
-                if (question.clientId !== questionId) {
-                    return question;
-                }
-
-                return {
-                    ...question,
-                    options: [...question.options, createOption()],
-                };
-            })
+            current.map((question) =>
+                question.clientId === questionId
+                    ? {
+                        ...question,
+                        options: [...question.options, createOption()],
+                    }
+                    : question
+            )
         );
     }
 
-    function deleteOption(
-        questionId: string,
-        optionId: string
-    ) {
+    function deleteOption(questionId: string, optionId: string) {
         setQuestions((current) =>
             current.map((question) => {
-                if (question.clientId !== questionId) {
-                    return question;
-                }
-
-                if (question.options.length <= 2) {
-                    return question;
-                }
+                if (question.clientId !== questionId) return question;
+                if (question.options.length <= 2) return question;
 
                 const nextOptions = question.options.filter(
                     (option) => option.clientId !== optionId
@@ -502,16 +669,10 @@ function CreateTestContent() {
                     question.type === "single_choice" &&
                     !nextOptions.some((option) => option.isCorrect)
                 ) {
-                    nextOptions[0] = {
-                        ...nextOptions[0],
-                        isCorrect: true,
-                    };
+                    nextOptions[0] = { ...nextOptions[0], isCorrect: true };
                 }
 
-                return {
-                    ...question,
-                    options: nextOptions,
-                };
+                return { ...question, options: nextOptions };
             })
         );
     }
@@ -536,40 +697,32 @@ function CreateTestContent() {
     }
 
     function validate(): string | null {
-        if (!title.trim()) {
-            return "Введите название теста";
-        }
+        if (!title.trim()) return "Введите название теста";
+        if (!selectedGroupId) return "Выберите группу";
+        if (questions.length === 0) return "Добавьте хотя бы один вопрос";
 
-        if (!selectedGroupId) {
-            return "Выберите группу";
-        }
+        const hasUploadingImages = questions.some(
+            (question) =>
+                question.imageUploading ||
+                question.options.some((option) => option.imageUploading)
+        );
 
-        if (questions.length === 0) {
-            return "Добавьте хотя бы один вопрос";
+        if (hasUploadingImages) {
+            return "Дождитесь завершения загрузки изображений";
         }
 
         const startDate = startsAt ? new Date(startsAt) : null;
         const endDate = endsAt ? new Date(endsAt) : null;
 
-        if (
-            startDate &&
-            Number.isNaN(startDate.getTime())
-        ) {
+        if (startDate && Number.isNaN(startDate.getTime())) {
             return "Неверная дата начала";
         }
 
-        if (
-            endDate &&
-            Number.isNaN(endDate.getTime())
-        ) {
+        if (endDate && Number.isNaN(endDate.getTime())) {
             return "Неверная дата завершения";
         }
 
-        if (
-            startDate &&
-            endDate &&
-            endDate.getTime() <= startDate.getTime()
-        ) {
+        if (startDate && endDate && endDate.getTime() <= startDate.getTime()) {
             return "Дата завершения должна быть позже даты начала";
         }
 
@@ -581,13 +734,12 @@ function CreateTestContent() {
             }
 
             const points = Number(question.points);
-
             if (!Number.isFinite(points) || points <= 0) {
                 return `Укажите количество баллов для вопроса №${index + 1}`;
             }
 
             const filledOptions = question.options.filter(
-                (option) => option.text.trim()
+                (option) => option.text.trim() || option.imageStorageKey
             );
 
             if (filledOptions.length < 2) {
@@ -598,17 +750,11 @@ function CreateTestContent() {
                 (option) => option.isCorrect
             ).length;
 
-            if (
-                question.type === "single_choice" &&
-                correctCount !== 1
-            ) {
+            if (question.type === "single_choice" && correctCount !== 1) {
                 return `У вопроса №${index + 1} должен быть ровно 1 правильный ответ`;
             }
 
-            if (
-                question.type === "multiple_choice" &&
-                correctCount < 1
-            ) {
+            if (question.type === "multiple_choice" && correctCount < 1) {
                 return `У вопроса №${index + 1} должен быть хотя бы 1 правильный ответ`;
             }
         }
@@ -638,13 +784,8 @@ function CreateTestContent() {
                 groupId: selectedGroupId,
                 sessionId: selectedSessionId || null,
                 timeLimitMinutes:
-                    Number(timeLimitMinutes) > 0
-                        ? Number(timeLimitMinutes)
-                        : null,
-                attemptsAllowed: Math.max(
-                    1,
-                    Number(attemptsAllowed) || 1
-                ),
+                    Number(timeLimitMinutes) > 0 ? Number(timeLimitMinutes) : null,
+                attemptsAllowed: Math.max(1, Number(attemptsAllowed) || 1),
                 shuffleQuestions,
                 shuffleOptions,
                 startsAt: toIsoDate(startsAt),
@@ -667,12 +808,15 @@ function CreateTestContent() {
                         text: question.text.trim(),
                         points: Number(question.points),
                         order: questionIndex,
-                        explanation:
-                            question.explanation.trim() || null,
+                        explanation: question.explanation.trim() || null,
+                        imageStorageKey: question.imageStorageKey || null,
                         options: question.options
-                            .filter((option) => option.text.trim())
+                            .filter(
+                                (option) => option.text.trim() || option.imageStorageKey
+                            )
                             .map((option, optionIndex) => ({
-                                text: option.text.trim(),
+                                text: option.text.trim() || null,
+                                imageStorageKey: option.imageStorageKey || null,
                                 isCorrect: option.isCorrect,
                                 order: optionIndex,
                             })),
@@ -680,10 +824,7 @@ function CreateTestContent() {
                 );
             }
 
-            await api.post<CreatedTest>(
-                `tests/${createdTest.id}/publish`
-            );
-
+            await api.post<CreatedTest>(`tests/${createdTest.id}/publish`);
             testPublished = true;
 
             await createTask({
@@ -703,9 +844,7 @@ function CreateTestContent() {
         } catch (requestError) {
             if (createdTestId && !testPublished) {
                 try {
-                    await api.delete<{ ok: boolean }>(
-                        `tests/${createdTestId}`
-                    );
+                    await api.delete<{ ok: boolean }>(`tests/${createdTestId}`);
                 } catch {
                     // Не блокируем основную ошибку, если очистить draft не удалось.
                 }
@@ -773,22 +912,14 @@ function CreateTestContent() {
                         <button
                             type="button"
                             onClick={() => void handlePublish()}
-                            disabled={
-                                saving ||
-                                loadingGroups ||
-                                !selectedGroupId
-                            }
+                            disabled={saving || loadingGroups || !selectedGroupId}
                             className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-extrabold text-white shadow-lg shadow-violet-200 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {saving ? (
-                                <Loader2
-                                    size={17}
-                                    className="animate-spin"
-                                />
+                                <Loader2 size={17} className="animate-spin" />
                             ) : (
                                 <Save size={17} />
                             )}
-
                             {saving ? "Публикуем..." : "Опубликовать"}
                         </button>
                     </div>
@@ -797,7 +928,6 @@ function CreateTestContent() {
                 {error && (
                     <div className="mb-6 flex items-start justify-between gap-4 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
                         <span>{error}</span>
-
                         <button
                             type="button"
                             onClick={() => setError(null)}
@@ -809,28 +939,21 @@ function CreateTestContent() {
                 )}
 
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_230px_330px]">
-                    <main
-                        id="test-questions"
-                        className="min-w-0 space-y-5"
-                    >
+                    <main id="test-questions" className="min-w-0 space-y-5">
                         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                             <div className="h-2 bg-violet-600" />
 
                             <div className="p-6 md:p-8">
                                 <input
                                     value={title}
-                                    onChange={(event) =>
-                                        setTitle(event.target.value)
-                                    }
+                                    onChange={(event) => setTitle(event.target.value)}
                                     placeholder="Название теста"
                                     className="w-full border-none bg-transparent text-2xl font-extrabold text-slate-950 outline-none placeholder:text-slate-300 md:text-3xl"
                                 />
 
                                 <textarea
                                     value={description}
-                                    onChange={(event) =>
-                                        setDescription(event.target.value)
-                                    }
+                                    onChange={(event) => setDescription(event.target.value)}
                                     rows={2}
                                     placeholder="Описание теста (необязательно)"
                                     className="mt-5 w-full resize-none border-none bg-transparent text-sm font-medium leading-6 text-slate-600 outline-none placeholder:text-slate-400"
@@ -865,17 +988,60 @@ function CreateTestContent() {
                                             className="w-full resize-none border-b border-slate-200 bg-transparent pb-3 text-base font-extrabold leading-7 text-slate-950 outline-none transition focus:border-violet-500"
                                         />
 
+                                        <div className="mt-4">
+                                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-600">
+                                                {question.imageUploading ? (
+                                                    <Loader2 size={17} className="animate-spin" />
+                                                ) : (
+                                                    <ImagePlus size={17} />
+                                                )}
+
+                                                {question.imageUploading
+                                                    ? "Загрузка..."
+                                                    : "Добавить изображение"}
+
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    disabled={question.imageUploading}
+                                                    className="hidden"
+                                                    onChange={(event) => {
+                                                        const file = event.target.files?.[0];
+
+                                                        if (file) {
+                                                            void uploadQuestionImage(
+                                                                question.clientId,
+                                                                file
+                                                            );
+                                                        }
+
+                                                        event.target.value = "";
+                                                    }}
+                                                />
+                                            </label>
+
+                                            {question.imagePreviewUrl && (
+                                                <ImagePreview
+                                                    src={question.imagePreviewUrl}
+                                                    alt={`Изображение вопроса ${questionIndex + 1}`}
+                                                    imageClassName="max-h-64 max-w-full rounded-xl object-contain"
+                                                    onRemove={() =>
+                                                        removeQuestionImage(question.clientId)
+                                                    }
+                                                />
+                                            )}
+                                        </div>
+
                                         <div className="mt-6 space-y-3">
-                                            {question.options.map(
-                                                (option, optionIndex) => (
-                                                    <div
-                                                        key={option.clientId}
-                                                        className="group flex items-center gap-3"
-                                                    >
+                                            {question.options.map((option, optionIndex) => (
+                                                <div
+                                                    key={option.clientId}
+                                                    className="rounded-2xl border border-slate-100 bg-slate-50/50 p-3"
+                                                >
+                                                    <div className="group flex items-center gap-3">
                                                         <input
                                                             type={
-                                                                question.type ===
-                                                                "single_choice"
+                                                                question.type === "single_choice"
                                                                     ? "radio"
                                                                     : "checkbox"
                                                             }
@@ -896,20 +1062,44 @@ function CreateTestContent() {
                                                                 updateOption(
                                                                     question.clientId,
                                                                     option.clientId,
-                                                                    {
-                                                                        text: event.target.value,
-                                                                    }
+                                                                    { text: event.target.value }
                                                                 )
                                                             }
                                                             placeholder={`Вариант ${optionIndex + 1}`}
                                                             className="min-w-0 flex-1 border-b border-transparent bg-transparent px-1 py-2 text-sm font-semibold text-slate-700 outline-none transition hover:border-slate-200 focus:border-violet-500"
                                                         />
 
+                                                        <label className="cursor-pointer rounded-lg p-2 text-slate-400 transition hover:bg-violet-50 hover:text-violet-600">
+                                                            {option.imageUploading ? (
+                                                                <Loader2 size={17} className="animate-spin" />
+                                                            ) : (
+                                                                <ImagePlus size={17} />
+                                                            )}
+
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                disabled={option.imageUploading}
+                                                                className="hidden"
+                                                                onChange={(event) => {
+                                                                    const file = event.target.files?.[0];
+
+                                                                    if (file) {
+                                                                        void uploadOptionImage(
+                                                                            question.clientId,
+                                                                            option.clientId,
+                                                                            file
+                                                                        );
+                                                                    }
+
+                                                                    event.target.value = "";
+                                                                }}
+                                                            />
+                                                        </label>
+
                                                         <button
                                                             type="button"
-                                                            disabled={
-                                                                question.options.length <= 2
-                                                            }
+                                                            disabled={question.options.length <= 2}
                                                             onClick={() =>
                                                                 deleteOption(
                                                                     question.clientId,
@@ -917,20 +1107,32 @@ function CreateTestContent() {
                                                                 )
                                                             }
                                                             title="Удалить вариант"
-                                                            className="rounded-lg p-2 text-slate-300 opacity-0 transition hover:bg-red-50 hover:text-red-500 disabled:hidden group-hover:opacity-100"
+                                                            className="rounded-lg p-2 text-slate-300 transition hover:bg-red-50 hover:text-red-500 disabled:hidden"
                                                         >
                                                             <X size={16} />
                                                         </button>
                                                     </div>
-                                                )
-                                            )}
+
+                                                    {option.imagePreviewUrl && (
+                                                        <ImagePreview
+                                                            src={option.imagePreviewUrl}
+                                                            alt={`Изображение варианта ${optionIndex + 1}`}
+                                                            imageClassName="max-h-40 max-w-full rounded-lg object-contain"
+                                                            onRemove={() =>
+                                                                removeOptionImage(
+                                                                    question.clientId,
+                                                                    option.clientId
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
 
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                addOption(question.clientId)
-                                            }
+                                            onClick={() => addOption(question.clientId)}
                                             className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-violet-600 transition hover:text-violet-700"
                                         >
                                             <Plus size={16} />
@@ -960,8 +1162,7 @@ function CreateTestContent() {
                                                 onChange={(event) =>
                                                     changeQuestionType(
                                                         question.clientId,
-                                                        event.target
-                                                            .value as QuestionType
+                                                        event.target.value as QuestionType
                                                     )
                                                 }
                                                 className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
@@ -969,7 +1170,6 @@ function CreateTestContent() {
                                                 <option value="single_choice">
                                                     Один правильный ответ
                                                 </option>
-
                                                 <option value="multiple_choice">
                                                     Несколько правильных
                                                 </option>
@@ -1004,9 +1204,7 @@ function CreateTestContent() {
                                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 px-6 py-4">
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            duplicateQuestion(question.clientId)
-                                        }
+                                        onClick={() => duplicateQuestion(question.clientId)}
                                         title="Дублировать вопрос"
                                         className="rounded-xl p-2.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                                     >
@@ -1015,9 +1213,7 @@ function CreateTestContent() {
 
                                     <button
                                         type="button"
-                                        onClick={() =>
-                                            deleteQuestion(question.clientId)
-                                        }
+                                        onClick={() => deleteQuestion(question.clientId)}
                                         title="Удалить вопрос"
                                         className="rounded-xl p-2.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
                                     >
@@ -1085,15 +1281,10 @@ function CreateTestContent() {
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:opacity-50"
                                 >
                                     {groups.length === 0 ? (
-                                        <option value="">
-                                            Групп нет
-                                        </option>
+                                        <option value="">Групп нет</option>
                                     ) : (
                                         groups.map((group) => (
-                                            <option
-                                                key={group.id}
-                                                value={group.id}
-                                            >
+                                            <option key={group.id} value={group.id}>
                                                 {group.name}
                                             </option>
                                         ))
@@ -1108,25 +1299,15 @@ function CreateTestContent() {
 
                                 <select
                                     value={selectedSessionId}
-                                    disabled={
-                                        !selectedGroupId || loadingSessions
-                                    }
+                                    disabled={!selectedGroupId || loadingSessions}
                                     onChange={(event) =>
-                                        setSelectedSessionId(
-                                            event.target.value
-                                        )
+                                        setSelectedSessionId(event.target.value)
                                     }
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:opacity-50"
                                 >
-                                    <option value="">
-                                        Без привязки к уроку
-                                    </option>
-
+                                    <option value="">Без привязки к уроку</option>
                                     {sessions.map((session) => (
-                                        <option
-                                            key={session.id}
-                                            value={session.id}
-                                        >
+                                        <option key={session.id} value={session.id}>
                                             {session.title}
                                         </option>
                                     ))}
@@ -1157,13 +1338,10 @@ function CreateTestContent() {
                                         min="1"
                                         value={timeLimitMinutes}
                                         onChange={(event) =>
-                                            setTimeLimitMinutes(
-                                                event.target.value
-                                            )
+                                            setTimeLimitMinutes(event.target.value)
                                         }
                                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-20 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                                     />
-
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
                     минут
                   </span>
@@ -1179,9 +1357,7 @@ function CreateTestContent() {
                                     type="number"
                                     min="1"
                                     value={attemptsAllowed}
-                                    onChange={(event) =>
-                                        setAttemptsAllowed(event.target.value)
-                                    }
+                                    onChange={(event) => setAttemptsAllowed(event.target.value)}
                                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                                 />
                             </label>
@@ -1191,7 +1367,6 @@ function CreateTestContent() {
                   <span className="text-sm font-bold text-slate-600">
                     Перемешивать вопросы
                   </span>
-
                                     <Toggle
                                         checked={shuffleQuestions}
                                         onChange={setShuffleQuestions}
@@ -1202,7 +1377,6 @@ function CreateTestContent() {
                   <span className="text-sm font-bold text-slate-600">
                     Перемешивать варианты
                   </span>
-
                                     <Toggle
                                         checked={shuffleOptions}
                                         onChange={setShuffleOptions}
@@ -1219,9 +1393,7 @@ function CreateTestContent() {
                                     <input
                                         type="datetime-local"
                                         value={startsAt}
-                                        onChange={(event) =>
-                                            setStartsAt(event.target.value)
-                                        }
+                                        onChange={(event) => setStartsAt(event.target.value)}
                                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                                     />
                                 </label>
@@ -1234,9 +1406,7 @@ function CreateTestContent() {
                                     <input
                                         type="datetime-local"
                                         value={endsAt}
-                                        onChange={(event) =>
-                                            setEndsAt(event.target.value)
-                                        }
+                                        onChange={(event) => setEndsAt(event.target.value)}
                                         className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                                     />
                                 </label>
@@ -1249,12 +1419,11 @@ function CreateTestContent() {
             {previewOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
                     <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
-                        <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
+                        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-5">
                             <div>
                                 <h2 className="text-xl font-extrabold text-slate-950">
                                     Предпросмотр теста
                                 </h2>
-
                                 <p className="mt-1 text-sm text-slate-500">
                                     Так тест будет выглядеть для студента
                                 </p>
@@ -1282,8 +1451,7 @@ function CreateTestContent() {
                                 )}
 
                                 <div className="mt-4 text-sm font-bold text-violet-700">
-                                    {questions.length} вопросов ·{" "}
-                                    {totalPoints} баллов
+                                    {questions.length} вопросов · {totalPoints} баллов
                                 </div>
                             </div>
 
@@ -1294,37 +1462,50 @@ function CreateTestContent() {
                                 >
                                     <div className="flex items-start justify-between gap-4">
                                         <h4 className="font-extrabold leading-6 text-slate-900">
-                                            {index + 1}.{" "}
-                                            {question.text.trim() ||
-                                                "Текст вопроса"}
+                                            {index + 1}. {question.text.trim() || "Текст вопроса"}
                                         </h4>
-
                                         <span className="shrink-0 text-xs font-bold text-slate-400">
                       {question.points || 0} балл.
                     </span>
                                     </div>
 
+                                    {question.imagePreviewUrl && (
+                                        <ImagePreview
+                                            src={question.imagePreviewUrl}
+                                            alt={`Изображение вопроса ${index + 1}`}
+                                            imageClassName="max-h-64 max-w-full rounded-xl object-contain"
+                                        />
+                                    )}
+
                                     <div className="mt-5 space-y-3">
                                         {question.options.map((option) => (
                                             <label
                                                 key={option.clientId}
-                                                className="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3"
+                                                className="flex items-start gap-3 rounded-xl border border-slate-200 px-4 py-3"
                                             >
                                                 <input
                                                     type={
-                                                        question.type ===
-                                                        "single_choice"
+                                                        question.type === "single_choice"
                                                             ? "radio"
                                                             : "checkbox"
                                                     }
                                                     disabled
-                                                    className="h-4 w-4"
+                                                    className="mt-1 h-4 w-4"
                                                 />
 
-                                                <span className="text-sm font-medium text-slate-700">
-                          {option.text.trim() ||
-                              "Вариант ответа"}
-                        </span>
+                                                <div className="min-w-0 flex-1">
+                          <span className="text-sm font-medium text-slate-700">
+                            {option.text.trim() || "Вариант ответа"}
+                          </span>
+
+                                                    {option.imagePreviewUrl && (
+                                                        <ImagePreview
+                                                            src={option.imagePreviewUrl}
+                                                            alt="Изображение варианта ответа"
+                                                            imageClassName="max-h-40 max-w-full rounded-lg object-contain"
+                                                        />
+                                                    )}
+                                                </div>
                                             </label>
                                         ))}
                                     </div>
@@ -1348,10 +1529,7 @@ export default function CreateTestPage() {
         <Suspense
             fallback={
                 <div className="flex min-h-screen items-center justify-center bg-[#f8f9ff]">
-                    <Loader2
-                        size={28}
-                        className="animate-spin text-violet-600"
-                    />
+                    <Loader2 size={28} className="animate-spin text-violet-600" />
                 </div>
             }
         >

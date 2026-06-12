@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -12,7 +17,11 @@ import {
     Send,
 } from "lucide-react";
 
-import { api } from "@/lib/api/client";
+import {
+    api,
+    getApiOriginUrl,
+    getToken,
+} from "@/lib/api/client";
 
 type QuestionType =
     | "single_choice"
@@ -24,6 +33,7 @@ type StudentTestOption = {
     questionId: string;
     text?: string | null;
     order: number;
+    imageUrl?: string | null;
 };
 
 type StudentTestQuestion = {
@@ -33,6 +43,7 @@ type StudentTestQuestion = {
     text: string;
     points: number;
     order: number;
+    imageUrl?: string | null;
     options: StudentTestOption[];
 };
 
@@ -68,7 +79,9 @@ function getErrorMessage(
     error: unknown,
     fallback: string
 ): string {
-    return error instanceof Error ? error.message : fallback;
+    return error instanceof Error
+        ? error.message
+        : fallback;
 }
 
 function formatDate(value?: string | null): string {
@@ -89,15 +102,109 @@ function formatDate(value?: string | null): string {
     });
 }
 
+function ProtectedTestImage({
+                                path,
+                                alt,
+                                className,
+                            }: {
+    path?: string | null;
+    alt: string;
+    className?: string;
+}) {
+    const [src, setSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        let objectUrl: string | null = null;
+
+        async function loadImage() {
+            const currentPath = path;
+
+            // await нужен также для устранения react-hooks/set-state-in-effect
+            await Promise.resolve();
+
+            if (!currentPath) {
+                if (!cancelled) {
+                    setSrc(null);
+                }
+                return;
+            }
+
+            const origin = getApiOriginUrl();
+            const token = getToken();
+
+            const url = currentPath.startsWith("http")
+                ? currentPath
+                : `${origin}${
+                    currentPath.startsWith("/")
+                        ? currentPath
+                        : `/${currentPath}`
+                }`;
+
+            try {
+                const headers = new Headers();
+
+                if (token) {
+                    headers.set("Authorization", `Bearer ${token}`);
+                }
+
+                const response = await fetch(url, {
+                    method: "GET",
+                    credentials: "include",
+                    headers,
+                });
+
+                if (!response.ok) {
+                    if (!cancelled) {
+                        setSrc(null);
+                    }
+                    return;
+                }
+
+                const blob = await response.blob();
+
+                if (cancelled) return;
+
+                objectUrl = URL.createObjectURL(blob);
+                setSrc(objectUrl);
+            } catch {
+                if (!cancelled) {
+                    setSrc(null);
+                }
+            }
+        }
+
+        void loadImage();
+
+        return () => {
+            cancelled = true;
+
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [path]);
+
+    if (!src) return null;
+
+    return (
+        <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={src}
+                alt={alt}
+                className={className}
+            />
+        </>
+    );
+}
+
 export default function StudentTestPage() {
     const params = useParams<{ id: string }>();
+    const testId = params.id;
 
-    const testId =
-        typeof params.id === "string" ? params.id : "";
-
-    const [test, setTest] = useState<StudentTest | null>(
-        null
-    );
+    const [test, setTest] =
+        useState<StudentTest | null>(null);
 
     const [result, setResult] =
         useState<TestSubmission | null>(null);
@@ -109,11 +216,11 @@ export default function StudentTestPage() {
         useState<TextAnswers>({});
 
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [submitting, setSubmitting] =
+        useState(false);
 
-    const [error, setError] = useState<string | null>(
-        null
-    );
+    const [error, setError] =
+        useState<string | null>(null);
 
     const answeredCount = useMemo(() => {
         if (!test) return 0;
@@ -163,9 +270,10 @@ export default function StudentTestPage() {
                 return;
             }
 
-            const loadedTest = await api.get<StudentTest>(
-                `tests/student/${testId}`
-            );
+            const loadedTest =
+                await api.get<StudentTest>(
+                    `tests/student/${testId}`
+                );
 
             setTest(loadedTest);
         } catch (requestError) {
@@ -199,10 +307,13 @@ export default function StudentTestPage() {
         optionId: string
     ) {
         setSelectedAnswers((current) => {
-            const selected = current[questionId] || [];
+            const selected =
+                current[questionId] || [];
 
             const next = selected.includes(optionId)
-                ? selected.filter((id) => id !== optionId)
+                ? selected.filter(
+                    (id) => id !== optionId
+                )
                 : [...selected, optionId];
 
             return {
@@ -225,8 +336,12 @@ export default function StudentTestPage() {
             const question = test.questions[index];
 
             if (question.type === "text") {
-                if (!textAnswers[question.id]?.trim()) {
-                    return `Ответьте на вопрос №${index + 1}`;
+                if (
+                    !textAnswers[question.id]?.trim()
+                ) {
+                    return `Ответьте на вопрос №${
+                        index + 1
+                    }`;
                 }
 
                 continue;
@@ -236,14 +351,18 @@ export default function StudentTestPage() {
                 selectedAnswers[question.id] || [];
 
             if (selected.length === 0) {
-                return `Выберите ответ в вопросе №${index + 1}`;
+                return `Выберите ответ в вопросе №${
+                    index + 1
+                }`;
             }
 
             if (
                 question.type === "single_choice" &&
                 selected.length !== 1
             ) {
-                return `В вопросе №${index + 1} можно выбрать только один ответ`;
+                return `В вопросе №${
+                    index + 1
+                } можно выбрать только один ответ`;
             }
         }
 
@@ -253,14 +372,17 @@ export default function StudentTestPage() {
     async function handleSubmit() {
         if (!test || submitting) return;
 
-        const validationError = validateAnswers();
+        const validationError =
+            validateAnswers();
 
         if (validationError) {
             setError(validationError);
+
             window.scrollTo({
                 top: 0,
                 behavior: "smooth",
             });
+
             return;
         }
 
@@ -281,15 +403,17 @@ export default function StudentTestPage() {
                             questionId: question.id,
                             selectedOptionIds: [],
                             textAnswer:
-                                textAnswers[question.id]?.trim() ||
-                                null,
+                                textAnswers[
+                                    question.id
+                                    ]?.trim() || null,
                         };
                     }
 
                     return {
                         questionId: question.id,
                         selectedOptionIds:
-                            selectedAnswers[question.id] || [],
+                            selectedAnswers[question.id] ||
+                            [],
                         textAnswer: null,
                     };
                 }
@@ -349,6 +473,7 @@ export default function StudentTestPage() {
                         size={24}
                         className="animate-spin text-violet-600"
                     />
+
                     Загрузка теста...
                 </div>
             </div>
@@ -361,7 +486,9 @@ export default function StudentTestPage() {
 
         const percentage =
             maxScore > 0
-                ? Math.round((score / maxScore) * 100)
+                ? Math.round(
+                    (score / maxScore) * 100
+                )
                 : 0;
 
         return (
@@ -393,7 +520,9 @@ export default function StudentTestPage() {
                         {result.submittedAt && (
                             <p className="mt-5 text-sm font-medium text-slate-500">
                                 Отправлено:{" "}
-                                {formatDate(result.submittedAt)}
+                                {formatDate(
+                                    result.submittedAt
+                                )}
                             </p>
                         )}
 
@@ -430,7 +559,9 @@ export default function StudentTestPage() {
                         <div className="mt-7 flex justify-center gap-3">
                             <button
                                 type="button"
-                                onClick={() => void loadTest()}
+                                onClick={() =>
+                                    void loadTest()
+                                }
                                 className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
                             >
                                 Повторить
@@ -480,6 +611,7 @@ export default function StudentTestPage() {
                             size={19}
                             className="mt-0.5 shrink-0"
                         />
+
                         {error}
                     </div>
                 )}
@@ -510,7 +642,8 @@ export default function StudentTestPage() {
 
                             {test.endsAt && (
                                 <span className="rounded-xl bg-orange-50 px-4 py-2 text-orange-700">
-                  Дедлайн: {formatDate(test.endsAt)}
+                  Дедлайн:{" "}
+                                    {formatDate(test.endsAt)}
                 </span>
                             )}
                         </div>
@@ -521,7 +654,8 @@ export default function StudentTestPage() {
                     {test.questions.map(
                         (question, questionIndex) => {
                             const selected =
-                                selectedAnswers[question.id] || [];
+                                selectedAnswers[question.id] ||
+                                [];
 
                             return (
                                 <section
@@ -539,17 +673,30 @@ export default function StudentTestPage() {
                     </span>
                                     </div>
 
+                                    <ProtectedTestImage
+                                        path={question.imageUrl}
+                                        alt={`Изображение вопроса ${
+                                            questionIndex + 1
+                                        }`}
+                                        className="mt-5 max-h-80 w-full rounded-2xl border border-slate-200 bg-slate-50 object-contain"
+                                    />
+
                                     {question.type === "text" ? (
                                         <textarea
                                             value={
-                                                textAnswers[question.id] || ""
+                                                textAnswers[
+                                                    question.id
+                                                    ] || ""
                                             }
                                             onChange={(event) =>
-                                                setTextAnswers((current) => ({
-                                                    ...current,
-                                                    [question.id]:
-                                                    event.target.value,
-                                                }))
+                                                setTextAnswers(
+                                                    (current) => ({
+                                                        ...current,
+                                                        [question.id]:
+                                                        event.target
+                                                            .value,
+                                                    })
+                                                )
                                             }
                                             rows={5}
                                             placeholder="Введите ваш ответ..."
@@ -560,13 +707,15 @@ export default function StudentTestPage() {
                                             {question.options.map(
                                                 (option) => {
                                                     const checked =
-                                                        selected.includes(option.id);
+                                                        selected.includes(
+                                                            option.id
+                                                        );
 
                                                     return (
                                                         <label
                                                             key={option.id}
                                                             className={[
-                                                                "flex cursor-pointer items-center gap-4 rounded-2xl border px-5 py-4 transition",
+                                                                "flex cursor-pointer items-start gap-4 rounded-2xl border px-5 py-4 transition",
                                                                 checked
                                                                     ? "border-violet-500 bg-violet-50 ring-4 ring-violet-100"
                                                                     : "border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/40",
@@ -580,7 +729,9 @@ export default function StudentTestPage() {
                                                                         : "checkbox"
                                                                 }
                                                                 name={`question-${question.id}`}
-                                                                checked={checked}
+                                                                checked={
+                                                                    checked
+                                                                }
                                                                 onChange={() => {
                                                                     if (
                                                                         question.type ===
@@ -597,13 +748,23 @@ export default function StudentTestPage() {
                                                                         );
                                                                     }
                                                                 }}
-                                                                className="h-4 w-4 shrink-0 accent-violet-600"
+                                                                className="mt-1 h-4 w-4 shrink-0 accent-violet-600"
                                                             />
 
-                                                            <span className="text-sm font-semibold text-slate-700">
-                                {option.text ||
-                                    "Вариант ответа"}
-                              </span>
+                                                            <div className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold text-slate-700">
+                                  {option.text ||
+                                      "Вариант ответа"}
+                                </span>
+
+                                                                <ProtectedTestImage
+                                                                    path={
+                                                                        option.imageUrl
+                                                                    }
+                                                                    alt="Изображение варианта ответа"
+                                                                    className="mt-3 max-h-52 max-w-full rounded-xl border border-slate-200 bg-white object-contain"
+                                                                />
+                                                            </div>
                                                         </label>
                                                     );
                                                 }
@@ -625,7 +786,9 @@ export default function StudentTestPage() {
 
                         <button
                             type="button"
-                            onClick={() => void handleSubmit()}
+                            onClick={() =>
+                                void handleSubmit()
+                            }
                             disabled={submitting}
                             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-7 text-sm font-extrabold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
                         >
