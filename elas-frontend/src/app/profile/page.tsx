@@ -9,11 +9,12 @@ import { useUI } from "@/components/layout/Providers";
 import {
   api,
   clearAuth,
+  getApiBaseUrl,
   getStoredAuth,
+  getToken,
   hasAuth,
   isApiAvailable,
   setAuth,
-  resolveAvatarUrl
 } from "@/lib/api/client";
 
 import {
@@ -49,6 +50,45 @@ const TABS = [
   { id: "subscription", label: "Подписка", icon: CreditCard },
   { id: "active_sessions", label: "Активные сессии", icon: Smartphone },
 ];
+
+function getApiOriginUrl() {
+  const apiBaseUrl = getApiBaseUrl();
+
+  try {
+    return new URL(apiBaseUrl).origin;
+  } catch {
+    return apiBaseUrl.replace(/\/api\/?$/, "");
+  }
+}
+
+function buildAvatarImageUrl(avatarUrl?: string | null, avatarVersion?: number) {
+  if (!avatarUrl) return null;
+
+  const token = getToken();
+  const apiBaseUrl = getApiBaseUrl();
+  const apiOriginUrl = getApiOriginUrl();
+
+  let url: string;
+
+  if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
+    url = avatarUrl;
+  } else if (avatarUrl.startsWith("/api/")) {
+    url = `${apiOriginUrl}${avatarUrl}`;
+  } else if (avatarUrl.startsWith("/")) {
+    url = `${apiBaseUrl}${avatarUrl}`;
+  } else {
+    url = `${apiBaseUrl}/${avatarUrl}`;
+  }
+
+  if (url.includes("/api/auth/avatar") && token) {
+    const imageUrl = new URL(url);
+    imageUrl.searchParams.set("t", token);
+    imageUrl.searchParams.set("v", String(avatarVersion ?? Date.now()));
+    return imageUrl.toString();
+  }
+
+  return url;
+}
 
 export default function UnifiedProfilePage() {
   const router = useRouter();
@@ -268,7 +308,7 @@ export default function UnifiedProfilePage() {
       if (!res.ok) throw new Error("Ошибка загрузки аватара");
       const refreshed = await api.get<MeRes>("auth/me");
       console.log("avatarUrl from backend:", refreshed.avatarUrl);
-      const avatarUrl = refreshed.avatarUrl || "/auth/avatar";
+      const avatarUrl = refreshed.avatarUrl || "/api/auth/avatar";
       setMe(refreshed);
       const newVersion = Date.now();
       if (stored) {
@@ -488,7 +528,9 @@ export default function UnifiedProfilePage() {
                             || formPhone !== (me?.phone || "")
                             || formOrganization !== (me?.organization || "");
 
-  const displayAvatar = resolveAvatarUrl(me?.avatarUrl, ui.state.avatarVersion);
+  const displayAvatar = useMemo(() => {
+    return buildAvatarImageUrl(me?.avatarUrl, ui.state.avatarVersion);
+  }, [me?.avatarUrl, ui.state.avatarVersion]);
   const memberSince = me?.createdAt
     ? new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long", year: "numeric" }).format(new Date(me.createdAt))
     : "—";
