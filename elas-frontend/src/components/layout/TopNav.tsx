@@ -568,15 +568,16 @@ export default function TopNav() {
   }, [state.loggedIn, state.avatarVersion]);
 
   const handleLogout = useCallback(() => {
-    clearAuth();
-    setLoggedIn(false);
-    setConsent(false);
-    setRole(null);
-    setStatus(null);
     setProfileOpen(false);
+    setNotifOpen(false);
     setMobileOpen(false);
-    router.push("/");
-  }, [router, setConsent, setLoggedIn, setRole, setStatus]);
+
+    clearAuth();
+
+    // Полная перезагрузка сразу останавливает запросы защищённой страницы,
+    // поэтому после выхода не появляется сообщение 401 / "Доступ запрещён".
+    window.location.replace("/");
+  }, []);
 
   return (
     <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
