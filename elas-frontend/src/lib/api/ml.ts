@@ -1,6 +1,6 @@
-// Integration with emotion-ml-service (backend/app.py).
-// - POST /analyze — send 64×64 grayscale frame, get emotion, risk, state.
-// Plus facade types for future session/stream API.
+// Integration with emotion-ml-service:
+// - GET  /health
+// - POST /analyze
 
 export type MlSessionId = string;
 
@@ -36,40 +36,24 @@ export type MlGroupState =
   | "low_engagement";
 
 export type MlPerFrameEvent = {
-  /** Monotonic timestamp in seconds from session start */
   t: number;
-  /** Optional wall-clock ISO timestamp from backend */
   ts?: string;
-  /** Face / participant identifier if available */
   faceId?: string;
-  /** Per-face engagement 0..1 */
   engagement?: number;
-  /** Per-face stress 0..1 */
   stress?: number;
-  /** Per-face fatigue 0..1 */
   fatigue?: number;
-  /** Dominant emotion label from model */
   emotion?: MlEmotionLabel;
-  /** Model confidence 0..1 (after smoothing/validation) */
   confidence?: number;
-  /** Attention drop flag for this frame/window */
   attentionDrop?: boolean;
-  /** Additional raw payload from backend if needed */
   meta?: Record<string, unknown>;
 };
 
 export type MlGroupSnapshot = {
-  /** Aggregated engagement 0..1 for group */
   engagement: number;
-  /** Aggregated stress 0..1 for group */
   stress: number;
-  /** Aggregated fatigue 0..1 for group */
   fatigue: number;
-  /** High-level technical state from FusionEngine */
   tzState: MlTzState;
-  /** Group-level descriptor (heterogeneity, cohesion) */
   groupState: MlGroupState;
-  /** Distribution by dominant emotion label */
   emotionDistribution: Partial<Record<MlEmotionLabel, number>>;
 };
 
@@ -85,18 +69,14 @@ export type MlSessionSummary = {
   startedAt: string;
   endedAt: string;
   durationSeconds: number;
-  /** Aggregate metrics for demo dashboards */
   metrics: {
     avgEngagement: number;
     avgStress: number;
     avgFatigue: number;
     stability: number;
   };
-  /** Most common emotion during the session */
   dominantEmotion: MlEmotionLabel;
-  /** Group-level fusion snapshot for last segment */
   group: MlGroupSnapshot;
-  /** Attention drops timeline for analytics pages */
   attentionDrops: MlAttentionDropEvent[];
 };
 
@@ -107,7 +87,6 @@ export type MlSessionEventsResponse = {
 
 export type MlStartSessionPayload = {
   sessionId: MlSessionId;
-  /** Optional metadata to send to Python service (group id, role, etc.) */
   meta?: Record<string, unknown>;
 };
 
@@ -121,24 +100,15 @@ export type MlStopSessionResponse = {
   state: MlSessionState;
 };
 
-/**
- * Start ML analytics for given session.
- * Later this will POST to Python backend: POST /sessions/start.
- */
 export async function mlStartSession(
-  _payload: MlStartSessionPayload
+  payload: MlStartSessionPayload
 ): Promise<MlStartSessionResponse> {
-  // For now this is a pure frontend mock: integration will be wired later.
   return {
-    sessionId: _payload.sessionId,
+    sessionId: payload.sessionId,
     state: "starting",
   };
 }
 
-/**
- * Stop ML analytics for given session.
- * Later this will POST /sessions/stop.
- */
 export async function mlStopSession(
   sessionId: MlSessionId
 ): Promise<MlStopSessionResponse> {
@@ -148,24 +118,33 @@ export async function mlStopSession(
   };
 }
 
-
-/**
- * Fetch summary JSON for a finished session.
- * Uses GET /sessions/{id}/analytics/summary when backend and auth are available.
- */
-export async function mlGetSessionSummary(sessionId: MlSessionId): Promise<MlSessionSummary | null> {
+export async function mlGetSessionSummary(
+  sessionId: MlSessionId
+): Promise<MlSessionSummary | null> {
   if (typeof window === "undefined") return null;
+
   const { getApiBaseUrl, getToken } = await import("./client");
   const base = getApiBaseUrl();
   const token = getToken();
+
   if (!base || !token) return null;
+
   try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as MlSessionSummary;
+    const response = await fetch(
+      `${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const data = (await response.json()) as MlSessionSummary;
+
     return {
       sessionId: data.sessionId ?? sessionId,
       startedAt: data.startedAt ?? new Date().toISOString(),
@@ -174,34 +153,28 @@ export async function mlGetSessionSummary(sessionId: MlSessionId): Promise<MlSes
       metrics: data.metrics,
       dominantEmotion: data.dominantEmotion ?? "neutral",
       group: data.group,
-      attentionDrops: Array.isArray(data.attentionDrops) ? data.attentionDrops : [],
+      attentionDrops: Array.isArray(data.attentionDrops)
+        ? data.attentionDrops
+        : [],
     };
   } catch {
     return null;
   }
 }
 
-/**
- * Fetch raw temporal events for log playback / advanced analytics.
- * Later: GET /sessions/{id}/events.
- */
 export async function mlGetSessionEvents(
-  _sessionId: MlSessionId
+  sessionId: MlSessionId
 ): Promise<MlSessionEventsResponse> {
   return {
-    sessionId: _sessionId,
+    sessionId,
     events: [],
   };
 }
 
-/**
- * Connect to realtime WebSocket stream with per-frame + group snapshots.
- * Later this will open WS /sessions/{id}/stream.
- */
 export type MlStreamCallbacks = {
   onOpen?: () => void;
   onClose?: () => void;
-  onError?: (err: unknown) => void;
+  onError?: (error: unknown) => void;
   onFrame?: (event: MlPerFrameEvent) => void;
   onGroupSnapshot?: (snapshot: MlGroupSnapshot) => void;
 };
@@ -214,43 +187,55 @@ export function mlConnectStream(
   _sessionId: MlSessionId,
   _callbacks: MlStreamCallbacks
 ): MlStreamConnection {
-  // Placeholder: later will hold WebSocket instance.
   return {
     close() {
-      // no-op in mock
+      // Reserved for a future realtime ML WebSocket.
     },
   };
 }
 
-// -------------------------------
-// emotion-ml-service backend/app.py contract
-// -------------------------------
-
-/** Send at most 1 frame per second to avoid 429 from ML service. */
+/**
+ * Backend accepts approximately 1–2 FPS per browser.
+ * 1000 ms leaves enough margin and avoids constant HTTP 429 responses.
+ */
 export const ML_INTERVAL = 1000;
 
-/** Pause duration (ms) after 429 before retrying. */
-export const ML_429_PAUSE_MS = 3000;
+/**
+ * Wait longer after a 429 response instead of repeatedly overloading the service.
+ */
+export const ML_429_PAUSE_MS = 5000;
+
+const configuredMlUrl =
+  process.env.NEXT_PUBLIC_ML_API_URL?.trim() ?? "";
 
 /**
- * NOTE:
- * In Next.js, NEXT_PUBLIC_* variables are inlined into client bundle.
- * So we can safely read `process.env.NEXT_PUBLIC_ML_API_URL` here.
+ * Never fall back to the visitor's localhost in production.
+ *
+ * In local development only, localhost:8000 remains convenient.
  */
-const ML_API_BASE = process.env.NEXT_PUBLIC_ML_API_URL || "http://localhost:8000";
+const ML_API_BASE =
+  configuredMlUrl ||
+  (process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : "");
 
 export function getMlApiBaseUrl(): string {
-  return (ML_API_BASE || "").replace(/\/$/, "");
+  return ML_API_BASE.replace(/\/+$/, "");
+}
+
+export function isMlApiConfigured(): boolean {
+  return Boolean(getMlApiBaseUrl());
 }
 
 export type MlAnalyzeResponse = {
-  // Variant 2: risk/state
-  state?: "NORMAL" | "SUSPICIOUS" | "POTENTIAL THREAT" | "NO_FACE";
+  state?:
+    | "NORMAL"
+    | "SUSPICIOUS"
+    | "POTENTIAL THREAT"
+    | "NO_FACE";
   risk?: number;
   dominant_emotion?: string;
   confidence?: number;
-
-  // Variant 1: per-frame educational metrics
   emotion?: string;
   engagement?: number;
   stress?: number;
@@ -263,199 +248,457 @@ export type MlAnalyzeResponse = {
 
 type AnalyzeOptions = {
   signal?: AbortSignal;
+  /**
+   * Cloud-hosted TensorFlow services can be slow during a cold start.
+   */
   timeoutMs?: number;
 };
 
-/**
- * Send a 64×64 grayscale frame to emotion-ml-service POST /analyze.
- * - supports AbortSignal
- * - has internal timeout to avoid hung requests
- * Returns null on network error or invalid response.
- */
+type MlRequestError = Error & {
+  status?: number;
+  retryAfterMs?: number;
+};
+
+let browserClientId: string | null = null;
+
+function getMlClientId(): string {
+  if (browserClientId) return browserClientId;
+
+  if (typeof window === "undefined") {
+    browserClientId = "server";
+    return browserClientId;
+  }
+
+  const storageKey = "konilai_ml_client_id";
+
+  try {
+    const stored = sessionStorage.getItem(storageKey);
+    if (stored) {
+      browserClientId = stored;
+      return stored;
+    }
+
+    const generated =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `ml-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    sessionStorage.setItem(storageKey, generated);
+    browserClientId = generated;
+    return generated;
+  } catch {
+    browserClientId = `ml-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}`;
+    return browserClientId;
+  }
+}
+
+function createRequestError(
+  message: string,
+  status?: number,
+  retryAfterMs?: number
+): MlRequestError {
+  const error = new Error(message) as MlRequestError;
+  error.status = status;
+  error.retryAfterMs = retryAfterMs;
+  return error;
+}
+
+function parseRetryAfterMs(response: Response): number | undefined {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return undefined;
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) {
+    return Math.max(0, seconds * 1000);
+  }
+
+  const date = Date.parse(raw);
+  if (Number.isFinite(date)) {
+    return Math.max(0, date - Date.now());
+  }
+
+  return undefined;
+}
+
+function isValidAnalyzeResponse(
+  value: unknown
+): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object");
+}
+
+export async function checkMlHealth(
+  opts: AnalyzeOptions = {}
+): Promise<boolean> {
+  const base = getMlApiBaseUrl();
+  if (!base) return false;
+
+  const controller = new AbortController();
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs
+  );
+
+  const onAbort = () => controller.abort();
+
+  try {
+    if (opts.signal) {
+      if (opts.signal.aborted) return false;
+      opts.signal.addEventListener("abort", onAbort, {
+        once: true,
+      });
+    }
+
+    const response = await fetch(`${base}/health`, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timeout);
+    opts.signal?.removeEventListener("abort", onAbort);
+  }
+}
+
 export async function mlAnalyzeFrame(
   image: number[][],
   opts: AnalyzeOptions = {}
 ): Promise<MlAnalyzeResponse | null> {
   const base = getMlApiBaseUrl();
-  if (!base) return null;
 
-  const timeoutMs = opts.timeoutMs ?? 1500;
+  if (!base) {
+    return null;
+  }
 
-  // internal controller to enforce timeout + allow chaining abort
+  /**
+   * 1.5 seconds was too short for TensorFlow cold starts on Render.
+   */
+  const timeoutMs = opts.timeoutMs ?? 12_000;
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    timeoutMs
+  );
 
   const onAbort = () => controller.abort();
 
   try {
     if (opts.signal) {
       if (opts.signal.aborted) return null;
-      opts.signal.addEventListener("abort", onAbort, { once: true });
+
+      opts.signal.addEventListener("abort", onAbort, {
+        once: true,
+      });
     }
 
-    const res = await fetch(`${base}/analyze`, {
+    const clientId = getMlClientId();
+
+    const response = await fetch(`${base}/analyze`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ image }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-ML-Client-Id": clientId,
+      },
+      body: JSON.stringify({
+        image,
+        client_id: clientId,
+      }),
       signal: controller.signal,
+      cache: "no-store",
     });
 
-    if (res.status === 429) {
-      const e = new Error("RATE_LIMIT") as Error & { status?: number };
-      e.status = 429;
-      throw e;
+    if (response.status === 429) {
+      throw createRequestError(
+        "RATE_LIMIT",
+        429,
+        parseRetryAfterMs(response)
+      );
     }
 
-    if (!res.ok) return null;
+    if (!response.ok) {
+      throw createRequestError(
+        `ML_HTTP_${response.status}`,
+        response.status
+      );
+    }
 
-    const data = await res.json().catch(() => null);
-    if (!data || (data as any).error) return null;
+    const data: unknown = await response.json().catch(() => null);
 
-    const d = data as Record<string, unknown>;
+    if (!isValidAnalyzeResponse(data)) {
+      return null;
+    }
 
-    // Accept both shapes (and future combined shape).
-    const out: MlAnalyzeResponse = {
-      state:
-        d.state === "NORMAL" || d.state === "SUSPICIOUS" || d.state === "POTENTIAL THREAT"
-          ? (d.state as MlAnalyzeResponse["state"])
+    const state =
+      data.state === "NORMAL" ||
+      data.state === "SUSPICIOUS" ||
+      data.state === "POTENTIAL THREAT" ||
+      data.state === "NO_FACE"
+        ? data.state
+        : undefined;
+
+    const output: MlAnalyzeResponse = {
+      state,
+      risk:
+        typeof data.risk === "number"
+          ? data.risk
           : undefined,
-      risk: typeof d.risk === "number" ? d.risk : undefined,
-      dominant_emotion: typeof d.dominant_emotion === "string" ? d.dominant_emotion : undefined,
-      confidence: typeof d.confidence === "number" ? d.confidence : undefined,
-
-      emotion: typeof d.emotion === "string" ? d.emotion : undefined,
-      engagement: typeof d.engagement === "number" ? d.engagement : undefined,
-      stress: typeof d.stress === "number" ? d.stress : undefined,
-      fatigue: typeof d.fatigue === "number" ? d.fatigue : undefined,
-      timestamp: typeof d.timestamp === "number" ? d.timestamp : undefined,
-      face_detected: typeof d.face_detected === "boolean" ? d.face_detected : undefined,
-      input_width: typeof d.input_width === "number" ? d.input_width : undefined,
-      input_height: typeof d.input_height === "number" ? d.input_height : undefined,
+      dominant_emotion:
+        typeof data.dominant_emotion === "string"
+          ? data.dominant_emotion
+          : undefined,
+      confidence:
+        typeof data.confidence === "number"
+          ? data.confidence
+          : undefined,
+      emotion:
+        typeof data.emotion === "string"
+          ? data.emotion
+          : undefined,
+      engagement:
+        typeof data.engagement === "number"
+          ? data.engagement
+          : undefined,
+      stress:
+        typeof data.stress === "number"
+          ? data.stress
+          : undefined,
+      fatigue:
+        typeof data.fatigue === "number"
+          ? data.fatigue
+          : undefined,
+      timestamp:
+        typeof data.timestamp === "number"
+          ? data.timestamp
+          : undefined,
+      face_detected:
+        typeof data.face_detected === "boolean"
+          ? data.face_detected
+          : state === "NO_FACE"
+            ? false
+            : undefined,
+      input_width:
+        typeof data.input_width === "number"
+          ? data.input_width
+          : undefined,
+      input_height:
+        typeof data.input_height === "number"
+          ? data.input_height
+          : undefined,
     };
 
-    // If it's completely empty, treat as invalid.
-    const hasAny =
-      out.state != null ||
-      out.risk != null ||
-      out.dominant_emotion != null ||
-      out.confidence != null ||
-      out.emotion != null ||
-      out.engagement != null ||
-      out.stress != null ||
-      out.fatigue != null;
-    if (!hasAny) return null;
+    /**
+     * NO_FACE is a valid response, not an ML failure.
+     */
+    const hasUsefulResult =
+      output.state !== undefined ||
+      output.face_detected !== undefined ||
+      output.risk !== undefined ||
+      output.dominant_emotion !== undefined ||
+      output.confidence !== undefined ||
+      output.emotion !== undefined ||
+      output.engagement !== undefined ||
+      output.stress !== undefined ||
+      output.fatigue !== undefined;
 
-    return out;
-  } catch (err) {
-    const e = err as Error & { status?: number };
-    if (e?.status === 429 || e?.message === "RATE_LIMIT") throw err;
+    return hasUsefulResult ? output : null;
+  } catch (error) {
+    const requestError = error as MlRequestError;
+
+    if (
+      requestError.status === 429 ||
+      requestError.message === "RATE_LIMIT"
+    ) {
+      throw requestError;
+    }
+
+    if (
+      requestError.name !== "AbortError"
+    ) {
+      console.warn(
+        "ML analyze request failed:",
+        requestError.message
+      );
+    }
+
     return null;
   } finally {
-    clearTimeout(timeout);
+    window.clearTimeout(timeout);
     opts.signal?.removeEventListener("abort", onAbort);
   }
 }
 
-/**
- * ML polling loop using setInterval.
- * Limits to 1 frame per second (ML_INTERVAL). On 429, pauses ML_429_PAUSE_MS before continuing.
- * captureFrame64x64Grayscale (or getFrame) must only be invoked inside the interval tick.
- */
 export function startMlLoop(params: {
   getFrame: () => number[][] | null;
-  onResult: (r: MlAnalyzeResponse) => void;
+  onResult: (result: MlAnalyzeResponse) => void;
   onTickError?: () => void;
   shouldSend?: () => boolean;
 }) {
   let stopped = false;
-  let intervalId: ReturnType<typeof setInterval> | null = null;
+  let running = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
   const controller = new AbortController();
-  let pausedUntil = 0;
+
+  const schedule = (delay: number) => {
+    if (stopped) return;
+
+    timer = setTimeout(() => {
+      void tick();
+    }, delay);
+  };
 
   const tick = async () => {
-    if (stopped) return;
-    if (Date.now() < pausedUntil) return;
+    if (stopped || running) return;
+
+    if (params.shouldSend && !params.shouldSend()) {
+      schedule(ML_INTERVAL);
+      return;
+    }
+
+    const frame = params.getFrame();
+
+    if (!frame) {
+      schedule(ML_INTERVAL);
+      return;
+    }
+
+    running = true;
 
     try {
-      if (params.shouldSend && !params.shouldSend()) return;
-
-      const frame = params.getFrame();
-      if (!frame) return;
-
       const result = await mlAnalyzeFrame(frame, {
         signal: controller.signal,
-        timeoutMs: 1500,
       });
 
-      if (result) params.onResult(result);
-      else params.onTickError?.();
-    } catch (err) {
-      const e = err as Error & { status?: number };
-      if (e?.status === 429 || e?.message === "RATE_LIMIT") {
-        pausedUntil = Date.now() + ML_429_PAUSE_MS;
+      if (result) {
+        params.onResult(result);
+      } else {
+        params.onTickError?.();
       }
-      params.onTickError?.();
+
+      schedule(ML_INTERVAL);
+    } catch (error) {
+      const requestError = error as MlRequestError;
+
+      if (requestError.status === 429) {
+        schedule(
+          requestError.retryAfterMs ??
+            ML_429_PAUSE_MS
+        );
+      } else {
+        params.onTickError?.();
+        schedule(ML_INTERVAL);
+      }
+    } finally {
+      running = false;
     }
   };
 
-  intervalId = setInterval(tick, ML_INTERVAL);
+  schedule(0);
 
   return {
     stop() {
       stopped = true;
       controller.abort();
-      if (intervalId) clearInterval(intervalId);
+
+      if (timer) {
+        clearTimeout(timer);
+      }
     },
   };
 }
 
-/**
- * Capture one frame from a video element as 64×64 grayscale (0–255).
- * Optimized: reuses a single canvas to avoid allocations.
- */
-let _canvas: HTMLCanvasElement | null = null;
-let _ctx: CanvasRenderingContext2D | null = null;
+let canvas: HTMLCanvasElement | null = null;
+let context: CanvasRenderingContext2D | null = null;
 
 export function captureSquareFrameGrayscale(
   video: HTMLVideoElement,
-  size = 64
+  size = 192
 ): number[][] | null {
-  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return null;
-
-  if (!_canvas) {
-    _canvas = document.createElement("canvas");
-    _ctx = _canvas.getContext("2d", { willReadFrequently: true });
+  if (
+    video.readyState < 2 ||
+    video.videoWidth === 0 ||
+    video.videoHeight === 0
+  ) {
+    return null;
   }
 
-  const ctx = _ctx;
-  if (!ctx || !_canvas) return null;
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    context = canvas.getContext("2d", {
+      willReadFrequently: true,
+    });
+  }
 
-  if (_canvas.width !== size) _canvas.width = size;
-  if (_canvas.height !== size) _canvas.height = size;
+  if (!canvas || !context) return null;
 
-  const sourceSize = Math.min(video.videoWidth, video.videoHeight);
-  const sx = Math.max(0, (video.videoWidth - sourceSize) / 2);
-  const sy = Math.max(0, (video.videoHeight - sourceSize) / 2);
+  if (canvas.width !== size) canvas.width = size;
+  if (canvas.height !== size) canvas.height = size;
 
-  ctx.drawImage(video, sx, sy, sourceSize, sourceSize, 0, 0, size, size);
+  const sourceSize = Math.min(
+    video.videoWidth,
+    video.videoHeight
+  );
 
-  const imageData = ctx.getImageData(0, 0, size, size);
-  const data = imageData.data;
+  const sourceX = Math.max(
+    0,
+    (video.videoWidth - sourceSize) / 2
+  );
 
-  const out: number[][] = [];
-  for (let y = 0; y < size; y++) {
+  const sourceY = Math.max(
+    0,
+    (video.videoHeight - sourceSize) / 2
+  );
+
+  context.drawImage(
+    video,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    size,
+    size
+  );
+
+  const imageData = context.getImageData(
+    0,
+    0,
+    size,
+    size
+  );
+
+  const pixels = imageData.data;
+  const output: number[][] = [];
+
+  for (let y = 0; y < size; y += 1) {
     const row: number[] = [];
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-      row.push(gray);
+
+    for (let x = 0; x < size; x += 1) {
+      const index = (y * size + x) * 4;
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+
+      row.push(
+        Math.round(
+          0.299 * red +
+            0.587 * green +
+            0.114 * blue
+        )
+      );
     }
-    out.push(row);
+
+    output.push(row);
   }
-  return out;
+
+  return output;
 }
 
 export function captureFrame64x64Grayscale(
