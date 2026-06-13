@@ -1,4 +1,3 @@
-
 import cv2
 import numpy as np
 import tensorflow as tf
@@ -22,6 +21,24 @@ class CompatibleBatchNormalization(tf.keras.layers.BatchNormalization):
         **kwargs,
     ):
         del renorm, renorm_clipping, renorm_momentum
+        super().__init__(*args, **kwargs)
+
+
+class CompatibleDense(tf.keras.layers.Dense):
+    """
+    Compatibility wrapper for Dense configs saved by a newer Keras version.
+
+    Some H5 models contain quantization_config=None, while the Dense layer
+    bundled with TensorFlow 2.16 does not accept that keyword.
+    """
+
+    def __init__(
+        self,
+        *args,
+        quantization_config=None,
+        **kwargs,
+    ):
+        del quantization_config
         super().__init__(*args, **kwargs)
 
 
@@ -78,6 +95,8 @@ class EmotionModel:
                 custom_objects={
                     "BatchNormalization": CompatibleBatchNormalization,
                     "CompatibleBatchNormalization": CompatibleBatchNormalization,
+                    "Dense": CompatibleDense,
+                    "CompatibleDense": CompatibleDense,
                 },
             )
 
