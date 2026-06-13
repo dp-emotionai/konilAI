@@ -37,6 +37,7 @@ import {
   type TeacherGroup,
 } from "@/lib/api/teacher";
 import { createTask,
+    updateTask,
     uploadTaskMaterials,
     type TaskStatus,
     type TaskType,
@@ -207,8 +208,9 @@ function CreateHomeworkContent() {
   const [publishNow, setPublishNow] =
     useState(true);
 
-    const [ allowLateSubmission, setAllowLateSubmission, ] =
-        useState(false);
+    const [ allowLateSubmission,
+        setAllowLateSubmission,
+    ] = useState(false);
 
   const [selectedFiles, setSelectedFiles] =
     useState<File[]>([]);
@@ -545,20 +547,25 @@ async function handleSave(
         ].filter(Boolean);
 
         const createdTask = await createTask({
-            title: title.trim(),
-            description:
-                descriptionParts.join("\n\n") || null,
+            title: title.trim(), description: descriptionParts.join("\n\n") || null,
             type: getTaskType(answerMode),
-            status: finalStatus,
+            status: "draft",
             groupId: selectedGroupId,
             sessionId: selectedSessionId || null,
-            testId: null, deadline: toIsoDate(deadline),
-            points: Number(points) || 0, allowLateSubmission, });
-        if (selectedFiles.length > 0)
-        { await uploadTaskMaterials(
-            createdTask.id,
-            selectedFiles
-        );
+            testId: null,
+            deadline: toIsoDate(deadline),
+            points: Number(points) || 0,
+            allowLateSubmission,
+        });
+        if (selectedFiles.length > 0) {
+            await uploadTaskMaterials(
+                createdTask.id, selectedFiles
+            );
+        }
+        if (finalStatus === "published") {
+            await updateTask(createdTask.id, {
+                status: "published",
+            });
         }
 
         router.push("/teacher/tasks");
