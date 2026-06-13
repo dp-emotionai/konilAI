@@ -946,16 +946,14 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                                             {taskActionLabel(task, role)}
                                           </Link>
                                       ) : (
-                                          <button
-                                              type="button"
-                                              disabled={task.status !== "published" || deadlinePassed}
-                                              onClick={() => openSubmitModal(task)}
-                                              className="inline-flex h-11 items-center justify-center rounded-xl border border-violet-300 bg-white px-5 text-sm font-extrabold text-violet-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                          <Link
+                                              href={`/student/tasks/${task.id}`}
+                                              className="inline-flex h-11 items-center justify-center rounded-xl border border-violet-300 bg-white px-5 text-sm font-extrabold text-violet-600 transition hover:bg-violet-50"
                                           >
-                                            {taskActionLabel(task, role)}
-                                          </button>
-                                      )
-                                  ) : (
+                                            Открыть задание
+                                          </Link>
+                                          )
+                                    ) : (
                                       <>
                                         <button
                                             type="button"
