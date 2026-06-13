@@ -1,8 +1,26 @@
-import { api, clearAuth, getApiBaseUrl, getToken, hasAuth } from "./client";
+import {
+  api,
+  clearAuth,
+  getApiBaseUrl,
+  getToken,
+  hasAuth,
+} from "./client";
 
-export type TaskType = "test" | "homework" | "file_upload" | "text_answer";
-export type TaskStatus = "draft" | "published" | "closed" | "archived";
-export type TaskSubmissionStatus = "submitted" | "graded";
+export type TaskType =
+  | "test"
+  | "homework"
+  | "file_upload"
+  | "text_answer";
+
+export type TaskStatus =
+  | "draft"
+  | "published"
+  | "closed"
+  | "archived";
+
+export type TaskSubmissionStatus =
+  | "submitted"
+  | "graded";
 
 export type TaskUser = {
   id: string;
@@ -39,12 +57,23 @@ export type TaskTest = {
   submissionCount?: number | null;
 };
 
+export type TaskMaterial = {
+  id: string;
+  taskId: string;
+  fileName: string;
+  mimeType?: string | null;
+  size?: number | null;
+  downloadUrl?: string | null;
+  createdAt?: string | null;
+};
+
 export type TaskSubmission = {
   id: string;
   taskId: string;
   studentId: string;
   student?: TaskUser | null;
   status: TaskSubmissionStatus | string;
+  isLate?: boolean;
   textAnswer?: string | null;
   attachmentFileName?: string | null;
   attachmentMimeType?: string | null;
@@ -78,6 +107,8 @@ export type Task = {
   status: TaskStatus;
   deadline?: string | null;
   points: number;
+  allowLateSubmission?: boolean;
+  materials?: TaskMaterial[];
   groupId?: string | null;
   sessionId?: string | null;
   testId?: string | null;
@@ -101,18 +132,31 @@ export type CreateTaskBody = {
   deadline?: string | null;
   points?: number;
   status?: TaskStatus;
+  allowLateSubmission?: boolean;
 };
 
-export type UpdateTaskBody = Partial<CreateTaskBody>;
+export type UpdateTaskBody =
+  Partial<CreateTaskBody>;
 
-function buildQuery(params: Record<string, string | null | undefined>) {
+function buildQuery(
+  params: Record<
+    string,
+    string | null | undefined
+  >
+) {
   const search = new URLSearchParams();
 
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && String(value).trim()) {
-      search.set(key, String(value));
+  Object.entries(params).forEach(
+    ([key, value]) => {
+      if (
+        value !== undefined &&
+        value !== null &&
+        String(value).trim()
+      ) {
+        search.set(key, String(value));
+      }
     }
-  });
+  );
 
   const qs = search.toString();
   return qs ? `?${qs}` : "";
@@ -120,31 +164,67 @@ function buildQuery(params: Record<string, string | null | undefined>) {
 
 async function rawRequest<T>(
   path: string,
-  options: RequestInit & { parseJson?: boolean } = {}
+  options: RequestInit & {
+    parseJson?: boolean;
+  } = {}
 ): Promise<T> {
   const base = getApiBaseUrl();
-  if (!base) throw new Error("API URL not configured");
 
-  const token = getToken();
-  const { parseJson = true, ...fetchOptions } = options;
-  const headers = new Headers(fetchOptions.headers);
-
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const isFormData = typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
-  if (fetchOptions.body && !isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
+  if (!base) {
+    throw new Error("API URL not configured");
   }
 
-  const safePath = path.startsWith("/") ? path : `/${path}`;
+  const token = getToken();
 
-  const res = await fetch(`${base}${safePath}`, {
-    ...fetchOptions,
-    credentials: fetchOptions.credentials ?? "include",
-    headers,
-  });
+  const {
+    parseJson = true,
+    ...fetchOptions
+  } = options;
 
-  if (res.status === 401) clearAuth();
+  const headers = new Headers(
+    fetchOptions.headers
+  );
+
+  if (token) {
+    headers.set(
+      "Authorization",
+      `Bearer ${token}`
+    );
+  }
+
+  const isFormData =
+    typeof FormData !== "undefined" &&
+    fetchOptions.body instanceof FormData;
+
+  if (
+    fetchOptions.body &&
+    !isFormData &&
+    !headers.has("Content-Type")
+  ) {
+    headers.set(
+      "Content-Type",
+      "application/json"
+    );
+  }
+
+  const safePath = path.startsWith("/")
+    ? path
+    : `/${path}`;
+
+  const res = await fetch(
+    `${base}${safePath}`,
+    {
+      ...fetchOptions,
+      credentials:
+        fetchOptions.credentials ??
+        "include",
+      headers,
+    }
+  );
+
+  if (res.status === 401) {
+    clearAuth();
+  }
 
   if (!res.ok) {
     const body = await res.text();
@@ -152,91 +232,213 @@ async function rawRequest<T>(
 
     try {
       const json = JSON.parse(body);
-      message = json?.error || json?.message || body;
-    } catch {}
 
-    throw new Error(message || `HTTP ${res.status}`);
+      message =
+        json?.error ||
+        json?.message ||
+        body;
+    } catch {
+      // Ответ сервера не является JSON.
+    }
+
+    throw new Error(
+      message || `HTTP ${res.status}`
+    );
   }
 
-  if (!parseJson) return undefined as T;
+  if (!parseJson) {
+    return undefined as T;
+  }
+
   return res.json() as Promise<T>;
 }
 
-export function buildTaskAttachmentUrl(submissionId: string) {
+export function buildTaskAttachmentUrl(
+  submissionId: string
+) {
   const base = getApiBaseUrl();
+
   if (!base) return "#";
+
   return `${base}/tasks/submissions/${submissionId}/attachment`;
 }
 
-export async function getTasks(params: {
-  groupId?: string | null;
-  sessionId?: string | null;
-  type?: TaskType | null;
-  status?: TaskStatus | null;
-} = {}): Promise<Task[]> {
-  if (!getApiBaseUrl() || !hasAuth()) return [];
-  const list = await api.get<Task[]>(`tasks${buildQuery(params)}`);
+export async function getTasks(
+    params: {
+      groupId?: string | null;
+      sessionId?: string | null;
+      type?: TaskType | null;
+      status?: TaskStatus | null;
+    } = {}
+): Promise<Task[]> {
+  if (!getApiBaseUrl() || !hasAuth()) {
+    return [];
+  }
+
+  const list = await api.get<Task[]>(
+      `tasks${buildQuery(params)}`
+  );
+
   return Array.isArray(list) ? list : [];
 }
 
-export async function getTask(taskId: string): Promise<Task> {
-  return api.get<Task>(`tasks/${taskId}`);
+export async function getTask(
+    taskId: string
+): Promise<Task> {
+  return api.get<Task>(
+      `tasks/${taskId}`
+  );
 }
 
-export async function createTask(body: CreateTaskBody): Promise<Task> {
+export async function createTask(
+    body: CreateTaskBody
+): Promise<Task> {
   return api.post<Task>("tasks", body);
 }
 
-export async function updateTask(taskId: string, body: UpdateTaskBody): Promise<Task> {
-  return api.patch<Task>(`tasks/${taskId}`, body);
+export async function updateTask(
+    taskId: string,
+    body: UpdateTaskBody
+): Promise<Task> {
+  return api.patch<Task>(
+      `tasks/${taskId}`,
+      body
+  );
 }
 
-export async function deleteTask(taskId: string): Promise<void> {
+export async function deleteTask(
+    taskId: string
+): Promise<void> {
   await api.delete(`tasks/${taskId}`);
 }
 
-export async function submitTask(
-  taskId: string,
-  body: { textAnswer?: string; attachment?: File | null }
-): Promise<TaskSubmission> {
+export async function uploadTaskMaterials(
+    taskId: string,
+    files: File[]
+): Promise<TaskMaterial[]> {
+  if (files.length === 0) {
+    return [];
+  }
+
   const formData = new FormData();
 
-  if (body.textAnswer?.trim()) formData.append("textAnswer", body.textAnswer.trim());
-  if (body.attachment) formData.append("attachment", body.attachment);
-
-  return rawRequest<TaskSubmission>(`tasks/${taskId}/submit`, {
-    method: "POST",
-    body: formData,
+  files.forEach((file) => {
+    formData.append("materials", file);
   });
+
+  return rawRequest<TaskMaterial[]>(
+      `tasks/${taskId}/materials`,
+      {
+        method: "POST",
+        body: formData,
+      }
+  );
 }
 
-export async function getMyTaskSubmission(taskId: string): Promise<{
-  type: "task" | "test";
-  submission: TaskSubmission | LinkedTestSubmission;
-}> {
-  return api.get(`tasks/${taskId}/my-submission`);
-}
-
-export async function getTaskSubmissions(taskId: string): Promise<{
-  type: "task" | "test";
-  submissions: TaskSubmission[] | LinkedTestSubmission[];
-}> {
-  return api.get(`tasks/${taskId}/submissions`);
-}
-
-export async function gradeTaskSubmission(
-  taskId: string,
-  submissionId: string,
-  body: { score: number; feedback?: string | null }
-): Promise<TaskSubmission> {
-  return api.patch<TaskSubmission>(`tasks/${taskId}/submissions/${submissionId}/grade`, body);
-}
-
-export async function getTaskAttachmentDownloadUrl(submissionId: string): Promise<{
+export async function getTaskMaterialDownloadUrl(
+    taskId: string,
+    materialId: string
+): Promise<{
   url: string;
   fileName?: string | null;
   mimeType?: string | null;
   size?: number | null;
 }> {
-  return api.get(`tasks/submissions/${submissionId}/attachment-url`);
+  return api.get(
+      `tasks/${taskId}/materials/${materialId}/download-url`
+  );
+}
+
+export async function deleteTaskMaterial(
+    taskId: string,
+    materialId: string
+): Promise<void> {
+  await api.delete(
+      `tasks/${taskId}/materials/${materialId}`
+  );
+}
+
+export async function submitTask(
+    taskId: string,
+    body: {
+      textAnswer?: string;
+      attachment?: File | null;
+    }
+): Promise<TaskSubmission> {
+  const formData = new FormData();
+
+  if (body.textAnswer?.trim()) {
+    formData.append(
+        "textAnswer",
+        body.textAnswer.trim()
+    );
+  }
+
+  if (body.attachment) {
+    formData.append(
+        "attachment",
+        body.attachment
+    );
+  }
+
+  return rawRequest<TaskSubmission>(
+      `tasks/${taskId}/submit`,
+      {
+        method: "POST",
+        body: formData,
+      }
+  );
+}
+
+export async function getMyTaskSubmission(
+    taskId: string
+): Promise<{
+  type: "task" | "test";
+  submission:
+      | TaskSubmission
+      | LinkedTestSubmission;
+}> {
+  return api.get(
+      `tasks/${taskId}/my-submission`
+  );
+}
+
+export async function getTaskSubmissions(
+    taskId: string
+): Promise<{
+  type: "task" | "test";
+  submissions:
+      | TaskSubmission[]
+      | LinkedTestSubmission[];
+}> {
+  return api.get(
+      `tasks/${taskId}/submissions`
+  );
+}
+
+export async function gradeTaskSubmission(
+    taskId: string,
+    submissionId: string,
+    body: {
+      score: number;
+      feedback?: string | null;
+    }
+): Promise<TaskSubmission> {
+  return api.patch<TaskSubmission>(
+      `tasks/${taskId}/submissions/${submissionId}/grade`,
+      body
+  );
+}
+
+export async function getTaskAttachmentDownloadUrl(
+    submissionId: string
+): Promise<{
+  url: string;
+  fileName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+}> {
+  return api.get(
+      `tasks/submissions/${submissionId}/attachment-url`
+  );
 }

@@ -36,10 +36,10 @@ import {
   type GroupSession,
   type TeacherGroup,
 } from "@/lib/api/teacher";
-import {
-  createTask,
-  type TaskStatus,
-  type TaskType,
+import { createTask,
+    uploadTaskMaterials,
+    type TaskStatus,
+    type TaskType,
 } from "@/lib/api/tasks";
 
 type AnswerMode =
@@ -206,6 +206,9 @@ function CreateHomeworkContent() {
 
   const [publishNow, setPublishNow] =
     useState(true);
+
+    const [ allowLateSubmission, setAllowLateSubmission, ] =
+        useState(false);
 
   const [selectedFiles, setSelectedFiles] =
     useState<File[]>([]);
@@ -501,10 +504,6 @@ function validate(): string | null {
         }
     }
 
-    if (selectedFiles.length > 0) {
-        return "Прикрепление материалов пока не поддерживается backend. Удалите выбранные файлы перед созданием задания.";
-    }
-
     return null;
 }
 
@@ -545,19 +544,22 @@ async function handleSave(
                 : "",
         ].filter(Boolean);
 
-        await createTask({
+        const createdTask = await createTask({
             title: title.trim(),
             description:
                 descriptionParts.join("\n\n") || null,
             type: getTaskType(answerMode),
             status: finalStatus,
             groupId: selectedGroupId,
-            sessionId:
-                selectedSessionId || null,
-            testId: null,
-            deadline: toIsoDate(deadline),
-            points: Number(points) || 0,
-        });
+            sessionId: selectedSessionId || null,
+            testId: null, deadline: toIsoDate(deadline),
+            points: Number(points) || 0, allowLateSubmission, });
+        if (selectedFiles.length > 0)
+        { await uploadTaskMaterials(
+            createdTask.id,
+            selectedFiles
+        );
+        }
 
         router.push("/teacher/tasks");
         router.refresh();
@@ -879,9 +881,8 @@ return (
                                     </div>
                                 ))}
 
-                                <p className="text-xs font-semibold text-orange-600">
-                                    Для сохранения материалов потребуется
-                                    отдельный backend endpoint.
+                                <p className="text-xs font-semibold text-emerald-600">
+                                    Выбрано файлов: {selectedFiles.length}
                                 </p>
                             </div>
                         )}
@@ -1077,14 +1078,13 @@ return (
                                         </div>
 
                                         <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-                                            Пока не поддерживается сервером
+                                            Студенты смогут отправить ответ после дедлайна
                                         </p>
                                     </div>
 
                                     <Switch
-                                        checked={false}
-                                        onChange={() => undefined}
-                                        disabled
+                                        checked={allowLateSubmission}
+                                        onChange={setAllowLateSubmission}
                                     />
                                 </div>
                             </div>
