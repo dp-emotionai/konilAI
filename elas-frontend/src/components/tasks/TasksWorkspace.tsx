@@ -209,24 +209,102 @@ function typeBoxClass(type: TaskType) {
 
 function studentStatusLabel(task: Task) {
   if (task.type === "test") {
-    return task.myTestSubmission ? "Выполнено" : "Не выполнено";
+    if (!task.myTestSubmission) {
+      return "Не выполнено";
+    }
+
+    if (
+      task.myTestSubmission.score !== null &&
+      task.myTestSubmission.score !== undefined
+    ) {
+      return "Оценено";
+    }
+
+    return "Выполнено";
   }
 
-  return task.mySubmission ? "Сдано" : "Не сдано";
+  if (!task.mySubmission) {
+    return "Не сдано";
+  }
+
+  if (
+    task.mySubmission.status === "graded" ||
+    task.mySubmission.score !== null &&
+      task.mySubmission.score !== undefined
+  ) {
+    return "Оценено";
+  }
+
+  if (task.mySubmission.isLate) {
+    return "Сдано с опозданием";
+  }
+
+  return "Сдано";
 }
 
 function studentStatusClass(task: Task) {
-  const done = task.type === "test" ? Boolean(task.myTestSubmission) : Boolean(task.mySubmission);
-  return done ? "bg-emerald-50 text-emerald-700" : "bg-orange-50 text-orange-700";
+  if (task.type === "test") {
+    if (!task.myTestSubmission) {
+      return "bg-orange-50 text-orange-700";
+    }
+
+    if (
+      task.myTestSubmission.score !== null &&
+      task.myTestSubmission.score !== undefined
+    ) {
+      return "bg-violet-50 text-violet-700";
+    }
+
+    return "bg-emerald-50 text-emerald-700";
+  }
+
+  if (!task.mySubmission) {
+    return "bg-orange-50 text-orange-700";
+  }
+
+  if (
+    task.mySubmission.status === "graded" ||
+    task.mySubmission.score !== null &&
+      task.mySubmission.score !== undefined
+  ) {
+    return "bg-violet-50 text-violet-700";
+  }
+
+  if (task.mySubmission.isLate) {
+    return "bg-orange-50 text-orange-700";
+  }
+
+  return "bg-emerald-50 text-emerald-700";
 }
 
 function taskActionLabel(task: Task, role: RoleMode) {
-  if (role === "teacher") return "Ответы";
+  if (role === "teacher") {
+    return "Ответы";
+  }
 
-  if (task.type === "test") return "Пройти тест";
-  if (task.type === "file_upload") return "Загрузить файл";
-  return "Сдать задание";
+  if (task.type === "test") {
+    if (task.myTestSubmission) {
+      return "Посмотреть баллы";
+    }
+
+    return "Пройти тест";
+  }
+
+  if (task.mySubmission) {
+    if (
+      task.mySubmission.status === "graded" ||
+      task.mySubmission.score !== null &&
+        task.mySubmission.score !== undefined
+    ) {
+      return "Посмотреть оценку";
+    }
+
+    return "Посмотреть отправку";
+  }
+
+  return "Открыть задание";
 }
+
 
 function ModalShell({
                       title,
@@ -950,7 +1028,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                                               href={`/student/tasks/${task.id}`}
                                               className="inline-flex h-11 items-center justify-center rounded-xl border border-violet-300 bg-white px-5 text-sm font-extrabold text-violet-600 transition hover:bg-violet-50"
                                           >
-                                            Открыть задание
+                                            {taskActionLabel(task, role)}
                                           </Link>
                                           )
                                     ) : (
