@@ -809,8 +809,6 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                 <option value="all">Все типы</option>
                 <option value="test">Тест</option>
                 <option value="homework">Задание</option>
-                <option value="file_upload">Файл</option>
-                <option value="text_answer">Ответ</option>
               </SelectField>
             </Field>
 
