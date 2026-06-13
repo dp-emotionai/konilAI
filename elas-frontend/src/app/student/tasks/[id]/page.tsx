@@ -36,6 +36,10 @@ import {
   type TaskMaterial,
 } from "@/lib/api/tasks";
 
+import {
+  markTaskNotificationsRead,
+} from "@/lib/api/notifications";
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 function getErrorMessage(
@@ -233,9 +237,36 @@ export default function StudentHomeworkPage() {
       setTask(loadedTask);
 
       setTextAnswer(
-        loadedTask.mySubmission
-          ?.textAnswer || ""
+        loadedTask.mySubmission?.textAnswer || ""
       );
+
+      const readResult =
+        await markTaskNotificationsRead(
+          loadedTask.id
+        ).catch((readError) => {
+          console.error(
+            "Failed to mark task notification as read",
+            readError
+          );
+
+          return null;
+        });
+
+      if (readResult) {
+        window.dispatchEvent(
+          new CustomEvent(
+            "notifications:counts-changed",
+            {
+              detail: {
+                totalUnread:
+                  readResult.totalUnread,
+                taskUnread:
+                  readResult.taskUnread,
+              },
+            }
+          )
+        );
+      }
     } catch (requestError) {
       setError(
         getErrorMessage(

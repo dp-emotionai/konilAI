@@ -42,22 +42,24 @@ import { useUI } from "./Providers";
 import { useTeacherLiveSession } from "@/hooks/useTeacherLiveSession";
 import { cn } from "@/lib/cn";
 import {
+  getNotificationCounts,
   getNotifications,
   markNotificationRead,
+  type NotificationCounts,
   type NotificationRow,
 } from "@/lib/api/notifications";
 import { ChatClient } from "@/lib/ws/chatClient";
 
 const DROPDOWN_PANEL =
-  "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
-  "bg-white p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
+    "rounded-xl overflow-hidden shadow-elevated border border-[color:var(--border)] " +
+    "bg-white p-2 animate-dropdown-in ring-1 ring-black/[0.04]";
 
 const DROPDOWN_ITEM =
-  "rounded-lg px-3 py-2 transition-all duration-150 text-fg hover:bg-surface-subtle";
+    "rounded-lg px-3 py-2 transition-all duration-150 text-fg hover:bg-surface-subtle";
 
 const PUBLIC_ICONS: Record<
-  string,
-  React.ComponentType<{ size?: number; className?: string }>
+    string,
+    React.ComponentType<{ size?: number; className?: string }>
 > = {
   LayoutDashboard,
   Video,
@@ -79,19 +81,19 @@ const PUBLIC_ICONS: Record<
 
 function KonilAILogoIcon({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-      aria-hidden
-    >
-      <path
-        d="M6 4v16h2.5V12l5.5 8h2.5l-5.5-7.5 5.5-8h-2.5L8.5 12V4H6z"
-        fill="currentColor"
-        className="text-[rgb(var(--primary))]"
-      />
-    </svg>
+      <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className={className}
+          aria-hidden
+      >
+        <path
+            d="M6 4v16h2.5V12l5.5 8h2.5l-5.5-7.5 5.5-8h-2.5L8.5 12V4H6z"
+            fill="currentColor"
+            className="text-[rgb(var(--primary))]"
+        />
+      </svg>
   );
 }
 
@@ -99,42 +101,50 @@ function Logo({ href = "/" }: { href?: string }) {
   const safeHref = typeof href === "string" && href.length > 0 ? href : "/";
 
   return (
-    <Link
-      href={safeHref}
-      className="flex shrink-0 items-center gap-2.5 rounded-elas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
-    >
+      <Link
+          href={safeHref}
+          className="flex shrink-0 items-center gap-2.5 rounded-elas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+      >
       <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-elas-lg bg-primary-muted ring-1 ring-[color:var(--border)]/25">
         <KonilAILogoIcon className="h-5 w-5" />
       </span>
-      <span className="font-semibold tracking-wide text-fg">KonilAI</span>
-    </Link>
+        <span className="font-semibold tracking-wide text-fg">KonilAI</span>
+      </Link>
   );
 }
 
 function NavLink({
-  href,
-  label,
-  active,
-  className,
-}: {
+                   href,
+                   label,
+                   active,
+                   className,
+                   badge = 0,
+                 }: {
   href: string;
   label: string;
   active?: boolean;
   className?: string;
+  badge?: number;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "rounded-full px-3 py-2 text-sm font-medium transition-[background-color,color] duration-150",
-        active
-          ? "bg-surface-subtle/80 text-fg"
-          : "text-muted hover:bg-surface-subtle/60 hover:text-fg",
-        className
-      )}
-    >
-      {label}
-    </Link>
+      <Link
+          href={href}
+          className={cn(
+              "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-[background-color,color] duration-150",
+              active
+                  ? "bg-surface-subtle/80 text-fg"
+                  : "text-muted hover:bg-surface-subtle/60 hover:text-fg",
+              className
+          )}
+      >
+        <span>{label}</span>
+
+        {badge > 0 && (
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-extrabold leading-none text-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
+        )}
+      </Link>
   );
 }
 
@@ -168,7 +178,7 @@ function PublicNavItem({ item }: { item: NavItem }) {
 
   if (item.type === "link") {
     return (
-      <NavLink href={item.href} label={item.label} active={safePath === item.href} />
+        <NavLink href={item.href} label={item.label} active={safePath === item.href} />
     );
   }
 
@@ -177,79 +187,81 @@ function PublicNavItem({ item }: { item: NavItem }) {
   const hasCardStyle = children.some((c) => Boolean(c.subtitle ?? c.icon));
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
-          open
-            ? "bg-surface-subtle/80 text-fg"
-            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
-        )}
-      >
-        {dropdown.label}
-        <ChevronDown
-          size={14}
-          className={cn("transition-transform duration-200", open && "rotate-180")}
-        />
-      </button>
-
-      {open && (
-        <div
-          className={cn(
-            "absolute left-0 top-full z-50 mt-2 py-2",
-            hasCardStyle ? "min-w-[280px]" : "min-w-[200px]",
-            DROPDOWN_PANEL
-          )}
+      <div className="relative" ref={ref}>
+        <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-haspopup="true"
+            className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]",
+                open
+                    ? "bg-surface-subtle/80 text-fg"
+                    : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
+            )}
         >
-          {children.map((child) => {
-            const IconComp = child.icon ? PUBLIC_ICONS[child.icon] : null;
+          {dropdown.label}
+          <ChevronDown
+              size={14}
+              className={cn("transition-transform duration-200", open && "rotate-180")}
+          />
+        </button>
 
-            return (
-              <Link
-                key={child.href}
-                href={child.href}
-                onClick={() => setOpen(false)}
+        {open && (
+            <div
                 className={cn(
-                  "flex items-center gap-3 rounded-lg text-sm text-fg transition-all hover:bg-black/[0.04]",
-                  hasCardStyle ? "px-4 py-3" : "px-3 py-2"
+                    "absolute left-0 top-full z-50 mt-2 py-2",
+                    hasCardStyle ? "min-w-[280px]" : "min-w-[200px]",
+                    DROPDOWN_PANEL
                 )}
-              >
-                {IconComp && (
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted/60 text-[rgb(var(--primary))]">
+            >
+              {children.map((child) => {
+                const IconComp = child.icon ? PUBLIC_ICONS[child.icon] : null;
+
+                return (
+                    <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                            "flex items-center gap-3 rounded-lg text-sm text-fg transition-all hover:bg-black/[0.04]",
+                            hasCardStyle ? "px-4 py-3" : "px-3 py-2"
+                        )}
+                    >
+                      {IconComp && (
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-muted/60 text-[rgb(var(--primary))]">
                     <IconComp size={18} />
                   </span>
-                )}
+                      )}
 
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-fg">{child.label}</div>
-                  {child.subtitle && (
-                    <div className="mt-0.5 truncate text-xs text-muted">
-                      {child.subtitle}
-                    </div>
-                  )}
-                </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium text-fg">{child.label}</div>
+                        {child.subtitle && (
+                            <div className="mt-0.5 truncate text-xs text-muted">
+                              {child.subtitle}
+                            </div>
+                        )}
+                      </div>
 
-                <ChevronRight size={16} className="shrink-0 text-muted" />
-              </Link>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                      <ChevronRight size={16} className="shrink-0 text-muted" />
+                    </Link>
+                );
+              })}
+            </div>
+        )}
+      </div>
   );
 }
 
 function AppNavItem({
-  item,
-  liveSessionId,
-}: {
+                      item,
+                      liveSessionId,
+                      taskUnread,
+                    }: {
   item: import("@/lib/nav").AppNavItem;
   liveSessionId: string | null;
+  taskUnread: number;
 }) {
   const path = usePathname();
   const safePath = typeof path === "string" ? path : "";
@@ -280,23 +292,28 @@ function AppNavItem({
 
   if (item.type === "link") {
     const active =
-      !!safePath &&
-      (safePath === item.href ||
-        safePath.startsWith(`${item.href}/`) ||
-        (safePath.startsWith("/teacher/session/") &&
-          item.href.includes("filter=live")));
+        !!safePath &&
+        (safePath === item.href ||
+            safePath.startsWith(`${item.href}/`) ||
+            (safePath.startsWith("/teacher/session/") &&
+                item.href.includes("filter=live")));
 
     return (
-      <NavLink
-        href={item.href}
-        label={item.label}
-        active={active}
-        className={
-          "badge" in item && item.badge === "live" && liveSessionId
-            ? "text-[rgb(var(--primary))]"
-            : undefined
-        }
-      />
+        <NavLink
+            href={item.href}
+            label={item.label}
+            active={active}
+            badge={
+              item.href === "/student/tasks"
+                  ? taskUnread
+                  : 0
+            }
+            className={
+              "badge" in item && item.badge === "live" && liveSessionId
+                  ? "text-[rgb(var(--primary))]"
+                  : undefined
+            }
+        />
     );
   }
 
@@ -304,60 +321,60 @@ function AppNavItem({
   const children = Array.isArray(dropdown.children) ? dropdown.children : [];
 
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="true"
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40",
-          open
-            ? "bg-surface-subtle/80 text-fg"
-            : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
-        )}
-      >
-        {dropdown.label}
-        <ChevronDown
-          size={14}
-          className={cn("transition-transform", open && "rotate-180")}
-        />
-      </button>
-
-      {open && (
-        <div
-          className={cn(
-            "absolute left-0 top-full z-50 mt-2 min-w-[220px]",
-            DROPDOWN_PANEL
-          )}
+      <div className="relative" ref={ref}>
+        <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            aria-haspopup="true"
+            className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40",
+                open
+                    ? "bg-surface-subtle/80 text-fg"
+                    : "text-muted hover:bg-surface-subtle/60 hover:text-fg"
+            )}
         >
-          {children.map((child) => (
-            <Link
-              key={child.href}
-              href={child.href}
-              onClick={() => setOpen(false)}
-              className={cn(
-                "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
-                child.accent
-                  ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70"
-                  : ""
-              )}
-            >
-              <span className="truncate">{child.label}</span>
+          {dropdown.label}
+          <ChevronDown
+              size={14}
+              className={cn("transition-transform", open && "rotate-180")}
+          />
+        </button>
 
-              {child.badge === "live" && liveSessionId ? (
-                <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
+        {open && (
+            <div
+                className={cn(
+                    "absolute left-0 top-full z-50 mt-2 min-w-[220px]",
+                    DROPDOWN_PANEL
+                )}
+            >
+              {children.map((child) => (
+                  <Link
+                      key={child.href}
+                      href={child.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                          "flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all hover:bg-black/[0.04]",
+                          child.accent
+                              ? "bg-primary-muted/50 font-medium text-[rgb(var(--primary))] hover:bg-primary-muted/70"
+                              : ""
+                      )}
+                  >
+                    <span className="truncate">{child.label}</span>
+
+                    {child.badge === "live" && liveSessionId ? (
+                        <span className="text-[10px] uppercase text-[rgb(var(--primary))]">
                   Live
                 </span>
-              ) : !child.accent ? (
-                <ChevronRight size={14} className="shrink-0 text-muted" />
-              ) : null}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
+                    ) : !child.accent ? (
+                        <ChevronRight size={14} className="shrink-0 text-muted" />
+                    ) : null}
+                  </Link>
+              ))}
+            </div>
+        )}
+      </div>
   );
 }
 
@@ -372,6 +389,11 @@ export default function TopNav() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [notificationCounts, setNotificationCounts] =
+      useState<NotificationCounts>({
+        totalUnread: 0,
+        taskUnread: 0,
+      });
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [navAvatarUrl, setNavAvatarUrl] = useState<string | null>(null);
 
@@ -382,23 +404,30 @@ export default function TopNav() {
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
 
   const appNavItems = useMemo(
-    () => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []),
-    [safeRole]
+      () => (safeRole ? NAV_APP_BY_ROLE[safeRole] ?? [] : []),
+      [safeRole]
   );
 
   const consentRequired = Boolean(state.loggedIn && !state.consent);
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
-  );
+  const unreadCount = notificationCounts.totalUnread;
+
+  const taskUnread =
+      safeRole === "student"
+          ? notificationCounts.taskUnread
+          : 0;
 
   const loadNotifications = useCallback(async (signal?: AbortSignal) => {
     setNotificationsLoading(true);
 
     try {
-      const list = await getNotifications({ signal });
+      const [list, counts] = await Promise.all([
+        getNotifications({ signal }),
+        getNotificationCounts({ signal }),
+      ]);
+
       setNotifications(Array.isArray(list) ? list : []);
+      setNotificationCounts(counts);
     } catch {
       // ignore
     } finally {
@@ -427,6 +456,10 @@ export default function TopNav() {
   useEffect(() => {
     if (!state.loggedIn) {
       setNotifications([]);
+      setNotificationCounts({
+        totalUnread: 0,
+        taskUnread: 0,
+      });
       return;
     }
 
@@ -458,30 +491,53 @@ export default function TopNav() {
 
       const payload = packet as {
         type?: string;
+        notification?: Partial<NotificationRow>;
         event?: Partial<NotificationRow>;
       };
 
-      if (payload.type !== "notification.new" || !payload.event?.id) return;
+      const event =
+          payload.notification ??
+          payload.event;
 
-      const event = payload.event;
+      if (
+          payload.type !== "notification.new" ||
+          !event?.id
+      ) {
+        return;
+      }
 
       setNotifications((prev) => {
-        if (prev.some((item) => item.id === event.id)) return prev;
+        if (prev.some((item) => item.id === event.id)) {
+          return prev;
+        }
 
         return [
           {
             id: String(event.id),
             type: String(event.type ?? "notification"),
-            title: String(event.title ?? "Уведомление"),
-            body: event.body == null ? null : String(event.body),
-            data: (event.data as Record<string, unknown> | null) ?? null,
+            title:
+                event.title == null
+                    ? "Уведомление"
+                    : String(event.title),
+            body:
+                event.body == null
+                    ? null
+                    : String(event.body),
+            data: event.data ?? null,
             readAt: null,
-            createdAt: String(event.createdAt ?? new Date().toISOString()),
+            createdAt: String(
+                event.createdAt ??
+                new Date().toISOString()
+            ),
             isRead: false,
           },
           ...prev,
         ];
       });
+
+      void getNotificationCounts()
+          .then(setNotificationCounts)
+          .catch(() => null);
     });
 
     client.connect();
@@ -489,6 +545,62 @@ export default function TopNav() {
 
     return () => client.disconnect();
   }, [state.loggedIn]);
+
+  useEffect(() => {
+    const handleCountsChanged = (event: Event) => {
+      const detail = (
+          event as CustomEvent<Partial<NotificationCounts>>
+      ).detail;
+
+      if (!detail) return;
+
+      setNotificationCounts((current) => ({
+        totalUnread:
+            typeof detail.totalUnread === "number"
+                ? detail.totalUnread
+                : current.totalUnread,
+        taskUnread:
+            typeof detail.taskUnread === "number"
+                ? detail.taskUnread
+                : current.taskUnread,
+      }));
+
+      setNotifications((current) =>
+          current.map((notification) => {
+            const notificationTaskId =
+                notification.data?.taskId;
+
+            if (
+                typeof notificationTaskId === "string" &&
+                safePathname ===
+                `/student/tasks/${notificationTaskId}`
+            ) {
+              return {
+                ...notification,
+                isRead: true,
+                readAt:
+                    notification.readAt ??
+                    new Date().toISOString(),
+              };
+            }
+
+            return notification;
+          })
+      );
+    };
+
+    window.addEventListener(
+        "notifications:counts-changed",
+        handleCountsChanged
+    );
+
+    return () => {
+      window.removeEventListener(
+          "notifications:counts-changed",
+          handleCountsChanged
+      );
+    };
+  }, [safePathname]);
 
   useEffect(() => {
     if (!profileOpen) return;
@@ -516,14 +628,14 @@ export default function TopNav() {
 
       try {
         const res = await fetch(
-          `/api/avatar-proxy?v=${state.avatarVersion ?? Date.now()}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            cache: "no-store",
-          }
+            `/api/avatar-proxy?v=${state.avatarVersion ?? Date.now()}`,
+            {
+              method: "GET",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              cache: "no-store",
+            }
         );
 
         if (res.status === 404 || res.status === 204) {
@@ -580,453 +692,488 @@ export default function TopNav() {
   }, []);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex shrink-0 items-center">
-          <Logo href="/" />
-        </div>
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[color:var(--border)] bg-surface/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
+          <div className="flex shrink-0 items-center">
+            <Logo href="/" />
+          </div>
 
-        <nav className="hidden flex-1 items-center justify-center gap-0.5 lg:flex">
-          {!state.loggedIn &&
-            (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
-              (item) => (
-                <PublicNavItem
-                  key={item.type === "dropdown" ? item.label : item.href}
-                  item={item}
-                />
-              )
+          <nav className="hidden flex-1 items-center justify-center gap-0.5 lg:flex">
+            {!state.loggedIn &&
+                (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
+                    (item) => (
+                        <PublicNavItem
+                            key={item.type === "dropdown" ? item.label : item.href}
+                            item={item}
+                        />
+                    )
+                )}
+
+            {state.loggedIn &&
+                appNavItems.map((item) => (
+                    <AppNavItem
+                        key={item.type === "dropdown" ? item.label : item.href}
+                        item={item}
+                        liveSessionId={liveSession?.id ?? null}
+                        taskUnread={taskUnread}
+                    />
+                ))}
+          </nav>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {state.loggedIn && safeRole === "teacher" && liveSession && (
+                <Link
+                    href={`/teacher/session/${liveSession.id}`}
+                    className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
+                >
+                  LIVE •{" "}
+                  {typeof liveSession.title === "string" &&
+                  liveSession.title.length > 18
+                      ? `${liveSession.title.slice(0, 18)}…`
+                      : liveSession.title}
+                </Link>
             )}
 
-          {state.loggedIn &&
-            appNavItems.map((item) => (
-              <AppNavItem
-                key={item.type === "dropdown" ? item.label : item.href}
-                item={item}
-                liveSessionId={liveSession?.id ?? null}
-              />
-            ))}
-        </nav>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {state.loggedIn && safeRole === "teacher" && liveSession && (
-            <Link
-              href={`/teacher/session/${liveSession.id}`}
-              className="rounded-full bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/20 transition-colors hover:bg-primary/15"
-            >
-              LIVE •{" "}
-              {typeof liveSession.title === "string" &&
-              liveSession.title.length > 18
-                ? `${liveSession.title.slice(0, 18)}…`
-                : liveSession.title}
-            </Link>
-          )}
-
-          {state.loggedIn && (
-            <>
-              <div className="relative hidden md:inline-flex" ref={notifRef}>
-                <button
-                  type="button"
-                  onClick={() => setNotifOpen((v) => !v)}
-                  aria-expanded={notifOpen}
-                  aria-haspopup="true"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
-                  aria-label="Уведомления"
-                >
+            {state.loggedIn && (
+                <>
+                  <div className="relative hidden md:inline-flex" ref={notifRef}>
+                    <button
+                        type="button"
+                        onClick={() => setNotifOpen((v) => !v)}
+                        aria-expanded={notifOpen}
+                        aria-haspopup="true"
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40"
+                        aria-label="Уведомления"
+                    >
                   <span className="relative inline-flex">
                     <Bell size={18} />
                     {unreadCount > 0 && (
-                      <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+                        <span className="absolute -right-1.5 -top-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     )}
                   </span>
-                </button>
+                    </button>
 
-                {notifOpen && (
-                  <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5">
-                    <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
-                      Уведомления
-                    </div>
+                    {notifOpen && (
+                        <div className="absolute right-0 top-12 z-50 w-80 overflow-hidden rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/5">
+                          <div className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">
+                            Уведомления
+                          </div>
 
-                    {notificationsLoading ? (
-                      <div className="py-6 text-center text-[13px] font-medium text-slate-500">
-                        Загружаем...
-                      </div>
-                    ) : notifications.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
-                        <Bell className="mb-2 text-slate-300" size={24} />
-                        <div className="text-[13px] font-medium leading-relaxed">
-                          У вас пока нет новых уведомлений
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
-                        {notifications.slice(0, 20).map((n) => {
-                          const sessionId =
-                            n.data &&
-                            typeof (n.data as Record<string, unknown>)
-                              .sessionId === "string"
-                              ? String(
-                                  (n.data as Record<string, unknown>).sessionId
-                                )
-                              : null;
-
-                          return (
-                            <button
-                              key={n.id}
-                              type="button"
-                              onClick={async () => {
-                                try {
-                                  if (!n.isRead) {
-                                    await markNotificationRead(n.id);
-                                    setNotifications((prev) =>
-                                      prev.map((x) =>
-                                        x.id === n.id
-                                          ? {
-                                              ...x,
-                                              isRead: true,
-                                              readAt: new Date().toISOString(),
-                                            }
-                                          : x
-                                      )
-                                    );
-                                  }
-                                } catch {
-                                  // ignore
-                                }
-
-                                if (sessionId) {
-                                  const prefix =
-                                    safeRole === "teacher"
-                                      ? "/teacher/session/"
-                                      : "/student/session/";
-
-                                  router.push(`${prefix}${sessionId}`);
-                                  setNotifOpen(false);
-                                }
-                              }}
-                              className={cn(
-                                "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
-                                n.isRead
-                                  ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
-                                  : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
-                              )}
-                            >
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <div className="truncate text-[13px] font-bold text-slate-900">
-                                    {n.title}
-                                  </div>
-
-                                  {n.body && (
-                                    <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
-                                      {n.body}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {!n.isRead && (
-                                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
-                                )}
+                          {notificationsLoading ? (
+                              <div className="py-6 text-center text-[13px] font-medium text-slate-500">
+                                Загружаем...
                               </div>
+                          ) : notifications.length === 0 ? (
+                              <div className="flex flex-col items-center justify-center py-6 text-center text-slate-500">
+                                <Bell className="mb-2 text-slate-300" size={24} />
+                                <div className="text-[13px] font-medium leading-relaxed">
+                                  У вас пока нет новых уведомлений
+                                </div>
+                              </div>
+                          ) : (
+                              <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+                                {notifications.slice(0, 20).map((n) => {
+                                  const sessionId =
+                                      n.data &&
+                                      typeof (n.data as Record<string, unknown>)
+                                          .sessionId === "string"
+                                          ? String(
+                                              (n.data as Record<string, unknown>).sessionId
+                                          )
+                                          : null;
 
-                              <div className="mt-2 text-[11px] font-semibold text-slate-400">
-                                {new Date(n.createdAt).toLocaleString("ru-RU", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
+                                  const href =
+                                      n.data &&
+                                      typeof n.data.href === "string"
+                                          ? n.data.href
+                                          : null;
+
+                                  return (
+                                      <button
+                                          key={n.id}
+                                          type="button"
+                                          onClick={async () => {
+                                            try {
+                                              if (!n.isRead) {
+                                                const result =
+                                                    await markNotificationRead(n.id);
+
+                                                if (result) {
+                                                  setNotificationCounts({
+                                                    totalUnread:
+                                                    result.totalUnread,
+                                                    taskUnread:
+                                                    result.taskUnread,
+                                                  });
+                                                }
+
+                                                setNotifications((prev) =>
+                                                    prev.map((x) =>
+                                                        x.id === n.id
+                                                            ? {
+                                                              ...x,
+                                                              isRead: true,
+                                                              readAt: new Date().toISOString(),
+                                                            }
+                                                            : x
+                                                    )
+                                                );
+                                              }
+                                            } catch {
+                                              // ignore
+                                            }
+
+                                            if (href) {
+                                              router.push(href);
+                                              setNotifOpen(false);
+                                              return;
+                                            }
+
+                                            if (sessionId) {
+                                              const prefix =
+                                                  safeRole === "teacher"
+                                                      ? "/teacher/session/"
+                                                      : "/student/session/";
+
+                                              router.push(`${prefix}${sessionId}`);
+                                              setNotifOpen(false);
+                                            }
+                                          }}
+                                          className={cn(
+                                              "w-full rounded-2xl border px-3 py-3 text-left transition-colors",
+                                              n.isRead
+                                                  ? "border-slate-100 bg-slate-50/40 hover:bg-slate-50"
+                                                  : "border-[#7448FF]/15 bg-[#F4F1FF] hover:bg-[#EFEAFF]"
+                                          )}
+                                      >
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div className="min-w-0">
+                                            <div className="truncate text-[13px] font-bold text-slate-900">
+                                              {n.title}
+                                            </div>
+
+                                            {n.body && (
+                                                <div className="mt-1 line-clamp-2 text-[12px] font-medium text-slate-500">
+                                                  {n.body}
+                                                </div>
+                                            )}
+                                          </div>
+
+                                          {!n.isRead && (
+                                              <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#7448FF]" />
+                                          )}
+                                        </div>
+
+                                        <div className="mt-2 text-[11px] font-semibold text-slate-400">
+                                          {new Date(n.createdAt).toLocaleString("ru-RU", {
+                                            day: "2-digit",
+                                            month: "short",
+                                            hour: "2-digit",
+                                            minute: "2-digit",
+                                          })}
+                                        </div>
+                                      </button>
+                                  );
                                 })}
                               </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="relative" ref={profileRef}>
-                <button
-                  type="button"
-                  onClick={() => setProfileOpen((v) => !v)}
-                  aria-expanded={profileOpen}
-                  aria-haspopup="true"
-                  className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
-                  aria-label="Меню аккаунта"
-                >
-                  {navAvatarUrl ? (
-                    <img
-                      src={navAvatarUrl}
-                      alt={state.fullName || "User"}
-                      className="h-full w-full object-cover"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <User size={18} />
-                  )}
-                </button>
-
-                {profileOpen && (
-                  <div
-                    className={cn(
-                      "absolute right-0 top-full z-50 mt-2 min-w-[220px] p-2",
-                      DROPDOWN_PANEL
-                    )}
-                  >
-                    {state.fullName && (
-                      <div className="truncate px-3 py-1 text-[13px] font-bold text-fg">
-                        {state.fullName}
-                      </div>
-                    )}
-
-                    <Link
-                      href="/profile"
-                      onClick={() => setProfileOpen(false)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
-                        DROPDOWN_ITEM
-                      )}
-                    >
-                      <User size={16} />
-                      Профиль
-                    </Link>
-
-                    <Link
-                      href="/settings"
-                      onClick={() => setProfileOpen(false)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden",
-                        DROPDOWN_ITEM
-                      )}
-                    >
-                      <Settings size={16} />
-                      Настройки
-                    </Link>
-
-                    <Link
-                      href="/docs"
-                      onClick={() => setProfileOpen(false)}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
-                        DROPDOWN_ITEM
-                      )}
-                    >
-                      <HelpCircle size={16} />
-                      Помощь
-                    </Link>
-
-                    {consentRequired && (
-                      <Link
-                        href={`/consent?next=${encodeURIComponent(
-                          safePathname || "/"
-                        )}`}
-                        onClick={() => setProfileOpen(false)}
-                        className={cn(
-                          "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all",
-                          DROPDOWN_ITEM
-                        )}
-                      >
-                        <ShieldCheck size={16} />
-                        Нужно согласие
-                      </Link>
-                    )}
-
-                    <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
-
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all",
-                        DROPDOWN_ITEM
-                      )}
-                    >
-                      <LogOut size={16} />
-                      Выйти
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {!state.loggedIn && (
-            <div className="flex items-center gap-2">
-              {NAV_PUBLIC_RIGHT?.signIn?.href && (
-                <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
-                  <Button variant="outline" size="sm">
-                    {NAV_PUBLIC_RIGHT.signIn.label}
-                  </Button>
-                </Link>
-              )}
-
-              {NAV_PUBLIC_RIGHT?.getStarted?.href && (
-                <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
-                  <Button size="sm">{NAV_PUBLIC_RIGHT.getStarted.label}</Button>
-                </Link>
-              )}
-            </div>
-          )}
-
-          <button
-            type="button"
-            aria-label={mobileOpen ? "Закрыть меню" : "Открыть меню"}
-            onClick={() => setMobileOpen((v) => !v)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
-          >
-            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
-      </div>
-
-      {mobileOpen && (
-        <div className="border-b border-[color:var(--border)] bg-white shadow-elevated lg:hidden">
-          <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
-            {!state.loggedIn &&
-              (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
-                (item) => (
-                  <div key={item.type === "dropdown" ? item.label : item.href}>
-                    {item.type === "link" ? (
-                      <Link
-                        href={typeof item.href === "string" ? item.href : "/"}
-                        onClick={() => setMobileOpen(false)}
-                        className="block py-2 text-fg"
-                      >
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <div className="py-2">
-                        <div className="text-sm font-medium text-muted">
-                          {(item as NavDropdownItem).label}
-                        </div>
-
-                        <div className="mt-1 space-y-1 pl-3">
-                          {((item as NavDropdownItem).children ?? []).map(
-                            (child) => (
-                              <Link
-                                key={child.href}
-                                href={
-                                  typeof child.href === "string"
-                                    ? child.href
-                                    : "/"
-                                }
-                                onClick={() => setMobileOpen(false)}
-                                className="block py-1.5 text-sm text-fg"
-                              >
-                                {child.label}
-                              </Link>
-                            )
                           )}
                         </div>
-                      </div>
                     )}
                   </div>
-                )
-              )}
 
-            {state.loggedIn && (
-              <>
-                <div className="pt-1">
-                  <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
-                    Навигация
-                  </div>
-
-                  <div className="mt-2 space-y-1">
-                    {appNavItems.map((item) => (
-                      <div
-                        key={item.type === "dropdown" ? item.label : item.href}
-                      >
-                        {item.type === "link" ? (
-                          <Link
-                            href={
-                              typeof item.href === "string" ? item.href : "/"
-                            }
-                            onClick={() => setMobileOpen(false)}
-                            className="block py-2 text-fg"
-                          >
-                            {item.label}
-                          </Link>
-                        ) : (
-                          <div className="py-2">
-                            <div className="text-sm font-medium text-muted">
-                              {(item as NavDropdownItem).label}
-                            </div>
-
-                            <div className="mt-1 space-y-1 pl-3">
-                              {((item as NavDropdownItem).children ?? []).map(
-                                (child) => (
-                                  <Link
-                                    key={child.href}
-                                    href={
-                                      typeof child.href === "string"
-                                        ? child.href
-                                        : "/"
-                                    }
-                                    onClick={() => setMobileOpen(false)}
-                                    className="block py-1.5 text-sm text-fg"
-                                  >
-                                    {child.label}
-                                  </Link>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border-t border-border/40 pt-2">
-                  <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
-                    Аккаунт
-                  </div>
-
-                  <div className="mt-2 space-y-1">
-                    <Link
-                      href="/profile"
-                      onClick={() => setMobileOpen(false)}
-                      className="block py-2 text-fg"
-                    >
-                      Профиль
-                    </Link>
-
-                    <Link
-                      href="/settings"
-                      onClick={() => setMobileOpen(false)}
-                      className="block py-2 text-fg"
-                    >
-                      Настройки
-                    </Link>
-
-                    {consentRequired && (
-                      <Link
-                        href={`/consent?next=${encodeURIComponent(
-                          safePathname || "/"
-                        )}`}
-                        onClick={() => setMobileOpen(false)}
-                        className="block py-2 text-warning"
-                      >
-                        Нужно согласие
-                      </Link>
-                    )}
-
+                  <div className="relative" ref={profileRef}>
                     <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="block w-full py-2 text-left text-fg"
+                        type="button"
+                        onClick={() => setProfileOpen((v) => !v)}
+                        aria-expanded={profileOpen}
+                        aria-haspopup="true"
+                        className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[color:var(--border)]/10 bg-surface-subtle/80 text-fg shadow-soft transition-colors hover:bg-surface-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ring)]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)]"
+                        aria-label="Меню аккаунта"
                     >
-                      Выйти
+                      {navAvatarUrl ? (
+                          <img
+                              src={navAvatarUrl}
+                              alt={state.fullName || "User"}
+                              className="h-full w-full object-cover"
+                              referrerPolicy="no-referrer"
+                          />
+                      ) : (
+                          <User size={18} />
+                      )}
                     </button>
+
+                    {profileOpen && (
+                        <div
+                            className={cn(
+                                "absolute right-0 top-full z-50 mt-2 min-w-[220px] p-2",
+                                DROPDOWN_PANEL
+                            )}
+                        >
+                          {state.fullName && (
+                              <div className="truncate px-3 py-1 text-[13px] font-bold text-fg">
+                                {state.fullName}
+                              </div>
+                          )}
+
+                          <Link
+                              href="/profile"
+                              onClick={() => setProfileOpen(false)}
+                              className={cn(
+                                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                                  DROPDOWN_ITEM
+                              )}
+                          >
+                            <User size={16} />
+                            Профиль
+                          </Link>
+
+                          <Link
+                              href="/settings"
+                              onClick={() => setProfileOpen(false)}
+                              className={cn(
+                                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all md:hidden",
+                                  DROPDOWN_ITEM
+                              )}
+                          >
+                            <Settings size={16} />
+                            Настройки
+                          </Link>
+
+                          <Link
+                              href="/docs"
+                              onClick={() => setProfileOpen(false)}
+                              className={cn(
+                                  "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-fg transition-all",
+                                  DROPDOWN_ITEM
+                              )}
+                          >
+                            <HelpCircle size={16} />
+                            Помощь
+                          </Link>
+
+                          {consentRequired && (
+                              <Link
+                                  href={`/consent?next=${encodeURIComponent(
+                                      safePathname || "/"
+                                  )}`}
+                                  onClick={() => setProfileOpen(false)}
+                                  className={cn(
+                                      "flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-warning transition-all",
+                                      DROPDOWN_ITEM
+                                  )}
+                              >
+                                <ShieldCheck size={16} />
+                                Нужно согласие
+                              </Link>
+                          )}
+
+                          <div className="mx-2 my-1 h-px bg-[color:var(--border)]/60" />
+
+                          <button
+                              type="button"
+                              onClick={handleLogout}
+                              className={cn(
+                                  "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-fg transition-all",
+                                  DROPDOWN_ITEM
+                              )}
+                          >
+                            <LogOut size={16} />
+                            Выйти
+                          </button>
+                        </div>
+                    )}
                   </div>
-                </div>
-              </>
+                </>
             )}
+
+            {!state.loggedIn && (
+                <div className="flex items-center gap-2">
+                  {NAV_PUBLIC_RIGHT?.signIn?.href && (
+                      <Link href={NAV_PUBLIC_RIGHT.signIn.href}>
+                        <Button variant="outline" size="sm">
+                          {NAV_PUBLIC_RIGHT.signIn.label}
+                        </Button>
+                      </Link>
+                  )}
+
+                  {NAV_PUBLIC_RIGHT?.getStarted?.href && (
+                      <Link href={NAV_PUBLIC_RIGHT.getStarted.href}>
+                        <Button size="sm">{NAV_PUBLIC_RIGHT.getStarted.label}</Button>
+                      </Link>
+                  )}
+                </div>
+            )}
+
+            <button
+                type="button"
+                aria-label={mobileOpen ? "Закрыть меню" : "Открыть меню"}
+                onClick={() => setMobileOpen((v) => !v)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-subtle/80 text-fg shadow-soft lg:hidden"
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
-      )}
-    </header>
+
+        {mobileOpen && (
+            <div className="border-b border-[color:var(--border)] bg-white shadow-elevated lg:hidden">
+              <div className="mx-auto max-w-elas-page space-y-3 px-4 py-4">
+                {!state.loggedIn &&
+                    (Array.isArray(NAV_PUBLIC_LEFT) ? NAV_PUBLIC_LEFT : []).map(
+                        (item) => (
+                            <div key={item.type === "dropdown" ? item.label : item.href}>
+                              {item.type === "link" ? (
+                                  <Link
+                                      href={typeof item.href === "string" ? item.href : "/"}
+                                      onClick={() => setMobileOpen(false)}
+                                      className="block py-2 text-fg"
+                                  >
+                                    {item.label}
+                                  </Link>
+                              ) : (
+                                  <div className="py-2">
+                                    <div className="text-sm font-medium text-muted">
+                                      {(item as NavDropdownItem).label}
+                                    </div>
+
+                                    <div className="mt-1 space-y-1 pl-3">
+                                      {((item as NavDropdownItem).children ?? []).map(
+                                          (child) => (
+                                              <Link
+                                                  key={child.href}
+                                                  href={
+                                                    typeof child.href === "string"
+                                                        ? child.href
+                                                        : "/"
+                                                  }
+                                                  onClick={() => setMobileOpen(false)}
+                                                  className="block py-1.5 text-sm text-fg"
+                                              >
+                                                {child.label}
+                                              </Link>
+                                          )
+                                      )}
+                                    </div>
+                                  </div>
+                              )}
+                            </div>
+                        )
+                    )}
+
+                {state.loggedIn && (
+                    <>
+                      <div className="pt-1">
+                        <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+                          Навигация
+                        </div>
+
+                        <div className="mt-2 space-y-1">
+                          {appNavItems.map((item) => (
+                              <div
+                                  key={item.type === "dropdown" ? item.label : item.href}
+                              >
+                                {item.type === "link" ? (
+                                    <Link
+                                        href={
+                                          typeof item.href === "string" ? item.href : "/"
+                                        }
+                                        onClick={() => setMobileOpen(false)}
+                                        className="block py-2 text-fg"
+                                    >
+                            <span className="flex items-center justify-between gap-3">
+                              <span>{item.label}</span>
+
+                              {item.href === "/student/tasks" &&
+                                  taskUnread > 0 && (
+                                      <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[10px] font-extrabold text-white">
+                                    {taskUnread > 99
+                                        ? "99+"
+                                        : taskUnread}
+                                  </span>
+                                  )}
+                            </span>
+                                    </Link>
+                                ) : (
+                                    <div className="py-2">
+                                      <div className="text-sm font-medium text-muted">
+                                        {(item as NavDropdownItem).label}
+                                      </div>
+
+                                      <div className="mt-1 space-y-1 pl-3">
+                                        {((item as NavDropdownItem).children ?? []).map(
+                                            (child) => (
+                                                <Link
+                                                    key={child.href}
+                                                    href={
+                                                      typeof child.href === "string"
+                                                          ? child.href
+                                                          : "/"
+                                                    }
+                                                    onClick={() => setMobileOpen(false)}
+                                                    className="block py-1.5 text-sm text-fg"
+                                                >
+                                                  {child.label}
+                                                </Link>
+                                            )
+                                        )}
+                                      </div>
+                                    </div>
+                                )}
+                              </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="border-t border-border/40 pt-2">
+                        <div className="px-1 text-xs font-medium uppercase tracking-[0.16em] text-muted">
+                          Аккаунт
+                        </div>
+
+                        <div className="mt-2 space-y-1">
+                          <Link
+                              href="/profile"
+                              onClick={() => setMobileOpen(false)}
+                              className="block py-2 text-fg"
+                          >
+                            Профиль
+                          </Link>
+
+                          <Link
+                              href="/settings"
+                              onClick={() => setMobileOpen(false)}
+                              className="block py-2 text-fg"
+                          >
+                            Настройки
+                          </Link>
+
+                          {consentRequired && (
+                              <Link
+                                  href={`/consent?next=${encodeURIComponent(
+                                      safePathname || "/"
+                                  )}`}
+                                  onClick={() => setMobileOpen(false)}
+                                  className="block py-2 text-warning"
+                              >
+                                Нужно согласие
+                              </Link>
+                          )}
+
+                          <button
+                              type="button"
+                              onClick={handleLogout}
+                              className="block w-full py-2 text-left text-fg"
+                          >
+                            Выйти
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                )}
+              </div>
+            </div>
+        )}
+      </header>
   );
 }
