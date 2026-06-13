@@ -507,13 +507,12 @@ export default function TopNav() {
     let objectUrl: string | null = null;
 
     async function loadNavAvatar() {
-  setNavAvatarUrl(null);
+      setNavAvatarUrl(null);
 
-  if (!state.loggedIn) return;
+      if (!state.loggedIn) return;
 
-  const token = getToken();
-
-  if (!token) return;
+      const token = getToken();
+      if (!token) return;
 
       try {
         const res = await fetch(
@@ -527,8 +526,18 @@ export default function TopNav() {
           }
         );
 
+        if (res.status === 404 || res.status === 204) {
+          if (!cancelled) setNavAvatarUrl(null);
+          return;
+        }
+
         if (!res.ok) {
           throw new Error(`Navbar avatar request failed: ${res.status}`);
+        }
+
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.startsWith("image/")) {
+          throw new Error("Navbar avatar response is not an image");
         }
 
         const blob = await res.blob();
@@ -556,7 +565,7 @@ export default function TopNav() {
         URL.revokeObjectURL(objectUrl);
       }
     };
-}, [state.loggedIn, state.avatarVersion]);
+  }, [state.loggedIn, state.avatarVersion]);
 
   const handleLogout = useCallback(() => {
     clearAuth();

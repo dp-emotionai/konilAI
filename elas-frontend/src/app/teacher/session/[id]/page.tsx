@@ -132,7 +132,7 @@ function getParticipantDisplayName(
   participant?: Participant | "local" | null,
   metric?: LiveMetricsParticipant | null
 ) {
-  if (participant === "local") return "Р’С‹";
+  if (participant === "local") return "Вы";
   if (participant && participantHasIdentity(participant)) {
     return formatParticipantLabel(participant);
   }
@@ -411,6 +411,27 @@ export default function TeacherLiveMonitorPage() {
         });
       },
       onDisconnect: () => setWsDisconnected(true),
+      onPeerLeft: (peerId) => {
+        setRemoteStreams((prev) => {
+          if (!prev[peerId]) return prev;
+
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+
+        setFocusedParticipant((current) => {
+          if (
+            current &&
+            current !== "local" &&
+            current.id === peerId
+          ) {
+            return "local";
+          }
+
+          return current;
+        });
+      },
     });
 
     peerManagerRef.current = manager;
@@ -1297,7 +1318,7 @@ export default function TeacherLiveMonitorPage() {
           <aside
             ref={chatSectionRef}
             className={cn(
-              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm lg:sticky lg:top-4 lg:flex lg:h-[calc(100dvh-96px)] lg:min-h-0 lg:flex-col",
+              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm lg:sticky lg:top-20 lg:flex lg:h-[calc(100dvh-112px)] lg:min-h-[640px] lg:flex-col",
               chatOpen
                 ? "fixed inset-0 z-50 flex min-h-0 flex-col rounded-none border-none lg:relative lg:inset-auto lg:z-auto lg:rounded-[32px] lg:border lg:shadow-sm"
                 : "hidden lg:flex"

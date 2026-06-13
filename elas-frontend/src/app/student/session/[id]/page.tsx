@@ -1065,9 +1065,9 @@ export default function StudentJoinSessionPage() {
 
             <div
               ref={chatSectionRef}
-              className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4 lg:h-[calc(100dvh-96px)] lg:min-h-0"
+              className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:self-start"
             >
-              <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] flex flex-col min-h-[480px] overflow-hidden lg:min-h-0 lg:flex-[1.2]">
+              <div className="flex h-[520px] min-h-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)] lg:h-[560px]">
                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                   <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                   <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
