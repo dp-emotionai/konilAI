@@ -399,6 +399,9 @@ export default function TopNav() {
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+  const notificationIdsRef = useRef<Set<string>>(
+      new Set()
+  );
 
   const safeRole: Role | null = state.role ?? null;
   const liveSession = useTeacherLiveSession(safeRole ?? "teacher");
@@ -426,10 +429,21 @@ export default function TopNav() {
         getNotificationCounts({ signal }),
       ]);
 
-      setNotifications(Array.isArray(list) ? list : []);
+      const safeList = Array.isArray(list)
+          ? list
+          : [];
+
+      notificationIdsRef.current = new Set(
+          safeList.map((item) => item.id)
+      );
+
+      setNotifications(safeList);
       setNotificationCounts(counts);
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error(
+          "Failed to load notifications",
+          error
+      );
     } finally {
       setNotificationsLoading(false);
     }
@@ -455,6 +469,7 @@ export default function TopNav() {
 
   useEffect(() => {
     if (!state.loggedIn) {
+      notificationIdsRef.current.clear();
       setNotifications([]);
       setNotificationCounts({
         totalUnread: 0,
@@ -493,6 +508,7 @@ export default function TopNav() {
         type?: string;
         notification?: Partial<NotificationRow>;
         event?: Partial<NotificationRow>;
+        countsDelta?: Partial<NotificationCounts>;
       };
 
       const event =
@@ -506,14 +522,24 @@ export default function TopNav() {
         return;
       }
 
-      setNotifications((prev) => {
-        if (prev.some((item) => item.id === event.id)) {
-          return prev;
-        }
+      const notificationId = String(event.id);
 
+      if (
+          notificationIdsRef.current.has(
+              notificationId
+          )
+      ) {
+        return;
+      }
+
+      notificationIdsRef.current.add(
+          notificationId
+      );
+
+      setNotifications((prev) => {
         return [
           {
-            id: String(event.id),
+            id: notificationId,
             type: String(event.type ?? "notification"),
             title:
                 event.title == null
@@ -535,9 +561,30 @@ export default function TopNav() {
         ];
       });
 
+      const delta = payload.countsDelta;
+
+      if (
+          typeof delta?.totalUnread === "number" ||
+          typeof delta?.taskUnread === "number"
+      ) {
+        setNotificationCounts((current) => ({
+          totalUnread:
+              current.totalUnread +
+              (delta.totalUnread || 0),
+          taskUnread:
+              current.taskUnread +
+              (delta.taskUnread || 0),
+        }));
+      }
+
       void getNotificationCounts()
           .then(setNotificationCounts)
-          .catch(() => null);
+          .catch((error) => {
+            console.error(
+                "Failed to refresh notification counts after realtime event",
+                error
+            );
+          });
     });
 
     client.connect();
@@ -828,8 +875,11 @@ const handleLogout = useCallback(() => {
                                                     )
                                                 );
                                               }
-                                            } catch {
-                                              // ignore
+                                            } catch (error) {
+                                              console.error(
+                                                  "Failed to mark notification as read",
+                                                  error
+                                              );
                                             }
 
                                             if (href) {

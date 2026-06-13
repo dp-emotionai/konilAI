@@ -22,6 +22,9 @@ import {
     getApiOriginUrl,
     getToken,
 } from "@/lib/api/client";
+import {
+    markTaskNotificationsRead,
+} from "@/lib/api/notifications";
 
 type QuestionType =
     | "single_choice"
@@ -291,6 +294,43 @@ export default function StudentTestPage() {
     useEffect(() => {
         void loadTest();
     }, [loadTest]);
+
+    useEffect(() => {
+        if (!testId) return;
+
+        let cancelled = false;
+
+        void markTaskNotificationsRead(testId)
+            .then((readResult) => {
+                if (cancelled || !readResult) {
+                    return;
+                }
+
+                window.dispatchEvent(
+                    new CustomEvent(
+                        "notifications:counts-changed",
+                        {
+                            detail: {
+                                totalUnread:
+                                readResult.totalUnread,
+                                taskUnread:
+                                readResult.taskUnread,
+                            },
+                        }
+                    )
+                );
+            })
+            .catch((readError) => {
+                console.error(
+                    "Failed to mark test notification as read",
+                    readError
+                );
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [testId]);
 
     function selectSingleAnswer(
         questionId: string,
