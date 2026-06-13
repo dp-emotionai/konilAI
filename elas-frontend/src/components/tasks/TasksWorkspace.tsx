@@ -1188,8 +1188,6 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                     >
                       <option value="homework">Задание</option>
                       <option value="text_answer">Текстовый ответ</option>
-                      <option value="file_upload">Файл</option>
-                      <option value="test">Тест</option>
                     </SelectField>
                   </Field>
 
