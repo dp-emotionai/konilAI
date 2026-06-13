@@ -69,3 +69,5 @@ emotion-ml-service/venv/
 emotion-ml-service/events_log*.csv
 emotion-ml-service/session_*.json
 emotion-ml-service/session_report_*.txt
+
+.idea/
