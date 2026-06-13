@@ -5,8 +5,8 @@ import { useUI } from "./Providers";
 import {
   api,
   isApiAvailable,
-  clearAuth,
   getStoredAuth,
+  setAuth,
   type UserStatus,
 } from "@/lib/api/client";
 import type { Role } from "@/lib/roles";
@@ -24,17 +24,34 @@ type MeRes = {
 
 function normalizeRole(value: unknown): Role | null {
   if (typeof value !== "string") return null;
-  const v = value.trim().toLowerCase();
-  if (v === "student" || v === "teacher" || v === "admin") return v;
+
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "student" ||
+    normalized === "teacher" ||
+    normalized === "admin"
+  ) {
+    return normalized;
+  }
+
   return null;
 }
 
 function normalizeStatus(value: unknown): UserStatus | null {
   if (typeof value !== "string") return null;
-  const v = value.trim().toLowerCase();
-  if (v === "pending" || v === "approved" || v === "limited" || v === "blocked") {
-    return v as UserStatus;
+
+  const normalized = value.trim().toLowerCase();
+
+  if (
+    normalized === "pending" ||
+    normalized === "approved" ||
+    normalized === "limited" ||
+    normalized === "blocked"
+  ) {
+    return normalized as UserStatus;
   }
+
   return null;
 }
 
@@ -50,16 +67,19 @@ export function AuthRestore() {
 
     if (!stored?.token) {
       setLoggedIn(false);
+      setRole(null);
+      setStatus(null);
       return;
     }
 
     const storedRole = normalizeRole(stored.role);
     const storedStatus = normalizeStatus(stored.status);
 
+    // Сразу восстанавливаем пользователя из localStorage.
     setLoggedIn(true);
-    if (storedRole) setRole(storedRole);
-    if (storedStatus) setStatus(storedStatus);
-    
+    setRole(storedRole);
+    setStatus(storedStatus);
+
     setUserInfo({
       firstName: stored.firstName ?? undefined,
       lastName: stored.lastName ?? undefined,
@@ -67,33 +87,71 @@ export function AuthRestore() {
       avatarUrl: stored.avatarUrl ?? undefined,
     });
 
-    if (!isApiAvailable()) {
-      return;
-    }
+    if (!isApiAvailable()) return;
+
+    const controller = new AbortController();
 
     api
-      .get<MeRes>("auth/me")
+      .get<MeRes>("auth/me", {
+        signal: controller.signal,
+        cache: "no-store",
+      })
       .then((me) => {
         const role = normalizeRole(me.role) ?? storedRole;
-        const status = normalizeStatus(me.status) ?? storedStatus ?? "approved";
+        const status =
+          normalizeStatus(me.status) ?? storedStatus ?? "approved";
 
-        if (role) setRole(role);
-        setStatus(status);
         setLoggedIn(true);
+        setRole(role);
+        setStatus(status);
+
         setUserInfo({
           firstName: me.firstName ?? undefined,
           lastName: me.lastName ?? undefined,
           fullName: me.fullName ?? undefined,
           avatarUrl: me.avatarUrl ?? undefined,
         });
+
+        // Обновляем сохранённые данные, но сохраняем существующий token.
+        setAuth({
+          token: stored.token,
+          email: me.email || stored.email,
+          id: me.id || stored.id,
+          role: role ?? stored.role,
+          firstName: me.firstName ?? stored.firstName,
+          lastName: me.lastName ?? stored.lastName,
+          fullName: me.fullName ?? stored.fullName,
+          avatarUrl: me.avatarUrl ?? stored.avatarUrl,
+          status,
+        });
       })
-      .catch(() => {
-  clearAuth();
-  setLoggedIn(false);
-  setRole(null);
-  setStatus(null);
-});
-  }, [setLoggedIn, setRole, setStatus]);
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        // Временная ошибка backend не должна разлогинивать пользователя.
+        console.warn(
+          "Не удалось обновить данные пользователя. Используем сохранённую сессию.",
+          error
+        );
+
+        setLoggedIn(true);
+        setRole(storedRole);
+        setStatus(storedStatus);
+
+        setUserInfo({
+          firstName: stored.firstName ?? undefined,
+          lastName: stored.lastName ?? undefined,
+          fullName: stored.fullName ?? undefined,
+          avatarUrl: stored.avatarUrl ?? undefined,
+        });
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [setLoggedIn, setRole, setStatus, setUserInfo]);
 
   return null;
 }
