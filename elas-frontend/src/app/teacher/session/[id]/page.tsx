@@ -370,7 +370,8 @@ export default function StudentJoinSessionPage() {
 
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
-  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [selectedVideoId, setSelectedVideoId] = useState<string>("local");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
@@ -446,6 +447,44 @@ export default function StudentJoinSessionPage() {
     setCurrentUser(getStoredAuth());
   }, []);
 
+  const videoTiles = useMemo(() => {
+    const localTile = {
+      id: "local",
+      stream: localStream,
+      label: currentStudentName,
+      roleLabel: "Вы",
+      icon: "👤",
+      isLocal: true,
+    };
+
+    const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
+      const participant = participants.find((p) => p.id === peerId) ?? null;
+      const isTeacher = participant?.role === "teacher";
+
+      return {
+        id: peerId,
+        stream,
+        label: formatParticipantLabel(participant),
+        roleLabel: isTeacher ? "Преподаватель" : "Участник",
+        icon: isTeacher ? "👩🏻‍🏫" : "🎓",
+        isLocal: false,
+      };
+    });
+
+    return [localTile, ...remoteTiles];
+  }, [currentStudentName, localStream, participants, remoteStreams]);
+
+  const selectedVideo = useMemo(() => {
+    return (
+        videoTiles.find((tile) => tile.id === selectedVideoId && tile.stream) ??
+        videoTiles.find((tile) => !tile.isLocal && tile.stream) ??
+        videoTiles.find((tile) => tile.stream) ??
+        videoTiles[0] ??
+        null
+    );
+  }, [selectedVideoId, videoTiles]);
+
+
   useEffect(() => {
     const onFullscreenChange = () => {
       setIsMonitorFullscreen(Boolean(document.fullscreenElement));
@@ -507,14 +546,33 @@ export default function StudentJoinSessionPage() {
     const wsBase = getWsBaseUrl().replace(/^ws/, "http");
     const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
-      onRemoteStream: (_peerId, stream) => {
+      onRemoteStream: (peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
-        setRemoteStream(hasTracks ? stream : null);
+        setRemoteStreams((prev) => {
+          const next = { ...prev };
+
+          if (hasTracks) {
+            next[peerId] = stream;
+          } else {
+            delete next[peerId];
+          }
+
+          return next;
+        });
+
+        if (hasTracks) {
+          setSelectedVideoId((current) => (current === "local" ? peerId : current));
+        }
       },
       onPeersChange: (peers) => setParticipants(peers),
       onDisconnect: () => setSocketDisconnected(true),
-      onPeerLeft: () => {
-        setRemoteStream(null);
+      onPeerLeft: (peerId) => {
+        setRemoteStreams((prev) => {
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+        setSelectedVideoId((current) => (current === peerId ? "local" : current));
       },
     });
 
@@ -556,7 +614,8 @@ export default function StudentJoinSessionPage() {
         setLive(false);
         setTab("prepare");
         manager.leave();
-        setRemoteStream(null);
+        setRemoteStreams({});
+        setSelectedVideoId("local");
         setLocalStream(null);
         setParticipants([]);
       }
@@ -567,7 +626,8 @@ export default function StudentJoinSessionPage() {
       screenStreamRef.current = null;
       peerManagerRef.current = null;
       manager.leave();
-      setRemoteStream(null);
+      setRemoteStreams({});
+      setSelectedVideoId("local");
       setLocalStream(null);
       setParticipants([]);
       setConnectionState("idle");
@@ -786,20 +846,28 @@ export default function StudentJoinSessionPage() {
                       ref={monitorRef}
                       className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
                   >
-                    {remoteStream ? (
-                        <StreamVideo
-                            stream={remoteStream}
-                            className="w-full h-full object-cover"
-                            autoPlay
-                            playsInline
-                        />
+                    {selectedVideo?.stream ? (
+                        <button
+                            type="button"
+                            onClick={() => void toggleMonitorFullscreen()}
+                            className="absolute inset-0 block h-full w-full cursor-pointer bg-black text-left"
+                            title="Открыть видео на весь экран"
+                        >
+                          <StreamVideo
+                              stream={selectedVideo.stream}
+                              className="h-full w-full object-cover"
+                              autoPlay
+                              playsInline
+                              muted={selectedVideo.isLocal}
+                          />
+                        </button>
                     ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
                           <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
-                            <span className="text-2xl">👨🏻‍🏫</span>
+                            <span className="text-2xl">👥</span>
                           </div>
                           <div className="text-slate-500 font-medium text-sm">
-                            Ожидание подключения преподавателя...
+                            Ожидание подключения участников...
                           </div>
                         </div>
                     )}
@@ -813,27 +881,54 @@ export default function StudentJoinSessionPage() {
                       <Maximize2 size={16} strokeWidth={2.5} />
                     </button>
 
-                    {remoteStream && (
+                    {selectedVideo?.stream && (
                         <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
                           <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
-                            🎓
+                            {selectedVideo.icon}
                           </div>
-                          <span className="truncate">{formatParticipantLabel(teacherParticipant)}</span>
+                          <span className="truncate">{selectedVideo.label}</span>
                         </div>
                     )}
 
-                    <div className="absolute bottom-4 right-4 w-[170px] sm:w-[220px] xl:w-[260px] h-[108px] sm:h-[132px] xl:h-[164px] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
-                      <StreamVideo
-                          stream={localStream}
-                          className="w-full h-full object-cover"
-                          autoPlay
-                          playsInline
-                          muted
-                      />
-                      <div className="absolute bottom-2 left-2 max-w-[85%] bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
-                        <span className="truncate">{currentStudentName}</span>
-                        <Mic size={12} className={isMicEnabled ? "text-white shrink-0" : "text-red-400 shrink-0"} />
-                      </div>
+                    <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] items-end gap-3 overflow-x-auto pb-1">
+                      {videoTiles.map((tile) => (
+                          <button
+                              key={tile.id}
+                              type="button"
+                              onClick={() => setSelectedVideoId(tile.id)}
+                              className={cn(
+                                  "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
+                                  selectedVideo?.id === tile.id
+                                      ? "border-[#7448FF] ring-4 ring-[#7448FF]/25"
+                                      : "border-white/20 hover:border-white/60"
+                              )}
+                              title={`Открыть ${tile.label} в большом окне`}
+                          >
+                            {tile.stream ? (
+                                <StreamVideo
+                                    stream={tile.stream}
+                                    className="h-full w-full object-cover"
+                                    autoPlay
+                                    playsInline
+                                    muted={tile.isLocal}
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
+                                  {tile.icon}
+                                </div>
+                            )}
+
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent px-2 pb-2 pt-7 text-white">
+                              <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
+                                <span className="truncate">{tile.label}</span>
+                                {tile.isLocal && (
+                                    <Mic size={12} className={isMicEnabled ? "shrink-0 text-white" : "shrink-0 text-red-400"} />
+                                )}
+                              </div>
+                              <div className="text-[10px] font-medium text-white/70">{tile.roleLabel}</div>
+                            </div>
+                          </button>
+                      ))}
                     </div>
                   </div>
 
