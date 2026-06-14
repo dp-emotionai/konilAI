@@ -248,6 +248,8 @@ export type MlAnalyzeResponse = {
 
 type AnalyzeOptions = {
   signal?: AbortSignal;
+  /** Lesson/session identifier used to isolate temporal ML state. */
+  sessionId?: string;
   /**
    * Cloud-hosted TensorFlow services can be slow during a cold start.
    */
@@ -399,6 +401,7 @@ export async function mlAnalyzeFrame(
     }
 
     const clientId = getMlClientId();
+    const sessionId = opts.sessionId?.trim();
 
     const response = await fetch(`${base}/analyze`, {
       method: "POST",
@@ -409,6 +412,7 @@ export async function mlAnalyzeFrame(
       body: JSON.stringify({
         image,
         client_id: clientId,
+        ...(sessionId ? { session_id: sessionId } : {}),
       }),
       signal: controller.signal,
       cache: "no-store",

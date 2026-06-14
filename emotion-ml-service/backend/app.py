@@ -13,16 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from backend.metrics_output import compute_per_frame_metrics
-from backend.model_logic import EmotionRiskModel
+from backend.model_logic import (
+    EmotionRiskModel,
+    EmotionStateRegistry,
+)
 from inference.face_processor import FaceProcessor, crop_face_with_margin
 
-
-# emotion-ml-service/
 BASE_DIR = Path(__file__).resolve().parents[1]
-
-# По умолчанию используем существующую модель проекта.
-# При необходимости путь можно переопределить в Render:
-# EMOTION_MODEL_PATH=/opt/render/project/src/emotion_model_custom.h5
 MODEL_PATH = Path(
     os.getenv(
         "EMOTION_MODEL_PATH",
@@ -80,6 +77,10 @@ if not MODEL_PATH.exists():
 
 
 emotion_engine = EmotionRiskModel(str(MODEL_PATH))
+emotion_states = EmotionStateRegistry(
+    buffer_max=120,
+    ttl_seconds=CLIENT_TTL_SECONDS,
+)
 
 face_processor = FaceProcessor(
     detector="haar",
@@ -107,6 +108,14 @@ class FrameRequest(BaseModel):
         max_length=128,
         description=(
             "Stable browser identifier used for per-client throttling."
+        ),
+    )
+
+    session_id: str | None = Field(
+        default=None,
+        max_length=128,
+        description=(
+            "Lesson/session identifier used to isolate temporal state."
         ),
     )
 
@@ -148,6 +157,19 @@ def _resolve_client_id(
     )
 
     return f"ip:{host}"
+
+
+def _resolve_state_key(
+    data: FrameRequest,
+    client_id: str,
+) -> str:
+    session_id = (data.session_id or "").strip()
+
+    if session_id:
+        return f"session:{session_id}:client:{client_id}"
+
+    # Backward compatibility for callers that do not send session_id yet.
+    return f"legacy:client:{client_id}"
 
 
 def _enforce_rate_limit(
@@ -312,6 +334,11 @@ def analyze_frame(
         now,
     )
 
+    state_key = _resolve_state_key(
+        data,
+        client_id,
+    )
+
     frame_for_model, face_detected = _pick_face_crop(
         frame
     )
@@ -340,9 +367,13 @@ def analyze_frame(
                 )
             )
 
-            state, risk, dominant = (
-                emotion_engine.evaluate_risk()
+        state, risk, dominant = (
+            emotion_states.record_and_evaluate(
+                state_key,
+                emotion_raw,
+                confidence,
             )
+        )
 
     except Exception as exc:
         print(

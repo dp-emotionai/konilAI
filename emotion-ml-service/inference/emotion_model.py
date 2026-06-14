@@ -1,6 +1,9 @@
 import cv2
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.applications.mobilenet_v2 import (
+    preprocess_input as mobilenet_v2_preprocess_input,
+)
 from typing import Dict, List, Tuple
 
 
@@ -163,8 +166,11 @@ class EmotionModel:
         Prepare a face image for the CNN.
 
         The image is converted to the channel format expected by the
-        loaded model, resized to the detected model input size and
-        normalized to the [0, 1] range.
+        loaded model and resized to the detected model input size.
+
+        Grayscale models receive values in the [0, 1] range. RGB models
+        use the same MobileNetV2 preprocessing as the training pipeline
+        (approximately [-1, 1]).
         """
         if face_img is None or face_img.size == 0:
             raise ValueError("Empty face image")
@@ -222,7 +228,14 @@ class EmotionModel:
 
         face_img = face_img.astype(
             np.float32
-        ) / 255.0
+        )
+
+        if self.grayscale:
+            face_img /= 255.0
+        else:
+            face_img = mobilenet_v2_preprocess_input(
+                face_img
+            )
 
         if self.grayscale and face_img.ndim == 2:
             face_img = np.expand_dims(

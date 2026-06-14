@@ -42,19 +42,10 @@ export type MarkNotificationReadResult =
   notification: NotificationRow;
 };
 
-function logNotificationApiCheck(action: string) {
-  console.log("NOTIFICATION API CHECK", {
-    action,
-    apiBaseUrl: getApiBaseUrl(),
-    hasAuth: hasAuth(),
-  });
-}
 
 export async function getNotifications(params?: {
   signal?: AbortSignal;
 }): Promise<NotificationRow[]> {
-  logNotificationApiCheck("getNotifications");
-
   if (!getApiBaseUrl() || !hasAuth()) {
     return [];
   }
@@ -72,8 +63,6 @@ export async function getNotifications(params?: {
 export async function getNotificationCounts(params?: {
   signal?: AbortSignal;
 }): Promise<NotificationCounts> {
-  logNotificationApiCheck("getNotificationCounts");
-
   if (!getApiBaseUrl() || !hasAuth()) {
     return {
       totalUnread: 0,
@@ -95,8 +84,6 @@ export async function markNotificationRead(
       signal?: AbortSignal;
     }
 ): Promise<MarkNotificationReadResult | null> {
-  logNotificationApiCheck("markNotificationRead");
-
   if (!getApiBaseUrl() || !hasAuth()) {
     return null;
   }
@@ -120,8 +107,6 @@ export async function markTaskNotificationsRead(
       signal?: AbortSignal;
     }
 ): Promise<MarkNotificationsReadResult | null> {
-  logNotificationApiCheck("markTaskNotificationsRead");
-
   if (!getApiBaseUrl() || !hasAuth()) {
     return null;
   }
@@ -142,8 +127,6 @@ export async function markTaskNotificationsRead(
 export async function markAllNotificationsRead(params?: {
   signal?: AbortSignal;
 }): Promise<MarkNotificationsReadResult | null> {
-  logNotificationApiCheck("markAllNotificationsRead");
-
   if (!getApiBaseUrl() || !hasAuth()) {
     return null;
   }

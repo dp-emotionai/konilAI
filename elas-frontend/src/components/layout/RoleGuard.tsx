@@ -48,7 +48,7 @@ export default function RoleGuard({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { state } = useUI();
+  const { state, authReady } = useUI();
 
   const safePathname = typeof pathname === "string" ? pathname : "";
 
@@ -84,6 +84,7 @@ export default function RoleGuard({
     !effectiveRole;
 
   useEffect(() => {
+    if (!authReady) return;
     if (!safePathname) return;
     if (isPublic) return;
     if (!matchedRule) return;
@@ -104,6 +105,7 @@ export default function RoleGuard({
       router.replace("/403");
     }
   }, [
+    authReady,
     safePathname,
     isPublic,
     matchedRule,
@@ -115,6 +117,10 @@ export default function RoleGuard({
   ]);
 
   if (!safePathname) return null;
+
+  if (!authReady && !isPublic && matchedRule) {
+    return null;
+  }
 
   if (!isPublic && matchedRule) {
     if (isHydratingProtectedRoute) return null;

@@ -25,7 +25,13 @@ const REALTIME_EVENT_TYPES = new Set([
   "material.deleted",
 ]);
 
-const READY_EVENT_TYPES = new Set(["auth-ok", "auth_ok", "ready", "connect"]);
+const READY_EVENT_TYPES = new Set([
+  "auth-ok",
+  "auth_ok",
+  "ready",
+  "connect",
+  "socket:ready",
+]);
 const SUBSCRIBED_EVENT_TYPES = new Set(["subscribed", "subscribe-ok"]);
 
 export class ChatClient {
@@ -150,7 +156,7 @@ export class ChatClient {
     if (!base) return;
 
     this.socket = io(base, {
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
       reconnection: true,
       auth: { token },
     });
@@ -159,9 +165,6 @@ export class ChatClient {
       this.authenticated = true;
       this.subscribedKeys.clear();
 
-      if (this.token) {
-        this.send({ type: "auth", token: this.token });
-      }
       this.flushSubscriptions();
     });
 

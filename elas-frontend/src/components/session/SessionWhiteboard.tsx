@@ -135,7 +135,7 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
     if (!token || !wsBase || !sessionId) return;
 
     const socket = io(wsBase.replace(/\/$/, ""), {
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
       reconnection: true,
       auth: { token },
     });

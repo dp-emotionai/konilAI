@@ -667,7 +667,9 @@ export default function StudentJoinSessionPage() {
 
       try {
         inflight = true;
-        const result = await mlAnalyzeFrame(frame);
+        const result = await mlAnalyzeFrame(frame, {
+          sessionId,
+        });
         if (cancelled) return;
 
         if (!result) {
