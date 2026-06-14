@@ -992,7 +992,7 @@ function TasksWorkspace({ role }: { role: RoleMode }) {
                                 </div>
 
                                 {deadlinePassed && task.status === "published" && (
-                                    <div className="mt-3 text-xs font-bold text-red-600">Дедлайн өтті</div>
+                                    <div className="mt-3 text-xs font-bold text-red-600">Дедлайн прошёл</div>
                                 )}
                               </div>
 
