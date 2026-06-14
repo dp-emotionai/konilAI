@@ -17,8 +17,11 @@ import { cn } from "@/lib/cn";
 type ConsentModalProps = {
   open: boolean;
   saving?: boolean;
+  statusLoading?: boolean;
+  hasConsent?: boolean;
   error?: string | null;
   onAccept: () => void;
+  onRevoke: () => void;
   onClose: () => void;
   onContinueWithoutAnalysis?: () => void;
   className?: string;
@@ -51,8 +54,11 @@ const consentItems = [
 export default function ConsentModal({
                                        open,
                                        saving = false,
+                                       statusLoading = false,
+                                       hasConsent = false,
                                        error = null,
                                        onAccept,
+                                       onRevoke,
                                        onClose,
                                        onContinueWithoutAnalysis,
                                        className,
@@ -127,12 +133,15 @@ export default function ConsentModal({
                     id="consent-modal-title"
                     className="mt-3 text-[28px] font-extrabold leading-[1.12] tracking-[-0.035em] text-slate-900 sm:text-[34px]"
                 >
-                  Согласие на анализ эмоций
+                  {hasConsent
+                      ? "Согласие на анализ эмоций активно"
+                      : "Согласие на анализ эмоций"}
                 </h1>
 
                 <p className="mt-2 max-w-[590px] text-sm font-medium leading-relaxed text-slate-500 sm:text-[15px]">
-                  Мы обрабатываем 1–2 кадра в секунду, без записи видео.
-                  Сохраняются только метаданные.
+                  {hasConsent
+                      ? "Вы разрешили обработку кадров для анализа вовлечённости. Исходное видео не сохраняется."
+                      : "Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные."}
                 </p>
               </div>
 
@@ -189,15 +198,34 @@ export default function ConsentModal({
               )}
 
               <div className="mt-6 flex flex-col gap-3">
-                <Button
-                    onClick={onAccept}
-                    disabled={saving}
-                    className="h-12 w-full rounded-[14px] border-none bg-[#7448FF] text-base font-semibold text-white shadow-[0_14px_30px_rgba(116,72,255,0.28)] hover:bg-[#6538f5] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving
-                      ? "Сохраняем согласие..."
-                      : "Принимаю и продолжаю"}
-                </Button>
+                {statusLoading ? (
+                    <Button
+                        disabled
+                        className="h-12 w-full rounded-[14px] border-none bg-slate-200 text-base font-semibold text-slate-500"
+                    >
+                      Проверяем статус...
+                    </Button>
+                ) : hasConsent ? (
+                    <Button
+                        onClick={onRevoke}
+                        disabled={saving}
+                        className="h-12 w-full rounded-[14px] border border-red-200 bg-red-50 text-base font-semibold text-red-600 shadow-none hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving
+                          ? "Отзываем согласие..."
+                          : "Отозвать согласие"}
+                    </Button>
+                ) : (
+                    <Button
+                        onClick={onAccept}
+                        disabled={saving}
+                        className="h-12 w-full rounded-[14px] border-none bg-[#7448FF] text-base font-semibold text-white shadow-[0_14px_30px_rgba(116,72,255,0.28)] hover:bg-[#6538f5] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving
+                          ? "Сохраняем согласие..."
+                          : "Принимаю и продолжаю"}
+                    </Button>
+                )}
 
                 <Link
                     href="/privacy"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import ConsentModal from "@/components/consent/ConsentModal";
@@ -31,6 +31,8 @@ export default function ConsentClient() {
 
     const { state, setConsent } = useUI();
 
+    const [hasConsent, setHasConsent] = useState<boolean | null>(null);
+    const [statusLoading, setStatusLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -46,8 +48,50 @@ export default function ConsentClient() {
                 ? ROLE_HOME[state.role]
                 : "/";
 
+    useEffect(() => {
+        const controller = new AbortController();
+
+        async function loadStatus() {
+            try {
+                setStatusLoading(true);
+
+                const status = await getConsentStatus(
+                    controller.signal
+                );
+
+                setHasConsent(status.hasConsent);
+                setConsent(status.hasConsent);
+                writeConsent(status.hasConsent);
+            } catch (error) {
+                if (
+                    error instanceof DOMException &&
+                    error.name === "AbortError"
+                ) {
+                    return;
+                }
+
+                console.error(
+                    "CONSENT STATUS LOAD FAILED",
+                    error
+                );
+
+                setHasConsent(false);
+            } finally {
+                if (!controller.signal.aborted) {
+                    setStatusLoading(false);
+                }
+            }
+        }
+
+        void loadStatus();
+
+        return () => {
+            controller.abort();
+        };
+    }, [setConsent]);
+
     const handleAccept = async () => {
-        if (saving) return;
+        if (saving || statusLoading) return;
 
         try {
             setSaving(true);
@@ -55,34 +99,23 @@ export default function ConsentClient() {
 
             const sessionId = getSessionId(returnUrl);
 
-            let hasConsent = false;
+            let consentValue: boolean;
 
             if (sessionId) {
-                /*
-                 * Бұл endpoint session consent пен global consent-ті
-                 * backend-та бір transaction ішінде сақтайды.
-                 */
                 await recordSessionConsent(sessionId);
 
-                /*
-                 * Сақталғаннан кейін backend-тен нақты статусты аламыз.
-                 */
                 const status = await getConsentStatus();
-                hasConsent = status.hasConsent;
+                consentValue = status.hasConsent;
             } else {
-                /*
-                 * /privacy немесе жай /consent арқылы келген кезде
-                 * global consent сақталады.
-                 */
                 const status = await updateConsentStatus(true);
-                hasConsent = status.hasConsent;
+                consentValue = status.hasConsent;
             }
 
-            setConsent(hasConsent);
-            writeConsent(hasConsent);
+            setHasConsent(consentValue);
+            setConsent(consentValue);
+            writeConsent(consentValue);
 
             router.replace(target);
-            router.refresh();
         } catch (error) {
             console.error("CONSENT SAVE FAILED", error);
 
@@ -96,7 +129,42 @@ export default function ConsentClient() {
         }
     };
 
+    const handleRevoke = async () => {
+        if (saving || statusLoading) return;
+
+        const confirmed = window.confirm(
+            "Вы действительно хотите отозвать согласие на анализ эмоций?"
+        );
+
+        if (!confirmed) return;
+
+        try {
+            setSaving(true);
+            setError(null);
+
+            const status = await updateConsentStatus(false);
+
+            setHasConsent(status.hasConsent);
+            setConsent(status.hasConsent);
+            writeConsent(status.hasConsent);
+
+            router.replace(target);
+        } catch (error) {
+            console.error("CONSENT REVOKE FAILED", error);
+
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "Не удалось отозвать согласие"
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleClose = () => {
+        if (saving) return;
+
         router.replace(target);
     };
 
@@ -104,12 +172,19 @@ export default function ConsentClient() {
         <ConsentModal
             open
             saving={saving}
+            statusLoading={statusLoading}
+            hasConsent={hasConsent === true}
             error={error}
             onClose={handleClose}
-            onContinueWithoutAnalysis={handleClose}
             onAccept={() => {
                 void handleAccept();
             }}
+            onRevoke={() => {
+                void handleRevoke();
+            }}
+            onContinueWithoutAnalysis={
+                hasConsent ? undefined : handleClose
+            }
         />
     );
 }
