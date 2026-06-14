@@ -79,7 +79,7 @@ import {
   LockKeyhole,
   X,
 } from "lucide-react";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 function StatusPill({ label, value }: { label: string; value: string }) {
@@ -413,7 +413,7 @@ export default function StudentJoinSessionPage() {
       "idle" | "connecting" | "connected" | "error"
   >("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [wsDisconnected, setWsDisconnected] = useState(false);
+  const [socketDisconnected, setSocketDisconnected] = useState(false);
 
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
@@ -504,22 +504,22 @@ export default function StudentJoinSessionPage() {
     setConnectionState("connecting");
     setConnectionError(null);
 
-    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
-    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
-    const manager = new PeerConnectionManager(signaling, roomId, "student", {
+    const socketBase = getSocketBaseUrl();
+    const signaling = new SignalingClient(socketBase);
+    const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
       onRemoteStream: (_peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
         setRemoteStream(hasTracks ? stream : null);
       },
       onPeersChange: (peers) => setParticipants(peers),
-      onDisconnect: () => setWsDisconnected(true),
+      onDisconnect: () => setSocketDisconnected(true),
       onPeerLeft: () => {
         setRemoteStream(null);
       },
     });
 
     peerManagerRef.current = manager;
-    signaling.on("open", () => setWsDisconnected(false));
+    signaling.on("open", () => setSocketDisconnected(false));
     signaling.connect();
 
     void (async () => {
@@ -530,7 +530,7 @@ export default function StudentJoinSessionPage() {
         await signaling.waitForOpen(12000);
 
         const auth = getStoredAuth();
-        manager.join(
+        await manager.join(
             auth
                 ? {
                   email: auth.email,
@@ -545,8 +545,8 @@ export default function StudentJoinSessionPage() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Ошибка подключения";
         const friendly =
-            msg.includes("timeout") || msg.includes("WebSocket")
-                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
+            msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("socket")
+                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки Socket.IO."
                 : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
                     ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
                     : msg;
@@ -572,7 +572,7 @@ export default function StudentJoinSessionPage() {
       setParticipants([]);
       setConnectionState("idle");
       setConnectionError(null);
-      setWsDisconnected(false);
+      setSocketDisconnected(false);
       setIsScreenSharing(false);
     };
   }, [live, roomId]);
@@ -667,9 +667,7 @@ export default function StudentJoinSessionPage() {
 
       try {
         inflight = true;
-        const result = await mlAnalyzeFrame(frame, {
-          sessionId,
-        });
+        const result = await mlAnalyzeFrame(frame);
         if (cancelled) return;
 
         if (!result) {
@@ -757,7 +755,7 @@ export default function StudentJoinSessionPage() {
                   </span>
                   )}
 
-                  {wsDisconnected && (
+                  {socketDisconnected && (
                       <span className="flex items-center gap-2 text-rose-600">
                     <AlertTriangle size={14} />
                     Соединение потеряно

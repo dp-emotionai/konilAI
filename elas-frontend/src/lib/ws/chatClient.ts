@@ -1,16 +1,16 @@
 import { io, type Socket } from "socket.io-client";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { getToken } from "@/lib/api/client";
 
 type ChatEventHandler = (event: unknown) => void;
 type Subscription =
-  | { scope: "session"; sessionId: string }
-  | { scope: "group"; groupId: string }
-  | { scope: "user" };
+    | { scope: "session"; sessionId: string }
+    | { scope: "group"; groupId: string }
+    | { scope: "user" };
 
 type ChatServerPacket =
-  | { type?: string; [key: string]: unknown }
-  | null;
+    | { type?: string; [key: string]: unknown }
+    | null;
 
 const REALTIME_EVENT_TYPES = new Set([
   "message.new",
@@ -25,13 +25,7 @@ const REALTIME_EVENT_TYPES = new Set([
   "material.deleted",
 ]);
 
-const READY_EVENT_TYPES = new Set([
-  "auth-ok",
-  "auth_ok",
-  "ready",
-  "connect",
-  "socket:ready",
-]);
+const READY_EVENT_TYPES = new Set(["auth-ok", "auth_ok", "ready", "connect"]);
 const SUBSCRIBED_EVENT_TYPES = new Set(["subscribed", "subscribe-ok"]);
 
 export class ChatClient {
@@ -63,7 +57,8 @@ export class ChatClient {
     const type = typeof packet.type === "string" ? packet.type : "";
     if (!type) return;
 
-    const { type: _type, ...payload } = packet;
+    const payload = { ...packet };
+    delete payload.type;
     this.socket.emit(type, payload);
   }
 
@@ -131,7 +126,7 @@ export class ChatClient {
 
     if (type === "error") {
       const message =
-        typeof packet.message === "string" ? packet.message.toLowerCase() : "";
+          typeof packet.message === "string" ? packet.message.toLowerCase() : "";
 
       if (message.includes("auth")) {
         this.authenticated = false;
@@ -152,12 +147,13 @@ export class ChatClient {
     this.manuallyClosed = false;
     this.authenticated = false;
 
-    const base = getWsBaseUrl().replace(/\/$/, "");
+    const base = getSocketBaseUrl();
     if (!base) return;
 
     this.socket = io(base, {
-      transports: ["polling", "websocket"],
       reconnection: true,
+      reconnectionAttempts: 8,
+      timeout: 20_000,
       auth: { token },
     });
 
@@ -165,6 +161,9 @@ export class ChatClient {
       this.authenticated = true;
       this.subscribedKeys.clear();
 
+      if (this.token) {
+        this.send({ type: "auth", token: this.token });
+      }
       this.flushSubscriptions();
     });
 

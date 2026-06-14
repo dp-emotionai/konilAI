@@ -5,35 +5,35 @@
 export type MlSessionId = string;
 
 export type MlSessionState =
-  | "idle"
-  | "starting"
-  | "live"
-  | "stopping"
-  | "stopped"
-  | "error";
+    | "idle"
+    | "starting"
+    | "live"
+    | "stopping"
+    | "stopped"
+    | "error";
 
 export type MlEmotionLabel =
-  | "angry"
-  | "disgust"
-  | "fear"
-  | "happy"
-  | "sad"
-  | "surprise"
-  | "neutral";
+    | "angry"
+    | "disgust"
+    | "fear"
+    | "happy"
+    | "sad"
+    | "surprise"
+    | "neutral";
 
 export type MlTzState =
-  | "stable"
-  | "overloaded"
-  | "underloaded"
-  | "fatigued"
-  | "uncertain";
+    | "stable"
+    | "overloaded"
+    | "underloaded"
+    | "fatigued"
+    | "uncertain";
 
 export type MlGroupState =
-  | "cohesive"
-  | "fragmented"
-  | "mixed"
-  | "high_engagement"
-  | "low_engagement";
+    | "cohesive"
+    | "fragmented"
+    | "mixed"
+    | "high_engagement"
+    | "low_engagement";
 
 export type MlPerFrameEvent = {
   t: number;
@@ -101,7 +101,7 @@ export type MlStopSessionResponse = {
 };
 
 export async function mlStartSession(
-  payload: MlStartSessionPayload
+    payload: MlStartSessionPayload
 ): Promise<MlStartSessionResponse> {
   return {
     sessionId: payload.sessionId,
@@ -110,7 +110,7 @@ export async function mlStartSession(
 }
 
 export async function mlStopSession(
-  sessionId: MlSessionId
+    sessionId: MlSessionId
 ): Promise<MlStopSessionResponse> {
   return {
     sessionId,
@@ -119,7 +119,7 @@ export async function mlStopSession(
 }
 
 export async function mlGetSessionSummary(
-  sessionId: MlSessionId
+    sessionId: MlSessionId
 ): Promise<MlSessionSummary | null> {
   if (typeof window === "undefined") return null;
 
@@ -131,14 +131,14 @@ export async function mlGetSessionSummary(
 
   try {
     const response = await fetch(
-      `${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        cache: "no-store",
-      }
+        `${base.replace(/\/$/, "")}/sessions/${sessionId}/analytics/summary`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          cache: "no-store",
+        }
     );
 
     if (!response.ok) return null;
@@ -154,8 +154,8 @@ export async function mlGetSessionSummary(
       dominantEmotion: data.dominantEmotion ?? "neutral",
       group: data.group,
       attentionDrops: Array.isArray(data.attentionDrops)
-        ? data.attentionDrops
-        : [],
+          ? data.attentionDrops
+          : [],
     };
   } catch {
     return null;
@@ -163,7 +163,7 @@ export async function mlGetSessionSummary(
 }
 
 export async function mlGetSessionEvents(
-  sessionId: MlSessionId
+    sessionId: MlSessionId
 ): Promise<MlSessionEventsResponse> {
   return {
     sessionId,
@@ -184,12 +184,12 @@ export type MlStreamConnection = {
 };
 
 export function mlConnectStream(
-  _sessionId: MlSessionId,
-  _callbacks: MlStreamCallbacks
+    _sessionId: MlSessionId,
+    _callbacks: MlStreamCallbacks
 ): MlStreamConnection {
   return {
     close() {
-      // Reserved for a future realtime ML WebSocket.
+      // Reserved for a future realtime ML channel.
     },
   };
 }
@@ -206,7 +206,7 @@ export const ML_INTERVAL = 1000;
 export const ML_429_PAUSE_MS = 5000;
 
 const configuredMlUrl =
-  process.env.NEXT_PUBLIC_ML_API_URL?.trim() ?? "";
+    process.env.NEXT_PUBLIC_ML_API_URL?.trim() ?? "";
 
 /**
  * Never fall back to the visitor's localhost in production.
@@ -214,10 +214,10 @@ const configuredMlUrl =
  * In local development only, localhost:8000 remains convenient.
  */
 const ML_API_BASE =
-  configuredMlUrl ||
-  (process.env.NODE_ENV === "development"
-    ? "http://localhost:8000"
-    : "");
+    configuredMlUrl ||
+    (process.env.NODE_ENV === "development"
+        ? "http://localhost:8000"
+        : "");
 
 export function getMlApiBaseUrl(): string {
   return ML_API_BASE.replace(/\/+$/, "");
@@ -229,10 +229,10 @@ export function isMlApiConfigured(): boolean {
 
 export type MlAnalyzeResponse = {
   state?:
-    | "NORMAL"
-    | "SUSPICIOUS"
-    | "POTENTIAL THREAT"
-    | "NO_FACE";
+      | "NORMAL"
+      | "SUSPICIOUS"
+      | "POTENTIAL THREAT"
+      | "NO_FACE";
   risk?: number;
   dominant_emotion?: string;
   confidence?: number;
@@ -248,8 +248,6 @@ export type MlAnalyzeResponse = {
 
 type AnalyzeOptions = {
   signal?: AbortSignal;
-  /** Lesson/session identifier used to isolate temporal ML state. */
-  sessionId?: string;
   /**
    * Cloud-hosted TensorFlow services can be slow during a cold start.
    */
@@ -281,25 +279,25 @@ function getMlClientId(): string {
     }
 
     const generated =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `ml-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `ml-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     sessionStorage.setItem(storageKey, generated);
     browserClientId = generated;
     return generated;
   } catch {
     browserClientId = `ml-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}`;
+        .toString(36)
+        .slice(2)}`;
     return browserClientId;
   }
 }
 
 function createRequestError(
-  message: string,
-  status?: number,
-  retryAfterMs?: number
+    message: string,
+    status?: number,
+    retryAfterMs?: number
 ): MlRequestError {
   const error = new Error(message) as MlRequestError;
   error.status = status;
@@ -325,13 +323,13 @@ function parseRetryAfterMs(response: Response): number | undefined {
 }
 
 function isValidAnalyzeResponse(
-  value: unknown
+    value: unknown
 ): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object");
 }
 
 export async function checkMlHealth(
-  opts: AnalyzeOptions = {}
+    opts: AnalyzeOptions = {}
 ): Promise<boolean> {
   const base = getMlApiBaseUrl();
   if (!base) return false;
@@ -339,8 +337,8 @@ export async function checkMlHealth(
   const controller = new AbortController();
   const timeoutMs = opts.timeoutMs ?? 15_000;
   const timeout = window.setTimeout(
-    () => controller.abort(),
-    timeoutMs
+      () => controller.abort(),
+      timeoutMs
   );
 
   const onAbort = () => controller.abort();
@@ -369,8 +367,8 @@ export async function checkMlHealth(
 }
 
 export async function mlAnalyzeFrame(
-  image: number[][],
-  opts: AnalyzeOptions = {}
+    image: number[][],
+    opts: AnalyzeOptions = {}
 ): Promise<MlAnalyzeResponse | null> {
   const base = getMlApiBaseUrl();
 
@@ -385,8 +383,8 @@ export async function mlAnalyzeFrame(
 
   const controller = new AbortController();
   const timeout = window.setTimeout(
-    () => controller.abort(),
-    timeoutMs
+      () => controller.abort(),
+      timeoutMs
   );
 
   const onAbort = () => controller.abort();
@@ -401,7 +399,6 @@ export async function mlAnalyzeFrame(
     }
 
     const clientId = getMlClientId();
-    const sessionId = opts.sessionId?.trim();
 
     const response = await fetch(`${base}/analyze`, {
       method: "POST",
@@ -412,7 +409,6 @@ export async function mlAnalyzeFrame(
       body: JSON.stringify({
         image,
         client_id: clientId,
-        ...(sessionId ? { session_id: sessionId } : {}),
       }),
       signal: controller.signal,
       cache: "no-store",
@@ -420,16 +416,16 @@ export async function mlAnalyzeFrame(
 
     if (response.status === 429) {
       throw createRequestError(
-        "RATE_LIMIT",
-        429,
-        parseRetryAfterMs(response)
+          "RATE_LIMIT",
+          429,
+          parseRetryAfterMs(response)
       );
     }
 
     if (!response.ok) {
       throw createRequestError(
-        `ML_HTTP_${response.status}`,
-        response.status
+          `ML_HTTP_${response.status}`,
+          response.status
       );
     }
 
@@ -440,94 +436,94 @@ export async function mlAnalyzeFrame(
     }
 
     const state =
-      data.state === "NORMAL" ||
-      data.state === "SUSPICIOUS" ||
-      data.state === "POTENTIAL THREAT" ||
-      data.state === "NO_FACE"
-        ? data.state
-        : undefined;
+        data.state === "NORMAL" ||
+        data.state === "SUSPICIOUS" ||
+        data.state === "POTENTIAL THREAT" ||
+        data.state === "NO_FACE"
+            ? data.state
+            : undefined;
 
     const output: MlAnalyzeResponse = {
       state,
       risk:
-        typeof data.risk === "number"
-          ? data.risk
-          : undefined,
+          typeof data.risk === "number"
+              ? data.risk
+              : undefined,
       dominant_emotion:
-        typeof data.dominant_emotion === "string"
-          ? data.dominant_emotion
-          : undefined,
+          typeof data.dominant_emotion === "string"
+              ? data.dominant_emotion
+              : undefined,
       confidence:
-        typeof data.confidence === "number"
-          ? data.confidence
-          : undefined,
+          typeof data.confidence === "number"
+              ? data.confidence
+              : undefined,
       emotion:
-        typeof data.emotion === "string"
-          ? data.emotion
-          : undefined,
+          typeof data.emotion === "string"
+              ? data.emotion
+              : undefined,
       engagement:
-        typeof data.engagement === "number"
-          ? data.engagement
-          : undefined,
+          typeof data.engagement === "number"
+              ? data.engagement
+              : undefined,
       stress:
-        typeof data.stress === "number"
-          ? data.stress
-          : undefined,
+          typeof data.stress === "number"
+              ? data.stress
+              : undefined,
       fatigue:
-        typeof data.fatigue === "number"
-          ? data.fatigue
-          : undefined,
+          typeof data.fatigue === "number"
+              ? data.fatigue
+              : undefined,
       timestamp:
-        typeof data.timestamp === "number"
-          ? data.timestamp
-          : undefined,
+          typeof data.timestamp === "number"
+              ? data.timestamp
+              : undefined,
       face_detected:
-        typeof data.face_detected === "boolean"
-          ? data.face_detected
-          : state === "NO_FACE"
-            ? false
-            : undefined,
+          typeof data.face_detected === "boolean"
+              ? data.face_detected
+              : state === "NO_FACE"
+                  ? false
+                  : undefined,
       input_width:
-        typeof data.input_width === "number"
-          ? data.input_width
-          : undefined,
+          typeof data.input_width === "number"
+              ? data.input_width
+              : undefined,
       input_height:
-        typeof data.input_height === "number"
-          ? data.input_height
-          : undefined,
+          typeof data.input_height === "number"
+              ? data.input_height
+              : undefined,
     };
 
     /**
      * NO_FACE is a valid response, not an ML failure.
      */
     const hasUsefulResult =
-      output.state !== undefined ||
-      output.face_detected !== undefined ||
-      output.risk !== undefined ||
-      output.dominant_emotion !== undefined ||
-      output.confidence !== undefined ||
-      output.emotion !== undefined ||
-      output.engagement !== undefined ||
-      output.stress !== undefined ||
-      output.fatigue !== undefined;
+        output.state !== undefined ||
+        output.face_detected !== undefined ||
+        output.risk !== undefined ||
+        output.dominant_emotion !== undefined ||
+        output.confidence !== undefined ||
+        output.emotion !== undefined ||
+        output.engagement !== undefined ||
+        output.stress !== undefined ||
+        output.fatigue !== undefined;
 
     return hasUsefulResult ? output : null;
   } catch (error) {
     const requestError = error as MlRequestError;
 
     if (
-      requestError.status === 429 ||
-      requestError.message === "RATE_LIMIT"
+        requestError.status === 429 ||
+        requestError.message === "RATE_LIMIT"
     ) {
       throw requestError;
     }
 
     if (
-      requestError.name !== "AbortError"
+        requestError.name !== "AbortError"
     ) {
       console.warn(
-        "ML analyze request failed:",
-        requestError.message
+          "ML analyze request failed:",
+          requestError.message
       );
     }
 
@@ -591,7 +587,7 @@ export function startMlLoop(params: {
 
       if (requestError.status === 429) {
         schedule(
-          requestError.retryAfterMs ??
+            requestError.retryAfterMs ??
             ML_429_PAUSE_MS
         );
       } else {
@@ -621,13 +617,13 @@ let canvas: HTMLCanvasElement | null = null;
 let context: CanvasRenderingContext2D | null = null;
 
 export function captureSquareFrameGrayscale(
-  video: HTMLVideoElement,
-  size = 192
+    video: HTMLVideoElement,
+    size = 192
 ): number[][] | null {
   if (
-    video.readyState < 2 ||
-    video.videoWidth === 0 ||
-    video.videoHeight === 0
+      video.readyState < 2 ||
+      video.videoWidth === 0 ||
+      video.videoHeight === 0
   ) {
     return null;
   }
@@ -645,37 +641,37 @@ export function captureSquareFrameGrayscale(
   if (canvas.height !== size) canvas.height = size;
 
   const sourceSize = Math.min(
-    video.videoWidth,
-    video.videoHeight
+      video.videoWidth,
+      video.videoHeight
   );
 
   const sourceX = Math.max(
-    0,
-    (video.videoWidth - sourceSize) / 2
+      0,
+      (video.videoWidth - sourceSize) / 2
   );
 
   const sourceY = Math.max(
-    0,
-    (video.videoHeight - sourceSize) / 2
+      0,
+      (video.videoHeight - sourceSize) / 2
   );
 
   context.drawImage(
-    video,
-    sourceX,
-    sourceY,
-    sourceSize,
-    sourceSize,
-    0,
-    0,
-    size,
-    size
+      video,
+      sourceX,
+      sourceY,
+      sourceSize,
+      sourceSize,
+      0,
+      0,
+      size,
+      size
   );
 
   const imageData = context.getImageData(
-    0,
-    0,
-    size,
-    size
+      0,
+      0,
+      size,
+      size
   );
 
   const pixels = imageData.data;
@@ -691,11 +687,11 @@ export function captureSquareFrameGrayscale(
       const blue = pixels[index + 2];
 
       row.push(
-        Math.round(
-          0.299 * red +
-            0.587 * green +
-            0.114 * blue
-        )
+          Math.round(
+              0.299 * red +
+              0.587 * green +
+              0.114 * blue
+          )
       );
     }
 
@@ -706,7 +702,7 @@ export function captureSquareFrameGrayscale(
 }
 
 export function captureFrame64x64Grayscale(
-  video: HTMLVideoElement
+    video: HTMLVideoElement
 ): number[][] | null {
   return captureSquareFrameGrayscale(video, 64);
 }

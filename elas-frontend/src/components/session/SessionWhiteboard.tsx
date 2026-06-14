@@ -12,7 +12,7 @@ import {
   type WhiteboardPoint,
 } from "@/lib/api/whiteboard";
 import { getStoredAuth, getToken } from "@/lib/api/client";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 type Props = {
@@ -71,15 +71,15 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
   }, []);
 
   const syncElements = useCallback(
-    (nextElements: WhiteboardElement[], nextVersion?: number) => {
-      elementsRef.current = nextElements;
-      if (typeof nextVersion === "number" && Number.isFinite(nextVersion)) {
-        versionRef.current = nextVersion;
-      }
-      setElements(nextElements);
-      requestAnimationFrame(() => render(nextElements));
-    },
-    [render]
+      (nextElements: WhiteboardElement[], nextVersion?: number) => {
+        elementsRef.current = nextElements;
+        if (typeof nextVersion === "number" && Number.isFinite(nextVersion)) {
+          versionRef.current = nextVersion;
+        }
+        setElements(nextElements);
+        requestAnimationFrame(() => render(nextElements));
+      },
+      [render]
   );
 
   useEffect(() => {
@@ -114,28 +114,27 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
     setError(null);
 
     getSessionWhiteboard(sessionId, { signal: controller.signal })
-      .then((snapshot) => {
-        syncElements(snapshot?.elements ?? [], snapshot?.version ?? 1);
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(err instanceof Error ? err.message : "Не удалось загрузить доску");
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+        .then((snapshot) => {
+          syncElements(snapshot?.elements ?? [], snapshot?.version ?? 1);
+        })
+        .catch((err) => {
+          if (!controller.signal.aborted) {
+            setError(err instanceof Error ? err.message : "Не удалось загрузить доску");
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
 
     return () => controller.abort();
   }, [sessionId, syncElements]);
 
   useEffect(() => {
     const token = getToken();
-    const wsBase = getWsBaseUrl();
-    if (!token || !wsBase || !sessionId) return;
+    const socketBase = getSocketBaseUrl();
+    if (!token || !socketBase || !sessionId) return;
 
-    const socket = io(wsBase.replace(/\/$/, ""), {
-      transports: ["polling", "websocket"],
+    const socket = io(socketBase, {
       reconnection: true,
       auth: { token },
     });
@@ -151,9 +150,9 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
 
     socket.onAny((eventName, eventPayload) => {
       const payload =
-        eventPayload && typeof eventPayload === "object"
-          ? { type: eventName, ...eventPayload }
-          : { type: eventName, event: eventPayload };
+          eventPayload && typeof eventPayload === "object"
+              ? { type: eventName, ...eventPayload }
+              : { type: eventName, event: eventPayload };
 
       if (payload?.type === "auth-ok") {
         socket.emit("subscribe", { scope: "session", sessionId });
@@ -165,8 +164,8 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
       if (payload?.type === "whiteboard.snapshot") {
         const snapshot = payload.event;
         syncElements(
-          Array.isArray(snapshot?.elements) ? snapshot.elements : [],
-          typeof snapshot?.version === "number" ? snapshot.version : undefined
+            Array.isArray(snapshot?.elements) ? snapshot.elements : [],
+            typeof snapshot?.version === "number" ? snapshot.version : undefined
         );
       }
 
@@ -183,24 +182,24 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
   }, [sessionId, syncElements]);
 
   const persist = useCallback(
-    async (nextElements: WhiteboardElement[], kind: "draw_batch" | "reset" = "draw_batch") => {
-      setSaving(true);
-      setError(null);
-      try {
-        const result = await postWhiteboardOperation(sessionId, {
-          kind,
-          payload: kind === "reset" ? {} : { elements: nextElements },
-        });
-        if (result?.whiteboard) {
-          syncElements(result.whiteboard.elements, result.whiteboard.version);
+      async (nextElements: WhiteboardElement[], kind: "draw_batch" | "reset" = "draw_batch") => {
+        setSaving(true);
+        setError(null);
+        try {
+          const result = await postWhiteboardOperation(sessionId, {
+            kind,
+            payload: kind === "reset" ? {} : { elements: nextElements },
+          });
+          if (result?.whiteboard) {
+            syncElements(result.whiteboard.elements, result.whiteboard.version);
+          }
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Не удалось сохранить доску");
+        } finally {
+          setSaving(false);
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Не удалось сохранить доску");
-      } finally {
-        setSaving(false);
-      }
-    },
-    [sessionId, syncElements]
+      },
+      [sessionId, syncElements]
   );
 
   const startStroke = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -219,82 +218,82 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
   }, []);
 
   const continueStroke = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const canvas = canvasRef.current;
-      const stroke = currentStrokeRef.current;
-      if (!canvas || !stroke) return;
+      (event: React.PointerEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        const stroke = currentStrokeRef.current;
+        if (!canvas || !stroke) return;
 
-      stroke.points.push(makePoint(event, canvas));
-      render([...elementsRef.current, stroke]);
-    },
-    [render]
+        stroke.points.push(makePoint(event, canvas));
+        render([...elementsRef.current, stroke]);
+      },
+      [render]
   );
 
   const endStroke = useCallback(
-    (event: React.PointerEvent<HTMLCanvasElement>) => {
-      const stroke = currentStrokeRef.current;
-      if (!stroke || stroke.points.length < 2) {
+      (event: React.PointerEvent<HTMLCanvasElement>) => {
+        const stroke = currentStrokeRef.current;
+        if (!stroke || stroke.points.length < 2) {
+          currentStrokeRef.current = null;
+          return;
+        }
+
+        const nextElements = [...elementsRef.current, stroke];
         currentStrokeRef.current = null;
-        return;
-      }
+        syncElements(nextElements, versionRef.current + 1);
+        void persist(nextElements);
 
-      const nextElements = [...elementsRef.current, stroke];
-      currentStrokeRef.current = null;
-      syncElements(nextElements, versionRef.current + 1);
-      void persist(nextElements);
-
-      try {
-        event.currentTarget.releasePointerCapture(event.pointerId);
-      } catch {}
-    },
-    [persist, syncElements]
+        try {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        } catch {}
+      },
+      [persist, syncElements]
   );
 
   return (
-    <div className={cn("flex h-full min-h-[320px] flex-col overflow-hidden rounded-[24px] border border-slate-100 bg-white", className)}>
-      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <div>
-          <div className="text-sm font-bold text-slate-900">Доска</div>
-          <div className="text-xs font-medium text-slate-400">
-            {loading ? "Загружаем..." : `${elements.length} штрихов`}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {saving && <Loader2 size={16} className="animate-spin text-slate-400" />}
-          <Button size="sm" variant="outline" onClick={() => void persist([], "reset")} disabled={saving}>
-            <RotateCcw size={14} />
-            Очистить
-          </Button>
-        </div>
-      </div>
-
-      <div className="relative flex-1 bg-slate-50">
-        <canvas
-          ref={canvasRef}
-          className="h-full min-h-[280px] w-full touch-none cursor-crosshair bg-white"
-          onPointerDown={startStroke}
-          onPointerMove={continueStroke}
-          onPointerUp={endStroke}
-          onPointerCancel={endStroke}
-        />
-
-        {loading && (
-          <div className="absolute inset-0 grid place-items-center bg-white/70 text-sm font-semibold text-slate-400">
-            Загружаем доску...
-          </div>
-        )}
-
-        {!loading && elements.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 grid place-items-center">
-            <div className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-4 py-2 text-xs font-bold text-slate-400 shadow-sm">
-              <Eraser size={14} />
-              Можно рисовать
+      <div className={cn("flex h-full min-h-[320px] flex-col overflow-hidden rounded-[24px] border border-slate-100 bg-white", className)}>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div>
+            <div className="text-sm font-bold text-slate-900">Доска</div>
+            <div className="text-xs font-medium text-slate-400">
+              {loading ? "Загружаем..." : `${elements.length} штрихов`}
             </div>
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            {saving && <Loader2 size={16} className="animate-spin text-slate-400" />}
+            <Button size="sm" variant="outline" onClick={() => void persist([], "reset")} disabled={saving}>
+              <RotateCcw size={14} />
+              Очистить
+            </Button>
+          </div>
+        </div>
 
-      {error && <div className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600">{error}</div>}
-    </div>
+        <div className="relative flex-1 bg-slate-50">
+          <canvas
+              ref={canvasRef}
+              className="h-full min-h-[280px] w-full touch-none cursor-crosshair bg-white"
+              onPointerDown={startStroke}
+              onPointerMove={continueStroke}
+              onPointerUp={endStroke}
+              onPointerCancel={endStroke}
+          />
+
+          {loading && (
+              <div className="absolute inset-0 grid place-items-center bg-white/70 text-sm font-semibold text-slate-400">
+                Загружаем доску...
+              </div>
+          )}
+
+          {!loading && elements.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                <div className="flex items-center gap-2 rounded-full border border-slate-100 bg-white px-4 py-2 text-xs font-bold text-slate-400 shadow-sm">
+                  <Eraser size={14} />
+                  Можно рисовать
+                </div>
+              </div>
+          )}
+        </div>
+
+        {error && <div className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-600">{error}</div>}
+      </div>
   );
 }
