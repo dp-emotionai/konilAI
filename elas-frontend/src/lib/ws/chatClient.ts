@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { getToken } from "@/lib/api/client";
 
 type ChatEventHandler = (event: unknown) => void;
@@ -57,7 +57,8 @@ export class ChatClient {
     const type = typeof packet.type === "string" ? packet.type : "";
     if (!type) return;
 
-    const { type: _type, ...payload } = packet;
+    const payload = { ...packet };
+    delete payload.type;
     this.socket.emit(type, payload);
   }
 
@@ -146,12 +147,13 @@ export class ChatClient {
     this.manuallyClosed = false;
     this.authenticated = false;
 
-    const base = getWsBaseUrl().replace(/\/$/, "");
+    const base = getSocketBaseUrl();
     if (!base) return;
 
     this.socket = io(base, {
-      transports: ["websocket"],
       reconnection: true,
+      reconnectionAttempts: 8,
+      timeout: 20_000,
       auth: { token },
     });
 
