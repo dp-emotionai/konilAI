@@ -95,30 +95,67 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PreparationStepper({ step }: { step: 1 | 2 }) {
+type PreparationStepperProps = {
+  step: 1 | 2;
+  canOpenStep2: boolean;
+  onStepChange: (step: 1 | 2) => void;
+};
+
+function PreparationStepper({
+                              step,
+                              canOpenStep2,
+                              onStepChange,
+                            }: PreparationStepperProps) {
   return (
       <div className="mx-auto flex w-full max-w-[190px] items-center">
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7448FF] text-[11px] font-bold text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]">
-          {step === 2 ? <CheckCircle2 size={15} /> : 1}
-        </div>
+        <button
+            type="button"
+            onClick={() => onStepChange(1)}
+            aria-label="Открыть шаг 1"
+            aria-current={step === 1 ? "step" : undefined}
+            className={cn(
+                "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200",
+                step === 1
+                    ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
+                    : "border-[#7448FF] bg-[#7448FF] text-white hover:scale-105"
+            )}
+        >
+          {canOpenStep2 ? <CheckCircle2 size={15} /> : 1}
+        </button>
+
         <div className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-slate-200">
           <div
               className={cn(
                   "absolute inset-y-0 left-0 rounded-full bg-[#7448FF] transition-all duration-300",
-                  step === 2 ? "w-full" : "w-0"
+                  canOpenStep2 ? "w-full" : "w-0"
               )}
           />
         </div>
-        <div
+
+        <button
+            type="button"
+            onClick={() => {
+              if (canOpenStep2) {
+                onStepChange(2);
+              }
+            }}
+            disabled={!canOpenStep2}
+            aria-label="Открыть шаг 2"
+            aria-current={step === 2 ? "step" : undefined}
+            title={canOpenStep2 ? "Открыть проверку камеры" : "Сначала подтвердите согласие"}
             className={cn(
                 "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200",
                 step === 2
                     ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
-                    : "border-slate-200 bg-white text-slate-400"
+                    : canOpenStep2
+                        ? "cursor-pointer border-violet-200 bg-white text-[#7448FF] hover:scale-105 hover:border-[#7448FF]"
+                        : "cursor-not-allowed border-slate-200 bg-white text-slate-400 opacity-70"
             )}
         >
           2
-        </div>
+        </button>
       </div>
   );
 }
@@ -305,8 +342,20 @@ export default function StudentJoinSessionPage() {
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
   const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
-  const preparationStep: 1 | 2 =
-      blockReason === "consent_required" || !state.consent ? 1 : 2;
+  const canOpenPreparationStep2 =
+      state.consent && blockReason !== "consent_required";
+  const [preparationStep, setPreparationStep] = useState<1 | 2>(
+      canOpenPreparationStep2 ? 2 : 1
+  );
+
+  useEffect(() => {
+    if (!canOpenPreparationStep2) {
+      setPreparationStep(1);
+      return;
+    }
+
+    setPreparationStep(2);
+  }, [canOpenPreparationStep2]);
 
   const [live, setLive] = useState(false);
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
@@ -1455,7 +1504,11 @@ export default function StudentJoinSessionPage() {
                       <div className="text-xs font-semibold text-slate-500">
                         Шаг {preparationStep}
                       </div>
-                      <PreparationStepper step={preparationStep} />
+                      <PreparationStepper
+                          step={preparationStep}
+                          canOpenStep2={canOpenPreparationStep2}
+                          onStepChange={setPreparationStep}
+                      />
                       <div className="hidden sm:block" />
                     </div>
                   </div>
