@@ -1355,17 +1355,17 @@ export default function StudentJoinSessionPage() {
           </div>
 
           <style jsx global>{`
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #e2e8f0;
-            border-radius: 10px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #cbd5e1;
-          }
-        `}</style>
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: #e2e8f0;
+              border-radius: 10px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: #cbd5e1;
+            }
+          `}</style>
         </div>
     );
   }
