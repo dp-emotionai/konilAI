@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   CalendarDays,
-  ChevronDown,
   Database,
   Download,
   ShieldCheck,
@@ -15,7 +14,6 @@ import { Card } from "@/components/ui/Card";
 const SECTIONS = [
   {
     id: "capture",
-    label: "What we capture",
     icon: Video,
     title: "What we capture",
     body:
@@ -23,7 +21,6 @@ const SECTIONS = [
   },
   {
     id: "storage",
-    label: "What we store",
     icon: Database,
     title: "What we store",
     body:
@@ -31,7 +28,6 @@ const SECTIONS = [
   },
   {
     id: "access",
-    label: "Who can access",
     icon: Users,
     title: "Who can access",
     body:
@@ -39,7 +35,6 @@ const SECTIONS = [
   },
   {
     id: "retention",
-    label: "Retention",
     icon: CalendarDays,
     title: "Retention",
     body:
@@ -47,7 +42,6 @@ const SECTIONS = [
   },
   {
     id: "consent",
-    label: "Your consent",
     icon: ShieldCheck,
     title: "Your consent",
     body:
@@ -69,26 +63,6 @@ export default function Privacy() {
               subtitle="What we capture, what we store, and who can access it."
           />
 
-          <nav aria-label="On this page" className="flex flex-wrap gap-3">
-            {SECTIONS.map(({ id, label, icon: Icon }, index) => (
-                <a
-                    key={id}
-                    href={`#${id}`}
-                    className={[
-                      "inline-flex items-center gap-3 rounded-full border px-6 py-3 text-sm font-semibold transition",
-                      index === 0
-                          ? "border-purple-200 bg-purple-100 text-[#7448FF] shadow-sm"
-                          : "border-slate-200 bg-white/80 text-slate-700 shadow-sm hover:border-purple-200 hover:bg-purple-50 hover:text-[#7448FF]",
-                    ].join(" ")}
-                >
-              <span className="grid h-8 w-8 place-items-center rounded-2xl bg-white/70 text-[#7448FF]">
-                <Icon size={18} />
-              </span>
-                  {label}
-                </a>
-            ))}
-          </nav>
-
           <Card className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-7">
             <div className="space-y-3">
               {SECTIONS.map(({ id, icon: Icon, title, body }) => (
@@ -97,7 +71,7 @@ export default function Privacy() {
                       id={id}
                       className="scroll-mt-24 rounded-[24px] border border-slate-200 bg-white px-5 py-4 shadow-sm transition hover:border-purple-100 hover:shadow-md sm:px-6"
                   >
-                    <div className="flex items-center gap-5">
+                    <div className="flex items-start gap-5">
                       <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] bg-purple-50 text-[#7448FF]">
                         <Icon size={24} />
                       </div>
@@ -110,11 +84,6 @@ export default function Privacy() {
                           {body}
                         </p>
                       </div>
-
-                      <ChevronDown
-                          size={18}
-                          className="hidden shrink-0 text-slate-500 sm:block"
-                      />
                     </div>
                   </section>
               ))}
@@ -145,12 +114,6 @@ export default function Privacy() {
                 <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-semibold text-emerald-700">
                 Consented
               </span>
-                <Link
-                    href="/consent"
-                    className="ml-0 font-semibold text-[#7448FF] hover:text-[#6538f5] sm:ml-6"
-                >
-                  Manage consent
-                </Link>
               </div>
             </div>
           </Card>
