@@ -79,7 +79,7 @@ import {
   LockKeyhole,
   X,
 } from "lucide-react";
-import { getSocketBaseUrl } from "@/lib/env";
+import { getWsBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 function StatusPill({ label, value }: { label: string; value: string }) {
@@ -413,7 +413,7 @@ export default function StudentJoinSessionPage() {
       "idle" | "connecting" | "connected" | "error"
   >("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [socketDisconnected, setSocketDisconnected] = useState(false);
+  const [wsDisconnected, setWsDisconnected] = useState(false);
 
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
@@ -501,46 +501,36 @@ export default function StudentJoinSessionPage() {
       return;
     }
 
-    let cancelled = false;
-
     setConnectionState("connecting");
     setConnectionError(null);
 
-    const socketBase = getSocketBaseUrl();
-    const signaling = new SignalingClient(socketBase);
-    const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
+    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
+    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
+    const manager = new PeerConnectionManager(signaling, roomId, "student", {
       onRemoteStream: (_peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
         setRemoteStream(hasTracks ? stream : null);
       },
       onPeersChange: (peers) => setParticipants(peers),
-      onDisconnect: () => setSocketDisconnected(true),
+      onDisconnect: () => setWsDisconnected(true),
       onPeerLeft: () => {
         setRemoteStream(null);
       },
     });
 
     peerManagerRef.current = manager;
-    signaling.on("open", () => setSocketDisconnected(false));
+    signaling.on("open", () => setWsDisconnected(false));
     signaling.connect();
 
     void (async () => {
       try {
         const stream = await manager.initLocalStream({ video: true, audio: true });
-
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
         setLocalStream(stream);
 
-        await signaling.waitForOpen(30_000);
-
-        if (cancelled) return;
+        await signaling.waitForOpen(12000);
 
         const auth = getStoredAuth();
-        await manager.join(
+        manager.join(
             auth
                 ? {
                   email: auth.email,
@@ -551,16 +541,12 @@ export default function StudentJoinSessionPage() {
                 : undefined
         );
 
-        if (cancelled) return;
-
         setConnectionState("connected");
       } catch (e) {
-        if (cancelled) return;
-
         const msg = e instanceof Error ? e.message : "Ошибка подключения";
         const friendly =
-            msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("socket")
-                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки Socket.IO."
+            msg.includes("timeout") || msg.includes("WebSocket")
+                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
                 : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
                     ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
                     : msg;
@@ -577,7 +563,6 @@ export default function StudentJoinSessionPage() {
     })();
 
     return () => {
-      cancelled = true;
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
       peerManagerRef.current = null;
@@ -587,7 +572,7 @@ export default function StudentJoinSessionPage() {
       setParticipants([]);
       setConnectionState("idle");
       setConnectionError(null);
-      setSocketDisconnected(false);
+      setWsDisconnected(false);
       setIsScreenSharing(false);
     };
   }, [live, roomId]);
@@ -770,7 +755,7 @@ export default function StudentJoinSessionPage() {
                   </span>
                   )}
 
-                  {socketDisconnected && (
+                  {wsDisconnected && (
                       <span className="flex items-center gap-2 text-rose-600">
                     <AlertTriangle size={14} />
                     Соединение потеряно

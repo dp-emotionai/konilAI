@@ -24,12 +24,18 @@ type EventHandlers = {
 type PartialHandlers = Partial<EventHandlers>;
 
 function normalizeSocketIoUrl(rawUrl: string) {
-  const value = rawUrl.trim();
+  const withHttpProtocol = rawUrl
+      .replace(/^wss:\/\//i, "https://")
+      .replace(/^ws:\/\//i, "http://");
 
   try {
-    return new URL(value).origin;
+    const url = new URL(withHttpProtocol);
+    return url.origin;
   } catch {
-    return value.replace(/\/$/, "");
+    return withHttpProtocol
+        .replace(/\/api\/ws\/?$/i, "")
+        .replace(/\/ws\/?$/i, "")
+        .replace(/\/$/, "");
   }
 }
 
@@ -87,11 +93,8 @@ export class SignalingClient {
 
     const token = getToken();
     this.socket = io(url, {
-      transports: ["websocket", "polling"],
-      tryAllTransports: true,
+      transports: ["websocket"],
       reconnection: true,
-      reconnectionAttempts: 8,
-      timeout: 20_000,
       auth: token ? { token } : undefined,
     });
 
@@ -117,10 +120,7 @@ export class SignalingClient {
     });
 
     this.socket.on("connect_error", (error) => {
-      const details = error instanceof Error && error.message
-          ? `: ${error.message}`
-          : "";
-      this.handlers.error?.(`Ошибка соединения с signaling server${details}`);
+      this.handlers.error?.("Ошибка соединения с signaling server.");
 
       if (
           !this.openedInCurrentConnection &&
@@ -137,19 +137,9 @@ export class SignalingClient {
         return;
       }
 
-      // A temporary 503/cold start must not immediately tear down the call.
-      // Socket.IO keeps reconnecting while `active` is true; waitForOpen()
-      // will resolve on a later successful attempt or reject on its timeout.
-      if (!this.socket?.active) {
-        if (this.openTimer) {
-          window.clearTimeout(this.openTimer);
-          this.openTimer = null;
-        }
-
-        this.rejectOpen?.(error);
-        this.rejectOpen = undefined;
-        this.resolveOpen = undefined;
-      }
+      this.rejectOpen?.(error);
+      this.rejectOpen = undefined;
+      this.resolveOpen = undefined;
     });
 
     this.socket.on("disconnect", () => {
@@ -172,7 +162,7 @@ export class SignalingClient {
     });
   }
 
-  waitForOpen(timeoutMs = 30_000): Promise<void> {
+  waitForOpen(timeoutMs = 10000): Promise<void> {
     if (this.isOpen && this.socket?.connected) {
       return Promise.resolve();
     }
@@ -212,47 +202,12 @@ export class SignalingClient {
         fullName?: string;
         avatarUrl?: string;
       }
-  ): Promise<void> {
-    if (!this.socket?.connected || !this.isOpen) {
-      return Promise.reject(new Error("Signaling socket is not connected"));
-    }
-
-    const payload = { sessionId, role, ...user };
-
-    return new Promise((resolve, reject) => {
-      this.socket
-          ?.timeout(10_000)
-          .emit(
-              "join",
-              payload,
-              (timeoutError: Error | null, response?: { ok?: boolean; error?: string }) => {
-                if (timeoutError) {
-                  reject(new Error("Signaling join timeout"));
-                  return;
-                }
-
-                if (!response?.ok) {
-                  reject(new Error(response?.error || "Failed to join video session"));
-                  return;
-                }
-
-                resolve();
-              }
-          );
-    });
+  ) {
+    this.send({ type: "join", sessionId, role, ...user });
   }
 
   leave() {
     this.closedManually = true;
-
-    if (this.openTimer) {
-      window.clearTimeout(this.openTimer);
-      this.openTimer = null;
-    }
-
-    this.rejectOpen?.(new Error("Signaling connection was closed"));
-    this.rejectOpen = undefined;
-    this.resolveOpen = undefined;
 
     if (this.isOpen && this.socket?.connected) {
       this.emitMessage({ type: "leave" satisfies ClientMessage["type"] });
