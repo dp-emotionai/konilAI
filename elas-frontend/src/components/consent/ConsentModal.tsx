@@ -21,7 +21,7 @@ type ConsentModalProps = {
   hasConsent?: boolean;
   error?: string | null;
   onAccept: () => void;
-  onRevoke: () => void;
+  onRevoke?: () => void;
   onClose: () => void;
   onContinueWithoutAnalysis?: () => void;
   className?: string;
@@ -205,7 +205,7 @@ export default function ConsentModal({
                     >
                       Проверяем статус...
                     </Button>
-                ) : hasConsent ? (
+                ) : hasConsent && onRevoke ? (
                     <Button
                         onClick={onRevoke}
                         disabled={saving}
