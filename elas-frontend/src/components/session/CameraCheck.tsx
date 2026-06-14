@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -24,7 +22,30 @@ type Props = {
 type PermissionState = "idle" | "granted" | "denied";
 type LightingState = "good" | "ok" | "poor";
 type FaceState = "detected" | "not_detected" | "unknown";
+type CameraErrorLike = {
+  name?: string;
+  message?: string;
+};
 
+function getCameraErrorInfo(error: unknown): CameraErrorLike {
+  if (error instanceof DOMException || error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const record = error as Record<string, unknown>;
+
+    return {
+      name: typeof record.name === "string" ? record.name : undefined,
+      message: typeof record.message === "string" ? record.message : undefined,
+    };
+  }
+
+  return {};
+}
 export default function CameraCheck({
                                       onReadyChange,
                                       onStart,
@@ -148,9 +169,7 @@ export default function CameraCheck({
   };
 
   function describeGetUserMediaError(err: unknown): { permission: PermissionState; message: string } {
-    const anyErr = err as any;
-    const name = typeof anyErr?.name === "string" ? anyErr.name : "";
-    const message = typeof anyErr?.message === "string" ? anyErr.message : "";
+    const { name = "", message = "" } = getCameraErrorInfo(err);
 
     if (message === "getUserMedia_unavailable") {
       return {
@@ -229,8 +248,8 @@ export default function CameraCheck({
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia(primaryConstraints);
-      } catch (err: any) {
-        const name = typeof err?.name === "string" ? err.name : "";
+      } catch (err: unknown) {
+      const { name = "" } = getCameraErrorInfo(err);
         if (name === "OverconstrainedError" || name === "NotReadableError") {
           stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
         } else {
@@ -268,7 +287,7 @@ export default function CameraCheck({
       setLighting("ok");
 
       startMonitoring();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[CameraCheck] getUserMedia failed", err);
       const info = describeGetUserMediaError(err);
 
