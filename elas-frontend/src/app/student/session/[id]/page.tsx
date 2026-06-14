@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -244,7 +244,9 @@ function CallControlButton({
 
 export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const sessionId = params?.id ?? "";
+  const autoStart = searchParams.get("autostart") === "1";
   const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
   const monitorRef = useRef<HTMLDivElement | null>(null);
@@ -399,7 +401,17 @@ export default function StudentJoinSessionPage() {
 
   const [live, setLive] = useState(false);
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
+
+  useEffect(() => {
+    if (!autoStart || joinInfoLoading || joinInfoError || live) return;
+    if (joinInfo?.allowedToJoin === false) return;
+
+    setLive(true);
+    setTab("live");
+  }, [autoStart, joinInfo?.allowedToJoin, joinInfoError, joinInfoLoading, live]);
+
   const showPreparation =
+      !autoStart &&
       !joinInfoLoading &&
       !joinInfoError &&
       !live &&
