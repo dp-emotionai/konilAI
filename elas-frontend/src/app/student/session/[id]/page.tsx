@@ -950,44 +950,46 @@ export default function StudentJoinSessionPage() {
                     )}
 
                     <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] items-end gap-3 overflow-x-auto pb-1">
-                      {videoTiles.map((tile) => (
-                          <button
-                              key={tile.id}
-                              type="button"
-                              onClick={() => setSelectedVideoId(tile.id)}
-                              className={cn(
-                                  "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
-                                  selectedVideo?.id === tile.id
-                                      ? "border-[#7448FF] ring-4 ring-[#7448FF]/25"
-                                      : "border-white/20 hover:border-white/60"
-                              )}
-                              title={`Открыть ${tile.label} в большом окне`}
-                          >
-                            {tile.stream ? (
-                                <StreamVideo
-                                    stream={tile.stream}
-                                    className="h-full w-full object-cover"
-                                    autoPlay
-                                    playsInline
-                                    muted={tile.isLocal}
-                                />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
-                                  {tile.icon}
-                                </div>
-                            )}
-
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent px-2 pb-2 pt-7 text-white">
-                              <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
-                                <span className="truncate">{tile.label}</span>
-                                {tile.isLocal && (
-                                    <Mic size={12} className={isMicEnabled ? "shrink-0 text-white" : "shrink-0 text-red-400"} />
+                      {videoTiles
+                          .filter((tile) => tile.id !== selectedVideo?.id)
+                          .map((tile) => (
+                              <button
+                                  key={tile.id}
+                                  type="button"
+                                  onClick={() => setSelectedVideoId(tile.id)}
+                                  className={cn(
+                                      "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
+                                      selectedVideo?.id === tile.id
+                                          ? "border-[#7448FF] ring-4 ring-[#7448FF]/25"
+                                          : "border-white/20 hover:border-white/60"
+                                  )}
+                                  title={`Открыть ${tile.label} в большом окне`}
+                              >
+                                {tile.stream ? (
+                                    <StreamVideo
+                                        stream={tile.stream}
+                                        className="h-full w-full object-cover"
+                                        autoPlay
+                                        playsInline
+                                        muted={tile.isLocal}
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
+                                      {tile.icon}
+                                    </div>
                                 )}
-                              </div>
-                              <div className="text-[10px] font-medium text-white/70">{tile.roleLabel}</div>
-                            </div>
-                          </button>
-                      ))}
+
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent px-2 pb-2 pt-7 text-white">
+                                  <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
+                                    <span className="truncate">{tile.label}</span>
+                                    {tile.isLocal && (
+                                        <Mic size={12} className={isMicEnabled ? "shrink-0 text-white" : "shrink-0 text-red-400"} />
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-medium text-white/70">{tile.roleLabel}</div>
+                                </div>
+                              </button>
+                          ))}
                     </div>
                   </div>
 

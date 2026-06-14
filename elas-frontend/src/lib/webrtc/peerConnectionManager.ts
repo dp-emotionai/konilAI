@@ -233,20 +233,16 @@ export class PeerConnectionManager {
           );
 
           /**
-           * Создаём WebRTC-связь не только с преподавателем, но и со всеми
-           * уже находящимися в комнате участниками.
-           *
-           * Преподаватель остаётся инициатором offer для связей teacher↔student.
-           * Для связей student↔student используем стабильное правило по socket id,
-           * чтобы offer создала только одна сторона и не было glare-конфликта.
+           * В текущей архитектуре преподаватель является инициатором offer.
            */
-          if (this.localStream) {
+          if (
+              this.role === "teacher" &&
+              this.localStream
+          ) {
             for (const participant of this.participants) {
-              if (this.shouldCreateOfferFor(participant)) {
-                void this.createPeerAndOffer(
-                    participant.id
-                );
-              }
+              void this.createPeerAndOffer(
+                  participant.id
+              );
             }
           }
         }
@@ -276,8 +272,8 @@ export class PeerConnectionManager {
           );
 
           if (
-              this.localStream &&
-              this.shouldCreateOfferFor(safe)
+              this.role === "teacher" &&
+              this.localStream
           ) {
             void this.createPeerAndOffer(
                 safe.id
@@ -379,32 +375,6 @@ export class PeerConnectionManager {
 
   getLocalStream(): MediaStream | null {
     return this.localStream;
-  }
-
-  private shouldCreateOfferFor(participant: Participant) {
-    if (!this.selfId || participant.id === this.selfId) {
-      return false;
-    }
-
-    /**
-     * Преподаватель инициирует все связи с учениками.
-     */
-    if (this.role === "teacher") {
-      return true;
-    }
-
-    /**
-     * Ученики не инициируют offer к преподавателю, чтобы не конфликтовать
-     * с teacher-initiated соединением.
-     */
-    if (participant.role === "teacher") {
-      return false;
-    }
-
-    /**
-     * Для student↔student выбираем одну сторону детерминированно.
-     */
-    return this.selfId < participant.id;
   }
 
   getParticipants(): Participant[] {
