@@ -23,6 +23,20 @@ type EventHandlers = {
 
 type PartialHandlers = Partial<EventHandlers>;
 
+type JoinUser = {
+  email?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  avatarUrl?: string;
+};
+
+type JoinPayload = JoinUser & {
+  sessionId: SessionId;
+  role: Role;
+};
+
 function normalizeSocketIoUrl(rawUrl: string) {
   const value = rawUrl.trim();
 
@@ -46,6 +60,7 @@ export class SignalingClient {
   private rejectOpen: ((reason?: unknown) => void) | undefined;
   private openTimer: number | null = null;
   private closedManually = false;
+  private joinPayload: JoinPayload | null = null;
 
   constructor(url: string | string[]) {
     const urls = Array.isArray(url) ? url : [url];
@@ -87,6 +102,7 @@ export class SignalingClient {
 
     const token = getToken();
     this.socket = io(url, {
+      path: "/socket.io",
       reconnection: true,
       reconnectionAttempts: 8,
       timeout: 20_000,
@@ -108,6 +124,13 @@ export class SignalingClient {
       this.resolveOpen?.();
       this.resolveOpen = undefined;
       this.rejectOpen = undefined;
+
+      if (this.joinPayload) {
+        void this.emitJoin(this.joinPayload).catch((error) => {
+          const message = error instanceof Error ? error.message : "Failed to rejoin video session";
+          this.handlers.error?.(message);
+        });
+      }
     });
 
     this.socket.onAny((eventName, payload) => {
@@ -135,9 +158,11 @@ export class SignalingClient {
         return;
       }
 
-      this.rejectOpen?.(error);
-      this.rejectOpen = undefined;
-      this.resolveOpen = undefined;
+      if (!this.socket?.active) {
+        this.rejectOpen?.(error);
+        this.rejectOpen = undefined;
+        this.resolveOpen = undefined;
+      }
     });
 
     this.socket.on("disconnect", () => {
@@ -192,21 +217,25 @@ export class SignalingClient {
   join(
       sessionId: SessionId,
       role: Role,
-      user?: {
-        email?: string;
-        name?: string;
-        firstName?: string;
-        lastName?: string;
-        fullName?: string;
-        avatarUrl?: string;
-      }
+      user?: JoinUser
   ): Promise<void> {
     if (!this.socket?.connected || !this.isOpen) {
       return Promise.reject(new Error("Signaling socket is not connected"));
     }
 
-    const payload = { sessionId, role, ...user };
+    const payload: JoinPayload = { sessionId, role, ...user };
+    this.joinPayload = payload;
 
+    return this.emitJoin(payload).catch((error) => {
+      if (this.joinPayload === payload) {
+        this.joinPayload = null;
+      }
+
+      throw error;
+    });
+  }
+
+  private emitJoin(payload: JoinPayload): Promise<void> {
     return new Promise((resolve, reject) => {
       this.socket
           ?.timeout(10_000)
@@ -243,6 +272,7 @@ export class SignalingClient {
     this.socket = null;
     this.isOpen = false;
     this.queue = [];
+    this.joinPayload = null;
   }
 
   sendOffer(to: ClientId, sdp: RTCSessionDescriptionInit) {

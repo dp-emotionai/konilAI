@@ -559,9 +559,15 @@ export default function StudentJoinSessionPage() {
     if (!live || !roomId) {
       setConnectionState("idle");
       setConnectionError(null);
+      setRemoteStream(null);
+      setLocalStream(null);
+      setParticipants([]);
+      setSocketDisconnected(false);
+      setIsScreenSharing(false);
       return;
     }
 
+    let cancelled = false;
     setConnectionState("connecting");
     setConnectionError(null);
 
@@ -586,9 +592,15 @@ export default function StudentJoinSessionPage() {
     void (async () => {
       try {
         const stream = await manager.initLocalStream({ video: true, audio: true });
+        if (cancelled || peerManagerRef.current !== manager) {
+          manager.leave();
+          return;
+        }
         setLocalStream(stream);
 
-        await signaling.waitForOpen(12000);
+        await signaling.waitForOpen(30000);
+
+        if (cancelled || peerManagerRef.current !== manager) return;
 
         const auth = getStoredAuth();
         await manager.join(
@@ -602,8 +614,11 @@ export default function StudentJoinSessionPage() {
                 : undefined
         );
 
+        if (cancelled || peerManagerRef.current !== manager) return;
         setConnectionState("connected");
       } catch (e) {
+        if (cancelled || peerManagerRef.current !== manager) return;
+
         const msg = e instanceof Error ? e.message : "Ошибка подключения";
         const friendly =
             msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("socket")
@@ -616,6 +631,7 @@ export default function StudentJoinSessionPage() {
         setConnectionState("error");
         setLive(false);
         setTab("prepare");
+        peerManagerRef.current = null;
         manager.leave();
         setRemoteStream(null);
         setLocalStream(null);
@@ -624,17 +640,13 @@ export default function StudentJoinSessionPage() {
     })();
 
     return () => {
+      cancelled = true;
       screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       screenStreamRef.current = null;
-      peerManagerRef.current = null;
+      if (peerManagerRef.current === manager) {
+        peerManagerRef.current = null;
+      }
       manager.leave();
-      setRemoteStream(null);
-      setLocalStream(null);
-      setParticipants([]);
-      setConnectionState("idle");
-      setConnectionError(null);
-      setSocketDisconnected(false);
-      setIsScreenSharing(false);
     };
   }, [live, roomId]);
 
