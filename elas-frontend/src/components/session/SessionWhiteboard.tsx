@@ -12,7 +12,7 @@ import {
   type WhiteboardPoint,
 } from "@/lib/api/whiteboard";
 import { getStoredAuth, getToken } from "@/lib/api/client";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 type Props = {
@@ -131,11 +131,10 @@ export function SessionWhiteboard({ sessionId, className }: Props) {
 
   useEffect(() => {
     const token = getToken();
-    const wsBase = getWsBaseUrl();
-    if (!token || !wsBase || !sessionId) return;
+    const socketBase = getSocketBaseUrl();
+    if (!token || !socketBase || !sessionId) return;
 
-    const socket = io(wsBase.replace(/\/$/, ""), {
-      transports: ["websocket"],
+    const socket = io(socketBase, {
       reconnection: true,
       auth: { token },
     });

@@ -1,41 +1,49 @@
-export function getWsBaseUrl() {
-  const value = process.env.NEXT_PUBLIC_WS_BASE_URL?.trim();
-  if (value) {
-    return value.replace(/\/$/, "");
+function normalizeSocketOrigin(rawValue: string) {
+  const value = rawValue
+      .trim()
+      .replace(/^wss:\/\//i, "https://")
+      .replace(/^ws:\/\//i, "http://");
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value
+        .replace(/\/api\/ws\/?$/i, "")
+        .replace(/\/socket\.io\/?$/i, "")
+        .replace(/\/ws\/?$/i, "")
+        .replace(/\/api\/?$/i, "")
+        .replace(/\/$/, "");
+  }
+}
+
+export function getSocketBaseUrl() {
+  /**
+   * В старом фронтенде видеозвонок брал URL из NEXT_PUBLIC_WS_BASE_URL.
+   * Оставляем его как fallback, чтобы новый фронт не ломался на старых env в Vercel.
+   */
+  const configured =
+      process.env.NEXT_PUBLIC_SOCKET_BASE_URL?.trim() ||
+      process.env.NEXT_PUBLIC_WS_BASE_URL?.trim();
+
+  if (configured) {
+    return normalizeSocketOrigin(configured);
   }
 
-  // If WS base is not explicitly configured, derive it from API env vars when possible
-  // to avoid hard-coded host mismatches across environments.
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || process.env.NEXT_PUBLIC_API_URL?.trim();
+  const apiBase =
+      process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
+      process.env.NEXT_PUBLIC_API_URL?.trim();
+
   if (apiBase) {
-    const origin = apiBase.replace(/\/$/, "").replace(/\/api$/, "");
-
-    if (origin.startsWith("wss://") || origin.startsWith("ws://")) {
-      return origin.replace(/\/$/, "");
-    }
-
-    if (origin.startsWith("https://")) {
-      return `wss://${origin.slice("https://".length)}`;
-    }
-
-    if (origin.startsWith("http://")) {
-      return `ws://${origin.slice("http://".length)}`;
-    }
+    return normalizeSocketOrigin(apiBase);
   }
 
   if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
+    const { hostname } = window.location;
 
     if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "ws://localhost:10000";
+      return "http://localhost:10000";
     }
-
-    if (protocol === "https:") {
-      return "wss://elas-backend.onrender.com";
-    }
-
-    return "ws://elas-backend.onrender.com";
   }
 
-  return "wss://elas-backend.onrender.com";
+  return "https://elas-backend.onrender.com";
 }

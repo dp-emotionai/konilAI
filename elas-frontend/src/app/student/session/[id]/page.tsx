@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -22,6 +22,8 @@ import {
   type SessionJoinInfo,
 } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import { updateConsentStatus } from "@/lib/api/consent";
+import { writeConsent } from "@/lib/consent";
 import {
   getMlApiBaseUrl,
   mlAnalyzeFrame,
@@ -67,6 +69,7 @@ import {
   MonitorUp,
   Sparkles,
   ShieldCheck,
+  ShieldX,
   Maximize2,
   MessageSquare,
   MoreHorizontal,
@@ -78,7 +81,7 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react";
-import { getWsBaseUrl } from "@/lib/env";
+import { getSocketBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 function StatusPill({ label, value }: { label: string; value: string }) {
@@ -95,30 +98,67 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PreparationStepper({ step }: { step: 1 | 2 }) {
+type PreparationStepperProps = {
+  step: 1 | 2;
+  canOpenStep2: boolean;
+  onStepChange: (step: 1 | 2) => void;
+};
+
+function PreparationStepper({
+                              step,
+                              canOpenStep2,
+                              onStepChange,
+                            }: PreparationStepperProps) {
   return (
       <div className="mx-auto flex w-full max-w-[190px] items-center">
-        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7448FF] text-[11px] font-bold text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]">
-          {step === 2 ? <CheckCircle2 size={15} /> : 1}
-        </div>
+        <button
+            type="button"
+            onClick={() => onStepChange(1)}
+            aria-label="Открыть шаг 1"
+            aria-current={step === 1 ? "step" : undefined}
+            className={cn(
+                "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200",
+                step === 1
+                    ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
+                    : "border-[#7448FF] bg-[#7448FF] text-white hover:scale-105"
+            )}
+        >
+          {canOpenStep2 ? <CheckCircle2 size={15} /> : 1}
+        </button>
+
         <div className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-slate-200">
           <div
               className={cn(
                   "absolute inset-y-0 left-0 rounded-full bg-[#7448FF] transition-all duration-300",
-                  step === 2 ? "w-full" : "w-0"
+                  canOpenStep2 ? "w-full" : "w-0"
               )}
           />
         </div>
-        <div
+
+        <button
+            type="button"
+            onClick={() => {
+              if (canOpenStep2) {
+                onStepChange(2);
+              }
+            }}
+            disabled={!canOpenStep2}
+            aria-label="Открыть шаг 2"
+            aria-current={step === 2 ? "step" : undefined}
+            title={canOpenStep2 ? "Открыть проверку камеры" : "Сначала подтвердите согласие"}
             className={cn(
                 "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-200",
                 step === 2
                     ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
-                    : "border-slate-200 bg-white text-slate-400"
+                    : canOpenStep2
+                        ? "cursor-pointer border-violet-200 bg-white text-[#7448FF] hover:scale-105 hover:border-[#7448FF]"
+                        : "cursor-not-allowed border-slate-200 bg-white text-slate-400 opacity-70"
             )}
         >
           2
-        </div>
+        </button>
       </div>
   );
 }
@@ -204,13 +244,22 @@ function CallControlButton({
 
 export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const sessionId = params?.id ?? "";
+  const autoStart = searchParams.get("autostart") === "1";
   const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
   const monitorRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    document.body.style.overflow = "";
+  }, []);
+
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentUpdating, setConsentUpdating] = useState(false);
+  const [consentActionError, setConsentActionError] = useState<string | null>(null);
   const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
   const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
@@ -305,12 +354,76 @@ export default function StudentJoinSessionPage() {
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
   const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
   const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
-  const preparationStep: 1 | 2 =
-      blockReason === "consent_required" || !state.consent ? 1 : 2;
+  const canOpenPreparationStep2 =
+      state.consent && blockReason !== "consent_required";
+  const [preparationStep, setPreparationStep] = useState<1 | 2>(
+      canOpenPreparationStep2 ? 2 : 1
+  );
+
+  useEffect(() => {
+    if (!canOpenPreparationStep2) {
+      setPreparationStep(1);
+      return;
+    }
+
+    setPreparationStep(2);
+  }, [canOpenPreparationStep2]);
+
+  const handleRevokeConsent = async () => {
+    if (consentUpdating) return;
+
+    const confirmed = window.confirm(
+        "Вы действительно хотите отозвать согласие на анализ эмоций?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setConsentUpdating(true);
+      setConsentActionError(null);
+
+      const status = await updateConsentStatus(false);
+
+      setConsent(status.hasConsent);
+      writeConsent(status.hasConsent);
+      setPreparationStep(1);
+
+      if (sessionId && getApiBaseUrl() && hasAuth()) {
+        const updated = await getSessionJoinInfo(sessionId);
+        setJoinInfo(updated ?? null);
+      }
+    } catch (error) {
+      console.error("CONSENT REVOKE FAILED", error);
+      setConsentActionError(
+          error instanceof Error
+              ? error.message
+              : "Не удалось отозвать согласие"
+      );
+    } finally {
+      setConsentUpdating(false);
+    }
+  };
 
   const [live, setLive] = useState(false);
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
+
+  const handleLeaveSession = useCallback(() => {
+    document.body.style.overflow = "";
+    setLive(false);
+    setTab("prepare");
+    router.replace("/student/sessions");
+  }, [router]);
+
+  useEffect(() => {
+    if (!autoStart || joinInfoLoading || joinInfoError || live) return;
+    if (joinInfo?.allowedToJoin === false) return;
+
+    setLive(true);
+    setTab("live");
+  }, [autoStart, joinInfo?.allowedToJoin, joinInfoError, joinInfoLoading, live]);
+
   const showPreparation =
+      !autoStart &&
       !joinInfoLoading &&
       !joinInfoError &&
       !live &&
@@ -361,7 +474,7 @@ export default function StudentJoinSessionPage() {
       "idle" | "connecting" | "connected" | "error"
   >("idle");
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [wsDisconnected, setWsDisconnected] = useState(false);
+  const [socketDisconnected, setSocketDisconnected] = useState(false);
 
   const [isMicEnabled, setIsMicEnabled] = useState(true);
   const [isCameraEnabled, setIsCameraEnabled] = useState(true);
@@ -452,22 +565,22 @@ export default function StudentJoinSessionPage() {
     setConnectionState("connecting");
     setConnectionError(null);
 
-    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
-    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
+    const socketBase = getSocketBaseUrl();
+    const signaling = new SignalingClient(socketBase);
     const manager = new PeerConnectionManager(signaling, roomId, "student", {
       onRemoteStream: (_peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
         setRemoteStream(hasTracks ? stream : null);
       },
       onPeersChange: (peers) => setParticipants(peers),
-      onDisconnect: () => setWsDisconnected(true),
+      onDisconnect: () => setSocketDisconnected(true),
       onPeerLeft: () => {
         setRemoteStream(null);
       },
     });
 
     peerManagerRef.current = manager;
-    signaling.on("open", () => setWsDisconnected(false));
+    signaling.on("open", () => setSocketDisconnected(false));
     signaling.connect();
 
     void (async () => {
@@ -478,7 +591,7 @@ export default function StudentJoinSessionPage() {
         await signaling.waitForOpen(12000);
 
         const auth = getStoredAuth();
-        manager.join(
+        await manager.join(
             auth
                 ? {
                   email: auth.email,
@@ -493,8 +606,8 @@ export default function StudentJoinSessionPage() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Ошибка подключения";
         const friendly =
-            msg.includes("timeout") || msg.includes("WebSocket")
-                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
+            msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("socket")
+                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки Socket.IO."
                 : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
                     ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
                     : msg;
@@ -520,7 +633,7 @@ export default function StudentJoinSessionPage() {
       setParticipants([]);
       setConnectionState("idle");
       setConnectionError(null);
-      setWsDisconnected(false);
+      setSocketDisconnected(false);
       setIsScreenSharing(false);
     };
   }, [live, roomId]);
@@ -703,7 +816,7 @@ export default function StudentJoinSessionPage() {
                   </span>
                   )}
 
-                  {wsDisconnected && (
+                  {socketDisconnected && (
                       <span className="flex items-center gap-2 text-rose-600">
                     <AlertTriangle size={14} />
                     Соединение потеряно
@@ -717,10 +830,8 @@ export default function StudentJoinSessionPage() {
               </div>
 
               <button
-                  onClick={() => {
-                    setLive(false);
-                    setTab("prepare");
-                  }}
+                  type="button"
+                  onClick={handleLeaveSession}
                   className="px-5 py-2.5 rounded-xl text-[13px] bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm font-semibold transition-colors shrink-0"
               >
                 Завершить сессию
@@ -827,10 +938,8 @@ export default function StudentJoinSessionPage() {
 
                     <div className="flex flex-col items-center gap-2 mx-1">
                       <button
-                          onClick={() => {
-                            setLive(false);
-                            setTab("prepare");
-                          }}
+                          type="button"
+                          onClick={handleLeaveSession}
                           className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
                       >
                         <PhoneOff size={22} />
@@ -1455,7 +1564,11 @@ export default function StudentJoinSessionPage() {
                       <div className="text-xs font-semibold text-slate-500">
                         Шаг {preparationStep}
                       </div>
-                      <PreparationStepper step={preparationStep} />
+                      <PreparationStepper
+                          step={preparationStep}
+                          canOpenStep2={canOpenPreparationStep2}
+                          onStepChange={setPreparationStep}
+                      />
                       <div className="hidden sm:block" />
                     </div>
                   </div>
@@ -1543,17 +1656,45 @@ export default function StudentJoinSessionPage() {
                               />
                             </div>
 
-                            {!state.consent && (
-                                <Button
-                                    onClick={() => setConsentModalOpen(true)}
-                                    className="mt-5 h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
-                                >
-                                  <ShieldCheck size={18} />
-                                  {blockReason === "consent_required"
-                                      ? "Перейти к согласию"
-                                      : "Подтвердить согласие"}
-                                </Button>
+                            {consentActionError && (
+                                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                                  {consentActionError}
+                                </div>
                             )}
+
+                            <Button
+                                onClick={() => {
+                                  setConsentActionError(null);
+
+                                  if (state.consent) {
+                                    void handleRevokeConsent();
+                                    return;
+                                  }
+
+                                  setConsentModalOpen(true);
+                                }}
+                                disabled={consentUpdating}
+                                className={cn(
+                                    "mt-5 h-11 w-full gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                                    state.consent
+                                        ? "border border-red-200 bg-red-50 text-red-600 shadow-none hover:bg-red-100"
+                                        : "border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
+                                )}
+                            >
+                              {state.consent ? (
+                                  <ShieldX size={18} />
+                              ) : (
+                                  <ShieldCheck size={18} />
+                              )}
+
+                              {consentUpdating
+                                  ? "Отзываем согласие..."
+                                  : state.consent
+                                      ? "Отозвать согласие"
+                                      : blockReason === "consent_required"
+                                          ? "Перейти к согласию"
+                                          : "Подтвердить согласие"}
+                            </Button>
                           </div>
                         </div>
                     ) : (
