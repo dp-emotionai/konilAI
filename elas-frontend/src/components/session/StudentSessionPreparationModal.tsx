@@ -120,6 +120,7 @@ export default function StudentSessionPreparationModal({
                                                        }: StudentSessionPreparationModalProps) {
   const { state, setConsent } = useUI();
   const setConsentRef = useRef(setConsent);
+  const previousBodyOverflowRef = useRef("");
 
   useEffect(() => {
     setConsentRef.current = setConsent;
@@ -243,12 +244,25 @@ export default function StudentSessionPreparationModal({
     }
   }, [canOpenStep2, consentStatusLoading, open, step]);
 
+  const restoreBodyScroll = () => {
+    document.body.style.overflow = previousBodyOverflowRef.current;
+  };
+
+  const handlePreparationClose = () => {
+    if (consentUpdating) return;
+
+    restoreBodyScroll();
+    onClose();
+  };
+
   useEffect(() => {
     if (!open) return;
 
-    const previousOverflow = document.body.style.overflow;
+    previousBodyOverflowRef.current = document.body.style.overflow;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !consentUpdating && !consentModalOpen) {
+        restoreBodyScroll();
         onClose();
       }
     };
@@ -257,7 +271,7 @@ export default function StudentSessionPreparationModal({
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      document.body.style.overflow = previousOverflow;
+      restoreBodyScroll();
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [consentModalOpen, consentUpdating, onClose, open]);
@@ -358,7 +372,7 @@ export default function StudentSessionPreparationModal({
                   !consentUpdating &&
                   !consentModalOpen
               ) {
-                onClose();
+                handlePreparationClose();
               }
             }}
         >
@@ -388,8 +402,8 @@ export default function StudentSessionPreparationModal({
 
                   <button
                       type="button"
-                      onClick={onClose}
-                      disabled={consentUpdating || consentStatusLoading}
+                      onClick={handlePreparationClose}
+                      disabled={consentUpdating}
                       aria-label="Закрыть"
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
                   >
@@ -543,7 +557,10 @@ export default function StudentSessionPreparationModal({
                       {sessionIsLive ? (
                           <CameraCheck
                               variant="modal"
-                              onStart={() => onStart(session.id)}
+                              onStart={() => {
+                                restoreBodyScroll();
+                                onStart(session.id);
+                              }}
                           />
                       ) : (
                           <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-6 py-8 text-center">
