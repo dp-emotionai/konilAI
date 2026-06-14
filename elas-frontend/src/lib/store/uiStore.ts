@@ -1,8 +1,12 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import type { Role } from "../roles";
-import { getStoredAuth, type UserStatus } from "../api/client";
+import {
+  getStoredAuth,
+  type UserStatus,
+} from "../api/client";
 
 type UIState = {
   loggedIn: boolean;
@@ -30,116 +34,285 @@ const defaultState: UIState = {
   avatarVersion: 0,
 };
 
-function normalizeRole(value: unknown): Role | null {
-  if (typeof value !== "string") return null;
-  const v = value.trim().toLowerCase();
-  if (v === "student" || v === "teacher" || v === "admin") return v;
+function normalizeRole(
+  value: unknown
+): Role | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === "student" ||
+    normalized === "teacher" ||
+    normalized === "admin"
+  ) {
+    return normalized;
+  }
+
   return null;
 }
 
-function normalizeStatus(value: unknown): UserStatus | null {
-  if (typeof value !== "string") return null;
-  const v = value.trim().toLowerCase();
-  if (v === "pending" || v === "approved" || v === "limited" || v === "blocked") {
-    return v as UserStatus;
+function normalizeStatus(
+  value: unknown
+): UserStatus | null {
+  if (typeof value !== "string") {
+    return null;
   }
+
+  const normalized = value
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalized === "pending" ||
+    normalized === "approved" ||
+    normalized === "limited" ||
+    normalized === "blocked"
+  ) {
+    return normalized as UserStatus;
+  }
+
   return null;
+}
+
+function readString(
+  value: unknown
+): string | null {
+  return typeof value === "string"
+    ? value
+    : null;
 }
 
 export function useUIStore() {
-  const [state, setState] = useState<UIState>(defaultState);
+  const [state, setState] =
+    useState<UIState>(defaultState);
+
+  /**
+   * false:
+   * localStorage ещё не прочитан.
+   *
+   * true:
+   * мы уже точно знаем, есть сессия или нет.
+   */
+  const [authReady, setAuthReady] =
+    useState(false);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
+      const raw =
+        localStorage.getItem(KEY);
+
+      const parsed =
+        raw
+          ? (JSON.parse(
+              raw
+            ) as Partial<UIState>)
+          : null;
+
       const auth = getStoredAuth();
+      const hasToken =
+        Boolean(auth?.token);
 
-      if (parsed && typeof parsed === "object") {
-        let next: UIState = {
-          loggedIn: !!parsed.loggedIn,
-          role: normalizeRole(parsed.role),
-          consent: !!parsed.consent,
-          status: normalizeStatus(parsed.status),
-          firstName: typeof parsed.firstName === "string" ? parsed.firstName : null,
-          lastName: typeof parsed.lastName === "string" ? parsed.lastName : null,
-          fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
-          avatarUrl: typeof parsed.avatarUrl === "string" ? parsed.avatarUrl : null,
-          avatarVersion: typeof parsed.avatarVersion === "number" ? parsed.avatarVersion : 0,
-        };
+      const restoredState: UIState = {
+        /**
+         * loggedIn нельзя брать из старого UI-state.
+         * Источник истины — наличие auth token.
+         */
+        loggedIn: hasToken,
 
-        if (auth?.token) {
-          next = {
-            ...next,
-            loggedIn: true,
-            role: normalizeRole(auth.role),
-            status: normalizeStatus(auth.status) ?? next.status ?? null,
-            firstName: auth.firstName ?? next.firstName,
-            lastName: auth.lastName ?? next.lastName,
-            fullName: auth.fullName ?? next.fullName,
-            avatarUrl: auth.avatarUrl ?? next.avatarUrl,
-          };
-        }
+        role: hasToken
+          ? normalizeRole(auth?.role)
+          : null,
 
-        setState(next);
-        return;
-      }
+        consent:
+          Boolean(parsed?.consent),
+
+        status: hasToken
+          ? normalizeStatus(
+              auth?.status
+            ) ??
+            normalizeStatus(
+              parsed?.status
+            )
+          : null,
+
+        firstName:
+          auth?.firstName ??
+          readString(
+            parsed?.firstName
+          ),
+
+        lastName:
+          auth?.lastName ??
+          readString(
+            parsed?.lastName
+          ),
+
+        fullName:
+          auth?.fullName ??
+          readString(
+            parsed?.fullName
+          ),
+
+        avatarUrl:
+          auth?.avatarUrl ??
+          readString(
+            parsed?.avatarUrl
+          ),
+
+        avatarVersion:
+          typeof parsed?.avatarVersion ===
+          "number"
+            ? parsed.avatarVersion
+            : 0,
+      };
+
+      setState(restoredState);
+    } catch {
+      /**
+       * Даже если UI-state повреждён,
+       * пытаемся восстановить сессию
+       * из основного auth storage.
+       */
+      const auth = getStoredAuth();
 
       if (auth?.token) {
         setState({
           ...defaultState,
           loggedIn: true,
-          role: normalizeRole(auth.role),
-          status: normalizeStatus(auth.status),
-          firstName: auth.firstName ?? null,
-          lastName: auth.lastName ?? null,
-          fullName: auth.fullName ?? null,
-          avatarUrl: auth.avatarUrl ?? null,
-          avatarVersion: 0,
+          role: normalizeRole(
+            auth.role
+          ),
+          status: normalizeStatus(
+            auth.status
+          ),
+          firstName:
+            auth.firstName ?? null,
+          lastName:
+            auth.lastName ?? null,
+          fullName:
+            auth.fullName ?? null,
+          avatarUrl:
+            auth.avatarUrl ?? null,
         });
+      } else {
+        setState(defaultState);
       }
-    } catch {
-      // ignore corrupted localStorage
+    } finally {
+      /**
+       * Устанавливается всегда,
+       * даже если localStorage повреждён.
+       */
+      setAuthReady(true);
     }
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(state));
-    } catch {
-      // ignore storage errors
+    /**
+     * Важно:
+     * не записываем defaultState до того,
+     * как завершилось восстановление.
+     */
+    if (!authReady) {
+      return;
     }
-  }, [state]);
+
+    try {
+      localStorage.setItem(
+        KEY,
+        JSON.stringify(state)
+      );
+    } catch {
+      // Игнорируем ошибки storage.
+    }
+  }, [authReady, state]);
 
   return {
     state,
-    setLoggedIn: (v: boolean) =>
-      setState((s) => ({
-        ...s,
-        loggedIn: v,
-        role: v ? s.role : null,
-        status: v ? s.status : null,
+    authReady,
+
+    setAuthReady,
+
+    setLoggedIn: (
+      value: boolean
+    ) =>
+      setState((current) => ({
+        ...current,
+        loggedIn: value,
+        role: value
+          ? current.role
+          : null,
+        status: value
+          ? current.status
+          : null,
       })),
-    setRole: (role: Role | null) =>
-      setState((s) => ({
-        ...s,
+
+    setRole: (
+      role: Role | null
+    ) =>
+      setState((current) => ({
+        ...current,
         role,
       })),
-    setConsent: (consent: boolean) =>
-      setState((s) => ({
-        ...s,
+
+    setConsent: (
+      consent: boolean
+    ) =>
+      setState((current) => ({
+        ...current,
         consent,
       })),
-    setStatus: (status: UserStatus | null) =>
-      setState((s) => ({
-        ...s,
+
+    setStatus: (
+      status: UserStatus | null
+    ) =>
+      setState((current) => ({
+        ...current,
         status,
       })),
-    setUserInfo: (info: { firstName?: string; lastName?: string; fullName?: string; avatarUrl?: string; avatarVersion?: number }) =>
-      setState((s) => ({
-        ...s,
-        ...info
+
+    setUserInfo: (info: {
+      firstName?: string | null;
+      lastName?: string | null;
+      fullName?: string | null;
+      avatarUrl?: string | null;
+      avatarVersion?: number;
+    }) =>
+      setState((current) => ({
+        ...current,
+
+        firstName:
+          info.firstName !== undefined
+            ? info.firstName
+            : current.firstName,
+
+        lastName:
+          info.lastName !== undefined
+            ? info.lastName
+            : current.lastName,
+
+        fullName:
+          info.fullName !== undefined
+            ? info.fullName
+            : current.fullName,
+
+        avatarUrl:
+          info.avatarUrl !== undefined
+            ? info.avatarUrl
+            : current.avatarUrl,
+
+        avatarVersion:
+          info.avatarVersion !==
+          undefined
+            ? info.avatarVersion
+            : current.avatarVersion,
       })),
-    reset: () => setState(defaultState),
+
+    reset: () =>
+      setState(defaultState),
   };
 }
