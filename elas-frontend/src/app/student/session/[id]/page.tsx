@@ -22,6 +22,8 @@ import {
   type SessionJoinInfo,
 } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import { updateConsentStatus } from "@/lib/api/consent";
+import { writeConsent } from "@/lib/consent";
 import {
   getMlApiBaseUrl,
   mlAnalyzeFrame,
@@ -67,6 +69,7 @@ import {
   MonitorUp,
   Sparkles,
   ShieldCheck,
+  ShieldX,
   Maximize2,
   MessageSquare,
   MoreHorizontal,
@@ -248,6 +251,8 @@ export default function StudentJoinSessionPage() {
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
+  const [consentUpdating, setConsentUpdating] = useState(false);
+  const [consentActionError, setConsentActionError] = useState<string | null>(null);
   const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
   const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
@@ -356,6 +361,41 @@ export default function StudentJoinSessionPage() {
 
     setPreparationStep(2);
   }, [canOpenPreparationStep2]);
+
+  const handleRevokeConsent = async () => {
+    if (consentUpdating) return;
+
+    const confirmed = window.confirm(
+        "Вы действительно хотите отозвать согласие на анализ эмоций?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setConsentUpdating(true);
+      setConsentActionError(null);
+
+      const status = await updateConsentStatus(false);
+
+      setConsent(status.hasConsent);
+      writeConsent(status.hasConsent);
+      setPreparationStep(1);
+
+      if (sessionId && getApiBaseUrl() && hasAuth()) {
+        const updated = await getSessionJoinInfo(sessionId);
+        setJoinInfo(updated ?? null);
+      }
+    } catch (error) {
+      console.error("CONSENT REVOKE FAILED", error);
+      setConsentActionError(
+          error instanceof Error
+              ? error.message
+              : "Не удалось отозвать согласие"
+      );
+    } finally {
+      setConsentUpdating(false);
+    }
+  };
 
   const [live, setLive] = useState(false);
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
@@ -1596,17 +1636,45 @@ export default function StudentJoinSessionPage() {
                               />
                             </div>
 
-                            {!state.consent && (
-                                <Button
-                                    onClick={() => setConsentModalOpen(true)}
-                                    className="mt-5 h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
-                                >
-                                  <ShieldCheck size={18} />
-                                  {blockReason === "consent_required"
-                                      ? "Перейти к согласию"
-                                      : "Подтвердить согласие"}
-                                </Button>
+                            {consentActionError && (
+                                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                                  {consentActionError}
+                                </div>
                             )}
+
+                            <Button
+                                onClick={() => {
+                                  setConsentActionError(null);
+
+                                  if (state.consent) {
+                                    void handleRevokeConsent();
+                                    return;
+                                  }
+
+                                  setConsentModalOpen(true);
+                                }}
+                                disabled={consentUpdating}
+                                className={cn(
+                                    "mt-5 h-11 w-full gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
+                                    state.consent
+                                        ? "border border-red-200 bg-red-50 text-red-600 shadow-none hover:bg-red-100"
+                                        : "border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
+                                )}
+                            >
+                              {state.consent ? (
+                                  <ShieldX size={18} />
+                              ) : (
+                                  <ShieldCheck size={18} />
+                              )}
+
+                              {consentUpdating
+                                  ? "Отзываем согласие..."
+                                  : state.consent
+                                      ? "Отозвать согласие"
+                                      : blockReason === "consent_required"
+                                          ? "Перейти к согласию"
+                                          : "Подтвердить согласие"}
+                            </Button>
                           </div>
                         </div>
                     ) : (
