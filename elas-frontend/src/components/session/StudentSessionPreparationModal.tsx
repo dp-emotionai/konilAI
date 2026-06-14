@@ -121,6 +121,9 @@ export default function StudentSessionPreparationModal({
   const { state, setConsent } = useUI();
   const setConsentRef = useRef(setConsent);
   const previousBodyOverflowRef = useRef("");
+  const onCloseRef = useRef(onClose);
+  const consentUpdatingRef = useRef(false);
+  const consentModalOpenRef = useRef(false);
 
   useEffect(() => {
     setConsentRef.current = setConsent;
@@ -132,6 +135,18 @@ export default function StudentSessionPreparationModal({
   const [consentUpdating, setConsentUpdating] = useState(false);
   const [consentStatusLoading, setConsentStatusLoading] = useState(false);
   const [consentActionError, setConsentActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    consentUpdatingRef.current = consentUpdating;
+  }, [consentUpdating]);
+
+  useEffect(() => {
+    consentModalOpenRef.current = consentModalOpen;
+  }, [consentModalOpen]);
 
   const blockReason =
       joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
@@ -249,32 +264,36 @@ export default function StudentSessionPreparationModal({
   };
 
   const handlePreparationClose = () => {
-    if (consentUpdating) return;
-
+    setConsentModalOpen(false);
     restoreBodyScroll();
-    onClose();
+    onCloseRef.current();
   };
 
   useEffect(() => {
     if (!open) return;
 
-    previousBodyOverflowRef.current = document.body.style.overflow;
+    const previousOverflow = document.body.style.overflow;
+    previousBodyOverflowRef.current = previousOverflow;
+    document.body.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !consentUpdating && !consentModalOpen) {
-        restoreBodyScroll();
-        onClose();
+      if (
+          event.key === "Escape" &&
+          !consentUpdatingRef.current &&
+          !consentModalOpenRef.current
+      ) {
+        document.body.style.overflow = previousOverflow;
+        onCloseRef.current();
       }
     };
 
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
-      restoreBodyScroll();
+      document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [consentModalOpen, consentUpdating, onClose, open]);
+  }, [open]);
 
   if (!open || !session) return null;
 
@@ -403,7 +422,6 @@ export default function StudentSessionPreparationModal({
                   <button
                       type="button"
                       onClick={handlePreparationClose}
-                      disabled={consentUpdating}
                       aria-label="Закрыть"
                       className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
                   >
@@ -509,7 +527,6 @@ export default function StudentSessionPreparationModal({
 
                               setConsentModalOpen(true);
                             }}
-                            disabled={consentUpdating || consentStatusLoading}
                             className={cn(
                                 "mt-5 h-11 w-full gap-2 rounded-xl font-semibold transition disabled:cursor-not-allowed disabled:opacity-60",
                                 state.consent
@@ -558,6 +575,7 @@ export default function StudentSessionPreparationModal({
                           <CameraCheck
                               variant="modal"
                               onStart={() => {
+                                setConsentModalOpen(false);
                                 restoreBodyScroll();
                                 onStart(session.id);
                               }}

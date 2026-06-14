@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -244,12 +244,17 @@ function CallControlButton({
 
 export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = params?.id ?? "";
   const autoStart = searchParams.get("autostart") === "1";
   const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
   const monitorRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "";
+  }, []);
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
@@ -401,6 +406,13 @@ export default function StudentJoinSessionPage() {
 
   const [live, setLive] = useState(false);
   const [tab, setTab] = useState<"prepare" | "live">("prepare");
+
+  const handleLeaveSession = useCallback(() => {
+    document.body.style.overflow = "";
+    setLive(false);
+    setTab("prepare");
+    router.replace("/student/sessions");
+  }, [router]);
 
   useEffect(() => {
     if (!autoStart || joinInfoLoading || joinInfoError || live) return;
@@ -818,10 +830,8 @@ export default function StudentJoinSessionPage() {
               </div>
 
               <button
-                  onClick={() => {
-                    setLive(false);
-                    setTab("prepare");
-                  }}
+                  type="button"
+                  onClick={handleLeaveSession}
                   className="px-5 py-2.5 rounded-xl text-[13px] bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm font-semibold transition-colors shrink-0"
               >
                 Завершить сессию
@@ -928,10 +938,8 @@ export default function StudentJoinSessionPage() {
 
                     <div className="flex flex-col items-center gap-2 mx-1">
                       <button
-                          onClick={() => {
-                            setLive(false);
-                            setTab("prepare");
-                          }}
+                          type="button"
+                          onClick={handleLeaveSession}
                           className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
                       >
                         <PhoneOff size={22} />
