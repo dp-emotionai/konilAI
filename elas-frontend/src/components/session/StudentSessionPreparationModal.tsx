@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -119,6 +119,12 @@ export default function StudentSessionPreparationModal({
                                                          onStart,
                                                        }: StudentSessionPreparationModalProps) {
   const { state, setConsent } = useUI();
+  const setConsentRef = useRef(setConsent);
+
+  useEffect(() => {
+    setConsentRef.current = setConsent;
+  }, [setConsent]);
+
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
   const [step, setStep] = useState<1 | 2>(1);
   const [consentModalOpen, setConsentModalOpen] = useState(false);
@@ -130,44 +136,62 @@ export default function StudentSessionPreparationModal({
       joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
   const canOpenStep2 =
       state.consent && blockReason !== "consent_required";
+  const sessionId = session?.id ?? null;
   const sessionIsLive =
       session?.status === "live" || joinInfo?.status === "active";
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
 
   useEffect(() => {
-    if (!open || !session) return;
+    if (!open || !sessionId) {
+      return;
+    }
 
-    let cancelled = false;
+    const activeSessionId = sessionId;
+    const controller = new AbortController();
+    let active = true;
 
     setJoinInfo(null);
     setConsentModalOpen(false);
     setConsentActionError(null);
     setConsentStatusLoading(true);
 
-    const loadPreparationState = async () => {
+    async function loadPreparationState() {
       try {
-        const consentStatus = await getConsentStatus();
+        const consentStatus = await getConsentStatus(
+            controller.signal
+        );
 
-        if (cancelled) return;
+        if (!active) return;
 
-        setConsent(consentStatus.hasConsent);
+        setConsentRef.current(consentStatus.hasConsent);
         writeConsent(consentStatus.hasConsent);
 
-        let info = await getSessionJoinInfo(session.id);
+        let info = await getSessionJoinInfo(activeSessionId);
 
-        // Совместимость: если глобальное согласие уже есть, но backend
-        // всё ещё требует session consent, создаём запись для этой сессии.
+        if (!active) return;
+
         if (
             consentStatus.hasConsent &&
             info?.reason === "consent_required"
         ) {
-          await recordSessionConsent(session.id);
-          info = await getSessionJoinInfo(session.id);
+          try {
+            await recordSessionConsent(activeSessionId);
+
+            if (!active) return;
+
+            info = await getSessionJoinInfo(activeSessionId);
+          } catch (error) {
+            console.warn(
+                "SESSION CONSENT SYNC FAILED",
+                error
+            );
+          }
         }
 
-        if (cancelled) return;
+        if (!active) return;
 
         setJoinInfo(info ?? null);
+
         setStep(
             consentStatus.hasConsent &&
             info?.reason !== "consent_required"
@@ -175,32 +199,49 @@ export default function StudentSessionPreparationModal({
                 : 1
         );
       } catch (error) {
-        if (!cancelled) {
-          setConsentActionError(
-              error instanceof Error
-                  ? error.message
-                  : "Не удалось загрузить статус согласия"
-          );
-          setStep(1);
+        if (
+            error instanceof DOMException &&
+            error.name === "AbortError"
+        ) {
+          return;
         }
+
+        console.error(
+            "PREPARATION STATUS LOAD FAILED",
+            error
+        );
+
+        if (!active) return;
+
+        setConsentActionError(
+            error instanceof Error
+                ? error.message
+                : "Не удалось загрузить статус согласия"
+        );
+
+        setStep(1);
       } finally {
-        if (!cancelled) {
+        if (active) {
           setConsentStatusLoading(false);
         }
       }
-    };
+    }
 
     void loadPreparationState();
 
     return () => {
-      cancelled = true;
+      active = false;
+      controller.abort();
     };
-  }, [open, session?.id, setConsent]);
+  }, [open, sessionId]);
 
   useEffect(() => {
-    if (!open) return;
-    setStep(canOpenStep2 ? 2 : 1);
-  }, [canOpenStep2, open, session?.id]);
+    if (!open || consentStatusLoading) return;
+
+    if (!canOpenStep2 && step === 2) {
+      setStep(1);
+    }
+  }, [canOpenStep2, consentStatusLoading, open, step]);
 
   useEffect(() => {
     if (!open) return;
@@ -240,9 +281,6 @@ export default function StudentSessionPreparationModal({
       // после закрытия модалки, перехода или обновления страницы.
       const consentStatus = await updateConsentStatus(true);
 
-      setConsent(consentStatus.hasConsent);
-      writeConsent(consentStatus.hasConsent);
-
       // Session consent нужен как audit-запись. Глобальное согласие уже
       // сохранено, поэтому ошибка audit-записи не должна его отменять.
       try {
@@ -254,6 +292,8 @@ export default function StudentSessionPreparationModal({
         );
       }
 
+      setConsent(consentStatus.hasConsent);
+      writeConsent(consentStatus.hasConsent);
       setConsentModalOpen(false);
 
       const updated = await refreshJoinInfo();
