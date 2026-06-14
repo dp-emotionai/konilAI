@@ -81,7 +81,7 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react";
-import { getSocketBaseUrl } from "@/lib/env";
+import { getWsBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
 
 function StatusPill({ label, value }: { label: string; value: string }) {
@@ -565,8 +565,8 @@ export default function StudentJoinSessionPage() {
     setConnectionState("connecting");
     setConnectionError(null);
 
-    const socketBase = getSocketBaseUrl();
-    const signaling = new SignalingClient(socketBase);
+    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
+    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
     const manager = new PeerConnectionManager(signaling, roomId, "student", {
       onRemoteStream: (_peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
@@ -591,7 +591,7 @@ export default function StudentJoinSessionPage() {
         await signaling.waitForOpen(12000);
 
         const auth = getStoredAuth();
-        await manager.join(
+        manager.join(
             auth
                 ? {
                   email: auth.email,

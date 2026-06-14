@@ -24,19 +24,17 @@ type EventHandlers = {
 type PartialHandlers = Partial<EventHandlers>;
 
 function normalizeSocketIoUrl(rawUrl: string) {
-  const value = rawUrl
-      .trim()
+  const withHttpProtocol = rawUrl
       .replace(/^wss:\/\//i, "https://")
       .replace(/^ws:\/\//i, "http://");
 
   try {
-    return new URL(value).origin;
+    const url = new URL(withHttpProtocol);
+    return url.origin;
   } catch {
-    return value
+    return withHttpProtocol
         .replace(/\/api\/ws\/?$/i, "")
-        .replace(/\/socket\.io\/?$/i, "")
         .replace(/\/ws\/?$/i, "")
-        .replace(/\/api\/?$/i, "")
         .replace(/\/$/, "");
   }
 }
@@ -95,12 +93,8 @@ export class SignalingClient {
 
     const token = getToken();
     this.socket = io(url, {
-      // Видеозвонок в старом фронте работал через чистый websocket.
-      // Так мы не попадаем в polling preflight/CORS и не меняем контракт backend-main.
       transports: ["websocket"],
       reconnection: true,
-      reconnectionAttempts: 8,
-      timeout: 20_000,
       auth: token ? { token } : undefined,
     });
 
@@ -126,10 +120,7 @@ export class SignalingClient {
     });
 
     this.socket.on("connect_error", (error) => {
-      const details = error instanceof Error && error.message
-          ? `: ${error.message}`
-          : "";
-      this.handlers.error?.(`Ошибка соединения с signaling server${details}`);
+      this.handlers.error?.("Ошибка соединения с signaling server.");
 
       if (
           !this.openedInCurrentConnection &&
@@ -211,34 +202,8 @@ export class SignalingClient {
         fullName?: string;
         avatarUrl?: string;
       }
-  ): Promise<void> {
-    if (!this.socket?.connected || !this.isOpen) {
-      return Promise.reject(new Error("Signaling socket is not connected"));
-    }
-
-    const payload = { sessionId, role, ...user };
-
-    return new Promise((resolve, reject) => {
-      this.socket
-          ?.timeout(10_000)
-          .emit(
-              "join",
-              payload,
-              (timeoutError: Error | null, response?: { ok?: boolean; error?: string }) => {
-                if (timeoutError) {
-                  reject(new Error("Signaling join timeout"));
-                  return;
-                }
-
-                if (!response?.ok) {
-                  reject(new Error(response?.error || "Failed to join video session"));
-                  return;
-                }
-
-                resolve();
-              }
-          );
-    });
+  ) {
+    this.send({ type: "join", sessionId, role, ...user });
   }
 
   leave() {
@@ -314,7 +279,7 @@ export class SignalingClient {
   private handleServerMessage(msg: ServerMessage) {
     switch (msg.type) {
       case "joined":
-        this.handlers.joined?.(msg.self, msg.participants ?? []);
+        this.handlers.joined?.(msg.self, msg.participants);
         break;
       case "user-joined":
         this.handlers["user-joined"]?.(msg.participant);

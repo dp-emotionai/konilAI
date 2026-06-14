@@ -381,21 +381,16 @@ export class PeerConnectionManager {
     return this.participants;
   }
 
-  async join(user?: {
+  join(user?: {
     email?: string;
     firstName?: string;
     lastName?: string;
     fullName?: string;
     avatarUrl?: string;
-  }): Promise<void> {
+  }) {
     this.isLeaving = false;
 
-    /**
-     * В новой странице вызывается `await manager.join(...)`.
-     * Поэтому обязательно возвращаем Promise от SignalingClient.join,
-     * иначе UI считает звонок подключённым до ответа backend-main.
-     */
-    await this.signaling.join(
+    this.signaling.join(
         this.sessionId,
         this.role,
         user
