@@ -15,37 +15,37 @@ const SECTIONS = [
   {
     id: "capture",
     icon: Video,
-    title: "What we capture",
+    title: "Что мы обрабатываем",
     body:
-        "We capture frames (images) from your webcam at a low rate (1–2 per second), not continuous video. These frames are used only for real-time emotion and engagement analysis. No video recording is stored.",
+        "Мы обрабатываем кадры с вашей веб-камеры с низкой частотой — 1–2 кадра в секунду. Это не непрерывная видеозапись. Кадры используются только для анализа эмоций и вовлечённости в реальном времени. Видеозапись не сохраняется.",
   },
   {
     id: "storage",
     icon: Database,
-    title: "What we store",
+    title: "Что мы сохраняем",
     body:
-        "We do not store raw video or images. We store only metadata: aggregated emotion metrics, engagement scores, and timestamps for analytics and reports. Data is anonymized in group-level views.",
+        "Мы не сохраняем исходное видео или изображения. Сохраняются только метаданные: агрегированные показатели эмоций, уровень вовлечённости и временные метки для аналитики и отчётов. В групповых отчётах данные обезличиваются.",
   },
   {
     id: "access",
     icon: Users,
-    title: "Who can access",
+    title: "Кто имеет доступ",
     body:
-        "Access is role-based. Students see only their own summary if they opt in. Teachers see aggregated analytics for their groups and sessions. Administrators manage users and system settings. We do not share data with third parties for marketing or non-educational purposes.",
+        "Доступ зависит от роли пользователя. Студенты видят только собственную сводку, если они дали согласие. Преподаватели видят агрегированную аналитику по своим группам и сессиям. Администраторы управляют пользователями и настройками системы. Мы не передаём данные третьим лицам для маркетинговых или неучебных целей.",
   },
   {
     id: "retention",
     icon: CalendarDays,
-    title: "Retention",
+    title: "Срок хранения",
     body:
-        "Retention policy is configurable by your institution. You can request deletion of your data; we will process it in line with applicable regulations such as GDPR.",
+        "Срок хранения данных может настраиваться вашей организацией. Вы можете запросить удаление своих данных, и мы обработаем такой запрос в соответствии с применимыми правилами и требованиями, например GDPR.",
   },
   {
     id: "consent",
     icon: ShieldCheck,
-    title: "Your consent",
+    title: "Ваше согласие",
     body:
-        "Participation in video-based analytics requires your explicit consent. You can give or withdraw consent at any time in the Consent Center. Without consent, no frames are captured or analyzed.",
+        "Участие в видеоаналитике требует вашего явного согласия. Вы можете дать или отозвать согласие в любой момент в центре согласия. Без согласия кадры не обрабатываются и не анализируются.",
   },
 ] as const;
 
@@ -58,9 +58,9 @@ export default function Privacy() {
 
         <div className="mx-auto max-w-7xl space-y-7">
           <PageTitle
-              overline="Public"
-              title="Privacy Policy"
-              subtitle="What we capture, what we store, and who can access it."
+              overline="Публичный документ"
+              title="Политика конфиденциальности"
+              subtitle="Что мы обрабатываем, что сохраняем и кто имеет доступ к данным."
           />
 
           <Card className="rounded-[28px] border border-slate-200 bg-white/90 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-7">
@@ -96,23 +96,23 @@ export default function Privacy() {
                     className="inline-flex items-center justify-center gap-3 rounded-2xl bg-[#7448FF] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(116,72,255,0.28)] transition hover:bg-[#6538f5]"
                 >
                   <ShieldCheck size={18} />
-                  Open Consent Center
+                  Открыть центр согласия
                 </Link>
 
-                <Link
-                    href="/privacy"
+                <a
+                    href={`${process.env.NEXT_PUBLIC_API_URL}/legal/privacy-policy/download`}
                     className="inline-flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-purple-200 hover:bg-purple-50 hover:text-[#7448FF]"
                 >
                   <Download size={18} />
-                  Download policy
-                </Link>
+                  Скачать политику
+                </a>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
                 <UserRoundCheck size={18} className="text-emerald-600" />
-                <span>Your consent status:</span>
+                <span>Статус согласия:</span>
                 <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-semibold text-emerald-700">
-                Consented
+                Согласие дано
               </span>
               </div>
             </div>
