@@ -45,6 +45,7 @@ import {
 } from "@/lib/api/presence";
 
 import CameraCheck from "@/components/session/CameraCheck";
+import ConsentModal from "@/components/consent/ConsentModal";
 import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
 import { SessionWhiteboard } from "@/components/session/SessionWhiteboard";
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
@@ -204,11 +205,12 @@ function CallControlButton({
 export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
-  const { state } = useUI();
+  const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
   const monitorRef = useRef<HTMLDivElement | null>(null);
 
   const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
+  const [consentModalOpen, setConsentModalOpen] = useState(false);
   const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
   const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
   const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
@@ -1419,7 +1421,7 @@ export default function StudentJoinSessionPage() {
                 </Section>
             )}
 
-        {showPreparation && tab === "prepare" && (
+        {showPreparation && tab === "prepare" && !consentModalOpen && (
             <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
               <div className="flex min-h-full items-center justify-center">
                 <div
@@ -1542,19 +1544,15 @@ export default function StudentJoinSessionPage() {
                             </div>
 
                             {!state.consent && (
-                                <Link
-                                    href={`/consent?returnUrl=${encodeURIComponent(
-                                        `/student/session/${sessionId}`
-                                    )}`}
-                                    className="mt-5 block"
+                                <Button
+                                    onClick={() => setConsentModalOpen(true)}
+                                    className="mt-5 h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
                                 >
-                                  <Button className="h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]">
-                                    <ShieldCheck size={18} />
-                                    {blockReason === "consent_required"
-                                        ? "Перейти к согласию"
-                                        : "Подтвердить согласие"}
-                                  </Button>
-                                </Link>
+                                  <ShieldCheck size={18} />
+                                  {blockReason === "consent_required"
+                                      ? "Перейти к согласию"
+                                      : "Подтвердить согласие"}
+                                </Button>
                             )}
                           </div>
                         </div>
@@ -1598,6 +1596,21 @@ export default function StudentJoinSessionPage() {
               </div>
             </div>
         )}
+
+        <ConsentModal
+            open={consentModalOpen}
+            onClose={() => setConsentModalOpen(false)}
+            onContinueWithoutAnalysis={() => setConsentModalOpen(false)}
+            onAccept={() => {
+              setConsent(true);
+
+              try {
+                localStorage.setItem("consent", "true");
+              } catch {}
+
+              setConsentModalOpen(false);
+            }}
+        />
       </div>
   );
 }
