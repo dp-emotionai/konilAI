@@ -1,21 +1,42 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { cn } from "@/lib/cn";
-import { AreaChart, Area, ResponsiveContainer } from "recharts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "next/navigation";
 
+import Breadcrumbs from "@/components/layout/Breadcrumbs";
+import PageHero from "@/components/common/PageHero";
+import Reveal from "@/components/common/Reveal";
+import Section from "@/components/common/Section";
+
+import { Card, CardContent } from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import Badge from "@/components/ui/Badge";
+
+import { useUI } from "@/components/layout/Providers";
 import {
-  getSessionLiveMetrics,
-  getSessionChatPolicy,
-  updateSessionChatPolicy,
-  updateSessionStatus,
-  type SessionLiveMetrics,
-  type SessionChatPolicy,
-  type LiveMetricsParticipant,
-} from "@/lib/api/teacher";
-import { getApiBaseUrl, hasAuth, isRealSessionId, getStoredAuth } from "@/lib/api/client";
+  getSessionJoinInfo,
+  getStudentSessionDetails,
+  recordSessionConsent,
+  sendSessionMetrics,
+  type SessionJoinInfo,
+} from "@/lib/api/student";
+import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import {
+  getMlApiBaseUrl,
+  mlAnalyzeFrame,
+  captureSquareFrameGrayscale,
+  ML_INTERVAL,
+  ML_429_PAUSE_MS,
+  type MlAnalyzeResponse,
+} from "@/lib/api/ml";
+import {
+  getSessionContent,
+  getSessionMaterials,
+  type SessionContent,
+  type SessionContentFile,
+} from "@/lib/api/sessionContent";
+import { getMaterialDownload, resolveDownloadUrl } from "@/lib/api/materials";
 import {
   getSessionPresence,
   joinSessionPresence,
@@ -23,60 +44,96 @@ import {
   type SessionPresenceRow,
 } from "@/lib/api/presence";
 
+import CameraCheck from "@/components/session/CameraCheck";
+import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
+import { SessionWhiteboard } from "@/components/session/SessionWhiteboard";
 import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
-import { getWsBaseUrl } from "@/lib/env";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
-import { SessionContentEditor } from "@/components/session/SessionContentEditor";
-import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
-import { SessionMaterialsPanel } from "@/components/session/SessionMaterialsPanel";
-import { SessionWhiteboard } from "@/components/session/SessionWhiteboard";
 import { StreamVideo } from "@/components/session/StreamVideo";
-import CameraCheck from "@/components/session/CameraCheck";
-import Modal from "@/components/ui/Modal";
-import { Card, CardContent } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
 
 import {
-  ArrowLeft,
-  PhoneOff,
   Mic,
   Video,
+  Share2,
+  PhoneOff,
+  AlertTriangle,
+  Activity,
+  AlertCircle,
   MicOff,
   VideoOff,
   MonitorUp,
-  MessageSquare,
-  Users,
-  Layout,
-  FileText,
-  AlertTriangle,
   Sparkles,
-  LogOut,
-  BrainCircuit,
-  TrendingUp,
-  Info,
+  ShieldCheck,
+  Maximize2,
+  MessageSquare,
+  MoreHorizontal,
+  Users2,
+  FileText,
+  Clock,
+  PenTool,
+  CheckSquare,
+  CheckCircle2,
+  ArrowLeft,
+  LockKeyhole,
+  X,
 } from "lucide-react";
+import { getWsBaseUrl } from "@/lib/env";
+import { cn } from "@/lib/cn";
 
-type SessionPhase = "preflight" | "live" | "ended";
-
-const COLORS = {
-  purple: "#7448FF",
-  rose: "#F43F5E",
-};
-
-function normalizeKey(v?: string | null) {
-  return (v || "").trim().toLowerCase();
+function StatusPill({ label, value }: { label: string; value: string }) {
+  return (
+      <div className="rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+          {label}
+        </div>
+        <div className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <span className="h-2 w-2 rounded-full bg-[#7448FF] shadow-[0_0_0_4px_rgba(116,72,255,0.10)]" />
+          {value}
+        </div>
+      </div>
+  );
 }
 
-function formatPersonName(input?: {
-  fullName?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-  role?: string | null;
-} | null) {
+function PreparationStepper({ step }: { step: 1 | 2 }) {
+  return (
+      <div className="mx-auto flex w-full max-w-[190px] items-center">
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7448FF] text-[11px] font-bold text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]">
+          {step === 2 ? <CheckCircle2 size={15} /> : 1}
+        </div>
+        <div className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div
+              className={cn(
+                  "absolute inset-y-0 left-0 rounded-full bg-[#7448FF] transition-all duration-300",
+                  step === 2 ? "w-full" : "w-0"
+              )}
+          />
+        </div>
+        <div
+            className={cn(
+                "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                step === 2
+                    ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
+                    : "border-slate-200 bg-white text-slate-400"
+            )}
+        >
+          2
+        </div>
+      </div>
+  );
+}
+
+function formatPersonName(
+    input?: {
+      fullName?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+      role?: string | null;
+      id?: string | null;
+    } | null
+) {
   if (!input) return "Участник";
 
   const fullName = input.fullName?.trim();
@@ -93,9 +150,8 @@ function formatPersonName(input?: {
   return "Участник";
 }
 
-function formatParticipantLabel(p?: Participant | "local" | null) {
-  if (p === "local") return "Вы";
-  if (!p) return "Студент";
+function formatParticipantLabel(p?: Participant | null) {
+  if (!p) return "Преподаватель";
 
   return formatPersonName({
     fullName: p.fullName,
@@ -103,214 +159,222 @@ function formatParticipantLabel(p?: Participant | "local" | null) {
     lastName: (p as { lastName?: string | null }).lastName,
     email: p.email,
     role: p.role,
+    id: p.id,
   });
 }
 
-function getMetricLabel(metric?: LiveMetricsParticipant | null) {
-  if (!metric) return null;
-
-  return formatPersonName({
-    fullName: metric.fullName,
-    firstName: metric.firstName,
-    lastName: metric.lastName,
-    email: metric.email,
-  });
-}
-
-function participantHasIdentity(participant?: Participant | null) {
-  if (!participant) return false;
-
-  return Boolean(
-    participant.fullName?.trim() ||
-      (participant as { firstName?: string | null }).firstName?.trim() ||
-      (participant as { lastName?: string | null }).lastName?.trim() ||
-      participant.email?.trim()
-  );
-}
-
-function getParticipantDisplayName(
-  participant?: Participant | "local" | null,
-  metric?: LiveMetricsParticipant | null
-) {
-  if (participant === "local") return "Вы";
-  if (participant && participantHasIdentity(participant)) {
-    return formatParticipantLabel(participant);
-  }
-  return getMetricLabel(metric) || formatParticipantLabel(participant);
-}
-
-function formatMetricPercent(value?: number | null) {
+function formatPercentMetric(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
 }
 
-function ChecklistItem({
-  label,
-  ok,
-  hint,
-}: {
+function CallControlButton({
+                             active = true,
+                             icon,
+                             dangerIcon,
+                             label,
+                             onClick,
+                             disabled,
+                           }: {
+  active?: boolean;
+  icon: React.ReactNode;
+  dangerIcon?: React.ReactNode;
   label: string;
-  ok: boolean;
-  hint: string;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 bg-slate-50/50">
-      <div
-        className={cn(
-          "mt-0.5 inline-flex h-4 w-4 shrink-0 rounded-full items-center justify-center",
-          ok ? "bg-emerald-500" : "bg-rose-500"
-        )}
-      >
-        <div className={cn("h-1.5 w-1.5 rounded-full bg-white", !ok && "animate-pulse")} />
+      <div className="flex flex-col items-center gap-2">
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center transition-all bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)]",
+                !active
+                    ? "bg-slate-100 text-slate-600"
+                    : "text-slate-900 hover:bg-slate-50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
+                disabled && "opacity-50 cursor-not-allowed"
+            )}
+        >
+          {!active && dangerIcon ? dangerIcon : icon}
+        </button>
+        <span className="text-xs font-semibold text-slate-700">{label}</span>
       </div>
-      <div>
-        <div className="text-[13px] font-bold text-slate-900">{label}</div>
-        <div className="mt-0.5 text-[12px] text-slate-500 font-medium">{hint}</div>
-      </div>
-    </div>
   );
 }
 
-function StatusPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-100 bg-white px-3 py-3 shadow-sm">
-      <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-        {label}
-      </div>
-      <div className="mt-1 text-[14px] font-bold text-slate-900">{value}</div>
-    </div>
-  );
-}
-
-function buildParticipantMetricsMap(
-  participants: Participant[],
-  mlParticipants: LiveMetricsParticipant[]
-) {
-  const map = new Map<string, LiveMetricsParticipant | null>();
-  const assignedMetricIds = new Set<string>();
-  const unresolvedParticipants: Participant[] = [];
-
-  const getMetricId = (metric: LiveMetricsParticipant, index: number) =>
-    `${metric.userId || "metric"}:${metric.email || metric.fullName || index}`;
-
-  for (const participant of participants) {
-    const participantUserId = normalizeKey(participant.userId);
-    const participantEmail = normalizeKey(participant.email);
-    const participantFullName = normalizeKey(
-      participant.fullName ||
-        `${(participant as { firstName?: string | null }).firstName || ""} ${(participant as {
-          lastName?: string | null;
-        }).lastName || ""}`.trim()
-    );
-
-    const candidates = mlParticipants.filter((metric, index) => {
-      const metricId = getMetricId(metric, index);
-      if (assignedMetricIds.has(metricId)) return false;
-
-      const userIdMatch =
-        normalizeKey(metric.userId) &&
-        participantUserId &&
-        normalizeKey(metric.userId) === participantUserId;
-      const emailMatch =
-        normalizeKey(metric.email) &&
-        participantEmail &&
-        normalizeKey(metric.email) === participantEmail;
-      const fullNameMatch =
-        normalizeKey(metric.fullName) &&
-        participantFullName &&
-        normalizeKey(metric.fullName) === participantFullName;
-
-      return Boolean(userIdMatch || emailMatch || fullNameMatch);
-    });
-
-    if (candidates.length === 1) {
-      const metric = candidates[0];
-      map.set(participant.id, metric);
-      assignedMetricIds.add(getMetricId(metric, mlParticipants.indexOf(metric)));
-    } else {
-      unresolvedParticipants.push(participant);
-    }
-  }
-
-  if (participants.length === 1 && mlParticipants.length === 1) {
-    map.set(participants[0].id, mlParticipants[0]);
-    return map;
-  }
-
-  const remainingMetrics = mlParticipants.filter(
-    (metric, index) => !assignedMetricIds.has(getMetricId(metric, index))
-  );
-
-  if (unresolvedParticipants.length === 1 && remainingMetrics.length === 1) {
-    map.set(unresolvedParticipants[0].id, remainingMetrics[0]);
-  }
-
-  for (const participant of unresolvedParticipants) {
-    if (!map.has(participant.id)) {
-      map.set(participant.id, null);
-    }
-  }
-
-  return map;
-}
-
-export default function TeacherLiveMonitorPage() {
+export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
-  const router = useRouter();
-
-  const [phase, setPhase] = useState<SessionPhase>("preflight");
-  const [liveSeconds, setLiveSeconds] = useState(0);
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-
-  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
-  const [metricsHistory, setMetricsHistory] = useState<
-    { time: string; engagement: number; stress: number; risk: number }[]
-  >([]);
-  const [chatPolicy, setChatPolicy] = useState<SessionChatPolicy | null>(null);
-
-  const [isMicEnabled, setIsMicEnabled] = useState(true);
-  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null);
-
-  const [connectionState, setConnectionState] = useState<
-    "idle" | "connecting" | "connected" | "error"
-  >("idle");
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [wsDisconnected, setWsDisconnected] = useState(false);
-
-  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-
-  const [focusedParticipant, setFocusedParticipant] = useState<Participant | "local" | null>(
-    null
-  );
-  const [cameraReady, setCameraReady] = useState(false);
-
-  const peerManagerRef = useRef<PeerConnectionManager | null>(null);
-  const screenStreamRef = useRef<MediaStream | null>(null);
+  const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
+  const monitorRef = useRef<HTMLDivElement | null>(null);
 
-  const [sessionTitle, setSessionTitle] = useState("Загрузка...");
-  const [sessionType, setSessionType] = useState<"lecture" | "exam">("lecture");
-  const [activeTab, setActiveTab] = useState<"board" | "materials" | "notes">("board");
-  const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
-  const [chartReady, setChartReady] = useState(false);
+  const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
+  const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
+  const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
+  const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">(
+      "whiteboard"
+  );
+  const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredAuth>>(null);
+  const [sessionContent, setSessionContent] = useState<SessionContent | null>(null);
+  const [sessionFiles, setSessionFiles] = useState<SessionContentFile[]>([]);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [isMonitorFullscreen, setIsMonitorFullscreen] = useState(false);
+
+  const loadJoinInfo = useCallback(async () => {
+    if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
+      setJoinInfoLoading(false);
+      return;
+    }
+
+    setJoinInfoError(null);
+    setJoinInfoLoading(true);
+
+    try {
+      const info = await getSessionJoinInfo(sessionId);
+      setJoinInfo(info ?? null);
+
+      if (info?.reason === "consent_required" && state.consent) {
+        try {
+          await recordSessionConsent(sessionId);
+          const updated = await getSessionJoinInfo(sessionId);
+          if (updated) setJoinInfo(updated);
+        } catch {
+          // ignore
+        }
+      }
+    } catch (e) {
+      setJoinInfo(null);
+      setJoinInfoError(
+          e instanceof Error ? e.message : "Не удалось загрузить данные сессии."
+      );
+    } finally {
+      setJoinInfoLoading(false);
+    }
+  }, [sessionId, state.consent]);
+
+  useEffect(() => {
+    void loadJoinInfo();
+  }, [loadJoinInfo]);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
+
+    if (blockReason === "session_not_started") {
+      timer = window.setInterval(() => {
+        void loadJoinInfo();
+      }, 5000);
+    }
+
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [joinInfo, loadJoinInfo]);
+
+  const title = joinInfo?.title ?? "Сессия";
+  const loadSessionContent = useCallback(async () => {
+    if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
+      setSessionContent(null);
+      setSessionFiles([]);
+      return;
+    }
+
+    setContentLoading(true);
+    try {
+      const [content, materials] = await Promise.all([
+        getSessionContent(sessionId),
+        getSessionMaterials(sessionId),
+      ]);
+
+      setSessionContent(content);
+      setSessionFiles(materials ?? content?.files ?? []);
+    } finally {
+      setContentLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    void loadSessionContent();
+  }, [loadSessionContent]);
+
+  const sessionType: "lecture" | "exam" = joinInfo?.type === "exam" ? "exam" : "lecture";
 
   const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
-  const wsUrl = getWsBaseUrl().replace(/^ws/, "http");
+  const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
+  const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
+  const preparationStep: 1 | 2 =
+      blockReason === "consent_required" || !state.consent ? 1 : 2;
+
+  const [live, setLive] = useState(false);
+  const [tab, setTab] = useState<"prepare" | "live">("prepare");
+  const [preparationView, setPreparationView] = useState<"main" | "consent-details">(
+      "main"
+  );
+  const [consentChecked, setConsentChecked] = useState(state.consent);
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const showPreparation =
+      !joinInfoLoading &&
+      !joinInfoError &&
+      !live &&
+      (canJoin || blockReason === "consent_required");
 
   useEffect(() => {
-    setChartReady(true);
-  }, []);
-  const roomId = sessionId;
-  const isLive = phase === "live";
+    if (state.consent) setConsentChecked(true);
+  }, [state.consent]);
 
   useEffect(() => {
-    if (!isLive || !apiAvailable || !roomId) {
+    if (preparationStep === 2) {
+      setPreparationView("main");
+      setConsentError(null);
+    }
+  }, [preparationStep]);
+
+  const confirmSessionConsent = useCallback(async () => {
+    if (!consentChecked || consentSaving) return;
+
+    setConsentSaving(true);
+    setConsentError(null);
+
+    try {
+      if (sessionId && getApiBaseUrl() && hasAuth()) {
+        await recordSessionConsent(sessionId);
+      }
+
+      setConsent(true);
+
+      try {
+        localStorage.setItem("consent", "true");
+      } catch {
+        // localStorage may be unavailable in privacy mode.
+      }
+
+      if (sessionId && getApiBaseUrl() && hasAuth()) {
+        const updated = await getSessionJoinInfo(sessionId);
+        if (updated) setJoinInfo(updated);
+      }
+    } catch (error) {
+      console.error("session consent save failed", error);
+      setConsentError(
+          error instanceof Error
+              ? error.message
+              : "Не удалось сохранить согласие. Попробуйте ещё раз."
+      );
+    } finally {
+      setConsentSaving(false);
+    }
+  }, [consentChecked, consentSaving, sessionId, setConsent]);
+
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!apiAvailable || !sessionId || !live) {
       setPresence([]);
       return;
     }
@@ -318,11 +382,11 @@ export default function TeacherLiveMonitorPage() {
     const controller = new AbortController();
     let closed = false;
 
-    void joinSessionPresence(roomId, { signal: controller.signal }).catch(() => {});
+    void joinSessionPresence(sessionId, { signal: controller.signal }).catch(() => {});
 
     const load = async () => {
       try {
-        const list = await getSessionPresence(roomId, { signal: controller.signal });
+        const list = await getSessionPresence(sessionId, { signal: controller.signal });
         if (!closed) setPresence(Array.isArray(list) ? list : []);
       } catch {
         if (!closed) setPresence([]);
@@ -336,47 +400,102 @@ export default function TeacherLiveMonitorPage() {
       closed = true;
       window.clearInterval(interval);
       controller.abort();
-      void leaveSessionPresence(roomId).catch(() => {});
+      void leaveSessionPresence(sessionId).catch(() => {});
     };
-  }, [apiAvailable, isLive, roomId]);
+  }, [apiAvailable, live, sessionId]);
 
-  const teacherDisplayName = useMemo(
-    () =>
-      formatPersonName({
-        fullName: auth?.fullName,
-        firstName: auth?.firstName,
-        lastName: auth?.lastName,
-        email: auth?.email,
-        role: "teacher",
-      }),
-    [auth]
+  const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
+  const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
+  const [mlActive, setMlActive] = useState(false);
+  const [mlUnavailable, setMlUnavailable] = useState(false);
+
+  const [connectionState, setConnectionState] = useState<
+      "idle" | "connecting" | "connected" | "error"
+  >("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [wsDisconnected, setWsDisconnected] = useState(false);
+
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const peerManagerRef = useRef<PeerConnectionManager | null>(null);
+
+  const mlApiAvailable = Boolean(getMlApiBaseUrl());
+  const shouldRunMl = live && state.consent && mlApiAvailable;
+  const roomId = sessionId;
+
+  const teacherParticipant = useMemo(
+      () => participants.find((p) => p.role === "teacher") ?? participants[0] ?? null,
+      [participants]
+  );
+
+  const currentStudentName = useMemo(
+      () =>
+          formatPersonName({
+            fullName: currentUser?.fullName,
+            firstName: currentUser?.firstName,
+            lastName: currentUser?.lastName,
+            email: currentUser?.email,
+            role: "student",
+          }),
+      [currentUser]
   );
   useEffect(() => {
-    setAuth(getStoredAuth());
+    setCurrentUser(getStoredAuth());
   }, []);
 
   useEffect(() => {
-    import("@/lib/api/teacher")
-      .then(({ getTeacherDashboardSessions }) => {
-        return getTeacherDashboardSessions().then((sessions) => {
-          const s = sessions.find((x) => x.id === sessionId);
-          if (s) {
-            setSessionTitle(s.title);
-            setSessionType(s.type);
-          }
-        });
-      })
-      .catch(() => {});
-  }, [sessionId]);
+    const onFullscreenChange = () => {
+      setIsMonitorFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleMonitorFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await monitorRef.current?.requestFullscreen();
+    } catch (error) {
+      console.error("monitor fullscreen failed", error);
+    }
+  }, []);
+
+  const teacherDisplayName = useMemo(() => {
+    const liveParticipantName = formatParticipantLabel(teacherParticipant);
+    if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
+    return liveParticipantName;
+  }, [sessionTeacherName, teacherParticipant]);
+
+  const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
+  const sessionStartTime = useRef<number>(Date.now());
 
   useEffect(() => {
-    if (!isLive) return;
-    const id = window.setInterval(() => setLiveSeconds((s) => s + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [isLive]);
+    if (!live || connectionState !== "connected") return;
+
+    sessionStartTime.current = Date.now();
+
+    const updater = setInterval(() => {
+      const span = Date.now() - sessionStartTime.current;
+      const s = Math.floor(span / 1000);
+      const m = Math.floor(s / 60);
+      const h = Math.floor(m / 60);
+      const fmt = (v: number) => v.toString().padStart(2, "0");
+      setSessionTimerLabel(`${fmt(h)}:${fmt(m % 60)}:${fmt(s % 60)}`);
+    }, 1000);
+
+    return () => clearInterval(updater);
+  }, [live, connectionState]);
 
   useEffect(() => {
-    if (!isLive || !roomId) {
+    if (!live || !roomId) {
       setConnectionState("idle");
       setConnectionError(null);
       return;
@@ -384,53 +503,18 @@ export default function TeacherLiveMonitorPage() {
 
     setConnectionState("connecting");
     setConnectionError(null);
-    setMediaError(null);
 
-    const signaling = new SignalingClient([`${wsUrl}/api/ws`, `${wsUrl}/ws`]);
-    const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
-      onRemoteStream: (peerId, stream) => {
+    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
+    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
+    const manager = new PeerConnectionManager(signaling, roomId, "student", {
+      onRemoteStream: (_peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
-        setRemoteStreams((prev) => {
-          if (!hasTracks) {
-            const next = { ...prev };
-            delete next[peerId];
-            return next;
-          }
-          return { ...prev, [peerId]: stream };
-        });
+        setRemoteStream(hasTracks ? stream : null);
       },
-      onPeersChange: (peers) => {
-        setParticipants(peers);
-        setRemoteStreams((prev) => {
-          const ids = new Set(peers.map((p) => p.id));
-          const next = { ...prev };
-          Object.keys(next).forEach((id) => {
-            if (!ids.has(id)) delete next[id];
-          });
-          return next;
-        });
-      },
+      onPeersChange: (peers) => setParticipants(peers),
       onDisconnect: () => setWsDisconnected(true),
-      onPeerLeft: (peerId) => {
-        setRemoteStreams((prev) => {
-          if (!prev[peerId]) return prev;
-
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
-        });
-
-        setFocusedParticipant((current) => {
-          if (
-            current &&
-            current !== "local" &&
-            current.id === peerId
-          ) {
-            return "local";
-          }
-
-          return current;
-        });
+      onPeerLeft: () => {
+        setRemoteStream(null);
       },
     });
 
@@ -442,40 +526,37 @@ export default function TeacherLiveMonitorPage() {
       try {
         const stream = await manager.initLocalStream({ video: true, audio: true });
         setLocalStream(stream);
-        setIsMicEnabled(true);
-        setIsCameraEnabled(true);
 
         await signaling.waitForOpen(12000);
 
-        const currentAuth = getStoredAuth();
+        const auth = getStoredAuth();
         manager.join(
-          currentAuth
-            ? {
-                email: currentAuth.email,
-                fullName: currentAuth.fullName || undefined,
-                firstName: currentAuth.firstName || undefined,
-                lastName: currentAuth.lastName || undefined,
-              }
-            : undefined
+            auth
+                ? {
+                  email: auth.email,
+                  fullName: auth.fullName || undefined,
+                  firstName: auth.firstName || undefined,
+                  lastName: auth.lastName || undefined,
+                }
+                : undefined
         );
 
         setConnectionState("connected");
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Ошибка подключения";
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Ошибка подключения";
         const friendly =
-          msg.includes("timeout") || msg.includes("WebSocket")
-            ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
-            : msg.includes("Permission") ||
-                msg.includes("NotAllowed") ||
-                msg.includes("NotFound")
-              ? "Камера или микрофон недоступны. Проверьте разрешения в браузере."
-              : "Не удалось запустить эфир. Проверьте камеру и подключение.";
+            msg.includes("timeout") || msg.includes("WebSocket")
+                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки WS."
+                : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
+                    ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
+                    : msg;
 
         setConnectionError(friendly);
         setConnectionState("error");
-        setPhase("preflight");
+        setLive(false);
+        setTab("prepare");
         manager.leave();
-        setRemoteStreams({});
+        setRemoteStream(null);
         setLocalStream(null);
         setParticipants([]);
       }
@@ -486,150 +567,30 @@ export default function TeacherLiveMonitorPage() {
       screenStreamRef.current = null;
       peerManagerRef.current = null;
       manager.leave();
-      setRemoteStreams({});
+      setRemoteStream(null);
       setLocalStream(null);
       setParticipants([]);
-      setIsScreenSharing(false);
       setConnectionState("idle");
       setConnectionError(null);
       setWsDisconnected(false);
+      setIsScreenSharing(false);
     };
-  }, [isLive, roomId, wsUrl]);
+  }, [live, roomId]);
 
   useEffect(() => {
-    if (!focusedParticipant && participants.length > 0) {
-      setFocusedParticipant(participants[0]);
-    }
+    if (!live || !sessionId || !apiAvailable) return;
 
-    if (
-      focusedParticipant &&
-      focusedParticipant !== "local" &&
-      !participants.some((p) => p.id === focusedParticipant.id)
-    ) {
-      setFocusedParticipant(participants[0] ?? "local");
-    }
-  }, [participants, focusedParticipant]);
+    let cancelled = false;
 
-  useEffect(() => {
-    if (!roomId || !apiAvailable || !isRealSessionId(roomId)) {
-      setChatPolicy(null);
-      return;
-    }
-
-    let mounted = true;
-    getSessionChatPolicy(roomId).then((p) => {
-      if (mounted && p) setChatPolicy(p);
+    void getStudentSessionDetails(sessionId).then((details) => {
+      if (cancelled || !details) return;
+      setSessionTeacherName(details.teacherFullName || details.teacher || null);
     });
 
     return () => {
-      mounted = false;
+      cancelled = true;
     };
-  }, [roomId, apiAvailable]);
-
-  useEffect(() => {
-    if (!isLive || !roomId || !apiAvailable || !isRealSessionId(roomId)) {
-      setLiveMetrics(null);
-      return;
-    }
-
-    let stopped = false;
-    let timer: number | null = null;
-    let inflight = false;
-
-    const tick = async () => {
-      if (stopped) return;
-      if (inflight) {
-        timer = window.setTimeout(tick, 700);
-        return;
-      }
-      inflight = true;
-
-      try {
-        const data = await getSessionLiveMetrics(roomId);
-        if (!stopped && data) {
-          setLiveMetrics(data);
-
-          const now = new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          });
-
-          const mlParticipants = data.participants ?? [];
-
-          const e_val =
-            data.avgEngagement ??
-            (mlParticipants.length
-              ? mlParticipants.reduce(
-                  (a, p) => a + (typeof p.engagement === "number" ? p.engagement : 0),
-                  0
-                ) /
-                Math.max(
-                  1,
-                  mlParticipants.filter((p) => typeof p.engagement === "number").length
-                )
-              : 0);
-
-          const s_val =
-            data.avgStress ??
-            (mlParticipants.length
-              ? mlParticipants.reduce(
-                  (a, p) => a + (typeof p.stress === "number" ? p.stress : 0),
-                  0
-                ) /
-                Math.max(
-                  1,
-                  mlParticipants.filter((p) => typeof p.stress === "number").length
-                )
-              : 0);
-
-          const r_val = data.avgRisk ?? 0;
-
-          setMetricsHistory((prev) => {
-            const next = [
-              ...prev,
-              {
-                time: now,
-                engagement: Math.round(e_val * 100),
-                stress: Math.round(s_val * 100),
-                risk: Math.round(r_val * 100),
-              },
-            ];
-            return next.slice(-30);
-          });
-        }
-      } finally {
-        inflight = false;
-        if (!stopped) timer = window.setTimeout(tick, 2000);
-      }
-    };
-
-    void tick();
-
-    return () => {
-      stopped = true;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [isLive, roomId, apiAvailable]);
-
-  const mlParticipants = liveMetrics?.participants ?? [];
-  const hasMl = mlParticipants.length > 0;
-
-  const avgEngagement =
-    metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].engagement : 0;
-  const avgStress =
-    metricsHistory.length > 0 ? metricsHistory[metricsHistory.length - 1].stress : 0;
-  const avgRisk = liveMetrics?.avgRisk != null ? Math.round(liveMetrics.avgRisk * 100) : 0;
-  const avgFatigue = liveMetrics?.avgFatigue != null ? Math.round(liveMetrics.avgFatigue * 100) : 0;
-
-  const gates = { backend: apiAvailable, ws: Boolean(wsUrl), camera: cameraReady };
-  const criticalOk = gates.backend && gates.ws && gates.camera;
-
-  const formatTimer = () => {
-    const m = Math.floor(liveSeconds / 60);
-    const s = liveSeconds % 60;
-    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-  };
+  }, [apiAvailable, live, sessionId]);
 
   const toggleMic = () => {
     const next = !isMicEnabled;
@@ -644,25 +605,17 @@ export default function TeacherLiveMonitorPage() {
     setIsCameraEnabled(next);
   };
 
-  const stopScreenShare = async () => {
-    const manager = peerManagerRef.current;
-    if (!manager || !localStream) return;
-
-    const cameraTrack = localStream.getVideoTracks()[0] ?? null;
-    if (cameraTrack) cameraTrack.enabled = isCameraEnabled;
-
-    await manager.replaceOutgoingVideoTrack(isCameraEnabled ? cameraTrack : null);
-    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
-    screenStreamRef.current = null;
-    setIsScreenSharing(false);
-  };
-
   const toggleScreenShare = async () => {
     const manager = peerManagerRef.current;
     if (!manager || !localStream) return;
 
     if (isScreenSharing) {
-      await stopScreenShare();
+      const cameraTrack = localStream.getVideoTracks()[0] ?? null;
+      if (cameraTrack) cameraTrack.enabled = isCameraEnabled;
+      await manager.replaceOutgoingVideoTrack(isCameraEnabled ? cameraTrack : null);
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setIsScreenSharing(false);
       return;
     }
 
@@ -671,960 +624,1162 @@ export default function TeacherLiveMonitorPage() {
         video: true,
         audio: false,
       });
-
       const displayTrack = displayStream.getVideoTracks()[0];
       if (!displayTrack) return;
 
       screenStreamRef.current = displayStream;
       await manager.replaceOutgoingVideoTrack(displayTrack);
       setIsScreenSharing(true);
-      setMediaError(null);
 
       displayTrack.onended = () => {
-        void stopScreenShare();
+        void toggleScreenShare();
       };
-    } catch {
-      setMediaError("Не удалось запустить демонстрацию экрана.");
+    } catch (err) {
+      console.error(err);
     }
   };
 
-  const activeRemoteParticipant =
-    focusedParticipant && focusedParticipant !== "local"
-      ? focusedParticipant
-      : participants[0] ?? null;
+  useEffect(() => {
+    if (!shouldRunMl || !localStream) return;
 
-  const hasRemoteFocus =
-    !!activeRemoteParticipant && !!remoteStreams[activeRemoteParticipant.id];
+    setMlActive(true);
+    setMlUnavailable(false);
 
-  const participantMetricsMap = useMemo(() => {
-    return buildParticipantMetricsMap(participants, mlParticipants);
-  }, [participants, mlParticipants]);
+    let cancelled = false;
+    let inflight = false;
+    let consecutiveFailures = 0;
+    let pausedUntil = 0;
+    const failureThreshold = 4;
 
-  const activeMainLabel =
-    hasRemoteFocus && activeRemoteParticipant
-      ? getParticipantDisplayName(
-          activeRemoteParticipant,
-          participantMetricsMap.get(activeRemoteParticipant.id) ?? null
-        )
-      : teacherDisplayName;
+    const hiddenVideo = document.createElement("video");
+    hiddenVideo.muted = true;
+    hiddenVideo.playsInline = true;
+    hiddenVideo.autoplay = true;
+    hiddenVideo.srcObject = localStream;
+    hiddenVideo.play().catch(() => { });
 
-  if (phase === "preflight") {
+    const timer = setInterval(async () => {
+      if (cancelled || inflight) return;
+      if (Date.now() < pausedUntil) return;
+
+      const frame = captureSquareFrameGrayscale(hiddenVideo, 192);
+      if (!frame) return;
+
+      try {
+        inflight = true;
+        const result = await mlAnalyzeFrame(frame);
+        if (cancelled) return;
+
+        if (!result) {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+          return;
+        }
+
+        consecutiveFailures = 0;
+        const hasFace = result.face_detected !== false;
+        setMlFaceDetected(hasFace);
+
+        if (!hasFace) {
+          setMlResult(null);
+          return;
+        }
+
+        setMlResult(result);
+
+        if (sessionId && apiAvailable) {
+          sendSessionMetrics(sessionId, {
+            emotion: result.emotion ?? "Neutral",
+            confidence: result.confidence ?? 0,
+            risk: result.risk ?? 0,
+            state: result.state ?? "NORMAL",
+            dominant_emotion: result.dominant_emotion ?? "Neutral",
+            engagement: result.engagement,
+            stress: result.stress,
+            fatigue: result.fatigue,
+          }).catch(() => { });
+        }
+      } catch (err) {
+        const e = err as Error & { status?: number };
+        if (e?.status === 429 || e?.message === "RATE_LIMIT") {
+          pausedUntil = Date.now() + ML_429_PAUSE_MS;
+        } else {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+        }
+      } finally {
+        inflight = false;
+      }
+    }, ML_INTERVAL);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      hiddenVideo.pause();
+      hiddenVideo.srcObject = null;
+      setMlActive(false);
+      setMlResult(null);
+      setMlFaceDetected(null);
+      setMlUnavailable(false);
+    };
+  }, [shouldRunMl, sessionId, apiAvailable, localStream]);
+
+  if (tab === "live") {
     return (
-      <div className="fixed top-[64px] bottom-0 left-0 right-0 bg-[#FAFAFB] flex flex-col pt-12 px-6 pb-24 selection:bg-purple-100 selection:text-[#7448FF] overflow-y-auto z-40">
-        <div className="mx-auto w-full max-w-[1000px] space-y-8">
-          <header className="flex items-center text-slate-500 transition-colors">
-            <Link
-              href="/teacher/sessions"
-              className="flex items-center gap-2 text-[14px] font-bold hover:text-slate-900 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100"
-            >
-              <ArrowLeft size={16} /> Назад к сессиям
-            </Link>
-          </header>
-
-          <div>
-            <h1 className="text-[32px] font-extrabold text-slate-900 tracking-tight">
-              Подготовка к эфиру
-            </h1>
-            <p className="text-slate-500 font-medium mt-1">
-              Осталось проверить оборудование и подключение перед стартом.
-            </p>
-          </div>
-
-          {connectionError && (
-            <Card className="border-amber-400/30 bg-amber-50 shadow-none">
-              <CardContent className="flex flex-wrap items-center gap-4 p-5">
-                <AlertTriangle className="text-amber-500" size={24} />
-                <div className="flex-1 min-w-[200px]">
-                  <div className="font-bold text-slate-900">Ошибка подключения</div>
-                  <div className="text-[13px] text-slate-600 font-medium">
-                    {connectionError}
-                  </div>
+        <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB]">
+          <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[1550px] flex-col px-4 py-8 md:px-8 animate-in fade-in zoom-in-[0.98] duration-300">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold text-slate-900 truncate">{title}</h1>
+                  <Badge className="bg-purple-50 text-[#7448FF] border-none font-semibold px-2.5 py-0.5 shrink-0">
+                    Онлайн-сессия
+                  </Badge>
                 </div>
-                <Button
-                  className="bg-amber-100 text-amber-700 hover:bg-amber-200"
-                  onClick={() => {
-                    setConnectionError(null);
-                    setConnectionState("idle");
-                  }}
-                >
-                  Попробовать снова
-                </Button>
-              </CardContent>
-            </Card>
-          )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.5fr_1fr] gap-8">
-            <div className="flex flex-col gap-6">
-              <div className="bg-white rounded-[32px] p-2 border border-slate-100 shadow-sm overflow-hidden h-full min-h-[400px]">
-                <CameraCheck onReadyChange={setCameraReady} />
-              </div>
-            </div>
+                <div className="flex flex-wrap items-center gap-6 mt-2 text-[13px] text-slate-500 font-medium">
+                <span>
+                  Преподаватель:{" "}
+                  <span className="text-slate-900">{teacherDisplayName}</span>
+                </span>
 
-            <div className="flex flex-col gap-6">
-              <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden max-h-min">
-                <CardContent className="p-8 space-y-6">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-purple-50 text-[#7448FF] rounded-2xl flex items-center justify-center shrink-0">
-                      <Sparkles size={20} />
-                    </div>
-                    <div>
-                      <div className="text-[12px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">
-                        Checklist
-                      </div>
-                      <div className="text-[16px] font-bold text-slate-900 leading-tight">
-                        Системные проверки
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 pt-2">
-                    <ChecklistItem
-                      label="Подключение к API"
-                      ok={gates.backend}
-                      hint={apiAvailable ? "API сервера доступен" : "Отсутствует подключение или токен"}
-                    />
-                    <ChecklistItem
-                      label="Сигналинг WebRTC"
-                      ok={gates.ws}
-                      hint={gates.ws ? "Соединение WS настроено" : "Проверьте NEXT_PUBLIC_WS_BASE_URL"}
-                    />
-                    <ChecklistItem
-                      label="Камера и микрофон"
-                      ok={gates.camera}
-                      hint={gates.camera ? "Разрешения даны, медиа работает" : "Дайте доступ к устройствам"}
-                    />
-                  </div>
-
-                  {!criticalOk && (
-                    <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4 flex items-start gap-3">
-                      <AlertTriangle size={16} className="text-rose-500 shrink-0 mt-0.5" />
-                      <div className="text-[12px] font-medium text-slate-600 leading-relaxed">
-                        Пока все проверки не станут зелеными, вы не сможете запустить сессию.
-                      </div>
-                    </div>
+                  {connectionState === "connected" ? (
+                      <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Сессия активна
+                  </span>
+                  ) : (
+                      <span className="flex items-center gap-2 text-amber-600">
+                    <AlertCircle size={14} />{" "}
+                        {connectionState === "connecting" ? "Подключение..." : "Сбой соединения"}
+                  </span>
                   )}
 
-                  <div className="pt-4 border-t border-slate-50">
-                    <Button
-                      onClick={async () => {
-                        if (!criticalOk) return;
-                        try {
-                          await updateSessionStatus(roomId, "active");
-                        } catch (e) {
-                          console.error("Failed to start session on backend", e);
-                        }
-                        setPhase("live");
-                        setLiveSeconds(0);
-                      }}
-                      disabled={!criticalOk}
-                      className="w-full h-14 rounded-2xl font-bold bg-[#7448FF] hover:bg-purple-600 shadow-[0_10px_25px_rgba(116,72,255,0.2)] disabled:opacity-50 disabled:shadow-none transition-all"
-                    >
-                      {criticalOk ? "Начать сессию" : "Ожидание оборудования..."}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  {wsDisconnected && (
+                      <span className="flex items-center gap-2 text-rose-600">
+                    <AlertTriangle size={14} />
+                    Соединение потеряно
+                  </span>
+                  )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <StatusPill label="Room" value={roomId ? `${roomId.slice(0, 8)}…` : "—"} />
-                <StatusPill label="Backend" value={gates.backend ? "OK" : "Off"} />
+                  {connectionState === "connected" && (
+                      <span className="tabular-nums opacity-60 font-semibold">{sessionTimerLabel}</span>
+                  )}
+                </div>
+              </div>
+
+              <button
+                  onClick={() => {
+                    setLive(false);
+                    setTab("prepare");
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-[13px] bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm font-semibold transition-colors shrink-0"
+              >
+                Завершить сессию
+              </button>
+            </div>
+
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] xl:grid-cols-[minmax(0,1fr)_460px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
+              <div className="flex min-w-0 flex-col">
+                <div className="shrink-0 space-y-6">
+                  <div
+                      ref={monitorRef}
+                      className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
+                  >
+                    {remoteStream ? (
+                        <StreamVideo
+                            stream={remoteStream}
+                            className="w-full h-full object-cover"
+                            autoPlay
+                            playsInline
+                        />
+                    ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
+                          <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+                            <span className="text-2xl">👨🏻‍🏫</span>
+                          </div>
+                          <div className="text-slate-500 font-medium text-sm">
+                            Ожидание подключения преподавателя...
+                          </div>
+                        </div>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={() => void toggleMonitorFullscreen()}
+                        className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer"
+                        aria-label={isMonitorFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+                    >
+                      <Maximize2 size={16} strokeWidth={2.5} />
+                    </button>
+
+                    {remoteStream && (
+                        <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
+                          <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
+                            🎓
+                          </div>
+                          <span className="truncate">{formatParticipantLabel(teacherParticipant)}</span>
+                        </div>
+                    )}
+
+                    <div className="absolute bottom-4 right-4 w-[170px] sm:w-[220px] xl:w-[260px] h-[108px] sm:h-[132px] xl:h-[164px] bg-black rounded-[20px] overflow-hidden border-[3px] border-white/10 shadow-xl transition-all">
+                      <StreamVideo
+                          stream={localStream}
+                          className="w-full h-full object-cover"
+                          autoPlay
+                          playsInline
+                          muted
+                      />
+                      <div className="absolute bottom-2 left-2 max-w-[85%] bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
+                        <span className="truncate">{currentStudentName}</span>
+                        <Mic size={12} className={isMicEnabled ? "text-white shrink-0" : "text-red-400 shrink-0"} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                    <CallControlButton
+                        active={isMicEnabled}
+                        icon={<Mic size={22} />}
+                        label="Микрофон"
+                        dangerIcon={<MicOff size={22} />}
+                        onClick={toggleMic}
+                    />
+                    <CallControlButton
+                        active={isCameraEnabled}
+                        icon={<Video size={22} />}
+                        label="Камера"
+                        dangerIcon={<VideoOff size={22} />}
+                        onClick={toggleCamera}
+                        disabled={isScreenSharing}
+                    />
+                    <CallControlButton
+                        active={isScreenSharing}
+                        icon={<Share2 size={22} />}
+                        label="Экран"
+                        onClick={toggleScreenShare}
+                    />
+                    <CallControlButton
+                        active
+                        icon={<MessageSquare size={22} />}
+                        label="Чат"
+                        onClick={() => {
+                          chatSectionRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }}
+                    />
+                    <CallControlButton
+                        active={false}
+                        disabled
+                        icon={<MoreHorizontal size={22} />}
+                        label="Еще"
+                    />
+
+                    <div className="flex flex-col items-center gap-2 mx-1">
+                      <button
+                          onClick={() => {
+                            setLive(false);
+                            setTab("prepare");
+                          }}
+                          className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
+                      >
+                        <PhoneOff size={22} />
+                      </button>
+                      <span className="text-xs font-semibold text-slate-700">Выйти</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-6 pt-2">
+                  <div>
+                    <div className="flex items-center gap-2 border-b border-slate-100 mb-6">
+                      {["Материалы", "Заметки", "Доска"].map((t) => {
+                        const id =
+                            t === "Материалы"
+                                ? "materials"
+                                : t === "Заметки"
+                                    ? "notes"
+                                    : "whiteboard";
+                        const isActive = activeBottomTab === id;
+
+                        return (
+                            <button
+                                key={id}
+                                onClick={() =>
+                                    setActiveBottomTab(id as "materials" | "notes" | "whiteboard")
+                                }
+                                className={cn(
+                                    "px-5 py-3 text-sm font-semibold transition-colors relative",
+                                    isActive ? "text-[#7448FF]" : "text-slate-500 hover:text-slate-700"
+                                )}
+                            >
+                              {t}
+                              {isActive && (
+                                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#7448FF] rounded-t-full" />
+                              )}
+                            </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] min-h-[300px] flex items-center justify-center p-8">
+                      {activeBottomTab === "whiteboard" && <SessionWhiteboard sessionId={sessionId} className="w-full" />}
+
+                      {activeBottomTab === "whiteboard" && false && (
+                          <div className="text-center w-full">
+                            <Reveal>
+                              <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <PenTool size={32} className="text-slate-200" strokeWidth={1} />
+                                <div className="font-semibold text-slate-700">
+                                  Интерактивная доска недоступна
+                                </div>
+                                <div className="text-sm max-w-sm">
+                                  Модуль совместной работы (Whiteboard) пока находится в разработке.
+                                </div>
+                              </div>
+                            </Reveal>
+                          </div>
+                      )}
+
+                      {activeBottomTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="student" />}
+
+                      {activeBottomTab === "notes" && false && (
+                          <div className="flex h-full w-full flex-col text-left">
+                        <textarea
+                            value=""
+                            onChange={() => {}}
+                            className="min-h-[220px] w-full flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-6 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all"
+                            placeholder="Личные заметки по сессии. Сохраняются только в этом браузере."
+                        />
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2">
+                              <div className="flex items-center gap-2 rounded-lg border border-orange-100 bg-orange-50 px-3 py-1.5">
+                                <AlertTriangle size={14} className="text-orange-500" />
+                                <span className="text-[11px] font-bold text-orange-600">
+                              Личные заметки не синхронизируются с сервером
+                            </span>
+                              </div>
+                              <button
+                                  type="button"
+                                  onClick={() => {}}
+                                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                              >
+                                Очистить заметки
+                              </button>
+                            </div>
+                          </div>
+                      )}
+
+                      {activeBottomTab === "materials" && (contentLoading || sessionFiles.length > 0) && (
+                          <div className="w-full">
+                            {contentLoading ? (
+                                <div className="text-center text-sm text-slate-400">
+                                  Загружаем материалы сессии...
+                                </div>
+                            ) : (
+                                <div className="grid gap-3">
+                                  {sessionFiles.map((file) => (
+                                      <button
+                                          key={file.id}
+                                          type="button"
+                                          onClick={async () => {
+                                            const direct = file.url?.trim();
+                                            if (direct) {
+                                              window.open(direct, "_blank", "noreferrer");
+                                              return;
+                                            }
+
+                                            const info = await getMaterialDownload(file.id);
+                                            const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                            if (url) {
+                                              window.open(url, "_blank", "noreferrer");
+                                            }
+                                          }}
+                                          className={cn(
+                                              "rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4 text-left transition",
+                                              "hover:bg-slate-50"
+                                          )}
+                                      >
+                                        <div className="flex items-start gap-3">
+                                          <div className="mt-0.5 rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
+                                            <FileText size={16} />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <div className="truncate font-semibold text-slate-900">
+                                              {file.title}
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                              {file.fileName || "Файл сессии"}
+                                            </div>
+                                            {false && (
+                                                <div className="mt-2 text-xs text-amber-600">
+                                                  Backend ещё не вернул ссылку на скачивание.
+                                                </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </button>
+                                  ))}
+                                </div>
+                            )}
+                          </div>
+                      )}
+
+                      {activeBottomTab === "materials" && !contentLoading && sessionFiles.length === 0 && (
+                          <div className="text-center w-full">
+                            <Reveal>
+                              <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <CheckSquare size={32} className="text-slate-200" strokeWidth={1} />
+                                <div className="font-semibold text-slate-700">Нет материалов</div>
+                                <div className="text-sm max-w-sm">
+                                  Учебный план для данной сессии не загружен сервером.
+                                </div>
+                              </div>
+                            </Reveal>
+                          </div>
+                      )}
+                    </div>
+
+                    {(contentLoading ||
+                        sessionContent?.lessonPlan ||
+                        sessionContent?.keyPoints?.length ||
+                        sessionFiles.length > 0) && (
+                        <div className="grid grid-cols-1 gap-6 mt-6 xl:grid-cols-3">
+                          <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                            <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
+                            {contentLoading ? (
+                                <div className="text-center py-8 text-slate-400">Загружаем план...</div>
+                            ) : sessionContent?.lessonPlan ? (
+                                <div className="whitespace-pre-line leading-7 text-slate-600">
+                                  {sessionContent.lessonPlan}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-400">
+                                  Backend пока не передал план занятия для этой сессии.
+                                </div>
+                            )}
+                          </div>
+
+                          <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                            <h3 className="font-bold text-slate-900 text-[15px] mb-4">Важные тезисы</h3>
+                            {contentLoading ? (
+                                <div className="text-center py-8 text-slate-400">Загружаем тезисы...</div>
+                            ) : sessionContent?.keyPoints?.length ? (
+                                <ul className="space-y-3">
+                                  {sessionContent.keyPoints.map((point, index) => (
+                                      <li
+                                          key={`${index}-${point}`}
+                                          className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 text-slate-600"
+                                      >
+                                        {point}
+                                      </li>
+                                  ))}
+                                </ul>
+                            ) : (
+                                <div className="text-center py-8 text-slate-400">
+                                  Backend пока не передал важные тезисы для этой сессии.
+                                </div>
+                            )}
+                          </div>
+
+                          <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                            <h3 className="font-bold text-slate-900 text-[15px] mb-4">Файлы</h3>
+                            {contentLoading ? (
+                                <div className="text-center py-8 text-slate-400">Загружаем файлы...</div>
+                            ) : sessionFiles.length > 0 ? (
+                                <div className="space-y-3">
+                                  {sessionFiles.map((file) => (
+                                      <button
+                                          key={file.id}
+                                          type="button"
+                                          onClick={async () => {
+                                            const direct = file.url?.trim();
+                                            if (direct) {
+                                              window.open(direct, "_blank", "noreferrer");
+                                              return;
+                                            }
+
+                                            const info = await getMaterialDownload(file.id);
+                                            const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                            if (url) {
+                                              window.open(url, "_blank", "noreferrer");
+                                            }
+                                          }}
+                                          className={cn(
+                                              "flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3 transition",
+                                              "hover:bg-slate-50"
+                                          )}
+                                      >
+                                        <div className="rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
+                                          <FileText size={16} />
+                                        </div>
+                                        <div className="min-w-0">
+                                          <div className="truncate font-semibold text-slate-900">{file.title}</div>
+                                          <div className="mt-1 text-xs text-slate-500">
+                                            {file.fileName || "Файл сессии"}
+                                          </div>
+                                        </div>
+                                      </button>
+                                  ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 text-slate-400">
+                                  Backend пока не передал прикреплённые файлы для этой сессии.
+                                </div>
+                            )}
+                          </div>
+                        </div>
+                    )}
+
+                    <div
+                        className={cn(
+                            "grid grid-cols-1 gap-6 mt-6 xl:grid-cols-3",
+                            (contentLoading ||
+                                sessionContent?.lessonPlan ||
+                                sessionContent?.keyPoints?.length ||
+                                sessionFiles.length > 0) &&
+                            "hidden"
+                        )}
+                    >
+                      <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                        <h3 className="font-bold text-slate-900 text-[15px] mb-4">План занятия</h3>
+                        <div className="text-center py-8 text-slate-400">План не загружен</div>
+                      </div>
+
+                      <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 md:p-8">
+                        <h3 className="font-bold text-slate-900 text-[15px] mb-4">Важные тезисы</h3>
+                        <div className="text-center py-8 text-slate-400">Записей нет</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                  ref={chatSectionRef}
+                  className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:self-start"
+              >
+                <div className="flex h-[520px] min-h-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)] lg:h-[560px]">
+                  <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
+                    <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
+                    <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
+                      <Users2 size={12} /> {participants.length || 1}
+                    </Badge>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <SessionChatPanel sessionId={roomId} role="student" type={sessionType} />
+                  </div>
+                </div>
+
+                <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 space-y-6 shrink-0">
+                  <h3 className="font-bold text-slate-900 text-[16px]">Информация о сессии</h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-0.5 font-medium">Тема</div>
+                      <div className="font-semibold text-slate-900 text-sm">{title}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-0.5 font-medium">Режим</div>
+                      <div className="font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                        <Clock size={14} className="text-slate-400" />
+                        Live-трансляция ({sessionType})
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
+                      <div className="flex flex-col gap-3">
+                        {presence.length > 0 && (
+                            <div className="space-y-2">
+                              {presence.map((p) => (
+                                  <div
+                                      key={p.userId}
+                                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate text-[13px] font-semibold text-slate-900">
+                                        {p.fullName || p.email || p.userId}
+                                      </div>
+                                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                        {p.email || ""}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                <span
+                                    className={cn(
+                                        "h-2 w-2 rounded-full",
+                                        p.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                                    )}
+                                />
+                                      <span className={p.status === "online" ? "text-emerald-600" : "text-slate-500"}>
+                                  {p.status}
+                                </span>
+                                    </div>
+                                  </div>
+                              ))}
+                            </div>
+                        )}
+                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
+                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
+                            👩🏻‍🏫
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13px] text-slate-900 truncate">
+                              {teacherDisplayName}
+                            </div>
+                            <div className="text-[11px] text-slate-500 font-medium">
+                              Преподаватель
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
+                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
+                            👦🏻
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13px] text-slate-900 truncate">
+                              {currentStudentName}
+                            </div>
+                            <div className="text-[11px] text-[#7448FF] font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-[#7448FF] rounded-full" />
+                              Студент
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {mlResult && (
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                          Ваши локальные ML-метрики
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Эмоция
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {mlResult.dominant_emotion || mlResult.emotion || "—"}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Уверенность
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {formatPercentMetric(mlResult.confidence)}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Вовлечённость
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {formatPercentMetric(mlResult.engagement)}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Стресс
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {formatPercentMetric(mlResult.stress)}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Усталость
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {formatPercentMetric(mlResult.fatigue)}
+                            </div>
+                          </div>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              Риск
+                            </div>
+                            <div className="mt-1.5 font-semibold text-slate-900">
+                              {formatPercentMetric(mlResult.risk)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                        Состояние: {mlResult.state || "—"}
+                      </span>
+                          {typeof mlResult.face_detected === "boolean" && (
+                              <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                          Лицо в кадре: {mlResult.face_detected ? "обнаружено" : "не найдено"}
+                        </span>
+                          )}
+                        </div>
+                      </div>
+                  )}
+
+                  {mlActive && mlFaceDetected === false && !mlUnavailable && (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
+                        Лицо не найдено в кадре. Аналитика временно приостановлена, пока лицо не вернется.
+                      </div>
+                  )}
+
+                  {mlActive && !mlResult && mlFaceDetected !== false && !mlUnavailable && (
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
+                        ML-анализ активен. Ожидание первых результатов...
+                      </div>
+                  )}
+
+                  {mlUnavailable && (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
+                        ML-анализ временно недоступен.
+                      </div>
+                  )}
+                </div>
+
+                <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 flex flex-col min-h-[160px]">
+                  <h3 className="font-bold text-slate-900 text-[16px] mb-4">Файлы</h3>
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                    <FileText size={20} className="text-slate-300 mb-2" strokeWidth={1.5} />
+                    <div className="text-[13px] font-semibold text-slate-500">
+                      Нет прикрепленных файлов
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
 
-  if (phase === "ended") {
-    return (
-      <div className="min-h-screen bg-[#FAFAFB] flex flex-col justify-center items-center p-4">
-        <Card className="w-full max-w-lg border-none shadow-[0_8px_40px_rgba(0,0,0,0.04)] overflow-hidden rounded-[32px]">
-          <CardContent className="p-12 text-center">
-            <div className="w-20 h-20 bg-emerald-50 rounded-[24px] flex items-center justify-center text-emerald-500 mx-auto mb-8">
-              <LogOut size={36} />
-            </div>
-            <h1 className="text-[26px] font-extrabold text-slate-900 mb-2">Сессия завершена</h1>
-            <p className="text-slate-500 mb-10 font-medium tracking-tight">
-              Подключение закрыто. Подробный отчет появится в аналитике.
-            </p>
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <StatusPill label="Duration" value={formatTimer()} />
-              <StatusPill label="Participants" value={`${participants.length}`} />
-            </div>
-            <Button
-              onClick={() => router.push("/teacher/sessions")}
-              className="w-full h-14 font-bold bg-[#7448FF] hover:bg-purple-600"
-            >
-              Вернуться к списку
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+          <style jsx global>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 10px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #cbd5e1;
+          }
+        `}</style>
+        </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB] text-slate-900 font-sans selection:bg-purple-100 selection:text-[#7448FF]">
-      <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[1700px] flex-col px-4 py-6 sm:px-6">
-        <header className="flex items-center justify-between mb-6 shrink-0">
-          <div className="flex items-center gap-6 min-w-0">
-            <Link
-              href="/teacher/sessions"
-              className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-900 transition-all hover:shadow-md shrink-0"
-            >
-              <ArrowLeft size={20} />
-            </Link>
-            <div className="min-w-0">
-              <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-xl font-extrabold tracking-tight text-slate-900 truncate">
-                  {sessionTitle}
-                </h1>
-                <Badge className="bg-purple-50 text-[#7448FF] border-none font-bold px-2.5 py-0.5 shrink-0">
-                  Онлайн
-                </Badge>
-              </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] font-bold text-slate-400">
-                <span className="truncate">
-                  Фокус:{" "}
-                  <span className="text-slate-600 underline decoration-slate-200 underline-offset-4 cursor-pointer">
-                    {getParticipantDisplayName(
-                      focusedParticipant,
-                      focusedParticipant &&
-                        focusedParticipant !== "local" &&
-                        "id" in focusedParticipant
-                        ? participantMetricsMap.get(focusedParticipant.id) ?? null
-                        : null
-                    )}
-                  </span>
-                </span>
-                <span className="flex items-center gap-1.5 text-emerald-500 font-bold shrink-0">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {formatTimer()}
-                </span>
-                {connectionState === "connecting" && (
-                  <span className="flex items-center gap-1.5 text-orange-500 shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                    reconnecting...
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+      <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
+        <Breadcrumbs
+            items={[
+              { label: "Студент", href: "/student/dashboard" },
+              { label: "Сессии", href: "/student/sessions" },
+              { label: title },
+            ]}
+        />
 
-          <Button
-            onClick={() => setConfirmEndOpen(true)}
-            variant="outline"
-            className="border-rose-100 bg-white text-rose-500 hover:bg-rose-50 font-bold h-11 px-6 rounded-[16px] transition-all shadow-sm shrink-0"
-          >
-            Завершить
-          </Button>
-        </header>
+        <Link
+            href="/student/sessions"
+            className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
+        >
+          ← К списку сессий
+        </Link>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-8 pb-4 lg:grid-cols-[minmax(0,1fr)_minmax(360px,420px)] 2xl:grid-cols-[minmax(0,1fr)_480px]">
-          <div className="flex min-w-0 flex-col">
-            {participants.length > 0 && (
-              <div className="shrink-0 flex gap-3 overflow-x-auto pb-3 hide-scrollbar">
-                {participants.map((p) => {
-                  const isActive =
-                    focusedParticipant !== "local" && focusedParticipant?.id === p.id;
-                  const metric = participantMetricsMap.get(p.id) ?? null;
+        {!live && (
+            <PageHero
+                overline="Студент · Сессия"
+                title={title}
+                subtitle={
+                  joinInfo?.groupName
+                      ? `${joinInfo.groupName}. Сначала согласие и проверка камеры, затем подключение.`
+                      : "Сначала согласие и проверка камеры, затем подключение к эфиру."
+                }
+                right={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{joinInfo?.type === "exam" ? "Экзамен" : "Лекция"}</Badge>
+                    <Badge variant={state.consent ? "success" : "warning"}>
+                      {state.consent ? "Согласие: да" : "Согласие: нет"}
+                    </Badge>
+                    <Link href="/student/sessions">
+                      <Button variant="outline">Назад</Button>
+                    </Link>
+                  </div>
+                }
+            />
+        )}
 
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setFocusedParticipant(p)}
-                      className={cn(
-                        "px-4 py-2 rounded-2xl border bg-white flex items-center justify-between min-w-[230px] transition text-left shadow-sm shrink-0",
-                        isActive
-                          ? "border-[#7448FF] ring-2 ring-[#7448FF]/20"
-                          : "border-slate-100 hover:border-slate-200 hover:bg-slate-50"
-                      )}
-                    >
-                      <div className="min-w-0 pr-3">
-                        <div className="text-[13px] font-bold text-slate-900 truncate">
-                          {getParticipantDisplayName(p, metric)}
-                        </div>
-                        <div className="text-[11px] font-medium text-slate-400 mt-0.5">
-                          {remoteStreams[p.id] ? "Видео потоком" : "Ожидание медиа"}
-                        </div>
-                        <button hidden
-                          type="button"
-                          onClick={() => {}}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                        >
-                          Очистить заметки
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500">
-                          {metric?.dominant_emotion || metric?.emotion || "Нет данных"}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+        {joinInfoLoading && (
+            <Section spacing="none" className="mt-6">
+              <Card>
+                <CardContent className="p-6 md:p-7">
+                  <div className="h-24 animate-pulse rounded-[20px] bg-slate-50" />
+                </CardContent>
+              </Card>
+            </Section>
+        )}
+
+        {joinInfoError && (
+            <Section spacing="none" className="mt-6">
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle size={20} className="shrink-0 text-amber-600" />
+                    <div>
+                      <div className="font-semibold text-slate-900">Ошибка загрузки</div>
+                      <div className="mt-0.5 text-sm text-amber-800">{joinInfoError}</div>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={() => void loadJoinInfo()} className="bg-white">
+                    Повторить
+                  </Button>
+                </CardContent>
+              </Card>
+            </Section>
+        )}
+
+        {!joinInfoLoading &&
+            !joinInfoError &&
+            !canJoin &&
+            blockReason &&
+            blockReason !== "consent_required" && (
+                <Section spacing="none" className="mt-6">
+                  <Reveal>
+                    <Card className="mx-auto max-w-3xl border-slate-100">
+                      <CardContent className="space-y-3 p-6 md:p-7">
+                        {(blockReason === "session_not_started" || blockReason === "session_ended") && (
+                            <>
+                              <div className="text-sm text-slate-500">Статус сессии</div>
+                              <div className="text-lg font-semibold text-slate-900">
+                                {blockReason === "session_ended"
+                                    ? "Сессия завершена."
+                                    : "Сессия ещё не началась."}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                {blockReason === "session_ended"
+                                    ? "Преподаватель завершил эфир. Подключение недоступно."
+                                    : "Дождитесь, когда преподаватель запустит сессию."}
+                              </div>
+
+                              <Link href="/student/sessions" className="mt-2 inline-block">
+                                <Button variant="outline">К списку</Button>
+                              </Link>
+                            </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Reveal>
+                </Section>
             )}
 
-            <div className="shrink-0 space-y-6">
-              <div className="relative w-full rounded-[32px] overflow-hidden bg-slate-900 shadow-[0_12px_45px_rgba(0,0,0,0.08)] border border-slate-100 h-[320px] sm:h-[380px] lg:h-[460px] xl:h-[560px]">
-                {hasRemoteFocus && activeRemoteParticipant ? (
-                  <StreamVideo
-                    stream={remoteStreams[activeRemoteParticipant.id] || null}
-                    autoPlay
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <StreamVideo
-                    stream={localStream}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full h-full object-cover"
-                  />
-                )}
-
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-
-                <div className="absolute top-6 left-6 z-10 flex flex-wrap items-center gap-3">
-                  {isScreenSharing && (
-                    <div className="bg-sky-500/80 backdrop-blur-xl border border-sky-500/20 text-white px-3 py-1.5 rounded-xl flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider">
-                      <MonitorUp size={14} /> Screen Share ON
-                    </div>
-                  )}
-                  {wsDisconnected && (
-                    <div className="bg-amber-500/80 backdrop-blur-xl border border-amber-500/20 text-white px-3 py-1.5 rounded-xl flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider shadow-lg">
-                      <AlertTriangle size={14} /> WS Off
-                    </div>
-                  )}
-                  {mediaError && (
-                    <div className="bg-rose-500/80 backdrop-blur-xl border border-rose-500/20 text-white px-3 py-1.5 rounded-xl flex items-center gap-2 text-[11px] font-bold shadow-lg">
-                      {mediaError}
-                    </div>
-                  )}
-                </div>
-
-                <div className="absolute bottom-6 left-6 z-10">
-                  <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl text-[12px] text-white font-bold flex items-center gap-2 border border-white/10 max-w-[60%]">
-                    <div
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        hasRemoteFocus ? "bg-emerald-400" : "bg-purple-400"
-                      )}
-                    />
-                    <span className="truncate">{activeMainLabel}</span>
-                  </div>
-                </div>
-
-                {hasRemoteFocus && (
-                  <button
-                    onClick={() => setFocusedParticipant("local")}
-                    className="absolute bottom-6 right-6 w-[170px] sm:w-[220px] xl:w-[260px] h-[100px] sm:h-[126px] xl:h-[150px] bg-slate-800 rounded-[20px] overflow-hidden border border-white/20 shadow-[0_10px_30px_rgba(0,0,0,0.4)] z-20 hover:scale-105 transition-transform duration-300 text-left"
-                  >
-                    <StreamVideo
-                      stream={localStream}
-                      autoPlay
-                      playsInline
-                      muted
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] text-white font-bold flex items-center gap-1.5">
-                      <span className="truncate max-w-[120px]">{teacherDisplayName}</span>
-                    </div>
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center justify-center gap-6 py-2 shrink-0 flex-wrap">
-                <button
-                  onClick={toggleMic}
-                  className={cn(
-                    "w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm",
-                    isMicEnabled
-                      ? "bg-white text-[#7448FF] hover:bg-purple-50 hover:text-purple-700 border border-slate-100 hover:border-purple-200"
-                      : "bg-rose-500 text-white hover:bg-rose-600 shadow-[0_8px_20px_rgba(244,63,94,0.3)]"
-                  )}
+        {showPreparation && tab === "prepare" && (
+            <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
+              <div className="flex min-h-full items-center justify-center">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className={cn(
+                        "relative w-full overflow-hidden border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.30)]",
+                        preparationStep === 1
+                            ? "max-w-[720px] rounded-[28px]"
+                            : "max-w-[980px] rounded-[30px]"
+                    )}
                 >
-                  {isMicEnabled ? <Mic size={24} /> : <MicOff size={24} />}
-                </button>
+                  <div className="pointer-events-none absolute -left-24 -top-28 h-64 w-64 rounded-full bg-purple-100/70 blur-3xl" />
+                  <div className="pointer-events-none absolute -right-24 top-1/3 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl" />
 
-                <button
-                  onClick={toggleCamera}
-                  disabled={isScreenSharing}
-                  className={cn(
-                    "w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm disabled:opacity-50",
-                    isCameraEnabled && !isScreenSharing
-                      ? "bg-white text-[#7448FF] hover:bg-purple-50 hover:text-purple-700 border border-slate-100 hover:border-purple-200"
-                      : "bg-rose-500 text-white hover:bg-rose-600 shadow-[0_8px_20px_rgba(244,63,94,0.3)]"
-                  )}
-                >
-                  {isCameraEnabled && !isScreenSharing ? (
-                    <Video size={24} />
-                  ) : (
-                    <VideoOff size={24} />
-                  )}
-                </button>
-
-                <button
-                  onClick={toggleScreenShare}
-                  className={cn(
-                    "w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-sm relative group",
-                    isScreenSharing
-                      ? "bg-[#7448FF] text-white hover:bg-purple-600 shadow-[0_8px_24px_rgba(116,72,255,0.4)]"
-                      : "bg-white text-[#7448FF] hover:bg-purple-50 hover:text-purple-700 border border-slate-100 hover:border-purple-200"
-                  )}
-                >
-                  <MonitorUp size={24} />
-                </button>
-
-                <button
-                  className="xl:hidden w-14 h-14 rounded-full flex items-center justify-center bg-white border border-slate-100 text-slate-400 hover:text-slate-600 shadow-sm"
-                  onClick={() => setChatOpen(!chatOpen)}
-                >
-                  <MessageSquare size={24} />
-                </button>
-
-                <button
-                  className="w-14 h-14 rounded-full flex items-center justify-center bg-white border border-slate-100 text-slate-400 hover:text-slate-600 shadow-sm"
-                  onClick={() => {
-                    chatSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                >
-                  <Users size={24} />
-                </button>
-
-                <button
-                  onClick={() => setConfirmEndOpen(true)}
-                  className="w-16 h-16 rounded-full bg-rose-500 text-white hover:bg-rose-600 flex items-center justify-center transition-all shadow-[0_8px_20px_rgba(244,63,94,0.3)] hover:scale-105"
-                >
-                  <PhoneOff size={26} fill="currentColor" />
-                </button>
-              </div>
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-6 pt-2">
-              <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col min-h-[450px]">
-                <div className="flex border-b border-slate-50 px-4 sm:px-8 overflow-x-auto hide-scrollbar">
-                  {["Доска", "Материалы", "Заметки"].map((t) => {
-                    const id =
-                      t === "Доска" ? "board" : t === "Материалы" ? "materials" : "notes";
-                    const active = activeTab === id;
-
-                    return (
-                      <button
-                        key={id}
-                        onClick={() => setActiveTab(id as "board" | "materials" | "notes")}
-                        className={cn(
-                          "h-16 px-6 font-bold text-sm transition-all relative shrink-0",
-                          active ? "text-[#7448FF]" : "text-slate-400 hover:text-slate-600"
-                        )}
+                  <div className="relative border-b border-slate-100 px-5 pb-5 pt-5 sm:px-7 sm:pb-6 sm:pt-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-[16px] font-extrabold tracking-[-0.01em] text-slate-900">
+                        Подготовка (согласие и камера)
+                      </div>
+                      <Link
+                          href="/student/sessions"
+                          aria-label="Назад"
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                       >
-                        {t}
-                        {active && (
-                          <div className="absolute bottom-0 left-0 w-full h-1 bg-[#7448FF] rounded-t-full shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex-1 p-6 flex flex-col min-h-[300px]">
-                  {activeTab === "board" && <SessionWhiteboard sessionId={sessionId} className="flex-1" />}
-                  {activeTab === "materials" && (
-                    <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                      <SessionContentEditor sessionId={sessionId} />
-                      <SessionMaterialsPanel sessionId={sessionId} />
+                        <X size={18} />
+                      </Link>
                     </div>
-                  )}
 
-                  {activeTab === "board" && false && (
-                    <div className="flex-1 border-2 border-slate-100 border-dashed rounded-[24px] flex items-center justify-center bg-slate-50/50 p-6 text-center">
-                      <div>
-                        <div className="w-16 h-16 bg-white rounded-[20px] shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-300">
-                          <Layout size={32} strokeWidth={1.5} />
-                        </div>
-                        <p className="font-bold text-slate-900 mb-1">Доска не подключена</p>
-                        <p className="text-[13px] text-slate-400 font-medium max-w-sm mx-auto leading-relaxed">
-                          Инструмент совместного рисования не имеет источника данных на бэкенде в текущей сессии.
-                        </p>
+                    <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 sm:grid-cols-[110px_minmax(0,1fr)_110px]">
+                      <div className="text-xs font-semibold text-slate-500">
+                        Шаг {preparationStep}
                       </div>
+                      <PreparationStepper step={preparationStep} />
+                      <div className="hidden sm:block" />
                     </div>
-                  )}
+                  </div>
 
-                  {activeTab === "materials" && false && (
-                    <div className="flex-1 border-2 border-slate-100 border-dashed rounded-[24px] flex items-center justify-center bg-slate-50/50 p-6 text-center">
-                      <div>
-                        <div className="w-16 h-16 bg-white rounded-[20px] shadow-sm flex items-center justify-center mx-auto mb-4 text-slate-300">
-                          <FileText size={32} strokeWidth={1.5} />
-                        </div>
-                        <p className="font-bold text-slate-900 mb-1">Нет прикрепленных материалов</p>
-                        <p className="text-[13px] text-slate-400 font-medium">
-                          Файлы для этого урока пока не загружены сервером.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="teacher" />}
-
-                  {activeTab === "notes" && false && (
-                    <div className="h-full flex flex-col">
-                      <textarea
-                        value=""
-                        onChange={() => {}}
-                        className="w-full flex-1 p-6 rounded-[24px] bg-slate-50/50 border border-slate-100 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all resize-none"
-                        placeholder="Напишите локальную черновую заметку..."
-                      />
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2">
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-50 border border-orange-100">
-                          <AlertTriangle size={14} className="text-orange-500" />
-                          <span className="text-[11px] font-bold text-orange-600">
-                            Черновик не сохраняется на сервере
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {}}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-                        >
-                          Очистить заметки
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 shrink-0">
-                <Card className="rounded-[32px] border-none shadow-sm overflow-hidden min-h-[340px] flex flex-col">
-                  <header className="px-8 pt-8 pb-4 flex items-center justify-between shrink-0">
-                    <h3 className="font-extrabold text-slate-900 text-[15px] uppercase tracking-wider">
-                      Динамика ML
-                    </h3>
-                    <TrendingUp size={18} className="text-[#7448FF]" />
-                  </header>
-                  <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col">
-                    {hasMl && metricsHistory.length > 0 ? (
-                      <div className="relative h-[180px] min-h-[180px] w-full min-w-0 overflow-hidden">
-                        {chartReady ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={metricsHistory}>
-                            <defs>
-                              <linearGradient id="teacherColorEngage" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLORS.purple} stopOpacity={0.1} />
-                                <stop offset="95%" stopColor={COLORS.purple} stopOpacity={0} />
-                              </linearGradient>
-                              <linearGradient id="teacherColorStress" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLORS.rose} stopOpacity={0.1} />
-                                <stop offset="95%" stopColor={COLORS.rose} stopOpacity={0} />
-                              </linearGradient>
-                            </defs>
-                            <Area
-                              type="monotone"
-                              dataKey="engagement"
-                              stroke={COLORS.purple}
-                              fillOpacity={1}
-                              fill="url(#teacherColorEngage)"
-                              strokeWidth={3}
-                              isAnimationActive={false}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="stress"
-                              stroke={COLORS.rose}
-                              fillOpacity={1}
-                              fill="url(#teacherColorStress)"
-                              strokeWidth={2}
-                              strokeDasharray="3 3"
-                              isAnimationActive={false}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                        ) : (
-                          <div className="flex h-full items-center justify-center text-[13px] font-bold text-slate-300">
-                            Готовим график...
+                  <div className="relative px-5 py-6 sm:px-7 sm:py-7">
+                    {connectionError && (
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <AlertTriangle size={18} className="shrink-0 text-amber-600" />
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">
+                                Ошибка подключения
+                              </div>
+                              <div className="mt-0.5 text-xs text-amber-800">{connectionError}</div>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex items-center justify-center text-[13px] font-bold text-slate-300">
-                        Сбор данных потока...
-                      </div>
+                          <Button
+                              variant="outline"
+                              className="rounded-xl bg-white"
+                              onClick={() => {
+                                setConnectionError(null);
+                                setConnectionState("idle");
+                              }}
+                          >
+                            Попробовать снова
+                          </Button>
+                        </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-6 mt-4 pl-4 shrink-0">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-[#7448FF]" />
-                        <span className="text-[11px] font-bold text-slate-400">Вовлечённость</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border-2 border-rose-400 border-dashed bg-white" />
-                        <span className="text-[11px] font-bold text-slate-400">Стресс</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    {preparationStep === 1 ? (
+                        preparationView === "consent-details" ? (
+                            <div className="mx-auto max-w-[650px]">
+                              <button
+                                  type="button"
+                                  onClick={() => setPreparationView("main")}
+                                  className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                              >
+                                <ArrowLeft size={17} />
+                                Назад
+                              </button>
 
-                <Card className="rounded-[32px] border-none shadow-sm overflow-hidden min-h-[340px] flex flex-col">
-                  <header className="px-8 pt-8 pb-4 flex items-center justify-between shrink-0">
-                    <h3 className="font-extrabold text-slate-900 text-[15px] uppercase tracking-wider">
-                      Эмоции по группе
-                    </h3>
-                    <BrainCircuit size={18} className="text-emerald-500" />
-                  </header>
-                  <CardContent className="px-6 pb-6 pt-0 flex-1 flex flex-col justify-center">
-                    {mlParticipants.length > 0 ? (
-                      <div className="space-y-4">
-                        {(() => {
-                          const counts = new Map<string, number>();
-                          mlParticipants.forEach((m) => {
-                            const key = (m.dominant_emotion || m.emotion || "neutral").trim();
-                            counts.set(key, (counts.get(key) || 0) + 1);
-                          });
-                          const total = mlParticipants.length || 1;
-
-                          return Array.from(counts.entries()).map(([emotion, count]) => {
-                            const pct = Math.round((count / total) * 100);
-                            return (
-                              <div key={emotion} className="space-y-1.5">
-                                <div className="flex justify-between text-[12px] font-bold">
-                                  <span className="text-slate-600">{emotion}</span>
-                                  <span className="text-slate-900">{pct}%</span>
+                              <div className="mt-3 rounded-[24px] border border-purple-100 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/70 p-5 sm:p-6">
+                                <div className="flex items-start gap-4">
+                                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.25)]">
+                                    <LockKeyhole size={21} />
+                                  </div>
+                                  <div>
+                                    <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                      Подробная информация
+                                    </div>
+                                    <h2 className="mt-1.5 text-xl font-extrabold tracking-[-0.02em] text-slate-900 sm:text-2xl">
+                                      Согласие на анализ эмоций
+                                    </h2>
+                                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                                      Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные.
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-amber-500 rounded-full"
-                                    style={{ width: `${pct}%` }}
+                              </div>
+
+                              <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+                                {[
+                                  {
+                                    title: "Мы обрабатываем",
+                                    description: "Изображения с веб-камеры без записи видео",
+                                  },
+                                  {
+                                    title: "Мы сохраняем",
+                                    description: "Только метаданные эмоций, без исходного видео",
+                                  },
+                                  {
+                                    title: "Используется для",
+                                    description:
+                                        "Анализа вовлечённости и стресса, чтобы улучшать преподавание",
+                                  },
+                                  {
+                                    title: "Не используется для",
+                                    description: "Оценок, санкций или дисциплинарных решений",
+                                  },
+                                ].map((item) => (
+                                    <div
+                                        key={item.title}
+                                        className="rounded-[18px] border border-slate-100 bg-slate-50/80 px-4 py-3.5"
+                                    >
+                                      <div className="text-xs font-bold text-slate-500">
+                                        {item.title}
+                                      </div>
+                                      <div className="mt-1 text-sm font-semibold leading-relaxed text-slate-900">
+                                        {item.description}
+                                      </div>
+                                    </div>
+                                ))}
+
+                                <div className="flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3.5">
+                                  <ShieldCheck
+                                      size={18}
+                                      className="mt-0.5 shrink-0 text-emerald-600"
+                                  />
+                                  <div className="text-xs font-medium leading-relaxed text-emerald-900/75">
+                                    Согласие можно отозвать в любой момент. После отзыва анализ новых кадров прекращается.
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setPreparationView("main")}
+                                    className="rounded-xl px-6"
+                                >
+                                  Назад
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => setPreparationView("main")}
+                                    className="rounded-xl bg-[#7448FF] px-7 text-white shadow-[0_10px_24px_rgba(116,72,255,0.24)] hover:bg-[#6538f5]"
+                                >
+                                  Понятно
+                                </Button>
+                              </div>
+                            </div>
+                        ) : (
+                            <div className="grid items-center gap-7 md:grid-cols-[0.82fr_1.18fr] md:gap-10">
+                              <div className="relative mx-auto grid min-h-[250px] w-full max-w-[280px] place-items-center overflow-hidden rounded-[30px] bg-[radial-gradient(circle_at_50%_40%,rgba(237,233,254,0.95),rgba(248,250,252,0.75)_58%,rgba(255,255,255,0)_72%)]">
+                                <div className="absolute left-5 top-12 h-3 w-3 rounded-full bg-[#7448FF]/20" />
+                                <div className="absolute right-8 top-8 h-2.5 w-2.5 rounded-full bg-sky-400/25" />
+                                <div className="absolute bottom-12 right-5 h-4 w-4 rounded-full bg-violet-300/25" />
+
+                                <div className="relative">
+                                  <div className="absolute -left-16 bottom-1 grid h-24 w-20 -rotate-6 place-items-center rounded-[22px] border border-white bg-white/90 text-[#7448FF] shadow-[0_18px_45px_rgba(116,72,255,0.12)]">
+                                    <CheckSquare size={38} strokeWidth={1.7} />
+                                  </div>
+                                  <div className="grid h-36 w-32 place-items-center rounded-[34px] border border-purple-100 bg-gradient-to-b from-[#8B6BFF] to-[#7448FF] text-white shadow-[0_24px_55px_rgba(116,72,255,0.30)]">
+                                    <ShieldCheck size={58} strokeWidth={1.7} />
+                                  </div>
+                                  <div className="absolute -right-12 bottom-3 grid h-16 w-14 rotate-6 place-items-center rounded-[18px] border border-white bg-white/90 text-violet-500 shadow-[0_16px_38px_rgba(116,72,255,0.12)]">
+                                    <Sparkles size={25} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                  Шаг 1
+                                </div>
+                                <div className="mt-2 text-xl font-extrabold tracking-[-0.02em] text-slate-900 sm:text-2xl">
+                                  Consent и правила приватности
+                                </div>
+                                <div className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
+                                  Видео не сохраняется. Анализ идёт 1–2 кадра в секунду, в систему попадают только агрегированные метрики.
+                                </div>
+
+                                {blockReason === "consent_required" && (
+                                    <div className="mt-4 rounded-[18px] border border-purple-100 bg-purple-50/70 px-4 py-3.5">
+                                      <div className="text-xs font-bold text-[#7448FF]">Требуется согласие</div>
+                                      <div className="mt-1 text-sm font-semibold text-slate-800">
+                                        Для подключения к сессии нужно дать согласие на анализ эмоций
+                                      </div>
+                                      <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                                        Согласие обязательно по этике платформы. Его можно отозвать в любой момент.
+                                      </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                  <StatusPill
+                                      label="Согласие пользователя"
+                                      value={state.consent ? "Принято ✅" : "Ожидает"}
+                                  />
+                                  <StatusPill
+                                      label="ML сервис (нейросеть)"
+                                      value={
+                                        mlApiAvailable
+                                            ? "Подключен и Готов ✅"
+                                            : "Временно недоступен"
+                                      }
                                   />
                                 </div>
+
+                                {!state.consent && (
+                                    <div className="mt-5">
+                                      <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-slate-200 bg-slate-50/80 px-4 py-3.5 transition hover:border-purple-200 hover:bg-purple-50/40">
+                                        <input
+                                            type="checkbox"
+                                            checked={consentChecked}
+                                            onChange={(event) => {
+                                              setConsentChecked(event.target.checked);
+                                              setConsentError(null);
+                                            }}
+                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[#7448FF]"
+                                        />
+                                        <span className="text-xs font-medium leading-relaxed text-slate-600">
+                                Я согласен на анализ обезличенных показателей.
+                                          {" "}
+                                          <button
+                                              type="button"
+                                              onClick={(event) => {
+                                                event.preventDefault();
+                                                setPreparationView("consent-details");
+                                              }}
+                                              className="font-bold text-[#7448FF] underline decoration-[#7448FF]/30 underline-offset-2 hover:text-[#6538f5]"
+                                          >
+                                  Подробнее
+                                </button>
+                              </span>
+                                      </label>
+
+                                      {consentError && (
+                                          <div className="mt-3 rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
+                                            {consentError}
+                                          </div>
+                                      )}
+
+                                      <Button
+                                          type="button"
+                                          onClick={() => void confirmSessionConsent()}
+                                          disabled={!consentChecked || consentSaving}
+                                          className="mt-4 h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
+                                      >
+                                        <ShieldCheck size={18} />
+                                        {consentSaving
+                                            ? "Сохраняем..."
+                                            : blockReason === "consent_required"
+                                                ? "Подтвердить и продолжить"
+                                                : "Подтвердить согласие"}
+                                      </Button>
+                                    </div>
+                                )}
                               </div>
-                            );
-                          });
-                        })()}
-                      </div>
+                            </div>
+                        )
                     ) : (
-                      <div className="flex-1 flex items-center justify-center text-[13px] font-bold text-slate-300">
-                        Ожидание выражений лица
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-
-          <aside
-            ref={chatSectionRef}
-            className={cn(
-              "w-full overflow-hidden rounded-[32px] border border-slate-100 bg-white shadow-sm lg:sticky lg:top-20 lg:flex lg:h-[calc(100dvh-112px)] lg:min-h-[640px] lg:flex-col",
-              chatOpen
-                ? "fixed inset-0 z-50 flex min-h-0 flex-col rounded-none border-none lg:relative lg:inset-auto lg:z-auto lg:rounded-[32px] lg:border lg:shadow-sm"
-                : "hidden lg:flex"
-            )}
-          >
-            <header className="p-6 pb-4 flex items-center justify-between border-b border-slate-50 shrink-0">
-              <h3 className="font-extrabold text-slate-900 text-[14px] uppercase tracking-widest flex items-center gap-2">
-                Real-time Control
-                <div className="px-2 py-0.5 bg-rose-50 text-rose-500 text-[9px] rounded-md font-black animate-pulse">
-                  LIVE
-                </div>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button className="xl:hidden text-slate-400 p-2" onClick={() => setChatOpen(false)}>
-                  <LogOut size={16} />
-                </button>
-                <div className="w-8 h-8 rounded-[10px] bg-slate-50 flex items-center justify-center text-slate-400">
-                  <BrainCircuit size={16} />
-                </div>
-              </div>
-            </header>
-
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
-              <div className="p-6 border-b border-slate-50 space-y-6">
-                <div className="flex items-center gap-4 p-4 bg-purple-50/50 rounded-2xl border border-purple-100/50">
-                  <div className="w-12 h-12 bg-[#7448FF] rounded-xl flex items-center justify-center text-white shadow-md shadow-purple-500/20 shrink-0">
-                    <Users size={24} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-purple-400 mb-0.5">
-                      Состояние группы
-                    </div>
-                    <div className="text-[14px] font-bold text-slate-900 truncate">
-                      {liveMetrics?.groupState || "Сбор данных потока..."}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                      <span>Ср. Вовлеченность</span>
-                      <span className="text-[#7448FF]">{avgEngagement}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-[#7448FF] transition-all duration-1000 ease-out"
-                        style={{ width: `${avgEngagement}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                      <span>Стресс</span>
-                      <span className="text-rose-500">{avgStress}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-rose-500 transition-all duration-1000 ease-out"
-                        style={{ width: `${avgStress}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                      <span>Усталость</span>
-                      <span className="text-amber-500">{avgFatigue}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500 transition-all duration-1000 ease-out"
-                        style={{ width: `${avgFatigue}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                      <span>Риск</span>
-                      <span className="text-slate-700">{avgRisk}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-slate-700 transition-all duration-1000 ease-out"
-                        style={{ width: `${avgRisk}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-b border-slate-50 space-y-6 shrink-0">
-                <div>
-                  <div className="text-[12px] font-black uppercase text-slate-400 tracking-widest mb-3">
-                    Студенты и их текущие метрики
-                  </div>
-
-                  <div className="space-y-4">
-                    {participants.length === 0 && (
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[13px] font-medium text-slate-400">
-                        Пока никто не подключился.
-                      </div>
-                    )}
-
-                    {participants.map((p) => {
-                      const participantMetric = participantMetricsMap.get(p.id) ?? null;
-
-                      return (
-                        <div
-                          key={p.id}
-                          className="rounded-[24px] border border-[#7448FF]/30 bg-white p-4 shadow-sm"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-[14px] font-bold text-slate-900 truncate">
-                                {getParticipantDisplayName(p, participantMetric)}
-                              </div>
-                              <div className="mt-1 text-[12px] text-slate-400 font-medium">
-                                {participantMetric
-                                  ? "Есть свежие ML-данные"
-                                  : "Нет свежих ML-данных"}
-                              </div>
+                        <div>
+                          <div className="mb-5 flex items-start gap-3">
+                            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-500 shadow-sm">
+                              <MonitorUp size={18} />
                             </div>
-
-                            <div className="rounded-full bg-slate-50 border border-slate-100 px-3 py-1 text-[11px] font-bold text-slate-500 shrink-0">
-                              {participantMetric?.dominant_emotion ||
-                                participantMetric?.emotion ||
-                                "Нет данных"}
+                            <div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                Шаг 2
+                              </div>
+                              <div className="mt-1 text-xl font-extrabold tracking-[-0.02em] text-slate-900">
+                                Проверка камеры
+                              </div>
+                              <div className="mt-1.5 text-sm font-medium text-slate-500">
+                                Настройте свет и положение лица, затем нажмите «Начать».
+                              </div>
                             </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-5">
-                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Confidence
-                              </div>
-                              <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {formatMetricPercent(participantMetric?.confidence)}
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Stress
-                              </div>
-                              <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {formatMetricPercent(participantMetric?.stress)}
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Engage
-                              </div>
-                              <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {formatMetricPercent(participantMetric?.engagement)}
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Fatigue
-                              </div>
-                              <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {formatMetricPercent(participantMetric?.fatigue)}
-                              </div>
-                            </div>
-
-                            <div className="rounded-2xl bg-slate-50 border border-slate-100 p-3 text-center">
-                              <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                Risk
-                              </div>
-                              <div className="mt-2 text-[14px] font-bold text-slate-900">
-                                {formatMetricPercent(participantMetric?.risk)}
-                              </div>
-                            </div>
-                          </div>
+                          <CameraCheck
+                              variant="modal"
+                              onStart={() => {
+                                setLive(true);
+                                setTab("live");
+                              }}
+                          />
                         </div>
-                      );
-                    })}
+                    )}
                   </div>
-                </div>
 
-                <div>
-                  <div className="text-[12px] font-black uppercase text-slate-400 tracking-widest mb-3">
-                    Настройки чата
-                  </div>
-                  <select
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-700 outline-none focus:ring-2 disabled:opacity-50"
-                    disabled={!apiAvailable || !isRealSessionId(roomId)}
-                    value={chatPolicy?.mode ?? "lecture_open"}
-                    onChange={async (e) => {
-                      try {
-                        const updated = await updateSessionChatPolicy(roomId, {
-                          mode: e.target.value as SessionChatPolicy["mode"],
-                        });
-                        setChatPolicy(updated);
-                      } catch (err) {
-                        console.error(err);
-                      }
-                    }}
-                  >
-                    <option value="lecture_open">Свободный чат</option>
-                    <option value="questions_only">Только вопросы (Q&A)</option>
-                    <option value="locked">Чат заблокирован</option>
-                  </select>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 text-[12px] font-black uppercase text-slate-400 tracking-widest mb-3">
-                    Integrity Check <Info size={14} className="text-slate-300" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 flex flex-col gap-1 items-center justify-center text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Backend
-                      </span>
-                      <span
-                        className={cn(
-                          "text-[12px] font-black",
-                          apiAvailable ? "text-emerald-500" : "text-rose-500"
-                        )}
-                      >
-                        {apiAvailable ? "OK" : "ERR"}
-                      </span>
-                    </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 flex flex-col gap-1 items-center justify-center text-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        Consent
-                      </span>
-                      <span className="text-[12px] font-black text-emerald-500">
-                        ACTIVE
-                      </span>
+                  <div className="relative flex items-start justify-center gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 text-center sm:px-7">
+                    <Activity className="mt-0.5 shrink-0 text-slate-400" size={15} />
+                    <div className="max-w-3xl text-[11px] font-medium leading-relaxed text-slate-500">
+                      Соединение защищено по стандарту WebRTC P2P. Видео-поток не записывается. Бэкенд получает только обезличенные числовые метрики эмоций.
                     </div>
                   </div>
-                </div>
-              </div>
-
-              </div>
-
-              <div className="flex min-h-[320px] flex-[0_0_38%] flex-col border-t border-slate-100 bg-slate-50/30 lg:min-h-[340px]">
-                <header className="p-5 border-b border-slate-50 flex items-center justify-between shrink-0">
-                  <h3 className="font-extrabold text-slate-900 text-[13px] uppercase tracking-widest flex items-center gap-2">
-                    Сообщения
-                    <Badge className="bg-slate-100 text-slate-500 border-none font-bold px-2 py-0">
-                      {participants.length}
-                    </Badge>
-                  </h3>
-                </header>
-                <div className="flex-1 min-h-0 overflow-hidden">
-                  <SessionChatPanel sessionId={roomId} role="teacher" type={sessionType} />
                 </div>
               </div>
             </div>
-          </aside>
-        </div>
+        )}
       </div>
-
-      <Modal open={confirmEndOpen} onClose={() => setConfirmEndOpen(false)} title="Завершить сессию?">
-        <div className="p-4 text-center">
-          <div className="w-16 h-16 bg-rose-50 rounded-[20px] flex items-center justify-center text-rose-500 mx-auto mb-6">
-            <PhoneOff size={32} />
-          </div>
-          <p className="text-slate-500 font-medium mb-10 leading-relaxed max-w-sm mx-auto">
-            Эфир будет остановлен для всех участников. Вы сможете найти запись и подробный отчет в архиве.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <Button onClick={() => setConfirmEndOpen(false)} variant="outline" className="h-12 font-bold text-slate-500">
-              Отмена
-            </Button>
-            <Button
-              onClick={() => {
-                setConfirmEndOpen(false);
-                setPhase("ended");
-                setWsDisconnected(false);
-              }}
-              className="h-12 bg-rose-500 hover:bg-rose-600 font-bold shadow-[0_8px_20px_rgba(244,63,94,0.3)] border-none"
-            >
-              Да, завершить
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #e2e8f0;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #cbd5e1;
-        }
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
-    </div>
   );
 }
