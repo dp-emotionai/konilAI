@@ -39,3 +39,5 @@ export function getWsBaseUrl() {
 
   return "wss://elas-backend.onrender.com";
 }
+
+export const getSocketBaseUrl = getWsBaseUrl;
