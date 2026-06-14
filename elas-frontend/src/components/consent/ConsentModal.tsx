@@ -81,6 +81,8 @@ export default function ConsentModal({
     };
   }, [onClose, open, saving]);
 
+  const consentIsActive = !statusLoading && hasConsent;
+
   if (!open) return null;
 
   return (
@@ -101,14 +103,13 @@ export default function ConsentModal({
               role="dialog"
               aria-modal="true"
               aria-labelledby="consent-modal-title"
-              aria-busy={saving}
+              aria-busy={saving || statusLoading}
               className={cn(
                   "relative w-full max-w-[700px] overflow-hidden rounded-[28px] border border-white/75 bg-white shadow-[0_32px_100px_rgba(15,23,42,0.36)]",
                   className
               )}
           >
             <div className="pointer-events-none absolute -left-20 -top-24 h-56 w-56 rounded-full bg-purple-100/70 blur-3xl" />
-
             <div className="pointer-events-none absolute -right-24 top-1/3 h-64 w-64 rounded-full bg-indigo-100/55 blur-3xl" />
 
             <div className="relative max-h-[calc(100vh-32px)] overflow-y-auto px-5 pb-5 pt-5 sm:px-10 sm:pb-7 sm:pt-8">
@@ -131,15 +132,19 @@ export default function ConsentModal({
                     id="consent-modal-title"
                     className="mt-3 text-[28px] font-extrabold leading-[1.12] tracking-[-0.035em] text-slate-900 sm:text-[34px]"
                 >
-                  {hasConsent
+                  {consentIsActive
                       ? "Согласие на анализ эмоций активно"
-                      : "Согласие на анализ эмоций"}
+                      : statusLoading
+                          ? "Проверяем статус согласия"
+                          : "Согласие на анализ эмоций"}
                 </h1>
 
                 <p className="mt-2 max-w-[590px] text-sm font-medium leading-relaxed text-slate-500 sm:text-[15px]">
-                  {hasConsent
+                  {consentIsActive
                       ? "Вы разрешили обработку кадров для анализа вовлечённости. Исходное видео не сохраняется."
-                      : "Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные."}
+                      : statusLoading
+                          ? "Получаем актуальный статус согласия с сервера."
+                          : "Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные."}
                 </p>
               </div>
 
@@ -203,7 +208,7 @@ export default function ConsentModal({
                     >
                       Проверяем статус...
                     </Button>
-                ) : hasConsent && onRevoke ? (
+                ) : consentIsActive && onRevoke ? (
                     <Button
                         onClick={onRevoke}
                         disabled={saving}
@@ -256,7 +261,7 @@ export default function ConsentModal({
                     <button
                         type="button"
                         onClick={onContinueWithoutAnalysis}
-                        disabled={saving}
+                        disabled={saving || statusLoading}
                         className="mx-auto px-4 py-1 text-sm font-semibold text-[#7448FF] transition hover:text-[#5f31e8] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Продолжить без анализа

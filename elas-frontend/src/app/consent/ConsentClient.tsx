@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import ConsentModal from "@/components/consent/ConsentModal";
 import { useUI } from "@/components/layout/Providers";
-
 import {
     getConsentStatus,
     updateConsentStatus,
 } from "@/lib/api/consent";
-
 import { recordSessionConsent } from "@/lib/api/student";
 import { writeConsent } from "@/lib/consent";
 import { ROLE_HOME } from "@/lib/routes";
@@ -31,10 +29,18 @@ export default function ConsentClient() {
 
     const { state, setConsent } = useUI();
 
-    const [hasConsent, setHasConsent] = useState<boolean | null>(null);
-    const [statusLoading, setStatusLoading] = useState(true);
+    const [hasConsent, setHasConsent] = useState<boolean | null>(
+        state.consent ? true : null
+    );
+    const [statusLoading, setStatusLoading] = useState(!state.consent);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const setConsentRef = useRef(setConsent);
+
+    useEffect(() => {
+        setConsentRef.current = setConsent;
+    }, [setConsent]);
 
     const returnUrl =
         searchParams.get("next") ??
@@ -50,18 +56,18 @@ export default function ConsentClient() {
 
     useEffect(() => {
         const controller = new AbortController();
+        let active = true;
 
         async function loadStatus() {
             try {
-                setStatusLoading(true);
+                const status = await getConsentStatus(controller.signal);
 
-                const status = await getConsentStatus(
-                    controller.signal
-                );
+                if (!active) return;
 
                 setHasConsent(status.hasConsent);
-                setConsent(status.hasConsent);
+                setConsentRef.current(status.hasConsent);
                 writeConsent(status.hasConsent);
+                setError(null);
             } catch (error) {
                 if (
                     error instanceof DOMException &&
@@ -70,14 +76,14 @@ export default function ConsentClient() {
                     return;
                 }
 
-                console.error(
-                    "CONSENT STATUS LOAD FAILED",
-                    error
-                );
+                console.error("CONSENT STATUS LOAD FAILED", error);
 
-                setHasConsent(false);
+                if (!active) return;
+
+                setHasConsent((current) => current ?? false);
+                setError("Не удалось проверить статус согласия");
             } finally {
-                if (!controller.signal.aborted) {
+                if (active) {
                     setStatusLoading(false);
                 }
             }
@@ -86,9 +92,10 @@ export default function ConsentClient() {
         void loadStatus();
 
         return () => {
+            active = false;
             controller.abort();
         };
-    }, [setConsent]);
+    }, []);
 
     const handleAccept = async () => {
         if (saving || statusLoading) return;
@@ -112,7 +119,7 @@ export default function ConsentClient() {
             }
 
             setHasConsent(consentValue);
-            setConsent(consentValue);
+            setConsentRef.current(consentValue);
             writeConsent(consentValue);
 
             router.replace(target);
@@ -145,7 +152,7 @@ export default function ConsentClient() {
             const status = await updateConsentStatus(false);
 
             setHasConsent(status.hasConsent);
-            setConsent(status.hasConsent);
+            setConsentRef.current(status.hasConsent);
             writeConsent(status.hasConsent);
 
             router.replace(target);
@@ -183,7 +190,9 @@ export default function ConsentClient() {
                 void handleRevoke();
             }}
             onContinueWithoutAnalysis={
-                hasConsent ? undefined : handleClose
+                statusLoading || hasConsent
+                    ? undefined
+                    : handleClose
             }
         />
     );
