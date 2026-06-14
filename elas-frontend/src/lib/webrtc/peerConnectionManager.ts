@@ -217,16 +217,6 @@ export class PeerConnectionManager {
     this.signaling.on(
         "joined",
         (self, participants) => {
-          if (this.selfId && this.selfId !== self.id) {
-            for (const pc of this.peers.values()) {
-              this.closePeerConnection(pc);
-            }
-
-            this.peers.clear();
-            this.pendingIceCandidates.clear();
-            this.offerInProgress.clear();
-          }
-
           this.selfId = self.id;
 
           const normalized = participants
@@ -370,11 +360,6 @@ export class PeerConnectionManager {
             constraints
         );
 
-    if (this.isLeaving) {
-      stream.getTracks().forEach((track) => track.stop());
-      throw new DOMException("Media initialization was cancelled", "AbortError");
-    }
-
     this.localStream = stream;
 
     /**
@@ -402,7 +387,7 @@ export class PeerConnectionManager {
     lastName?: string;
     fullName?: string;
     avatarUrl?: string;
-  }) {
+  }): Promise<void> {
     this.isLeaving = false;
 
     return this.signaling.join(
