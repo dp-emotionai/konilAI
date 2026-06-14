@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -8,8 +11,13 @@ import {
   Users,
   Video,
 } from "lucide-react";
+
 import PageTitle from "@/components/common/PageTitle";
 import { Card } from "@/components/ui/Card";
+import {
+  getConsentStatus,
+  type ConsentStatus,
+} from "@/lib/api/consent";
 
 const SECTIONS = [
   {
@@ -50,10 +58,59 @@ const SECTIONS = [
 ] as const;
 
 export default function Privacy() {
+  const [consentStatus, setConsentStatus] =
+      useState<ConsentStatus | null>(null);
+
+  const [consentLoading, setConsentLoading] = useState(true);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let mounted = true;
+
+    async function loadConsentStatus() {
+      try {
+        const status = await getConsentStatus(controller.signal);
+
+        if (mounted) {
+          setConsentStatus(status);
+        }
+      } catch (error) {
+        if (
+            error instanceof DOMException &&
+            error.name === "AbortError"
+        ) {
+          return;
+        }
+
+        console.error("CONSENT STATUS LOAD FAILED", error);
+
+        if (mounted) {
+          setConsentStatus({
+            hasConsent: false,
+            consentedAt: null,
+          });
+        }
+      } finally {
+        if (mounted) {
+          setConsentLoading(false);
+        }
+      }
+    }
+
+    void loadConsentStatus();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, []);
+
   return (
       <div className="relative -mx-4 -my-6 min-h-[calc(100vh-80px)] overflow-hidden px-4 py-8 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.16),transparent_34%)]" />
+
         <div className="pointer-events-none absolute bottom-0 left-0 -z-10 h-72 w-72 rounded-full border border-purple-200/60 opacity-40" />
+
         <div className="pointer-events-none absolute bottom-8 left-8 -z-10 h-56 w-56 rounded-full border border-purple-200/50 opacity-40" />
 
         <div className="mx-auto max-w-7xl space-y-7">
@@ -80,6 +137,7 @@ export default function Privacy() {
                         <h2 className="text-lg font-bold text-slate-950">
                           {title}
                         </h2>
+
                         <p className="mt-1 max-w-5xl text-sm leading-relaxed text-slate-600">
                           {body}
                         </p>
@@ -92,11 +150,16 @@ export default function Privacy() {
             <div className="mt-5 flex flex-col gap-4 rounded-[24px] bg-white pt-1 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
-                    href="/consent"
+                    href="/consent?returnUrl=/privacy"
                     className="inline-flex items-center justify-center gap-3 rounded-2xl bg-[#7448FF] px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_28px_rgba(116,72,255,0.28)] transition hover:bg-[#6538f5]"
                 >
                   <ShieldCheck size={18} />
-                  Открыть центр согласия
+
+                  {consentLoading
+                      ? "Проверяем согласие..."
+                      : consentStatus?.hasConsent
+                          ? "Управление согласием"
+                          : "Дать согласие"}
                 </Link>
 
                 <a
@@ -109,11 +172,30 @@ export default function Privacy() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                <UserRoundCheck size={18} className="text-emerald-600" />
+                <UserRoundCheck
+                    size={18}
+                    className={
+                      consentStatus?.hasConsent
+                          ? "text-emerald-600"
+                          : "text-slate-400"
+                    }
+                />
+
                 <span>Статус согласия:</span>
-                <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-semibold text-emerald-700">
-                Согласие дано
-              </span>
+
+                {consentLoading ? (
+                    <span className="rounded-full bg-slate-100 px-4 py-1.5 text-sm font-semibold text-slate-500">
+                  Проверяем...
+                </span>
+                ) : consentStatus?.hasConsent ? (
+                    <span className="rounded-full bg-emerald-100 px-4 py-1.5 text-sm font-semibold text-emerald-700">
+                  Согласие дано
+                </span>
+                ) : (
+                    <span className="rounded-full bg-amber-100 px-4 py-1.5 text-sm font-semibold text-amber-700">
+                  Согласие не дано
+                </span>
+                )}
               </div>
             </div>
           </Card>

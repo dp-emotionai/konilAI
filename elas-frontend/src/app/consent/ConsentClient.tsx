@@ -1,101 +1,115 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageTitle from "@/components/common/PageTitle";
-import { Card } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
+
+import ConsentModal from "@/components/consent/ConsentModal";
 import { useUI } from "@/components/layout/Providers";
+
+import {
+    getConsentStatus,
+    updateConsentStatus,
+} from "@/lib/api/consent";
+
+import { recordSessionConsent } from "@/lib/api/student";
+import { writeConsent } from "@/lib/consent";
 import { ROLE_HOME } from "@/lib/routes";
 
+function getSessionId(returnUrl: string | null): string | null {
+    if (!returnUrl) return null;
+
+    const match = returnUrl.match(
+        /^\/student\/session\/([^/?#]+)/
+    );
+
+    return match?.[1] ?? null;
+}
+
 export default function ConsentClient() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const returnUrl =
-    searchParams.get("next") ?? searchParams.get("returnUrl") ?? null;
-  const { state, setConsent } = useUI();
+    const router = useRouter();
+    const searchParams = useSearchParams();
 
-  const roleLabel =
-    state.role === "student"
-      ? "Студент"
-      : state.role === "teacher"
-      ? "Преподаватель"
-      : state.role === "admin"
-      ? "Админ"
-      : null;
+    const { state, setConsent } = useUI();
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <Breadcrumbs
-        items={[
-          ...(state.role && roleLabel
-            ? [{ label: roleLabel, href: ROLE_HOME[state.role] }]
-            : []),
-          { label: "Согласие на анализ" },
-        ]}
-      />
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-      <PageTitle
-        overline="Согласие"
-        title="Согласие на анализ эмоций"
-        subtitle="Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные."
-      />
+    const returnUrl =
+        searchParams.get("next") ??
+        searchParams.get("returnUrl") ??
+        null;
 
-      <Card className="space-y-3 p-6">
-        <Item t="Мы обрабатываем" d="Изображения с веб-камеры без записи видео" />
-        <Item t="Мы сохраняем" d="Только метаданные эмоций, без исходного видео" />
-        <Item
-          t="Используется для"
-          d="Анализа вовлечённости и стресса, чтобы улучшать преподавание"
-        />
-        <Item
-          t="Не используется для"
-          d="Оценок, санкций или дисциплинарных решений"
-        />
-      </Card>
-
-      <Card className="flex flex-col gap-3 p-6">
-        <Button
-          onClick={() => {
-            setConsent(true);
-
-            try {
-              localStorage.setItem("consent", "true");
-            } catch {}
-
-            const target =
-              returnUrl && returnUrl.startsWith("/")
-                ? returnUrl
-                : state.role
+    const target =
+        returnUrl && returnUrl.startsWith("/")
+            ? returnUrl
+            : state.role
                 ? ROLE_HOME[state.role]
                 : "/";
 
-            router.push(target);
-          }}
-        >
-          Принимаю и продолжаю
-        </Button>
+    const handleAccept = async () => {
+        if (saving) return;
 
-        <Link href="/privacy">
-          <Button variant="outline" className="w-full">
-            Полный текст о конфиденциальности
-          </Button>
-        </Link>
+        try {
+            setSaving(true);
+            setError(null);
 
-        <Link href="/ethics" className="text-sm text-muted hover:text-fg">
-          Принципы этики использования
-        </Link>
-      </Card>
-    </div>
-  );
-}
+            const sessionId = getSessionId(returnUrl);
 
-function Item({ t, d }: { t: string; d: string }) {
-  return (
-    <div className="rounded-2xl border border-[color:var(--border)] bg-surface-subtle p-4">
-      <div className="text-sm text-muted">{t}</div>
-      <div className="mt-1 text-fg">{d}</div>
-    </div>
-  );
+            let hasConsent = false;
+
+            if (sessionId) {
+                /*
+                 * Бұл endpoint session consent пен global consent-ті
+                 * backend-та бір transaction ішінде сақтайды.
+                 */
+                await recordSessionConsent(sessionId);
+
+                /*
+                 * Сақталғаннан кейін backend-тен нақты статусты аламыз.
+                 */
+                const status = await getConsentStatus();
+                hasConsent = status.hasConsent;
+            } else {
+                /*
+                 * /privacy немесе жай /consent арқылы келген кезде
+                 * global consent сақталады.
+                 */
+                const status = await updateConsentStatus(true);
+                hasConsent = status.hasConsent;
+            }
+
+            setConsent(hasConsent);
+            writeConsent(hasConsent);
+
+            router.replace(target);
+            router.refresh();
+        } catch (error) {
+            console.error("CONSENT SAVE FAILED", error);
+
+            setError(
+                error instanceof Error
+                    ? error.message
+                    : "Не удалось сохранить согласие"
+            );
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleClose = () => {
+        router.replace(target);
+    };
+
+    return (
+        <ConsentModal
+            open
+            saving={saving}
+            error={error}
+            onClose={handleClose}
+            onContinueWithoutAnalysis={handleClose}
+            onAccept={() => {
+                void handleAccept();
+            }}
+        />
+    );
 }

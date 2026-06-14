@@ -16,6 +16,14 @@ import {
   type UserStatus,
 } from "@/lib/api/client";
 
+import {
+  getConsentStatus,
+} from "@/lib/api/consent";
+
+import {
+  writeConsent,
+} from "@/lib/consent";
+
 import type { Role } from "@/lib/roles";
 
 type MeRes = {
@@ -84,15 +92,13 @@ export function AuthRestore() {
     setRole,
     setStatus,
     setUserInfo,
+    setConsent
   } = useUI();
 
   const done = useRef(false);
 
   useEffect(() => {
-    /**
-     * Ждём, пока uiStore прочитает
-     * localStorage.
-     */
+
     if (
       !authReady ||
       done.current
@@ -109,6 +115,8 @@ export function AuthRestore() {
       setLoggedIn(false);
       setRole(null);
       setStatus(null);
+      setConsent(false);
+      writeConsent(false);
 
       setUserInfo({
         firstName: null,
@@ -128,19 +136,34 @@ export function AuthRestore() {
         stored.status
       );
 
-    /**
-     * Пользователь уже восстановлен
-     * из localStorage внутри uiStore.
-     *
-     * Здесь только проверяем и обновляем
-     * данные через backend.
-     */
     if (!isApiAvailable()) {
       return;
     }
 
     const controller =
       new AbortController();
+
+    getConsentStatus(controller.signal)
+        .then((consentStatus) => {
+          setConsent(consentStatus.hasConsent);
+          writeConsent(consentStatus.hasConsent);
+        })
+        .catch((error) => {
+          if (
+              error instanceof DOMException &&
+              error.name === "AbortError"
+          ) {
+            return;
+          }
+
+          console.warn(
+              "Не удалось получить статус согласия",
+              error
+          );
+
+          setConsent(false);
+          writeConsent(false);
+        });
 
     api
       .get<MeRes>("auth/me", {
@@ -174,10 +197,6 @@ export function AuthRestore() {
             me.avatarUrl ?? null,
         });
 
-        /**
-         * Обновляем сохранённый профиль,
-         * но сохраняем прежний token.
-         */
         setAuth({
           token: stored.token,
 
@@ -220,13 +239,6 @@ export function AuthRestore() {
           return;
         }
 
-        /**
-         * request() очищает auth при 401.
-         *
-         * Поэтому повторно проверяем storage.
-         * Если token исчез — сессия реально
-         * недействительна.
-         */
         const currentAuth =
           getStoredAuth();
 
@@ -245,11 +257,6 @@ export function AuthRestore() {
           return;
         }
 
-        /**
-         * Если token всё ещё существует,
-         * значит это временная ошибка backend.
-         * Сохраняем локальную сессию.
-         */
         console.warn(
           "Не удалось обновить данные пользователя. Используем сохранённую сессию.",
           error
@@ -279,6 +286,7 @@ export function AuthRestore() {
     setLoggedIn,
     setRole,
     setStatus,
+    setConsent,
     setUserInfo,
   ]);
 
