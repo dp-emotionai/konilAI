@@ -390,10 +390,7 @@ export default function TeacherGroupDetailPage() {
         throw new Error(message);
       }
 
-      setGroupImageMessage({
-        type: "success",
-        text: "Фото группы обновлено. Если backend вернул новый imageUrl, карточка обновится сразу.",
-      });
+      setGroupImageMessage(null);
       refetchGroup();
     } catch (error) {
       setGroupImageMessage({

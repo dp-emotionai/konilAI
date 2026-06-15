@@ -1,4 +1,4 @@
-import { api, hasAuth, getApiBaseUrl } from "./client";
+import { api, hasAuth, getApiBaseUrl, resolveAvatarUrl } from "./client";
 
 export type TeacherDashboardSession = {
   id: string;
@@ -33,7 +33,7 @@ export type FullGroup = {
   students: { id: string; fullName: string; email?: string | null }[];
   createdAt: string;
   description?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
 };
 
 function delay(ms: number) {
@@ -141,7 +141,19 @@ export type GroupDetailResponse = {
   teacherId: string;
   teacher: string;
   teacherName: string;
-  sessions: { id: string; title: string; type: string; status: string; code?: string; startedAt?: string | null; endedAt?: string | null }[];
+  imageUrl?: string | null;
+  sessions: {
+    id: string;
+    title: string;
+    type: string;
+    status: string;
+    code?: string;
+    startedAt?: string | null;
+    endedAt?: string | null;
+    scheduledStartAt?: string | null;
+    scheduledEndAt?: string | null;
+    createdAt?: string;
+  }[];
   members: { id: string; fullName: string | null; email: string }[];
   createdAt: string;
 };
@@ -158,7 +170,8 @@ export async function getGroupById(groupId: string): Promise<GroupWithSessions |
       type: s.type === "exam" ? "exam" : "lecture",
       status: s.status === "active" ? "live" : s.status === "finished" ? "ended" : "upcoming",
       groupId: raw.id,
-      startsAt: s.startedAt ?? undefined,
+      startsAt: s.startedAt ?? s.scheduledStartAt ?? undefined,
+      createdAt: s.createdAt,
     }));
     const group: FullGroup = {
       id: raw.id,
@@ -167,7 +180,8 @@ export async function getGroupById(groupId: string): Promise<GroupWithSessions |
       status: "active",
       teacher: { id: raw.teacherId, fullName: raw.teacherName ?? raw.teacher, email: raw.teacher },
       students: (raw.members ?? []).map((m) => ({ id: m.id, fullName: m.fullName ?? m.email, email: m.email })),
-      createdAt: typeof raw.createdAt === "string" ? raw.createdAt : new Date(raw.createdAt).toISOString(),
+      createdAt: raw.createdAt,
+      imageUrl: resolveAvatarUrl(raw.imageUrl),
     };
     return { group, sessions };
   } catch {
@@ -273,27 +287,22 @@ export type SessionSummary = {
   durationMinutes?: number | null;
 };
 
-type SessionSummaryResponse = SessionSummary & { id?: string };
+type SessionSummaryResponse = Partial<SessionSummary> & { id?: string };
 
 export async function getSessionSummary(sessionId: string): Promise<SessionSummary | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
   try {
     // Ожидаемый endpoint партнёра: GET /sessions/:id/summary
-    const raw = await api.get<SessionSummaryResponse>(
-        `sessions/${sessionId}/summary`
-    );
+    const raw = await api.get<SessionSummaryResponse>(`sessions/${sessionId}/summary`);
     if (!raw) return null;
     const baseId = raw.sessionId ?? raw.id ?? sessionId;
     return {
       sessionId: baseId,
       avgEngagement: typeof raw.avgEngagement === "number" ? raw.avgEngagement : 0,
-      attentionDrops:
-          typeof raw.attentionDrops === "number" ? raw.attentionDrops : 0,
+      attentionDrops: typeof raw.attentionDrops === "number" ? raw.attentionDrops : 0,
       quality: raw.quality ?? "medium",
-      avgStress:
-          typeof raw.avgStress === "number" ? raw.avgStress : null,
-      durationMinutes:
-          typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
+      avgStress: typeof raw.avgStress === "number" ? raw.avgStress : null,
+      durationMinutes: typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
     };
   } catch {
     return null;
@@ -326,16 +335,14 @@ export async function getSessionTimeline(sessionId: string): Promise<SessionTime
 export type CreateGroupResult = { id: string; name: string; teacherId: string; createdAt: string };
 
 export async function createGroup(name: string): Promise<CreateGroupResult> {
-  const res = await api.post<CreateGroupResult>("groups", { name: name.trim() });
-  return res;
+  return api.post<CreateGroupResult>("groups", { name: name.trim() });
 }
 
 export type CreateSessionBody = { title: string; type: "lecture" | "exam"; groupId: string };
 export type CreateSessionResult = { id: string; title: string; type: string; status: string; code: string; groupId: string; createdAt: string };
 
 export async function createSession(body: CreateSessionBody): Promise<CreateSessionResult> {
-  const res = await api.post<CreateSessionResult>("sessions", body);
-  return res;
+  return api.post<CreateSessionResult>("sessions", body);
 }
 
 /** Start (active), end (finished), or reopen (draft). */
@@ -348,8 +355,7 @@ export async function updateSessionStatus(
 
 /** Пригласить студентов в группу по email (список через запятую или массив). */
 export async function createInvitations(groupId: string, emails: string[]): Promise<{ created: { email: string; invitationId: string }[] }> {
-  const res = await api.post<{ created: { email: string; invitationId: string }[] }>(`groups/${groupId}/invitations`, { emails });
-  return res;
+  return api.post<{ created: { email: string; invitationId: string }[] }>(`groups/${groupId}/invitations`, { emails });
 }
 
 export type InvitableStudentRow = {
@@ -396,12 +402,22 @@ export type GroupMemberRow = {
 
 export type GroupMembersResponse = { teacher: { id: string; email: string; fullName: string | null }; students: GroupMemberRow[] };
 
+type RawGroupMember = {
+  id: string;
+  email: string;
+  name?: string | null;
+  fullName?: string | null;
+  removed?: boolean;
+};
+
+type RawGroupMembersResponse = GroupMembersResponse | RawGroupMember[];
+
 export async function getGroupMembers(groupId: string, includeRemoved = false): Promise<GroupMembersResponse> {
   const url = includeRemoved
       ? `groups/${groupId}/members?includeRemoved=true`
       : `groups/${groupId}/members`;
 
-  const data = await api.get<any>(url);
+  const data = await api.get<RawGroupMembersResponse>(url);
 
   if (Array.isArray(data)) {
     return {
@@ -445,8 +461,9 @@ export type GroupMessage = {
 };
 
 export async function getGroupMessages(groupId: string, tab: "announcements" | "qa" | "chat" = "announcements"): Promise<GroupMessage[]> {
-  const list = await api.get<GroupMessage[]>(`groups/${groupId}/messages?tab=${tab}`);
-  return Array.isArray(list) ? list : [];
+  const raw = await api.get<{ messages?: GroupMessage[]; nextCursor?: string | null } | GroupMessage[]>(`groups/${groupId}/messages?tab=${tab}`);
+  if (Array.isArray(raw)) return raw;
+  return Array.isArray(raw.messages) ? raw.messages : [];
 }
 
 export async function postGroupMessage(
