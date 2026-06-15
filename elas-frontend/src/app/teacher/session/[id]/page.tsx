@@ -1552,9 +1552,6 @@ export default function TeacherJoinSessionPage() {
                                     : "Дождитесь, когда преподаватель запустит сессию."}
                               </div>
 
-                              <Link href="/teacher/sessions" className="mt-2 inline-block">
-                                <Button variant="outline">К списку</Button>
-                              </Link>
                             </>
                         )}
                       </CardContent>
