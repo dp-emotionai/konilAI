@@ -562,8 +562,8 @@ export function SessionChatPanel({
                 </span>
                 <span>
                   {typingUsers.length === 1
-                      ? `${typingUsers[0].name} жазып жатыр...`
-                      : `${typingUsers[0].name} және тағы ${typingUsers.length - 1} адам жазып жатыр...`}
+                      ? `${typingUsers[0].name} печатает...`
+                      : `${typingUsers[0].name} и ещё ${typingUsers.length - 1} человек печатают...`}
                 </span>
               </div>
           )}
