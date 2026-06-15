@@ -443,36 +443,47 @@ export default function StudentJoinSessionPage() {
           }),
       [currentUser]
   );
-  const videoTiles = useMemo(() => {
-    const remoteTiles = participants.map((participant) => ({
-      id: participant.id,
-      label: formatParticipantLabel(participant),
-      role: participant.role,
-      stream: remoteStreams[participant.id] ?? null,
-      muted: false,
-      isLocal: false,
-    }));
-
-    return [
-      {
-        id: "local",
-        label: currentStudentName,
-        role: "student" as const,
-        stream: localStream,
-        muted: true,
-        isLocal: true,
-      },
-      ...remoteTiles,
-    ];
-  }, [currentStudentName, localStream, participants, remoteStreams]);
-
-  const selectedVideoTile = useMemo(() => {
-    return videoTiles.find((tile) => tile.id === selectedVideoId) ?? videoTiles[0] ?? null;
-  }, [selectedVideoId, videoTiles]);
-
   useEffect(() => {
     setCurrentUser(getStoredAuth());
   }, []);
+
+  const videoTiles = useMemo(() => {
+    const localTile = {
+      id: "local",
+      stream: localStream,
+      label: currentStudentName,
+      roleLabel: "Вы",
+      icon: "👤",
+      isLocal: true,
+    };
+
+    const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
+      const participant = participants.find((p) => p.id === peerId) ?? null;
+      const isTeacher = participant?.role === "teacher";
+
+      return {
+        id: peerId,
+        stream,
+        label: formatParticipantLabel(participant),
+        roleLabel: isTeacher ? "Преподаватель" : "Участник",
+        icon: isTeacher ? "👩🏻‍🏫" : "🎓",
+        isLocal: false,
+      };
+    });
+
+    return [localTile, ...remoteTiles];
+  }, [currentStudentName, localStream, participants, remoteStreams]);
+
+  const selectedVideo = useMemo(() => {
+    return (
+        videoTiles.find((tile) => tile.id === selectedVideoId && tile.stream) ??
+        videoTiles.find((tile) => !tile.isLocal && tile.stream) ??
+        videoTiles.find((tile) => tile.stream) ??
+        videoTiles[0] ??
+        null
+    );
+  }, [selectedVideoId, videoTiles]);
+
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -537,13 +548,21 @@ export default function StudentJoinSessionPage() {
     const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
       onRemoteStream: (peerId, stream) => {
         const hasTracks = stream.getTracks().length > 0;
-        if (!hasTracks) return;
+        setRemoteStreams((prev) => {
+          const next = { ...prev };
 
-        setRemoteStreams((prev) => ({
-          ...prev,
-          [peerId]: stream,
-        }));
-        setSelectedVideoId((current) => (current ? current : peerId));
+          if (hasTracks) {
+            next[peerId] = stream;
+          } else {
+            delete next[peerId];
+          }
+
+          return next;
+        });
+
+        if (hasTracks) {
+          setSelectedVideoId((current) => (current === "local" ? peerId : current));
+        }
       },
       onPeersChange: (peers) => setParticipants(peers),
       onDisconnect: () => setSocketDisconnected(true),
@@ -827,23 +846,28 @@ export default function StudentJoinSessionPage() {
                       ref={monitorRef}
                       className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
                   >
-                    {selectedVideoTile?.stream ? (
-                        <StreamVideo
-                            stream={selectedVideoTile.stream}
-                            className="w-full h-full object-cover"
-                            autoPlay
-                            playsInline
-                            muted={selectedVideoTile.muted}
-                        />
+                    {selectedVideo?.stream ? (
+                        <button
+                            type="button"
+                            onClick={() => void toggleMonitorFullscreen()}
+                            className="absolute inset-0 block h-full w-full cursor-pointer bg-black text-left"
+                            title="Открыть видео на весь экран"
+                        >
+                          <StreamVideo
+                              stream={selectedVideo.stream}
+                              className="h-full w-full object-cover"
+                              autoPlay
+                              playsInline
+                              muted={selectedVideo.isLocal}
+                          />
+                        </button>
                     ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
                           <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
-                            <span className="text-2xl">{selectedVideoTile?.isLocal ? "🙂" : "👨🏻‍🏫"}</span>
+                            <span className="text-2xl">👥</span>
                           </div>
-                          <div className="text-slate-500 font-medium text-sm text-center px-4">
-                            {selectedVideoTile
-                                ? `${selectedVideoTile.label} подключается к видео...`
-                                : "Ожидание подключения участников..."}
+                          <div className="text-slate-500 font-medium text-sm">
+                            Ожидание подключения участников...
                           </div>
                         </div>
                     )}
@@ -857,50 +881,56 @@ export default function StudentJoinSessionPage() {
                       <Maximize2 size={16} strokeWidth={2.5} />
                     </button>
 
-                    {selectedVideoTile && (
+                    {selectedVideo?.stream && (
                         <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
                           <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
-                            {selectedVideoTile.isLocal ? "🙂" : selectedVideoTile.role === "teacher" ? "🎓" : "👤"}
+                            {selectedVideo.icon}
                           </div>
-                          <span className="truncate">{selectedVideoTile.label}</span>
+                          <span className="truncate">{selectedVideo.label}</span>
                         </div>
                     )}
 
-                    <div className="absolute bottom-4 right-4 flex max-w-[92%] gap-3 overflow-x-auto pb-1">
-                      {videoTiles.map((tile) => (
-                          <button
-                              key={tile.id}
-                              type="button"
-                              onClick={() => setSelectedVideoId(tile.id)}
-                              className={cn(
-                                  "relative h-[108px] w-[170px] shrink-0 overflow-hidden rounded-[20px] bg-black text-left shadow-xl transition-all sm:h-[132px] sm:w-[220px] xl:h-[164px] xl:w-[260px]",
-                                  selectedVideoId === tile.id
-                                      ? "border-[3px] border-[#7448FF]"
-                                      : "border-[3px] border-white/10 hover:border-white/50"
-                              )}
-                              aria-label={`Показать видео: ${tile.label}`}
-                          >
-                            {tile.stream ? (
-                                <StreamVideo
-                                    stream={tile.stream}
-                                    className="w-full h-full object-cover"
-                                    autoPlay
-                                    playsInline
-                                    muted={tile.muted}
-                                />
-                            ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-slate-800 text-white">
-                                  <span className="text-2xl">{tile.isLocal ? "🙂" : tile.role === "teacher" ? "🎓" : "👤"}</span>
+                    <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] items-end gap-3 overflow-x-auto pb-1">
+                      {videoTiles
+                          .filter((tile) => tile.id !== selectedVideo?.id)
+                          .map((tile) => (
+                              <button
+                                  key={tile.id}
+                                  type="button"
+                                  onClick={() => setSelectedVideoId(tile.id)}
+                                  className={cn(
+                                      "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
+                                      selectedVideo?.id === tile.id
+                                          ? "border-[#7448FF] ring-4 ring-[#7448FF]/25"
+                                          : "border-white/20 hover:border-white/60"
+                                  )}
+                                  title={`Открыть ${tile.label} в большом окне`}
+                              >
+                                {tile.stream ? (
+                                    <StreamVideo
+                                        stream={tile.stream}
+                                        className="h-full w-full object-cover"
+                                        autoPlay
+                                        playsInline
+                                        muted={tile.isLocal}
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
+                                      {tile.icon}
+                                    </div>
+                                )}
+
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent px-2 pb-2 pt-7 text-white">
+                                  <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
+                                    <span className="truncate">{tile.label}</span>
+                                    {tile.isLocal && (
+                                        <Mic size={12} className={isMicEnabled ? "shrink-0 text-white" : "shrink-0 text-red-400"} />
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-medium text-white/70">{tile.roleLabel}</div>
                                 </div>
-                            )}
-                            <div className="absolute bottom-2 left-2 right-2 bg-slate-900/60 backdrop-blur-xl px-2 py-1 text-white rounded-xl flex items-center gap-1.5 text-[11px] font-medium">
-                              <span className="truncate">{tile.label}</span>
-                              {tile.isLocal && (
-                                  <Mic size={12} className={isMicEnabled ? "text-white shrink-0" : "text-red-400 shrink-0"} />
-                              )}
-                            </div>
-                          </button>
-                      ))}
+                              </button>
+                          ))}
                     </div>
                   </div>
 
