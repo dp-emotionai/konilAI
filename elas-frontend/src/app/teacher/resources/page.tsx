@@ -34,6 +34,7 @@ import {
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import MaterialPreviewModal from "@/components/resources/MaterialPreviewModal";
 import { useToast } from "@/components/ui/Toast";
 import { cn } from "@/lib/cn";
 import {
@@ -217,6 +218,7 @@ export default function TeacherResourcesPage() {
   const [mediaDetails, setMediaDetails] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [previewMaterial, setPreviewMaterial] = useState<MaterialRow | null>(null);
   const [activeMaterial, setActiveMaterial] = useState<MaterialRow | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [activeAssignments, setActiveAssignments] = useState<MaterialAssignmentRow[]>([]);
@@ -458,7 +460,6 @@ export default function TeacherResourcesPage() {
         title: form.title.trim(),
         description: descriptionParts.filter(Boolean).join("\n") || null,
         fileName: uploaded.fileName,
-        kind: uploaded.kind || createKind,
         mimeType: uploaded.mimeType || form.mimeType.trim() || null,
         storageKey: uploaded.storageKey,
         size: uploaded.size,
@@ -764,6 +765,7 @@ export default function TeacherResourcesPage() {
                               onToggleMenu={() =>
                                   setActionMenuId((current) => current === material.id ? null : material.id)
                               }
+                              onPreview={() => setPreviewMaterial(material)}
                               onDownload={() => void handleDownload(material)}
                               onAssign={() => openAssign(material)}
                               onDelete={() => void handleDelete(material)}
@@ -834,6 +836,12 @@ export default function TeacherResourcesPage() {
             </div>
           </section>
         </div>
+
+        <MaterialPreviewModal
+            open={Boolean(previewMaterial)}
+            material={previewMaterial}
+            onClose={() => setPreviewMaterial(null)}
+        />
 
         <Modal
             open={createOpen}
@@ -1208,6 +1216,7 @@ function MaterialTableRow({
                             menuOpen,
                             disabled,
                             onToggleMenu,
+                            onPreview,
                             onDownload,
                             onAssign,
                             onDelete,
@@ -1216,6 +1225,7 @@ function MaterialTableRow({
   menuOpen: boolean;
   disabled: boolean;
   onToggleMenu: () => void;
+  onPreview: () => void;
   onDownload: () => void;
   onAssign: () => void;
   onDelete: () => void;
@@ -1225,7 +1235,7 @@ function MaterialTableRow({
   const Icon = meta.icon;
 
   return (
-      <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+      <tr onClick={onPreview} className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
         <td className="px-5 py-4">
           <div className="flex items-center gap-3">
           <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", meta.iconClass)}>
@@ -1256,7 +1266,10 @@ function MaterialTableRow({
           <div className="flex items-center justify-end gap-2">
             <button
                 type="button"
-                onClick={onDownload}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onDownload();
+                }}
                 disabled={disabled}
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
             >
@@ -1265,7 +1278,10 @@ function MaterialTableRow({
             </button>
             <button
                 type="button"
-                onClick={onAssign}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAssign();
+                }}
                 disabled={disabled}
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
             >
@@ -1278,7 +1294,10 @@ function MaterialTableRow({
                   type="button"
                   aria-label="Дополнительные действия"
                   aria-expanded={menuOpen}
-                  onClick={onToggleMenu}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleMenu();
+                  }}
                   disabled={disabled}
                   className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
               >
@@ -1288,7 +1307,10 @@ function MaterialTableRow({
                   <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_14px_35px_rgba(15,23,42,0.14)]">
                     <button
                         type="button"
-                        onClick={onDelete}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete();
+                        }}
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
                     >
                       <Trash2 size={15} />

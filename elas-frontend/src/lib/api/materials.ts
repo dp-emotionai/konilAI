@@ -5,7 +5,6 @@ export type MaterialRow = {
   title: string;
   description: string | null;
   fileName: string;
-  kind?: string | null;
   mimeType: string | null;
   storageKey: string;
   size: number | null;
@@ -28,7 +27,6 @@ export type MaterialUploadResult = {
   storageKey: string;
   fileName: string;
   mimeType: string | null;
-  kind: string | null;
   size: number | null;
 };
 
@@ -39,7 +37,6 @@ export type AssignedMaterialRow = {
   description: string | null;
   fileName: string | null;
   mimeType: string | null;
-  kind: string | null;
   size: number | null;
   createdAt: string;
   visibleFrom: string | null;
@@ -59,7 +56,6 @@ export async function createMaterial(
       fileName: string;
       mimeType?: string | null;
       storageKey: string;
-      kind?: string | null;
       size?: number | null;
     },
     params?: { signal?: AbortSignal }
@@ -74,20 +70,6 @@ export async function uploadMaterialFile(file: File): Promise<MaterialUploadResu
 
   const formData = new FormData();
   formData.append("file", file);
-
-  const mime = String(file.type || "").toLowerCase();
-  const name = String(file.name || "").toLowerCase();
-  const kind = mime.startsWith("video/")
-      ? "video"
-      : mime.startsWith("audio/")
-          ? "audio"
-          : mime.startsWith("image/")
-              ? "image"
-              : mime.includes("pdf") || /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(name)
-                  ? "document"
-                  : "file";
-
-  formData.append("kind", kind);
 
   const response = await fetch(`${base}/materials/upload`, {
     method: "POST",
@@ -171,21 +153,16 @@ export async function getStudentMaterials(params?: { signal?: AbortSignal }): Pr
 export async function getMaterialDownload(
     materialId: string,
     params?: { signal?: AbortSignal; mode?: "inline" | "download" }
-): Promise<{ downloadUrl: string; url?: string; fileName: string; kind?: string | null; mimeType?: string | null } | null> {
+): Promise<{ downloadUrl: string; fileName: string } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
-
-  const query = params?.mode ? `?mode=${encodeURIComponent(params.mode)}` : "";
-
-  return api.get<{ downloadUrl: string; url?: string; fileName: string; kind?: string | null; mimeType?: string | null }>(
-      `/materials/${materialId}/download${query}`,
-      { signal: params?.signal }
-  );
+  const mode = params?.mode === "inline" ? "inline" : "download";
+  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/${materialId}/download?mode=${mode}`, { signal: params?.signal });
 }
 
 export async function getMaterialDownloadByStorageKey(
-    input: { storageKey: string; fileName?: string | null; mode?: "inline" | "download" },
+    input: { storageKey: string; fileName?: string | null },
     params?: { signal?: AbortSignal }
-): Promise<{ downloadUrl: string; url?: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; fileName: string } | null> {
   const storageKey = String(input.storageKey || "").trim();
   if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
 
@@ -196,11 +173,7 @@ export async function getMaterialDownloadByStorageKey(
     query.set("fileName", fileName);
   }
 
-  if (input.mode) {
-    query.set("mode", input.mode);
-  }
-
-  return api.get<{ downloadUrl: string; url?: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
+  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
     signal: params?.signal,
   });
 }
