@@ -164,7 +164,7 @@ function EmptyState({
   return (
     <div className="rounded-2xl border border-dashed border-[color:var(--border)]/30 bg-surface-subtle/30 px-5 py-8 text-center">
       <div className="text-sm font-medium text-fg">{title}</div>
-      <div className="mt-1 text-sm text-muted">{description}</div>
+      <div className="mt-2 text-sm font-semibold text-slate-500">{description}</div>
     </div>
   );
 }
@@ -179,7 +179,7 @@ function StatTile({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/50 px-4 py-4">
+    <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-5 py-5 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
         {icon}
@@ -515,7 +515,7 @@ export default function TeacherGroupDetailPage() {
   }
 
   return (
-    <div className="relative space-y-10 pb-20">
+    <div className="relative space-y-8 pb-20">
       <Glow />
 
       <Breadcrumbs
@@ -538,7 +538,7 @@ export default function TeacherGroupDetailPage() {
       <Section spacing="none">
         <Card variant="elevated" className="overflow-hidden">
           <div
-            className="relative h-36 w-full bg-gradient-to-br from-primary-muted/40 to-primary-muted/10 md:h-44"
+            className="relative h-44 w-full bg-gradient-to-br from-[#7448FF] via-[#8B5CF6] to-[#B38CFF] md:h-56"
             style={
               groupImageUrl
                 ? {
@@ -549,10 +549,10 @@ export default function TeacherGroupDetailPage() {
                 : undefined
             }
           >
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_34%),linear-gradient(to_top,rgba(15,23,42,0.28),transparent)]" />
           </div>
 
-          <CardContent className="relative -mt-16 px-6 pb-6 md:-mt-20 md:px-8 md:pb-8">
+          <CardContent className="relative -mt-16 px-6 pb-7 md:-mt-20 md:px-8 md:pb-8">
             <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
               <div className="flex min-w-0 items-end gap-4">
                 <input
@@ -566,7 +566,7 @@ export default function TeacherGroupDetailPage() {
                 {groupImageUrl ? (
                   <div className="relative group/avatar">
                     <div
-                      className="h-24 w-24 shrink-0 rounded-3xl bg-surface-subtle bg-cover bg-center shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28"
+                      className="h-24 w-24 shrink-0 rounded-[28px] bg-surface-subtle bg-cover bg-center shadow-2xl ring-4 ring-white md:h-28 md:w-28"
                       style={{ backgroundImage: `url(${groupImageUrl})` }}
                     />
                     <button
@@ -580,7 +580,7 @@ export default function TeacherGroupDetailPage() {
                   </div>
                 ) : (
                   <div className="relative group/avatar">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-muted to-primary-muted/60 text-3xl font-bold text-[rgb(var(--primary))] shadow-card ring-4 ring-[var(--surface)] md:h-28 md:w-28 md:text-4xl">
+                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[28px] bg-white text-3xl font-black text-[#7448FF] shadow-2xl ring-4 ring-white/80 md:h-28 md:w-28 md:text-4xl">
                       {group.name.slice(0, 2).toUpperCase()}
                     </div>
                     <button
@@ -620,7 +620,7 @@ export default function TeacherGroupDetailPage() {
                     </div>
                   ) : (
                     <div className="flex min-w-0 items-center gap-2">
-                      <h1 className="truncate text-2xl font-bold text-fg md:text-3xl">
+                      <h1 className="truncate text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
                         {localName || group.name}
                       </h1>
                       <button
@@ -691,7 +691,7 @@ export default function TeacherGroupDetailPage() {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 md:grid-cols-4">
+            <div className="mt-6 grid gap-4 md:grid-cols-4">
               <StatTile
                 label="Преподаватель"
                 value={group.teacher.fullName}
@@ -714,7 +714,7 @@ export default function TeacherGroupDetailPage() {
               />
             </div>
 
-            <div className="mt-5 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4">
+            <div className="mt-6 rounded-3xl border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur">
               {editingDesc ? (
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted">Описание группы</label>
@@ -772,7 +772,7 @@ export default function TeacherGroupDetailPage() {
       )}
 
       <Section>
-        <div className="mb-5 flex flex-wrap gap-2 border-b border-[color:var(--border)]/30 pb-3">
+        <div className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-slate-200/70 bg-white/75 p-2 shadow-sm backdrop-blur">
           <TabButton
             active={activeTab === "sessions"}
             label="Сессии"
@@ -831,7 +831,7 @@ export default function TeacherGroupDetailPage() {
                           return (
                             <div
                               key={s.id}
-                              className="rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-5"
+                              className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-5 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
                             >
                               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                                 <div className="min-w-0">
@@ -918,7 +918,7 @@ export default function TeacherGroupDetailPage() {
 
                     {apiAvailable ? (
                       <>
-                        <div className="mt-5 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4">
+                        <div className="mt-6 rounded-3xl border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur">
                           <textarea
                             className="w-full rounded-2xl border border-[color:var(--border)]/20 bg-surface px-4 py-3 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]/30"
                             rows={4}
@@ -969,7 +969,7 @@ export default function TeacherGroupDetailPage() {
                             announcements.map((m) => (
                               <div
                                 key={m.id}
-                                className="rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
+                                className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4 transition hover:bg-white hover:shadow-md"
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <ToneBadge tone="purple">Объявление</ToneBadge>
