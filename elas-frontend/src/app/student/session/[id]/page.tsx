@@ -1050,13 +1050,6 @@ export default function StudentJoinSessionPage() {
                                             });
                                         }}
                                     />
-                                    <CallControlButton
-                                        active={false}
-                                        disabled
-                                        icon={<MoreHorizontal size={22} />}
-                                        label="Еще"
-                                    />
-
                                     <div className="flex flex-col items-center gap-2 mx-1">
                                         <button
                                             type="button"
@@ -1549,9 +1542,23 @@ export default function StudentJoinSessionPage() {
         );
     }
 
+    const shouldShowPreparationModal = showPreparation && tab === "prepare" && !consentModalOpen;
+
+    if (!shouldShowPreparationModal) {
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FAFAFB]">
+                <div className="rounded-3xl border border-slate-100 bg-white px-6 py-5 text-center shadow-[0_18px_55px_rgba(15,23,42,0.10)]">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#7448FF]" />
+                    <div className="text-sm font-semibold text-slate-900">Подключаем видеозвонок...</div>
+                    <div className="mt-1 text-xs text-slate-500">Пожалуйста, подождите несколько секунд.</div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
-            {showPreparation && tab === "prepare" && !consentModalOpen && (
+            {shouldShowPreparationModal && (
                 <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
                     <div className="flex min-h-full items-center justify-center">
                         <div
