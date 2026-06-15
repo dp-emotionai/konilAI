@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
+import TeacherSessionPreparationModal from "@/components/session/TeacherSessionPreparationModal";
 
 type TabValue = "all" | "live" | "upcoming" | "ended";
 
@@ -118,6 +119,7 @@ export default function TeacherSessionsPage() {
   const [loading, setLoading] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [confirmEndSession, setConfirmEndSession] = useState<GroupSession | null>(null);
+  const [selectedSession, setSelectedSession] = useState<GroupSession | null>(null);
 
   const [q, setQ] = useState("");
   const [activeTab, setActiveTab] = useState<TabValue>("all");
@@ -325,19 +327,29 @@ export default function TeacherSessionsPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-                            <button
-                                type="button"
-                                onClick={() => router.push(getActionHref(session))}
-                                className={cn(
-                                    "inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-colors",
-                                    session.status === "live"
-                                        ? "bg-[#7448FF] text-white shadow-sm hover:bg-[#623ce6]"
-                                        : "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
-                                )}
-                            >
-                              {getActionLabel(session)}
-                              <ArrowRight size={15} />
-                            </button>
+                            {session.status === "ended" ? (
+                                <Link
+                                    href={getActionHref(session)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-[13px] font-bold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                                >
+                                  {getActionLabel(session)}
+                                  <ArrowRight size={15} />
+                                </Link>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedSession(session)}
+                                    className={cn(
+                                        "inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-bold transition-colors",
+                                        session.status === "live"
+                                            ? "bg-[#7448FF] text-white shadow-sm hover:bg-[#623ce6]"
+                                            : "border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                                    )}
+                                >
+                                  {getActionLabel(session)}
+                                  <ArrowRight size={15} />
+                                </button>
+                            )}
 
                             <Button
                                 variant="ghost"
@@ -369,6 +381,16 @@ export default function TeacherSessionsPage() {
               </div>
           )}
         </div>
+
+        <TeacherSessionPreparationModal
+            open={Boolean(selectedSession)}
+            session={selectedSession}
+            onClose={() => setSelectedSession(null)}
+            onStart={(sessionId) => {
+              setSelectedSession(null);
+              router.push(`/teacher/session/${sessionId}?autostart=1`);
+            }}
+        />
 
         <Modal
             open={!!confirmEndSession}
