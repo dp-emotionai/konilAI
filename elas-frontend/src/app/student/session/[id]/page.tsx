@@ -244,6 +244,10 @@ function CallControlButton({
     );
 }
 
+function deferStateUpdate(callback: () => void) {
+    queueMicrotask(callback);
+}
+
 export default function StudentJoinSessionPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
@@ -363,12 +367,9 @@ export default function StudentJoinSessionPage() {
     );
 
     useEffect(() => {
-        if (!canOpenPreparationStep2) {
-            setPreparationStep(1);
-            return;
-        }
-
-        setPreparationStep(2);
+        deferStateUpdate(() => {
+            setPreparationStep(canOpenPreparationStep2 ? 2 : 1);
+        });
     }, [canOpenPreparationStep2]);
 
     const handleRevokeConsent = async () => {
@@ -420,8 +421,10 @@ export default function StudentJoinSessionPage() {
         if (!autoStart || joinInfoLoading || joinInfoError || live) return;
         if (joinInfo?.allowedToJoin === false) return;
 
-        setLive(true);
-        setTab("live");
+        deferStateUpdate(() => {
+            setLive(true);
+            setTab("live");
+        });
     }, [autoStart, joinInfo?.allowedToJoin, joinInfoError, joinInfoLoading, live]);
 
     const showPreparation =
@@ -439,7 +442,9 @@ export default function StudentJoinSessionPage() {
 
     useEffect(() => {
         if (!apiAvailable || !sessionId || !live) {
-            setPresence([]);
+            deferStateUpdate(() => {
+                setPresence([]);
+            });
             return;
         }
 
@@ -507,7 +512,9 @@ export default function StudentJoinSessionPage() {
         [currentUser]
     );
     useEffect(() => {
-        setCurrentUser(getStoredAuth());
+        deferStateUpdate(() => {
+            setCurrentUser(getStoredAuth());
+        });
     }, []);
 
     const videoTiles = useMemo(() => {
@@ -598,13 +605,17 @@ export default function StudentJoinSessionPage() {
 
     useEffect(() => {
         if (!live || !roomId) {
-            setConnectionState("idle");
-            setConnectionError(null);
+            deferStateUpdate(() => {
+                setConnectionState("idle");
+                setConnectionError(null);
+            });
             return;
         }
 
-        setConnectionState("connecting");
-        setConnectionError(null);
+        deferStateUpdate(() => {
+            setConnectionState("connecting");
+            setConnectionError(null);
+        });
 
         const wsBase = getWsBaseUrl().replace(/^ws/, "http");
         const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
@@ -689,14 +700,16 @@ export default function StudentJoinSessionPage() {
             screenStreamRef.current = null;
             peerManagerRef.current = null;
             manager.leave();
-            setRemoteStreams({});
-            setSelectedVideoId("local");
-            setLocalStream(null);
-            setParticipants([]);
-            setConnectionState("idle");
-            setConnectionError(null);
-            setSocketDisconnected(false);
-            setIsScreenSharing(false);
+            deferStateUpdate(() => {
+                setRemoteStreams({});
+                setSelectedVideoId("local");
+                setLocalStream(null);
+                setParticipants([]);
+                setConnectionState("idle");
+                setConnectionError(null);
+                setSocketDisconnected(false);
+                setIsScreenSharing(false);
+            });
         };
     }, [live, roomId]);
 
@@ -765,8 +778,10 @@ export default function StudentJoinSessionPage() {
     useEffect(() => {
         if (!shouldRunMl || !localStream) return;
 
-        setMlActive(true);
-        setMlUnavailable(false);
+        deferStateUpdate(() => {
+            setMlActive(true);
+            setMlUnavailable(false);
+        });
 
         let cancelled = false;
         let inflight = false;
@@ -840,10 +855,12 @@ export default function StudentJoinSessionPage() {
             clearInterval(timer);
             hiddenVideo.pause();
             hiddenVideo.srcObject = null;
-            setMlActive(false);
-            setMlResult(null);
-            setMlFaceDetected(null);
-            setMlUnavailable(false);
+            deferStateUpdate(() => {
+                setMlActive(false);
+                setMlResult(null);
+                setMlFaceDetected(null);
+                setMlUnavailable(false);
+            });
         };
     }, [shouldRunMl, sessionId, apiAvailable, localStream]);
 
