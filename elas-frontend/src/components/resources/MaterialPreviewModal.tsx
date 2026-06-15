@@ -24,7 +24,20 @@ import {
   type MaterialRow,
 } from "@/lib/api/materials";
 
-type PreviewMaterial = MaterialRow | AssignedMaterialRow;
+type PreviewMaterial = (MaterialRow | AssignedMaterialRow | {
+  id?: string;
+  materialId?: string;
+  title: string;
+  description?: string | null;
+  kind?: MaterialKind | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+  createdAt?: string | null;
+  groupId?: string | null;
+  groupName?: string | null;
+  group?: { name?: string | null } | null;
+});
 type PreviewKind = MaterialKind;
 
 type Props = {
@@ -40,7 +53,8 @@ type PreviewInfo = {
 };
 
 function getMaterialId(material: PreviewMaterial): string {
-  return "materialId" in material ? material.materialId : material.id;
+  const row = material as { id?: string | null; materialId?: string | null };
+  return String(row.materialId || row.id || "");
 }
 
 function getKind(material: PreviewMaterial): PreviewKind {
@@ -98,9 +112,12 @@ function getBadgeClass(kind: PreviewKind): string {
 }
 
 function getMaterialGroupName(material: PreviewMaterial): string {
-  if (!("assignmentId" in material)) return "—";
-
-  return String(material.group?.name || material.groupName || material.groupId || "Без группы").trim();
+  const row = material as {
+    group?: { name?: string | null } | null;
+    groupName?: string | null;
+    groupId?: string | null;
+  };
+  return String(row.group?.name || row.groupName || row.groupId || "—").trim();
 }
 
 function getFileExtension(fileName: string | null | undefined, mimeType?: string | null): string {
@@ -277,7 +294,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                     </div>
                     <div>
                       <div className="text-xs font-black text-slate-400">Размер</div>
-                      <div className="mt-1 text-sm font-bold text-slate-700">{formatBytes(material.size)}</div>
+                      <div className="mt-1 text-sm font-bold text-slate-700">{formatBytes(material.size ?? null)}</div>
                     </div>
                     <div>
                       <div className="text-xs font-black text-slate-400">Группа</div>
@@ -356,7 +373,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
               <div className="mt-5 grid gap-3 text-sm sm:grid-cols-4">
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-400"><FileText size={15} /> Размер</div>
-                  <div className="mt-2 font-black text-slate-700">{formatBytes(material.size)}</div>
+                  <div className="mt-2 font-black text-slate-700">{formatBytes(material.size ?? null)}</div>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-400"><Icon size={15} /> Тип</div>

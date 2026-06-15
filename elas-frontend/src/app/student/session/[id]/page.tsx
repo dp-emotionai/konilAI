@@ -54,6 +54,7 @@ import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
 import { StreamAudio, StreamVideo } from "@/components/session/StreamVideo";
+import MaterialPreviewModal from "@/components/resources/MaterialPreviewModal";
 
 import {
     Mic,
@@ -297,6 +298,7 @@ export default function StudentJoinSessionPage() {
     const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredAuth>>(null);
     const [sessionContent, setSessionContent] = useState<SessionContent | null>(null);
     const [sessionFiles, setSessionFiles] = useState<SessionContentFile[]>([]);
+    const [selectedMaterialPreview, setSelectedMaterialPreview] = useState<SessionContentFile | null>(null);
     const [contentLoading, setContentLoading] = useState(false);
     const [isMonitorFullscreen, setIsMonitorFullscreen] = useState(false);
 
@@ -1219,19 +1221,7 @@ export default function StudentJoinSessionPage() {
                                                                     <div className="ml-auto flex shrink-0 items-center gap-2">
                                                                         <button
                                                                             type="button"
-                                                                            onClick={async () => {
-                                                                                const direct = file.url?.trim();
-                                                                                if (direct) {
-                                                                                    window.open(direct, "_blank", "noreferrer");
-                                                                                    return;
-                                                                                }
-
-                                                                                const info = await getMaterialDownload(file.id);
-                                                                                const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
-                                                                                if (url) {
-                                                                                    window.open(url, "_blank", "noreferrer");
-                                                                                }
-                                                                            }}
+                                                                            onClick={() => setSelectedMaterialPreview(file)}
                                                                             className="inline-flex items-center gap-2 rounded-[18px] border border-purple-100 bg-white px-4 py-2.5 text-[12px] font-bold text-[#7448FF] transition hover:border-[#7448FF]/30 hover:bg-purple-50"
                                                                         >
                                                                             Открыть
@@ -1241,7 +1231,7 @@ export default function StudentJoinSessionPage() {
                                                                         <button
                                                                             type="button"
                                                                             onClick={async () => {
-                                                                                const info = await getMaterialDownload(file.id);
+                                                                                const info = await getMaterialDownload(file.id, { mode: "download" });
                                                                                 const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : file.url || "";
                                                                                 if (url) window.open(url, "_blank", "noreferrer");
                                                                             }}
@@ -1734,6 +1724,13 @@ export default function StudentJoinSessionPage() {
                     </div>
                 </div>
             )}
+
+
+            <MaterialPreviewModal
+                open={Boolean(selectedMaterialPreview)}
+                material={selectedMaterialPreview}
+                onClose={() => setSelectedMaterialPreview(null)}
+            />
 
             <ConsentModal
                 open={consentModalOpen}
