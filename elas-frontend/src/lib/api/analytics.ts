@@ -29,12 +29,18 @@ export type SessionAnalyticsTimelinePoint = {
   time_sec?: number;
   timeSec?: number;
   from_sec?: number;
+  fromSec?: number;
   to_sec?: number;
+  toSec?: number;
   engagement?: number;
   avg_engagement?: number;
   avgEngagement?: number;
   stress?: number;
+  avg_stress?: number;
+  avgStress?: number;
   risk?: number;
+  avg_risk?: number;
+  avgRisk?: number;
 };
 
 export type SessionAnalyticsParticipantResponse = {
@@ -57,67 +63,15 @@ export type SessionAnalyticsParticipantResponse = {
 export type GroupAnalyticsResponse = {
   group_id?: string;
   groupId?: string;
-  groupName?: string;
   total_sessions?: number;
   totalSessions?: number;
-  studentCount?: number;
-  materialCount?: number;
-  taskCount?: number;
-  testCount?: number;
   average_engagement?: number;
   avgEngagement?: number;
   avg_engagement?: number;
-  averageEngagement?: number;
-  averageAttendance?: number;
-  taskCompletionRate?: number;
-  averageScore?: number;
-  engagement_trend?: GroupTrendPointResponse[];
-  engagementTrend?: GroupTrendPointResponse[];
-  attendanceTrend?: GroupAttendancePointResponse[];
-  materialBreakdown?: GroupBreakdownResponse[];
-  assignmentStatus?: GroupStatusResponse[];
-  topStudents?: GroupStudentResponse[];
-  students?: GroupStudentResponse[];
-};
-
-export type GroupTrendPointResponse = {
-  sessionId?: string;
-  label?: string;
-  date?: string;
-  time_sec?: number;
-  timeSec?: number;
-  engagement?: number;
-  avg_engagement?: number;
-  avgEngagement?: number;
-};
-
-export type GroupAttendancePointResponse = {
-  sessionId?: string;
-  title?: string;
-  label?: string;
-  date?: string;
-  joined?: number;
-  total?: number;
-  rate?: number;
-};
-
-export type GroupBreakdownResponse = {
-  kind?: string;
-  count?: number;
-};
-
-export type GroupStatusResponse = {
-  status?: string;
-  count?: number;
-};
-
-export type GroupStudentResponse = {
-  userId?: string;
-  fullName?: string;
-  email?: string;
-  attendanceRate?: number;
-  taskCompletionRate?: number;
-  averageScore?: number;
+  engagement_trend?:
+    | SessionAnalyticsTimelinePoint[]
+    | { time_sec?: number; engagement?: number }[];
+  engagementTrend?: SessionAnalyticsTimelinePoint[];
 };
 
 export type TeacherAnalyticsResponse = {
@@ -150,7 +104,14 @@ export type SessionAnalytics = {
   averageEngagement: number;
   stressEvents: number;
   attentionDrops: number;
-  timeline: { timeSec: number; engagement: number; stress?: number; risk?: number }[];
+  timeline: {
+    timeSec: number;
+    fromSec?: number;
+    toSec?: number;
+    engagement: number;
+    stress?: number;
+    risk?: number;
+  }[];
   quality?: string;
   durationMinutes?: number;
   aiSummary?: string | null;
@@ -159,22 +120,9 @@ export type SessionAnalytics = {
 
 export type GroupAnalytics = {
   groupId: string;
-  groupName?: string;
   totalSessions: number;
-  studentCount: number;
-  materialCount: number;
-  taskCount: number;
-  testCount: number;
   averageEngagement: number;
-  averageAttendance: number;
-  taskCompletionRate: number;
-  averageScore: number;
-  engagementTrend: { sessionId?: string; label: string; date?: string; timeSec: number; engagement: number }[];
-  attendanceTrend: { sessionId?: string; label: string; date?: string; joined: number; total: number; rate: number }[];
-  materialBreakdown: { kind: string; count: number }[];
-  assignmentStatus: { status: string; count: number }[];
-  topStudents: { userId: string; fullName: string; email?: string; attendanceRate: number; taskCompletionRate: number; averageScore: number }[];
-  students: { userId: string; fullName: string; email?: string; attendanceRate: number; taskCompletionRate: number; averageScore: number }[];
+  engagementTrend: { timeSec: number; engagement: number }[];
 };
 
 export type TeacherAnalytics = {
@@ -200,27 +148,43 @@ function normalizeMaybePercent(value: unknown): number | undefined {
 }
 
 function normSessionAnalytics(
-    raw: SessionAnalyticsResponse,
-    sessionId: string
+  raw: SessionAnalyticsResponse,
+  sessionId: string
 ): SessionAnalytics {
   const avg =
-      raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
+    raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
 
   const stress = raw.stress_events ?? raw.stressEvents ?? 0;
   const drops = raw.attention_drops ?? raw.attentionDrops ?? 0;
   const timelineRaw = Array.isArray(raw.timeline) ? raw.timeline : [];
 
-  const timeline = timelineRaw.map((p) => ({
-    timeSec: toNumber(p.time_sec ?? p.timeSec ?? p.from_sec ?? 0, 0),
-    engagement: normalizePercent(
+  const timeline = timelineRaw.map((p) => {
+    const fromSec = toNumber(
+      p.from_sec ?? p.fromSec ?? p.time_sec ?? p.timeSec ?? 0,
+      0
+    );
+    const rawToSec = p.to_sec ?? p.toSec;
+    const toSec =
+      typeof rawToSec === "number" && !Number.isNaN(rawToSec)
+        ? rawToSec
+        : undefined;
+
+    return {
+      timeSec: fromSec,
+      fromSec,
+      toSec,
+      engagement: normalizePercent(
         p.engagement ?? p.avg_engagement ?? p.avgEngagement ?? 0
-    ),
-    stress: normalizeMaybePercent(p.stress),
-    risk: normalizeMaybePercent(p.risk),
-  }));
+      ),
+      stress: normalizeMaybePercent(
+        p.stress ?? p.avg_stress ?? p.avgStress
+      ),
+      risk: normalizeMaybePercent(p.risk ?? p.avg_risk ?? p.avgRisk),
+    };
+  });
 
   const participants = Array.isArray(raw.participants)
-      ? raw.participants.map((p, index) => ({
+    ? raw.participants.map((p, index) => ({
         userId: String(p.user_id ?? p.userId ?? `participant-${index + 1}`),
         fullName: String(p.fullName ?? p.email ?? `Участник ${index + 1}`),
         firstName: p.firstName,
@@ -234,7 +198,7 @@ function normSessionAnalytics(
         risk: normalizeMaybePercent(p.risk),
         confidence: normalizeMaybePercent(p.confidence),
       }))
-      : [];
+    : [];
 
   return {
     sessionId: raw.sessionId ?? raw.session_id ?? sessionId,
@@ -244,88 +208,62 @@ function normSessionAnalytics(
     timeline,
     quality: raw.quality,
     durationMinutes:
-        typeof raw.duration_minutes === "number"
-            ? raw.duration_minutes
-            : typeof raw.durationMinutes === "number"
-                ? raw.durationMinutes
-                : undefined,
+      typeof raw.duration_minutes === "number"
+        ? raw.duration_minutes
+        : typeof raw.durationMinutes === "number"
+          ? raw.durationMinutes
+          : timeline.length > 0
+            ? Math.max(
+                ...timeline.map((point) => point.toSec ?? point.fromSec ?? point.timeSec)
+              ) / 60
+            : undefined,
     aiSummary: raw.ai_summary ?? undefined,
     participants,
   };
 }
 
 function normGroupAnalytics(
-    raw: GroupAnalyticsResponse,
-    groupId: string
+  raw: GroupAnalyticsResponse,
+  groupId: string
 ): GroupAnalytics {
   const total = raw.total_sessions ?? raw.totalSessions ?? 0;
   const avg =
-      raw.averageEngagement ??
-      raw.average_engagement ??
-      raw.avgEngagement ??
-      raw.avg_engagement ??
-      0;
+    raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
   const trendRaw = raw.engagement_trend ?? raw.engagementTrend ?? [];
 
-  const engagementTrend = trendRaw.map((p, index) => ({
-    sessionId: p.sessionId,
-    label: String(p.label ?? p.date ?? `Сессия ${index + 1}`),
-    date: p.date,
-    timeSec: toNumber(p.time_sec ?? p.timeSec ?? index * 60, index * 60),
-    engagement: normalizePercent(
-        p.engagement ?? p.avg_engagement ?? p.avgEngagement ?? 0
-    ),
-  }));
-
-  const attendanceTrend = (raw.attendanceTrend ?? []).map((p, index) => ({
-    sessionId: p.sessionId,
-    label: String(p.label ?? p.title ?? p.date ?? `Сессия ${index + 1}`),
-    date: p.date,
-    joined: toNumber(p.joined, 0),
-    total: toNumber(p.total, 0),
-    rate: normalizePercent(p.rate ?? 0),
-  }));
-
-  const normalizeStudent = (p: GroupStudentResponse, index: number) => ({
-    userId: String(p.userId ?? `student-${index + 1}`),
-    fullName: String(p.fullName ?? p.email ?? `Студент ${index + 1}`),
-    email: p.email,
-    attendanceRate: normalizePercent(p.attendanceRate ?? 0),
-    taskCompletionRate: normalizePercent(p.taskCompletionRate ?? 0),
-    averageScore: normalizePercent(p.averageScore ?? 0),
-  });
+  const engagementTrend = trendRaw.map(
+    (
+      p:
+        | SessionAnalyticsTimelinePoint
+        | { time_sec?: number; engagement?: number }
+    ) => ({
+      timeSec:
+        (p as SessionAnalyticsTimelinePoint).time_sec ??
+        (p as SessionAnalyticsTimelinePoint).timeSec ??
+        (p as { time_sec?: number }).time_sec ??
+        0,
+      engagement: normalizePercent(
+        (p as SessionAnalyticsTimelinePoint).engagement ??
+          (p as SessionAnalyticsTimelinePoint).avg_engagement ??
+          (p as SessionAnalyticsTimelinePoint).avgEngagement ??
+          (p as { engagement?: number }).engagement ??
+          0
+      ),
+    })
+  );
 
   return {
     groupId: raw.groupId ?? raw.group_id ?? groupId,
-    groupName: raw.groupName,
     totalSessions: toNumber(total, 0),
-    studentCount: toNumber(raw.studentCount, 0),
-    materialCount: toNumber(raw.materialCount, 0),
-    taskCount: toNumber(raw.taskCount, 0),
-    testCount: toNumber(raw.testCount, 0),
     averageEngagement: normalizePercent(avg),
-    averageAttendance: normalizePercent(raw.averageAttendance ?? 0),
-    taskCompletionRate: normalizePercent(raw.taskCompletionRate ?? 0),
-    averageScore: normalizePercent(raw.averageScore ?? 0),
     engagementTrend,
-    attendanceTrend,
-    materialBreakdown: (raw.materialBreakdown ?? []).map((p) => ({
-      kind: String(p.kind ?? "Файл"),
-      count: toNumber(p.count, 0),
-    })),
-    assignmentStatus: (raw.assignmentStatus ?? []).map((p) => ({
-      status: String(p.status ?? "Статус"),
-      count: toNumber(p.count, 0),
-    })),
-    topStudents: (raw.topStudents ?? []).map(normalizeStudent),
-    students: (raw.students ?? []).map(normalizeStudent),
   };
 }
 
 function normTeacherAnalytics(raw: TeacherAnalyticsResponse): TeacherAnalytics {
   const total = raw.total_sessions ?? raw.totalSessions ?? 0;
   const avg =
-      raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
+    raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
   const stress = raw.stress_events ?? raw.stressEvents ?? 0;
 
   return {
@@ -338,12 +276,12 @@ function normTeacherAnalytics(raw: TeacherAnalyticsResponse): TeacherAnalytics {
 const ANALYTICS_PREFIX = "analytics";
 
 export async function fetchSessionAnalytics(
-    sessionId: string
+  sessionId: string
 ): Promise<SessionAnalytics | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
   try {
     const raw = await api.get<SessionAnalyticsResponse>(
-        `${ANALYTICS_PREFIX}/session/${sessionId}`
+      `${ANALYTICS_PREFIX}/session/${sessionId}`
     );
     return raw ? normSessionAnalytics(raw, sessionId) : null;
   } catch {
@@ -352,12 +290,12 @@ export async function fetchSessionAnalytics(
 }
 
 export async function fetchGroupAnalytics(
-    groupId: string
+  groupId: string
 ): Promise<GroupAnalytics | null> {
   if (!getApiBaseUrl() || !hasAuth() || !groupId) return null;
   try {
     const raw = await api.get<GroupAnalyticsResponse>(
-        `${ANALYTICS_PREFIX}/group/${groupId}`
+      `${ANALYTICS_PREFIX}/group/${groupId}`
     );
     return raw ? normGroupAnalytics(raw, groupId) : null;
   } catch {
@@ -369,7 +307,7 @@ export async function fetchTeacherAnalytics(): Promise<TeacherAnalytics | null> 
   if (!getApiBaseUrl() || !hasAuth()) return null;
   try {
     const raw = await api.get<TeacherAnalyticsResponse>(
-        `${ANALYTICS_PREFIX}/teacher`
+      `${ANALYTICS_PREFIX}/teacher`
     );
     return raw ? normTeacherAnalytics(raw) : null;
   } catch {
@@ -387,8 +325,8 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export async function exportSessionReport(
-    sessionId: string,
-    format: "json" | "csv" | "pdf"
+  sessionId: string,
+  format: "json" | "csv" | "pdf"
 ): Promise<void> {
   const base = getApiBaseUrl();
   const token = getToken();
@@ -406,8 +344,8 @@ export async function exportSessionReport(
   const blob = await res.blob();
   const ext = format === "pdf" ? "pdf" : format;
   const name = res.headers
-      .get("Content-Disposition")
-      ?.match(/filename="?([^";]+)"?/)?.[1];
+    .get("Content-Disposition")
+    ?.match(/filename="?([^";]+)"?/)?.[1];
 
   downloadBlob(blob, name ?? `session-${sessionId}-report.${ext}`);
 }
@@ -417,7 +355,7 @@ export async function exportGroupReport(groupId: string): Promise<void> {
   const token = getToken();
   if (!base || !token) throw new Error("API not configured or not authenticated");
 
-  const path = `${base.replace(/\/$/, "")}/analytics/group/${groupId}/export?format=pdf`;
+  const path = `${base.replace(/\/$/, "")}/analytics/group/${groupId}/export`;
 
   const res = await fetch(path, {
     method: "GET",
@@ -428,8 +366,8 @@ export async function exportGroupReport(groupId: string): Promise<void> {
 
   const blob = await res.blob();
   const name = res.headers
-      .get("Content-Disposition")
-      ?.match(/filename="?([^";]+)"?/)?.[1];
+    .get("Content-Disposition")
+    ?.match(/filename="?([^";]+)"?/)?.[1];
 
   downloadBlob(blob, name ?? `group-${groupId}-report.pdf`);
 }
@@ -450,8 +388,8 @@ export async function exportTeacherReport(): Promise<void> {
 
   const blob = await res.blob();
   const name = res.headers
-      .get("Content-Disposition")
-      ?.match(/filename="?([^";]+)"?/)?.[1];
+    .get("Content-Disposition")
+    ?.match(/filename="?([^";]+)"?/)?.[1];
 
   downloadBlob(blob, name ?? "teacher-analytics-report.pdf");
 }

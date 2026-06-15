@@ -174,19 +174,25 @@ function formatTimelineWindow(
   point: SessionAnalytics["timeline"][number],
   nextPoint?: SessionAnalytics["timeline"][number]
 ) {
-  const from = formatClockFromSec(point.timeSec);
-  const to = nextPoint ? formatClockFromSec(nextPoint.timeSec) : null;
-  return to ? `${from}–${to}` : `с ${from}`;
+  const fromSec = point.fromSec ?? point.timeSec;
+  const explicitToSec = point.toSec;
+  const fallbackToSec = nextPoint?.fromSec ?? nextPoint?.timeSec;
+  const toSec =
+    typeof explicitToSec === "number" ? explicitToSec : fallbackToSec;
+
+  const from = formatClockFromSec(fromSec);
+  if (typeof toSec !== "number" || toSec <= fromSec) return `с ${from}`;
+  return `${from}–${formatClockFromSec(toSec)}`;
 }
 
 function buildTimelineHighlights(analytics: SessionAnalytics) {
-  return analytics.timeline.slice(0, 4).map((point, index, array) => {
+  return analytics.timeline.slice(0, 6).map((point, index, array) => {
     const bits = [`вовлечённость ${point.engagement}%`];
     if (typeof point.stress === "number") bits.push(`стресс ${point.stress}%`);
     if (typeof point.risk === "number") bits.push(`риск ${point.risk}%`);
 
     return {
-      id: `${point.timeSec}-${index}`,
+      id: `${point.fromSec ?? point.timeSec}-${point.toSec ?? index}`,
       window: formatTimelineWindow(point, array[index + 1]),
       description: bits.join(" • "),
     };
@@ -210,19 +216,10 @@ function buildSessionStory(
   }
 
   if (!analytics) {
-    return "Подробная аналитика ещё не сформирована backend'ом. Карточка показывает только доступные метаданные сессии.";
+    return "Подробная аналитика ещё не сформирована backend. Показаны только доступные метаданные сессии.";
   }
 
   if (analytics.aiSummary) return analytics.aiSummary;
-
-  const strongest = analytics.participants?.[0];
-  if (strongest) {
-    return `${strongest.fullName} чаще всего был в состоянии «${formatEmotionLabel(
-      strongest.dominantEmotion || strongest.emotion
-    )}». Средняя вовлечённость по сессии составила ${
-      analytics.averageEngagement
-    }%, а заметных спадов внимания было ${analytics.attentionDrops}.`;
-  }
 
   return `Средняя вовлечённость по сессии составила ${analytics.averageEngagement}%, стрессовых событий зафиксировано ${analytics.stressEvents}, спадов внимания — ${analytics.attentionDrops}.`;
 }
@@ -310,8 +307,12 @@ export default function TeacherReportsPage() {
       finishedRows
         .filter((row) => !(row.id in analyticsCache))
         .map(async (row) => {
-          const analytics = await fetchSessionAnalytics(row.id);
-          return [row.id, analytics] as const;
+          try {
+            const analytics = await fetchSessionAnalytics(row.id);
+            return [row.id, analytics] as const;
+          } catch {
+            return [row.id, null] as const;
+          }
         })
     ).then((entries) => {
       if (cancelled) return;
@@ -565,6 +566,9 @@ export default function TeacherReportsPage() {
                     </div>
 
                     <div className="border-t border-slate-100 p-6 md:p-8">
+                      <div className="mb-5 rounded-2xl border border-purple-100 bg-purple-50/50 px-4 py-3 text-sm leading-6 text-slate-600">
+                        Блоки ниже строятся только из ответов backend: live metrics для активной сессии и timeline buckets для завершённой.
+                      </div>
                       <div className="grid gap-5 lg:grid-cols-2">
                         <div className="rounded-[20px] border border-slate-200 bg-white p-5">
                           <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-800">
@@ -627,7 +631,7 @@ export default function TeacherReportsPage() {
                             </div>
                           ) : (
                             <div className="text-sm leading-6 text-slate-500">
-                              Backend пока не вернул достаточно timeline-точек.
+                              Backend пока не вернул временные buckets для этой сессии.
                             </div>
                           )}
                         </div>
@@ -638,30 +642,7 @@ export default function TeacherReportsPage() {
                             Участники и эмоции
                           </div>
 
-                          {row.status === "finished" &&
-                          analytics?.participants?.length ? (
-                            <div className="space-y-2">
-                              {analytics.participants
-                                .slice(0, 4)
-                                .map((participant) => (
-                                  <div
-                                    key={participant.userId}
-                                    className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
-                                  >
-                                    <div className="font-medium text-slate-900">
-                                      {participant.fullName}
-                                    </div>
-                                    <div className="mt-1 text-sm text-slate-500">
-                                      {formatEmotionLabel(
-                                        participant.dominantEmotion ||
-                                          participant.emotion
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          ) : row.status === "active" &&
-                            live?.participants?.length ? (
+                          {row.status === "active" && live?.participants?.length ? (
                             <div className="space-y-2">
                               {live.participants
                                 .slice(0, 4)
@@ -684,7 +665,9 @@ export default function TeacherReportsPage() {
                             </div>
                           ) : (
                             <div className="text-sm leading-6 text-slate-500">
-                              Персональные данные пока недоступны.
+                              {row.status === "finished"
+                                ? "Текущий endpoint завершённой аналитики не возвращает персональные данные участников. Здесь не подставляются демонстрационные значения."
+                                : "Live-метрики участников пока не поступили."}
                             </div>
                           )}
                         </div>
