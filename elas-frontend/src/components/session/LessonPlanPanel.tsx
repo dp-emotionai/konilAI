@@ -12,6 +12,18 @@ function today() {
     return new Date().toISOString().slice(0, 10);
 }
 
+const contentClass =
+    "text-sm text-slate-700 " +
+    "[&_h1]:mb-3 [&_h1]:text-2xl [&_h1]:font-bold " +
+    "[&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold " +
+    "[&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-bold " +
+    "[&_p]:mb-2 " +
+    "[&_ul]:mb-3 [&_ul]:ml-6 [&_ul]:list-disc " +
+    "[&_ol]:mb-3 [&_ol]:ml-6 [&_ol]:list-decimal " +
+    "[&_li]:mb-1 " +
+    "[&_a]:text-violet-600 [&_a]:underline " +
+    "[&_u]:underline";
+
 export default function LessonPlanPanel({
                                             sessionId,
                                             role,
@@ -23,10 +35,24 @@ export default function LessonPlanPanel({
     const [plan, setPlan] = useState<LessonPlan | null>(null);
     const [title, setTitle] = useState("");
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState("");
 
     const editor = useEditor({
         extensions: [
-            StarterKit,
+            StarterKit.configure({
+                heading: {
+                    levels: [1, 2, 3],
+                },
+                bulletList: {
+                    keepMarks: true,
+                    keepAttributes: false,
+                },
+                orderedList: {
+                    keepMarks: true,
+                    keepAttributes: false,
+                },
+            }),
             Underline,
             Link.configure({
                 openOnClick: true,
@@ -35,79 +61,119 @@ export default function LessonPlanPanel({
             }),
         ],
         content: "",
+        immediatelyRender: false,
         editorProps: {
             attributes: {
                 class:
-                    "min-h-[160px] rounded-b-2xl border border-t-0 border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base",
+                    "min-h-[170px] rounded-b-2xl border border-t-0 border-slate-200 bg-white px-4 py-3 outline-none " +
+                    contentClass,
             },
         },
-        immediatelyRender: false,
     });
 
-    async function loadPlan() {
-        if (!sessionId) return;
-
-        setLoading(true);
-
-        try {
-            const data = await lessonPlansApi.getToday(sessionId, date);
-
-            setPlan(data);
-            setTitle(data?.title ?? "");
-
-            editor?.commands.setContent(data?.description || "");
-        } finally {
-            setLoading(false);
-        }
-    }
-
     useEffect(() => {
-        if (!editor) return;
-        loadPlan().catch(console.error);
+        if (!sessionId || !editor) return;
+
+        let cancelled = false;
+
+        async function loadPlan() {
+            setLoading(true);
+            setError("");
+
+            try {
+                const data = await lessonPlansApi.getToday(sessionId, date);
+
+                if (cancelled) return;
+
+                setPlan(data);
+                setTitle(data?.title ?? "");
+                editor.commands.setContent(data?.description || "");
+            } catch (err) {
+                if (!cancelled) {
+                    setError(err instanceof Error ? err.message : "Ошибка загрузки плана");
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
+            }
+        }
+
+        loadPlan();
+
+        return () => {
+            cancelled = true;
+        };
     }, [sessionId, date, editor]);
 
     async function savePlan() {
-        if (!title.trim()) return;
+        if (!sessionId || !editor || saving) return;
 
-        const description = editor?.getHTML() ?? "";
+        const cleanTitle = title.trim();
+        if (!cleanTitle) {
+            setError("Напиши тему занятия");
+            return;
+        }
 
-        const saved = plan
-            ? await lessonPlansApi.update(plan.id, {
-                date,
-                title,
-                description,
-            })
-            : await lessonPlansApi.save(sessionId, {
-                date,
-                title,
-                description,
-            });
+        setSaving(true);
+        setError("");
 
-        setPlan(saved);
+        try {
+            const description = editor.getHTML();
+
+            const saved = plan
+                ? await lessonPlansApi.update(plan.id, {
+                    date,
+                    title: cleanTitle,
+                    description,
+                })
+                : await lessonPlansApi.save(sessionId, {
+                    date,
+                    title: cleanTitle,
+                    description,
+                });
+
+            setPlan(saved);
+            setTitle(saved.title);
+            editor.commands.setContent(saved.description || "");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Не удалось сохранить план");
+        } finally {
+            setSaving(false);
+        }
     }
 
     async function deletePlan() {
-        if (!plan) return;
+        if (!plan || saving) return;
 
-        await lessonPlansApi.remove(plan.id);
+        setSaving(true);
+        setError("");
 
-        setPlan(null);
-        setTitle("");
-        editor?.commands.clearContent();
+        try {
+            await lessonPlansApi.remove(plan.id);
+
+            setPlan(null);
+            setTitle("");
+            editor?.commands.clearContent();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Не удалось удалить план");
+        } finally {
+            setSaving(false);
+        }
     }
 
     function addLink() {
-        const previousUrl = editor?.getAttributes("link").href;
+        if (!editor) return;
+
+        const previousUrl = editor.getAttributes("link").href;
         const url = window.prompt("Вставь ссылку", previousUrl || "");
 
         if (url === null) return;
 
         if (url === "") {
-            editor?.chain().focus().extendMarkRange("link").unsetLink().run();
+            editor.chain().focus().extendMarkRange("link").unsetLink().run();
             return;
         }
 
-        editor?.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+        editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
     }
 
     return (
@@ -126,6 +192,12 @@ export default function LessonPlanPanel({
                 />
             </div>
 
+            {error && (
+                <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
+                    {error}
+                </div>
+            )}
+
             {role === "teacher" ? (
                 <div className="space-y-3">
                     <input
@@ -137,99 +209,34 @@ export default function LessonPlanPanel({
 
                     <div>
                         <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border border-slate-200 bg-white px-3 py-2">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    editor?.chain().focus().toggleHeading({ level: 1 }).run()
-                                }
-                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                H1
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    editor?.chain().focus().toggleHeading({ level: 2 }).run()
-                                }
-                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                H2
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    editor?.chain().focus().toggleHeading({ level: 3 }).run()
-                                }
-                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                H3
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => editor?.chain().focus().setParagraph().run()}
-                                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
-                            >
-                                P
-                            </button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">H1</button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">H2</button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">H3</button>
+                            <button type="button" onClick={() => editor?.chain().focus().setParagraph().run()} className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100">P</button>
 
                             <div className="mx-1 h-7 w-px bg-slate-200" />
 
-                            <button
-                                type="button"
-                                onClick={() => editor?.chain().focus().toggleBold().run()}
-                                className="rounded-lg px-3 py-2 text-lg font-bold text-slate-600 hover:bg-slate-100"
-                            >
-                                B
-                            </button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className="rounded-lg px-3 py-2 text-lg font-bold text-slate-600 hover:bg-slate-100">B</button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className="rounded-lg px-3 py-2 text-lg italic text-slate-600 hover:bg-slate-100">I</button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleUnderline().run()} className="rounded-lg px-3 py-2 text-lg underline text-slate-600 hover:bg-slate-100">U</button>
 
-                            <button
-                                type="button"
-                                onClick={() => editor?.chain().focus().toggleItalic().run()}
-                                className="rounded-lg px-3 py-2 text-lg italic text-slate-600 hover:bg-slate-100"
-                            >
-                                I
-                            </button>
+                            <div className="mx-1 h-7 w-px bg-slate-200" />
 
-                            <button
-                                type="button"
-                                onClick={() => editor?.chain().focus().toggleUnderline().run()}
-                                className="rounded-lg px-3 py-2 text-lg underline text-slate-600 hover:bg-slate-100"
-                            >
-                                U
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    editor?.chain().focus().toggleBulletList().run()
-                                }
-                                className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100"
-                            >
-                                ☷
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={addLink}
-                                className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100"
-                            >
-                                🔗
-                            </button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleBulletList().run()} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">• List</button>
+                            <button type="button" onClick={() => editor?.chain().focus().toggleOrderedList().run()} className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100">1. List</button>
+                            <button type="button" onClick={addLink} className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100">🔗</button>
                         </div>
 
                         <EditorContent editor={editor} />
                     </div>
 
                     <div className="flex gap-2">
-                        <Button onClick={savePlan}>
-                            {plan ? "Обновить план" : "Создать план"}
+                        <Button type="button" onClick={savePlan} disabled={saving || loading}>
+                            {saving ? "Сохраняю..." : plan ? "Обновить план" : "Создать план"}
                         </Button>
 
                         {plan && (
-                            <Button variant="danger" onClick={deletePlan}>
+                            <Button type="button" variant="danger" onClick={deletePlan} disabled={saving}>
                                 Удалить
                             </Button>
                         )}
@@ -243,7 +250,7 @@ export default function LessonPlanPanel({
 
                     {plan.description && (
                         <div
-                            className="prose prose-sm mt-3 max-w-none text-slate-600 prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base"
+                            className={`mt-3 ${contentClass}`}
                             dangerouslySetInnerHTML={{ __html: plan.description }}
                         />
                     )}
