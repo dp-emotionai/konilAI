@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Send, Paperclip, X, Download } from "lucide-react";
+import { Send, Paperclip, X } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { getStoredAuth, getToken } from "@/lib/api/client";
@@ -45,6 +45,26 @@ type MessageNewEvent = {
   roomId?: string | null;
   session_id?: string | null;
   event?: Record<string, unknown> | null;
+};
+
+type TypingEvent = {
+  type?: string;
+  scope?: string | null;
+  sessionId?: string | null;
+  roomId?: string | null;
+  session_id?: string | null;
+  userId?: string | null;
+  name?: string | null;
+  senderName?: string | null;
+  fullName?: string | null;
+  role?: string | null;
+  isTyping?: boolean | null;
+};
+
+type TypingUser = {
+  userId: string;
+  name: string;
+  role: string | null;
 };
 
 type NormalizedChatMessage = {
@@ -132,50 +152,30 @@ function extractRealtimeMessage(raw: unknown): RawChatMessage | null {
   };
 }
 
+function extractTypingEvent(raw: unknown): TypingEvent | null {
+  if (!raw || typeof raw !== "object") return null;
 
-function formatFileSize(size?: number | null) {
-  if (!size || size <= 0) return "";
-  if (size < 1024) return `${size} Б`;
-  if (size < 1024 * 1024) return `${Math.round(size / 1024)} КБ`;
-  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+  const packet = raw as TypingEvent;
+  if (packet.type !== "typing") return null;
+
+  return packet;
 }
 
-async function downloadChatAttachment(attachment: ChatAttachment) {
-  const url =
-      attachment.url ||
-      (attachment.storageKey ? resolveDownloadUrl(`/uploads/${attachment.storageKey}`) : "");
+function normalizeTypingUser(raw: TypingEvent): TypingUser | null {
+  const userId = raw.userId?.trim();
+  if (!userId) return null;
 
-  if (!url) throw new Error("Файл недоступен для скачивания.");
+  const name =
+      raw.name?.trim() ||
+      raw.senderName?.trim() ||
+      raw.fullName?.trim() ||
+      "Участник";
 
-  const fileName = attachment.fileName || "file";
-  const token = getToken();
-
-  try {
-    const response = await fetch(url, {
-      credentials: "include",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    });
-
-    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = fileName;
-    link.rel = "noreferrer";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-  } catch (error) {
-    // Fallback: if static files are public but fetch is blocked by CORS, open the file URL.
-    // The user can still save it from the browser.
-    window.open(url, "_blank", "noreferrer");
-    if (error instanceof Error && error.message.includes("Файл недоступен")) {
-      throw error;
-    }
-  }
+  return {
+    userId,
+    name,
+    role: raw.role ?? null,
+  };
 }
 
 function formatTime(value: string) {
@@ -196,13 +196,16 @@ export function SessionChatPanel({
   const [auth, setAuth] = useState<ReturnType<typeof getStoredAuth>>(null);
   const [messages, setMessages] = useState<NormalizedChatMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedAttachment, setSelectedAttachment] = useState<File | null>(null);
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
-  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const chatClientRef = useRef<ChatClient | null>(null);
+  const typingStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingUserTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const activeChannel: "public" | "help" = type === "exam" ? "help" : "public";
   const currentUserId = useMemo(() => {
@@ -210,6 +213,7 @@ export function SessionChatPanel({
     return maybeAuth?.id ?? maybeAuth?.email ?? null;
   }, [auth]);
   const currentUserEmail = auth?.email?.toLowerCase?.() ?? null;
+  const currentUserName = auth?.fullName?.trim() || auth?.email?.trim() || "Участник";
   const authFullName = auth?.fullName?.trim().toLowerCase() ?? null;
 
   useEffect(() => {
@@ -253,11 +257,74 @@ export function SessionChatPanel({
     void loadMessages();
   }, [loadMessages]);
 
+  const removeTypingUser = useCallback((userId: string) => {
+    const timer = typingUserTimersRef.current.get(userId);
+    if (timer) {
+      clearTimeout(timer);
+      typingUserTimersRef.current.delete(userId);
+    }
+
+    setTypingUsers((prev) => prev.filter((user) => user.userId !== userId));
+  }, []);
+
+  const upsertTypingUser = useCallback(
+      (user: TypingUser) => {
+        if (currentUserId && user.userId === currentUserId) return;
+
+        setTypingUsers((prev) => {
+          const exists = prev.some((item) => item.userId === user.userId);
+          if (exists) {
+            return prev.map((item) => (item.userId === user.userId ? user : item));
+          }
+          return [...prev, user];
+        });
+
+        const oldTimer = typingUserTimersRef.current.get(user.userId);
+        if (oldTimer) clearTimeout(oldTimer);
+
+        const timer = setTimeout(() => {
+          removeTypingUser(user.userId);
+        }, 3500);
+        typingUserTimersRef.current.set(user.userId, timer);
+      },
+      [currentUserId, removeTypingUser]
+  );
+
+  const emitTyping = useCallback(
+      (isTyping: boolean) => {
+        if (!currentUserId) return;
+
+        chatClientRef.current?.sendSessionTyping(sessionId, {
+          userId: currentUserId,
+          name: currentUserName,
+          role,
+          isTyping,
+        });
+      },
+      [currentUserId, currentUserName, role, sessionId]
+  );
+
   useEffect(() => {
     if (!getToken()) return;
 
     const client = new ChatClient((raw) => {
       try {
+        const typing = extractTypingEvent(raw);
+        if (typing) {
+          const eventSessionId = typing.sessionId ?? typing.session_id ?? null;
+          if (eventSessionId && eventSessionId !== sessionId) return;
+
+          const user = normalizeTypingUser(typing);
+          if (!user) return;
+
+          if (typing.isTyping === false) {
+            removeTypingUser(user.userId);
+          } else {
+            upsertTypingUser(user);
+          }
+          return;
+        }
+
         const realtime = extractRealtimeMessage(raw);
         if (!realtime) return;
 
@@ -266,23 +333,54 @@ export function SessionChatPanel({
 
         appendMessage(normalized);
       } catch (error) {
-        console.error("chat websocket parse failed", error);
+        console.error("chat Socket.IO packet parse failed", error);
       }
     });
 
+    chatClientRef.current = client;
     client.connect();
     client.joinSession(sessionId);
 
     return () => {
+      chatClientRef.current = null;
       client.disconnect();
+      typingUserTimersRef.current.forEach((timer) => clearTimeout(timer));
+      typingUserTimersRef.current.clear();
     };
-  }, [appendMessage, sessionId]);
+  }, [appendMessage, removeTypingUser, sessionId, upsertTypingUser]);
 
   useEffect(() => {
     const element = listRef.current;
     if (!element) return;
     element.scrollTop = element.scrollHeight;
-  }, [messages]);
+  }, [messages, typingUsers]);
+
+  const handleDraftChange = useCallback(
+      (value: string) => {
+        setDraft(value);
+
+        if (!value.trim()) {
+          if (typingStopTimerRef.current) {
+            clearTimeout(typingStopTimerRef.current);
+            typingStopTimerRef.current = null;
+          }
+          emitTyping(false);
+          return;
+        }
+
+        emitTyping(true);
+
+        if (typingStopTimerRef.current) {
+          clearTimeout(typingStopTimerRef.current);
+        }
+
+        typingStopTimerRef.current = setTimeout(() => {
+          emitTyping(false);
+          typingStopTimerRef.current = null;
+        }, 1600);
+      },
+      [emitTyping]
+  );
 
   const handleSend = useCallback(async () => {
     const text = draft.trim();
@@ -293,6 +391,12 @@ export function SessionChatPanel({
           "Файл выбран и будет отправлен вместе с сообщением."
       );
       if (!text) return;
+    }
+
+    emitTyping(false);
+    if (typingStopTimerRef.current) {
+      clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
     }
 
     setSending(true);
@@ -331,7 +435,7 @@ export function SessionChatPanel({
     } finally {
       setSending(false);
     }
-  }, [activeChannel, appendMessage, draft, loadMessages, selectedAttachment, sending, sessionId]);
+  }, [activeChannel, appendMessage, draft, emitTyping, loadMessages, selectedAttachment, sending, sessionId]);
 
   const handleKeyDown = useCallback(
       async (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -383,40 +487,21 @@ export function SessionChatPanel({
                           {message.attachment && (
                               <button
                                   type="button"
-                                  disabled={downloadingAttachmentId === message.id}
-                                  onClick={async () => {
-                                    if (!message.attachment) return;
-
-                                    setDownloadingAttachmentId(message.id);
-                                    setAttachmentNotice(null);
-                                    try {
-                                      await downloadChatAttachment(message.attachment);
-                                    } catch (error) {
-                                      setAttachmentNotice(
-                                          error instanceof Error
-                                              ? error.message
-                                              : "Не удалось скачать файл."
-                                      );
-                                    } finally {
-                                      setDownloadingAttachmentId(null);
-                                    }
+                                  onClick={() => {
+                                    const url =
+                                        message.attachment?.url ||
+                                        (message.attachment?.storageKey
+                                            ? resolveDownloadUrl(`/uploads/${message.attachment.storageKey}`)
+                                            : "");
+                                    if (url) window.open(url, "_blank", "noreferrer");
                                   }}
                                   className={cn(
-                                      "mt-2 flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold transition disabled:cursor-wait disabled:opacity-70",
-                                      isMine ? "bg-white/15 text-white hover:bg-white/20" : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                                      "mt-2 flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold",
+                                      isMine ? "bg-white/15 text-white" : "bg-slate-50 text-slate-700"
                                   )}
-                                  title="Скачать файл"
                               >
-                                <Paperclip size={14} className="shrink-0" />
-                                <span className="min-w-0 flex-1 truncate">
-                          {message.attachment.fileName || "Файл"}
-                                  {formatFileSize(message.attachment.size) && (
-                                      <span className={cn("ml-2 font-medium", isMine ? "text-white/70" : "text-slate-400")}>
-                              {formatFileSize(message.attachment.size)}
-                            </span>
-                                  )}
-                        </span>
-                                <Download size={14} className="shrink-0" />
+                                <Paperclip size={14} />
+                                <span className="truncate">{message.attachment.fileName || "Файл"}</span>
                               </button>
                           )}
                         </div>
@@ -427,6 +512,23 @@ export function SessionChatPanel({
                     </div>
                 );
               })
+          )}
+
+          {typingUsers.length > 0 && (
+              <div className="flex justify-start">
+                <div className="flex max-w-[85%] items-center gap-2 rounded-2xl rounded-bl-md border border-slate-100 bg-white px-4 py-2 text-xs font-semibold text-slate-500 shadow-sm">
+                  <span className="flex items-center gap-0.5" aria-hidden="true">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.2s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.1s]" />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+                  </span>
+                  <span>
+                    {typingUsers.length === 1
+                        ? `${typingUsers[0].name} жазып жатыр...`
+                        : `${typingUsers[0].name} және тағы ${typingUsers.length - 1} адам жазып жатыр...`}
+                  </span>
+                </div>
+              </div>
           )}
         </div>
 
@@ -481,7 +583,7 @@ export function SessionChatPanel({
             <div className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
             <textarea
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => handleDraftChange(event.target.value)}
                 onKeyDown={handleKeyDown}
                 rows={1}
                 placeholder="Сообщение в чат сессии..."

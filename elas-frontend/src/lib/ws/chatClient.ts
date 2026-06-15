@@ -23,6 +23,7 @@ const REALTIME_EVENT_TYPES = new Set([
   "material.created",
   "material.updated",
   "material.deleted",
+  "typing",
 ]);
 
 const READY_EVENT_TYPES = new Set(["auth-ok", "auth_ok", "ready", "connect"]);
@@ -220,6 +221,22 @@ export class ChatClient {
 
     if (!this.socket) this.connect();
     this.flushSubscriptions();
+  }
+
+  sendSessionTyping(
+      sessionId: string,
+      payload: { userId?: string | null; name?: string | null; role?: string | null; isTyping: boolean }
+  ) {
+    if (!sessionId) return;
+    if (!this.socket) this.connect();
+
+    this.send({
+      type: "typing",
+      roomId: `session:${sessionId}`,
+      sessionId,
+      scope: "session",
+      ...payload,
+    });
   }
 
   joinUser() {
