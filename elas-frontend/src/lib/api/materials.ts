@@ -50,15 +50,15 @@ export async function getMyMaterials(params?: { signal?: AbortSignal }): Promise
 }
 
 export async function createMaterial(
-  input: {
-    title: string;
-    description?: string | null;
-    fileName: string;
-    mimeType?: string | null;
-    storageKey: string;
-    size?: number | null;
-  },
-  params?: { signal?: AbortSignal }
+    input: {
+      title: string;
+      description?: string | null;
+      fileName: string;
+      mimeType?: string | null;
+      storageKey: string;
+      size?: number | null;
+    },
+    params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.post<MaterialRow>("/materials", input, { signal: params?.signal });
 }
@@ -89,9 +89,9 @@ export async function uploadMaterialFile(file: File): Promise<MaterialUploadResu
 }
 
 export async function updateMaterial(
-  materialId: string,
-  input: Partial<Pick<MaterialRow, "title" | "description" | "fileName" | "mimeType" | "storageKey" | "size">>,
-  params?: { signal?: AbortSignal }
+    materialId: string,
+    input: Partial<Pick<MaterialRow, "title" | "description" | "fileName" | "mimeType" | "storageKey" | "size">>,
+    params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.patch<MaterialRow>(`/materials/${materialId}`, input, { signal: params?.signal });
 }
@@ -101,29 +101,29 @@ export async function deleteMaterial(materialId: string, params?: { signal?: Abo
 }
 
 export async function assignMaterial(
-  materialId: string,
-  input: {
-    groupId?: string;
-    sessionId?: string;
-    visibleFrom?: string | null;
-    visibleTo?: string | null;
-  },
-  params?: { signal?: AbortSignal }
+    materialId: string,
+    input: {
+      groupId?: string;
+      sessionId?: string;
+      visibleFrom?: string | null;
+      visibleTo?: string | null;
+    },
+    params?: { signal?: AbortSignal }
 ): Promise<MaterialAssignmentRow> {
   return api.post<MaterialAssignmentRow>(`/materials/${materialId}/assign`, input, { signal: params?.signal });
 }
 
 export async function unassignMaterial(
-  materialId: string,
-  assignmentId: string,
-  params?: { signal?: AbortSignal }
+    materialId: string,
+    assignmentId: string,
+    params?: { signal?: AbortSignal }
 ): Promise<void> {
   await api.delete(`/materials/${materialId}/assignments/${assignmentId}`, { signal: params?.signal });
 }
 
 export async function getMaterialAssignments(
-  materialId: string,
-  params?: { signal?: AbortSignal }
+    materialId: string,
+    params?: { signal?: AbortSignal }
 ): Promise<MaterialAssignmentRow[]> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return [];
   const list = await api.get<MaterialAssignmentRow[]>(`/materials/${materialId}/assignments`, {
@@ -151,18 +151,56 @@ export async function getStudentMaterials(params?: { signal?: AbortSignal }): Pr
 }
 
 export async function getMaterialDownload(
-  materialId: string,
-  params?: { signal?: AbortSignal }
+    materialId: string,
+    params?: { signal?: AbortSignal }
 ): Promise<{ downloadUrl: string; fileName: string } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
   return api.get<{ downloadUrl: string; fileName: string }>(`/materials/${materialId}/download`, { signal: params?.signal });
+}
+
+export async function getMaterialDownloadByStorageKey(
+    input: { storageKey: string; fileName?: string | null },
+    params?: { signal?: AbortSignal }
+): Promise<{ downloadUrl: string; fileName: string } | null> {
+  const storageKey = String(input.storageKey || "").trim();
+  if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
+
+  const query = new URLSearchParams({ key: storageKey });
+  const fileName = String(input.fileName || "").trim();
+
+  if (fileName) {
+    query.set("fileName", fileName);
+  }
+
+  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
+    signal: params?.signal,
+  });
+}
+
+export function downloadFromUrl(url: string, fileName?: string | null): void {
+  if (typeof window === "undefined" || !url) return;
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.rel = "noreferrer";
+  link.target = "_blank";
+
+  if (fileName) {
+    link.download = fileName;
+  }
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 export function resolveDownloadUrl(downloadUrl: string): string {
   const raw = String(downloadUrl || "").trim();
   if (!raw) return "";
   if (raw.startsWith("http://") || raw.startsWith("https://")) return raw;
+
   const origin = getApiOriginUrl();
   if (!origin) return raw;
+
   return `${origin}${raw.startsWith("/") ? raw : "/" + raw}`;
 }

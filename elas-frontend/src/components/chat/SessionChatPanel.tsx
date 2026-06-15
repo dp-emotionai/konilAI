@@ -6,11 +6,24 @@ import { Send, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { getStoredAuth, getToken } from "@/lib/api/client";
 import { getSessionMessages, postSessionMessage } from "@/lib/api/teacher";
-import { resolveDownloadUrl, uploadMaterialFile } from "@/lib/api/materials";
+import {
+  downloadFromUrl,
+  getMaterialDownloadByStorageKey,
+  resolveDownloadUrl,
+  uploadMaterialFile,
+} from "@/lib/api/materials";
 import { ChatClient } from "@/lib/ws/chatClient";
 
 type ChatRole = "teacher" | "student";
 type ChatType = "lecture" | "exam";
+
+type ChatAttachment = {
+  storageKey?: string | null;
+  fileName?: string | null;
+  mimeType?: string | null;
+  size?: number | null;
+  url?: string | null;
+};
 
 type RawChatMessage = {
   id?: string;
@@ -82,14 +95,6 @@ type NormalizedChatMessage = {
   sessionId: string | null;
 };
 
-type ChatAttachment = {
-  storageKey?: string | null;
-  fileName?: string | null;
-  mimeType?: string | null;
-  size?: number | null;
-  url?: string | null;
-};
-
 function normalizeSenderName(raw: RawChatMessage) {
   return (
       raw.senderName?.trim() ||
@@ -116,8 +121,7 @@ function normalizeMessage(raw: RawChatMessage): NormalizedChatMessage | null {
     attachment: raw.attachment ?? null,
     senderId: raw.senderId ?? raw.userId ?? null,
     senderName: normalizeSenderName(raw),
-    senderEmail:
-        raw.senderEmail?.trim()?.toLowerCase() || raw.email?.trim()?.toLowerCase() || null,
+    senderEmail: raw.senderEmail?.trim()?.toLowerCase() || raw.email?.trim()?.toLowerCase() || null,
     senderRole: raw.senderRole || raw.role || "student",
     createdAt: raw.createdAt || raw.timestamp || new Date().toISOString(),
     channel: raw.channel === "help" ? "help" : "public",
@@ -135,8 +139,7 @@ function extractRealtimeMessage(raw: unknown): RawChatMessage | null {
   if (!event || typeof event !== "object") return null;
 
   const message = event as Record<string, unknown>;
-  const channel =
-      typeof message.channel === "string" ? message.channel : null;
+  const channel = typeof message.channel === "string" ? message.channel : null;
   const sessionId =
       (typeof message.sessionId === "string" ? message.sessionId : null) ??
       (typeof message.roomId === "string" ? message.roomId : null) ??
@@ -202,10 +205,12 @@ export function SessionChatPanel({
   const lastTypingSentRef = useRef(false);
 
   const activeChannel: "public" | "help" = type === "exam" ? "help" : "public";
+
   const currentUserId = useMemo(() => {
     const maybeAuth = auth as { id?: string | null; email?: string | null } | null;
     return maybeAuth?.id ?? maybeAuth?.email ?? null;
   }, [auth]);
+
   const currentUserEmail = auth?.email?.toLowerCase?.() ?? null;
   const authFullName = auth?.fullName?.trim().toLowerCase() ?? null;
   const currentDisplayName =
@@ -374,19 +379,36 @@ export function SessionChatPanel({
     element.scrollTop = element.scrollHeight;
   }, [messages]);
 
+  const handleAttachmentDownload = useCallback(async (attachment: ChatAttachment) => {
+    try {
+      if (attachment.url) {
+        downloadFromUrl(resolveDownloadUrl(attachment.url), attachment.fileName || "file");
+        return;
+      }
+
+      if (!attachment.storageKey) return;
+
+      const result = await getMaterialDownloadByStorageKey({
+        storageKey: attachment.storageKey,
+        fileName: attachment.fileName,
+      });
+
+      if (result?.downloadUrl) {
+        downloadFromUrl(resolveDownloadUrl(result.downloadUrl), result.fileName || attachment.fileName || "file");
+      }
+    } catch (error) {
+      console.error("download attachment failed", error);
+      setAttachmentNotice("Файлды скачать ету мүмкін болмады.");
+    }
+  }, []);
+
   const handleSend = useCallback(async () => {
     const text = draft.trim();
     if ((!text && !selectedAttachment) || sending) return;
 
-    if (false && false && selectedAttachment) {
-      setAttachmentNotice(
-          "Файл выбран и будет отправлен вместе с сообщением."
-      );
-      if (!text) return;
-    }
-
     setSending(true);
     setAttachmentNotice(null);
+
     try {
       const uploaded = selectedAttachment ? await uploadMaterialFile(selectedAttachment) : null;
       const response = await postSessionMessage(sessionId, {
@@ -412,10 +434,12 @@ export function SessionChatPanel({
 
       setDraft("");
       sendTypingState(false);
+
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         typingTimeoutRef.current = null;
       }
+
       if (selectedAttachment) {
         setSelectedAttachment(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -458,14 +482,12 @@ export function SessionChatPanel({
                     (currentUserEmail && senderName === currentUserEmail);
 
                 return (
-                    <div
-                        key={message.id}
-                        className={cn("flex", isMine ? "justify-end" : "justify-start")}
-                    >
+                    <div key={message.id} className={cn("flex", isMine ? "justify-end" : "justify-start")}>
                       <div className={cn("min-w-0 max-w-[85%] sm:max-w-[82%]", isMine ? "items-end" : "items-start")}>
                         <div className="mb-1 px-1 text-[11px] font-semibold text-slate-500">
                           {isMine ? "Вы" : message.senderName}
                         </div>
+
                         <div
                             className={cn(
                                 "break-words rounded-2xl px-4 py-3 text-sm shadow-sm",
@@ -475,17 +497,11 @@ export function SessionChatPanel({
                             )}
                         >
                           {message.text && <div>{message.text}</div>}
+
                           {message.attachment && (
                               <button
                                   type="button"
-                                  onClick={() => {
-                                    const url =
-                                        message.attachment?.url ||
-                                        (message.attachment?.storageKey
-                                            ? resolveDownloadUrl(`/uploads/${message.attachment.storageKey}`)
-                                            : "");
-                                    if (url) window.open(url, "_blank", "noreferrer");
-                                  }}
+                                  onClick={() => void handleAttachmentDownload(message.attachment as ChatAttachment)}
                                   className={cn(
                                       "mt-2 flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold",
                                       isMine ? "bg-white/15 text-white" : "bg-slate-50 text-slate-700"
@@ -496,9 +512,8 @@ export function SessionChatPanel({
                               </button>
                           )}
                         </div>
-                        <div className="mt-1 px-1 text-[10px] text-slate-400">
-                          {formatTime(message.createdAt)}
-                        </div>
+
+                        <div className="mt-1 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</div>
                       </div>
                     </div>
                 );
@@ -514,30 +529,19 @@ export function SessionChatPanel({
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 setSelectedAttachment(file);
-                window.setTimeout(() => {
-                  setAttachmentNotice(file ? "Файл выбран и будет отправлен вместе с сообщением." : null);
-                }, 0);
-                setAttachmentNotice(
-                    file
-                        ? "Файл выбран и будет отправлен вместе с сообщением."
-                        : null
-                );
+                setAttachmentNotice(file ? "Файл выбран и будет отправлен вместе с сообщением." : null);
               }}
           />
 
           {selectedAttachment && (
               <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                <div className="min-w-0 truncate font-medium">
-                  {selectedAttachment.name}
-                </div>
+                <div className="min-w-0 truncate font-medium">{selectedAttachment.name}</div>
                 <button
                     type="button"
                     onClick={() => {
                       setSelectedAttachment(null);
                       setAttachmentNotice(null);
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
-                      }
+                      if (fileInputRef.current) fileInputRef.current.value = "";
                     }}
                     className="shrink-0 rounded-full p-1 text-amber-700 transition hover:bg-amber-100"
                     aria-label="Clear selected file"
@@ -555,16 +559,16 @@ export function SessionChatPanel({
 
           {typingUsers.length > 0 && (
               <div className="mb-3 flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
-                <span className="flex items-center gap-0.5" aria-hidden="true">
-                  <span className="animate-bounce">•</span>
-                  <span className="animate-bounce [animation-delay:120ms]">•</span>
-                  <span className="animate-bounce [animation-delay:240ms]">•</span>
-                </span>
+            <span className="flex items-center gap-0.5" aria-hidden="true">
+              <span className="animate-bounce">•</span>
+              <span className="animate-bounce [animation-delay:120ms]">•</span>
+              <span className="animate-bounce [animation-delay:240ms]">•</span>
+            </span>
                 <span>
-                  {typingUsers.length === 1
-                      ? `${typingUsers[0].name} печатает...`
-                      : `${typingUsers[0].name} и ещё ${typingUsers.length - 1} человек печатают...`}
-                </span>
+              {typingUsers.length === 1
+                  ? `${typingUsers[0].name} печатает...`
+                  : `${typingUsers[0].name} и ещё ${typingUsers.length - 1} человек печатают...`}
+            </span>
               </div>
           )}
 
