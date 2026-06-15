@@ -8,6 +8,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
 import Section from "@/components/common/Section";
+import LessonPlanPanel from "@/components/session/LessonPlanPanel";
 
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -83,6 +84,7 @@ import {
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
+
 
 function StatusPill({ label, value }: { label: string; value: string }) {
     return (
@@ -1321,6 +1323,7 @@ export default function StudentJoinSessionPage() {
                             ref={chatSectionRef}
                             className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:self-start"
                         >
+                            <LessonPlanPanel sessionId={sessionId} role="student" />
                             <div className="flex h-[520px] min-h-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)] lg:h-[560px]">
                                 <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                                     <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
