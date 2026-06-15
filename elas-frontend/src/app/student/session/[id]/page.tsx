@@ -1180,9 +1180,6 @@ export default function StudentJoinSessionPage() {
                                                             {sessionFiles.length}
                                                         </span>
                                                     </div>
-                                                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
-                                                        Обновляется в real-time
-                                                    </span>
                                                 </div>
 
                                                 {contentLoading ? (
