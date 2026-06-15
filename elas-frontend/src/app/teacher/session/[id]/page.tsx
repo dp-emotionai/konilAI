@@ -4,13 +4,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
-import Section from "@/components/common/Section";
 import LessonPlanPanel from "@/components/session/LessonPlanPanel";
 
-import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 
@@ -1656,66 +1652,38 @@ export default function TeacherJoinSessionPage() {
   }
 
   return (
-      <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
-        <Breadcrumbs
-            items={[
-              { label: "Преподаватель", href: "/teacher/dashboard" },
-              { label: "Сессии", href: "/teacher/sessions" },
-              { label: title },
-            ]}
-        />
-
-
-        {!live && (
-            <PageHero
-                overline="Преподаватель · Сессия"
-                title={title}
-                subtitle={
-                  joinInfo?.groupName
-                      ? `${joinInfo.groupName}. Сначала согласие и проверка камеры, затем подключение.`
-                      : "Сначала согласие и проверка камеры, затем подключение к эфиру."
-                }
-                right={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge>{joinInfo?.type === "exam" ? "Экзамен" : "Лекция"}</Badge>
-                    <Badge variant={state.consent ? "success" : "warning"}>
-                      {state.consent ? "Согласие: да" : "Согласие: нет"}
-                    </Badge>
-                    <Link href="/teacher/sessions">
-                      <Button variant="outline">Назад</Button>
-                    </Link>
-                  </div>
-                }
-            />
-        )}
-
+      <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB]">
         {joinInfoLoading && (
-            <Section spacing="none" className="mt-6">
-              <Card>
-                <CardContent className="p-6 md:p-7">
-                  <div className="h-24 animate-pulse rounded-[20px] bg-slate-50" />
-                </CardContent>
-              </Card>
-            </Section>
+            <div className="flex min-h-[calc(100dvh-64px)] items-center justify-center px-4">
+              <div className="flex items-center gap-3 rounded-[22px] border border-slate-100 bg-white px-5 py-4 text-sm font-semibold text-slate-500 shadow-[0_18px_55px_rgba(15,23,42,0.08)]">
+                <Loader2 size={18} className="animate-spin text-[#7448FF]" />
+                Загружаем сессию...
+              </div>
+            </div>
         )}
 
         {joinInfoError && (
-            <Section spacing="none" className="mt-6">
-              <Card className="border-amber-200 bg-amber-50">
-                <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle size={20} className="shrink-0 text-amber-600" />
-                    <div>
-                      <div className="font-semibold text-slate-900">Ошибка загрузки</div>
-                      <div className="mt-0.5 text-sm text-amber-800">{joinInfoError}</div>
-                    </div>
-                  </div>
-                  <Button variant="outline" onClick={() => void loadJoinInfo()} className="bg-white">
+            <div className="flex min-h-[calc(100dvh-64px)] items-center justify-center px-4">
+              <div className="w-full max-w-[520px] rounded-[28px] border border-amber-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-amber-50 text-amber-600">
+                  <AlertTriangle size={22} />
+                </div>
+                <div className="mt-4 text-lg font-extrabold text-slate-900">
+                  Не удалось открыть сессию
+                </div>
+                <div className="mt-2 text-sm font-medium text-slate-500">
+                  {joinInfoError}
+                </div>
+                <div className="mt-5 flex flex-wrap justify-center gap-3">
+                  <Button variant="outline" onClick={() => void loadJoinInfo()}>
                     Повторить
                   </Button>
-                </CardContent>
-              </Card>
-            </Section>
+                  <Link href="/teacher/sessions">
+                    <Button>Назад к сессиям</Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
         )}
 
         {!joinInfoLoading &&
@@ -1723,30 +1691,21 @@ export default function TeacherJoinSessionPage() {
             !canJoin &&
             blockReason &&
             blockReason !== "consent_required" && (
-                <Section spacing="none" className="mt-6">
-                  <Reveal>
-                    <Card className="mx-auto max-w-3xl border-slate-100">
-                      <CardContent className="space-y-3 p-6 md:p-7">
-                        {(blockReason === "session_not_started" || blockReason === "session_ended") && (
-                            <>
-                              <div className="text-sm text-slate-500">Статус сессии</div>
-                              <div className="text-lg font-semibold text-slate-900">
-                                {blockReason === "session_ended"
-                                    ? "Сессия завершена."
-                                    : "Сессия ещё не началась."}
-                              </div>
-                              <div className="text-sm text-slate-500">
-                                {blockReason === "session_ended"
-                                    ? "Преподаватель завершил эфир. Подключение недоступно."
-                                    : "Дождитесь, когда преподаватель запустит сессию."}
-                              </div>
-
-                            </>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Reveal>
-                </Section>
+                <div className="flex min-h-[calc(100dvh-64px)] items-center justify-center px-4">
+                  <div className="w-full max-w-[520px] rounded-[28px] border border-slate-100 bg-white p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+                    <div className="text-lg font-extrabold text-slate-900">
+                      {blockReason === "session_ended" ? "Сессия завершена" : "Сессия ещё не началась"}
+                    </div>
+                    <div className="mt-2 text-sm font-medium text-slate-500">
+                      {blockReason === "session_ended"
+                          ? "Преподаватель завершил эфир. Подключение недоступно."
+                          : "Дождитесь, когда сессия станет доступна."}
+                    </div>
+                    <Link href="/teacher/sessions" className="mt-5 inline-flex">
+                      <Button>Назад к сессиям</Button>
+                    </Link>
+                  </div>
+                </div>
             )}
 
         {showPreparation && tab === "prepare" && (
@@ -2057,6 +2016,7 @@ export default function TeacherJoinSessionPage() {
               </div>
             </div>
         )}
+
       </div>
   );
 }
