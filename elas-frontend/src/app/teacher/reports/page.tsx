@@ -3,14 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 
-import PageHero from "@/components/common/PageHero";
-import Reveal from "@/components/common/Reveal";
-import Section from "@/components/common/Section";
 import GlassCard from "@/components/ui/GlassCard";
-import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import Glow from "@/components/common/Glow";
 import { cn } from "@/lib/cn";
 import {
   getTeacherSessionsAsReports,
@@ -26,16 +21,13 @@ import {
 import {
   Activity,
   AlertCircle,
-  BarChart3,
   Clock3,
-  Download,
   FileJson,
   FileSpreadsheet,
   FileText,
   RefreshCw,
   Radio,
   Search,
-  Sparkles,
   Users,
 } from "lucide-react";
 
@@ -391,119 +383,143 @@ export default function TeacherReportsPage() {
   }
 
   return (
-    <div className="relative -m-4 min-h-[calc(100vh-72px)] bg-gradient-to-br from-white via-slate-50 to-purple-50/40 pb-16 md:-m-6 lg:-m-8">
-      <Glow />
+    <main className="min-h-[calc(100vh-72px)] bg-gradient-to-b from-[#F8F6FF] via-white to-slate-50">
+      <div className="mx-auto w-full max-w-[1440px] px-6 py-10 lg:px-10">
+        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 className="text-[38px] font-semibold tracking-[-0.03em] text-slate-950">
+              Отчёты
+            </h1>
+            <p className="mt-3 max-w-[620px] text-[16px] leading-7 text-slate-500">
+              Сводка по live-сессиям и завершённым занятиям с реальными
+              участниками, таймлайном и экспортом.
+            </p>
+          </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_50%_0%,rgba(116,72,255,0.14),transparent_65%)]" />
-
-      <PageHero
-        title="Отчёты"
-        subtitle="Сводка по live-сессиям и завершённым занятиям с реальными участниками, таймлайном и экспортом."
-        right={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-xl border border-purple-200 bg-white px-4 py-2.5 text-sm font-medium text-[#7448FF] shadow-sm">
               {filtered.length} сессий
-            </Badge>
-            <Button variant="outline" className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5 shadow-sm" onClick={loadReports}>
-              <RefreshCw size={14} />
+            </div>
+            <Button
+              variant="outline"
+              onClick={loadReports}
+              className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5 shadow-sm"
+            >
+              <RefreshCw size={16} />
               Обновить
             </Button>
           </div>
-        }
-      />
+        </header>
 
-      <Section spacing="normal" className="relative mt-8 space-y-6">
-        <Reveal>
-          <GlassCard className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.05)] md:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-[260px] flex-1">
-                <div className="relative">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted"
-                  />
-                  <Input
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Поиск по названию, группе, коду…"
-                    className="h-12 rounded-2xl border-slate-200 bg-white pl-11 shadow-none focus:border-[#7448FF]"
-                  />
-                </div>
-              </div>
-
-              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
-                <TabButton active={tab === "all"} onClick={() => setTab("all")}>
-                  Все {counts.all ? `(${counts.all})` : ""}
-                </TabButton>
-                <TabButton active={tab === "live"} onClick={() => setTab("live")}>
-                  Live {counts.live ? `(${counts.live})` : ""}
-                </TabButton>
-                <TabButton active={tab === "finished"} onClick={() => setTab("finished")}>
-                  Завершённые {counts.finished ? `(${counts.finished})` : ""}
-                </TabButton>
-              </div>
+        <section className="mt-10 rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_12px_40px_rgba(15,23,42,0.05)]">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-[620px]">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Поиск по названию, группе, коду..."
+                className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#7448FF] focus:ring-4 focus:ring-purple-100"
+              />
             </div>
 
-            {error && (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-elas-lg bg-[rgba(255,77,109,0.10)] px-4 py-3 text-sm text-fg shadow-soft">
-                <span>{error}</span>
-                <Button variant="outline" size="sm" onClick={loadReports}>
-                  Повторить
-                </Button>
-              </div>
-            )}
+            <div className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 p-1">
+              <TabButton active={tab === "all"} onClick={() => setTab("all")}>
+                Все {counts.all ? `(${counts.all})` : ""}
+              </TabButton>
+              <TabButton active={tab === "live"} onClick={() => setTab("live")}>
+                Live {counts.live ? `(${counts.live})` : ""}
+              </TabButton>
+              <TabButton
+                active={tab === "finished"}
+                onClick={() => setTab("finished")}
+              >
+                Завершённые
+              </TabButton>
+            </div>
+          </div>
 
-            {exportError && (
-              <div className="mt-4 flex items-center gap-2 rounded-elas-lg bg-amber-500/10 px-4 py-3 text-sm text-fg ring-1 ring-amber-400/20">
-                <AlertCircle size={16} className="text-amber-600" />
-                {exportError}
-              </div>
-            )}
-          </GlassCard>
-        </Reveal>
+          {error && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={loadReports}>
+                Повторить
+              </Button>
+            </div>
+          )}
 
-        <Reveal>
+          {exportError && (
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              <AlertCircle size={16} />
+              {exportError}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-6">
           {loading ? (
             <LoadingGrid />
           ) : filtered.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="grid gap-6">
+            <div className="space-y-6">
               {filtered.map((row) => {
                 const live = liveCache[row.id];
                 const analytics = analyticsCache[row.id] ?? null;
-                const timelineHighlights = analytics ? buildTimelineHighlights(analytics) : [];
+                const timelineHighlights = analytics
+                  ? buildTimelineHighlights(analytics)
+                  : [];
                 const exportState = exporting[row.id] ?? null;
                 const canExport = row.status === "finished";
 
                 return (
-                  <GlassCard key={row.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-0 shadow-[0_20px_65px_rgba(15,23,42,0.06)]">
-                    <div className="border-b border-slate-100 bg-[linear-gradient(180deg,rgba(116,72,255,0.05),rgba(255,255,255,0))] px-6 py-6 md:px-8">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="truncate text-2xl font-semibold tracking-tight text-slate-900">
-                            {row.title}
+                  <article
+                    key={row.id}
+                    className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.06)]"
+                  >
+                    <div className="p-6 md:p-8">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex min-w-0 items-start gap-5">
+                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] border border-purple-200 bg-purple-50 text-[#7448FF]">
+                            <Activity size={30} />
                           </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-                            <span>{row.groupName}</span>
-                            <span>•</span>
-                            <span>{formatDateTime(row.startedAt || row.createdAt)}</span>
-                            <span>•</span>
-                            <span>{row.code}</span>
+
+                          <div className="min-w-0">
+                            <h2 className="truncate text-[28px] font-semibold tracking-[-0.02em] text-slate-950">
+                              {row.title}
+                            </h2>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-500">
+                              <span className="inline-flex items-center gap-1.5">
+                                <Users size={15} />
+                                {row.groupName}
+                              </span>
+                              <span>•</span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <Clock3 size={15} />
+                                {formatDateTime(row.startedAt || row.createdAt)}
+                              </span>
+                              <span>•</span>
+                              <span>{row.code}</span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-2 justify-end">
+                        <div className="flex flex-wrap items-center gap-2">
                           <StatusBadge status={row.status} />
-                          <Badge className="bg-surface-subtle">{row.type}</Badge>
+                          <Badge className="rounded-xl border border-purple-200 bg-white px-3 py-1.5 text-sm font-medium text-[#7448FF]">
+                            {row.type}
+                          </Badge>
                         </div>
                       </div>
 
-                      <div className="mt-5 text-sm leading-6 text-slate-600">
+                      <p className="mt-5 text-[15px] leading-7 text-slate-600">
                         {buildSessionStory(row, analytics, live)}
-                      </div>
+                      </p>
 
-                      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                      <div className="mt-5 grid gap-4 md:grid-cols-3">
                         {row.status === "active" ? (
                           <>
                             <MetricPill
@@ -524,12 +540,20 @@ export default function TeacherReportsPage() {
                           <>
                             <MetricPill
                               label="Средняя вовлечённость"
-                              value={analytics ? `${analytics.averageEngagement}%` : "—"}
+                              value={
+                                analytics
+                                  ? `${analytics.averageEngagement}%`
+                                  : "—"
+                              }
                               accent
                             />
                             <MetricPill
                               label="Стресс-события"
-                              value={analytics ? String(analytics.stressEvents) : "—"}
+                              value={
+                                analytics
+                                  ? String(analytics.stressEvents)
+                                  : "—"
+                              }
                             />
                             <MetricPill
                               label="Длительность"
@@ -540,46 +564,57 @@ export default function TeacherReportsPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-6 px-6 py-6 md:px-8">
+                    <div className="border-t border-slate-100 p-6 md:p-8">
                       <div className="grid gap-5 lg:grid-cols-2">
-                        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
-                            {row.status === "active" ? <Radio size={14} /> : <Clock3 size={14} />}
-                            {row.status === "active" ? "Состояние сейчас" : "Ход сессии"}
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-5">
+                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-800">
+                            {row.status === "active" ? (
+                              <Radio size={16} />
+                            ) : (
+                              <Clock3 size={16} />
+                            )}
+                            {row.status === "active"
+                              ? "Состояние сейчас"
+                              : "Ход сессии"}
                           </div>
 
                           {row.status === "active" ? (
                             live && live.participants.length > 0 ? (
                               <div className="space-y-2">
-                                {live.participants.slice(0, 4).map((participant) => (
-                                  <div
-                                    key={participant.userId}
-                                    className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm"
-                                  >
-                                    <div className="font-medium text-slate-900">
-                                      {participant.fullName}
+                                {live.participants
+                                  .slice(0, 4)
+                                  .map((participant) => (
+                                    <div
+                                      key={participant.userId}
+                                      className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                                    >
+                                      <div className="font-medium text-slate-900">
+                                        {participant.fullName}
+                                      </div>
+                                      <div className="mt-1 text-sm text-slate-500">
+                                        {formatEmotionLabel(
+                                          participant.dominant_emotion ||
+                                            participant.emotion
+                                        )}{" "}
+                                        • риск {Math.round(participant.risk)}% •
+                                        уверенность{" "}
+                                        {Math.round(participant.confidence)}%
+                                      </div>
                                     </div>
-                                    <div className="mt-1 text-slate-500">
-                                      {formatEmotionLabel(
-                                        participant.dominant_emotion || participant.emotion
-                                      )}{" "}
-                                      • риск {Math.round(participant.risk)}% • уверенность{" "}
-                                      {Math.round(participant.confidence)}%
-                                    </div>
-                                  </div>
-                                ))}
+                                  ))}
                               </div>
                             ) : (
                               <div className="text-sm leading-6 text-slate-500">
-                                Участники подключены, но live-модель ещё не вернула свежие персональные метрики.
+                                Участники подключены, но live-модель ещё не
+                                вернула свежие персональные метрики.
                               </div>
                             )
                           ) : timelineHighlights.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-2">
                               {timelineHighlights.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                                  className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
                                 >
                                   <div className="text-sm font-medium text-slate-900">
                                     {item.window}
@@ -592,166 +627,137 @@ export default function TeacherReportsPage() {
                             </div>
                           ) : (
                             <div className="text-sm leading-6 text-slate-500">
-                              Backend пока не вернул достаточно timeline-точек, чтобы построить красивую покадровую историю этой сессии.
+                              Backend пока не вернул достаточно timeline-точек.
                             </div>
                           )}
                         </div>
 
-                        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
-                            <Users size={14} />
+                        <div className="rounded-[20px] border border-slate-200 bg-white p-5">
+                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-800">
+                            <Users size={16} />
                             Участники и эмоции
                           </div>
 
-                          {row.status === "finished" && analytics?.participants?.length ? (
+                          {row.status === "finished" &&
+                          analytics?.participants?.length ? (
                             <div className="space-y-2">
-                              {analytics.participants.slice(0, 4).map((participant) => (
-                                <div
-                                  key={participant.userId}
-                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
-                                >
-                                  <div className="text-sm font-medium text-slate-900">
-                                    {participant.fullName}
+                              {analytics.participants
+                                .slice(0, 4)
+                                .map((participant) => (
+                                  <div
+                                    key={participant.userId}
+                                    className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                                  >
+                                    <div className="font-medium text-slate-900">
+                                      {participant.fullName}
+                                    </div>
+                                    <div className="mt-1 text-sm text-slate-500">
+                                      {formatEmotionLabel(
+                                        participant.dominantEmotion ||
+                                          participant.emotion
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="mt-1 text-sm text-slate-500">
-                                    {formatEmotionLabel(
-                                      participant.dominantEmotion || participant.emotion
-                                    )}
-                                  </div>
-                                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                                    {typeof participant.engagement === "number" && (
-                                      <span>вовлечённость {participant.engagement}%</span>
-                                    )}
-                                    {typeof participant.stress === "number" && (
-                                      <span>стресс {participant.stress}%</span>
-                                    )}
-                                    {typeof participant.risk === "number" && (
-                                      <span>риск {participant.risk}%</span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                                ))}
                             </div>
-                          ) : row.status === "active" && live?.participants?.length ? (
+                          ) : row.status === "active" &&
+                            live?.participants?.length ? (
                             <div className="space-y-2">
-                              {live.participants.slice(0, 4).map((participant) => (
-                                <div
-                                  key={participant.userId}
-                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
-                                >
-                                  <div className="text-sm font-medium text-slate-900">
-                                    {participant.fullName}
+                              {live.participants
+                                .slice(0, 4)
+                                .map((participant) => (
+                                  <div
+                                    key={participant.userId}
+                                    className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3"
+                                  >
+                                    <div className="font-medium text-slate-900">
+                                      {participant.fullName}
+                                    </div>
+                                    <div className="mt-1 text-sm text-slate-500">
+                                      {formatEmotionLabel(
+                                        participant.dominant_emotion ||
+                                          participant.emotion
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="mt-1 text-sm text-slate-500">
-                                    {formatEmotionLabel(
-                                      participant.dominant_emotion || participant.emotion
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                                ))}
                             </div>
                           ) : (
                             <div className="text-sm leading-6 text-slate-500">
-                              Персональные данные по участникам пока недоступны для этой сессии.
+                              Персональные данные пока недоступны.
                             </div>
                           )}
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link href={`/teacher/session/${row.id}/analytics`}>
-                          <Button className="h-12 gap-2 rounded-xl bg-gradient-to-r from-[#6D3DF5] to-[#7C4DFF] px-6 shadow-[0_12px_30px_rgba(116,72,255,0.25)]">
-                            <Activity size={16} />
-                            Открыть аналитику
-                          </Button>
-                        </Link>
+                      <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex flex-wrap gap-3">
+                          <Link href={`/teacher/session/${row.id}/analytics`}>
+                            <Button className="h-11 gap-2 rounded-xl bg-gradient-to-r from-[#6D3DF5] to-[#7C4DFF] px-6 shadow-[0_12px_30px_rgba(116,72,255,0.22)]">
+                              <Activity size={16} />
+                              Открыть аналитику
+                            </Button>
+                          </Link>
 
-                        <Link href={`/teacher/session/${row.id}`}>
-                          <Button variant="outline" className="h-12 rounded-xl border-slate-200 bg-white px-6">Открыть монитор</Button>
-                        </Link>
+                          <Link href={`/teacher/session/${row.id}`}>
+                            <Button
+                              variant="outline"
+                              className="h-11 rounded-xl border-slate-200 bg-white px-6"
+                            >
+                              Открыть монитор
+                            </Button>
+                          </Link>
+                        </div>
 
-                        {analytics?.quality && (
-                          <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
-                            <Sparkles size={12} className="mr-1" />
-                            quality: {analytics.quality}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="border-t border-slate-100 pt-5">
-                        <div className="mb-4 flex items-center gap-3">
-                          <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="text-sm font-medium text-slate-600">
                             Экспорт
-                          </div>
+                          </span>
+
                           {!canExport && (
-                            <Badge className="bg-surface-subtle text-muted ring-1 ring-[color:var(--border)]/20">
+                            <Badge className="rounded-xl bg-purple-50 px-3 py-1.5 text-xs font-medium text-[#7448FF]">
                               Доступен после завершения
                             </Badge>
                           )}
-                        </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
-                            onClick={() => handleExport(row.id, "json")}
-                            disabled={!canExport || exportState !== null}
-                          >
-                            {exportState === "json" ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <FileJson size={14} />
-                            )}
-                            JSON
-                          </Button>
+                          {(["json", "csv", "pdf"] as const).map((format) => {
+                            const Icon =
+                              format === "json"
+                                ? FileJson
+                                : format === "csv"
+                                  ? FileSpreadsheet
+                                  : FileText;
 
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
-                            onClick={() => handleExport(row.id, "csv")}
-                            disabled={!canExport || exportState !== null}
-                          >
-                            {exportState === "csv" ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <FileSpreadsheet size={14} />
-                            )}
-                            CSV
-                          </Button>
-
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
-                            onClick={() => handleExport(row.id, "pdf")}
-                            disabled={!canExport || exportState !== null}
-                          >
-                            {exportState === "pdf" ? (
-                              <RefreshCw size={14} className="animate-spin" />
-                            ) : (
-                              <FileText size={14} />
-                            )}
-                            PDF
-                          </Button>
-
-                          {canExport && (
-                            <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
-                              <Download size={12} className="mr-1" />
-                              backend export route включён
-                            </Badge>
-                          )}
+                            return (
+                              <Button
+                                key={format}
+                                size="sm"
+                                variant="outline"
+                                className="h-10 gap-2 rounded-xl border-slate-200 bg-white px-4"
+                                onClick={() => handleExport(row.id, format)}
+                                disabled={!canExport || exportState !== null}
+                              >
+                                {exportState === format ? (
+                                  <RefreshCw
+                                    size={14}
+                                    className="animate-spin"
+                                  />
+                                ) : (
+                                  <Icon size={14} />
+                                )}
+                                {format.toUpperCase()}
+                              </Button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
-                  </GlassCard>
+                  </article>
                 );
               })}
             </div>
           )}
-        </Reveal>
-      </Section>
-    </div>
-  );
-}
+        </section>
+      </div>
+    </main>
+  );}
