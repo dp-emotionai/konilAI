@@ -93,8 +93,10 @@ export class SignalingClient {
 
     const token = getToken();
     this.socket = io(url, {
-      transports: ["websocket"],
+      path: "/socket.io",
+      transports: ["websocket", "polling"],
       reconnection: true,
+      withCredentials: true,
       auth: token ? { token } : undefined,
     });
 
