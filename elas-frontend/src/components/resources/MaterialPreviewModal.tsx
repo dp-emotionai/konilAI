@@ -54,7 +54,7 @@ type PreviewInfo = {
 
 function getMaterialId(material: PreviewMaterial): string {
   const row = material as { id?: string | null; materialId?: string | null };
-  return String(row.materialId || row.id || "");
+  return String(row.materialId || row.id || "").trim();
 }
 
 function getKind(material: PreviewMaterial): PreviewKind {
@@ -185,6 +185,13 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
     const controller = new AbortController();
     const materialId = getMaterialId(material);
 
+    if (!materialId) {
+      setLoading(false);
+      setError("ID материала не найден.");
+      setPreview(null);
+      return () => controller.abort();
+    }
+
     setLoading(true);
     setError(null);
     setPreview(null);
@@ -243,7 +250,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
   const fileType = getFileExtension(fileName, material.mimeType);
 
   return (
-      <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/35 backdrop-blur-lg">
+      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-slate-950/35 backdrop-blur-lg">
         <button
             type="button"
             aria-label="Закрыть предпросмотр"
@@ -251,7 +258,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
             onClick={onClose}
         />
 
-        <div className="relative z-[101] mx-auto flex min-h-full w-full max-w-5xl items-start justify-center px-3 py-6 sm:px-5 sm:py-10">
+        <div className="relative z-[10000] mx-auto flex min-h-full w-full max-w-5xl items-start justify-center px-3 py-6 sm:px-5 sm:py-10">
           <section
               role="dialog"
               aria-modal="true"
