@@ -18,18 +18,15 @@ import { useUI } from "@/components/layout/Providers";
 import {
   getSessionJoinInfo,
   getStudentSessionDetails,
-  sendSessionMetrics,
   type SessionJoinInfo,
 } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import { getMlApiBaseUrl } from "@/lib/api/ml";
 import {
-  getMlApiBaseUrl,
-  mlAnalyzeFrame,
-  captureSquareFrameGrayscale,
-  ML_INTERVAL,
-  ML_429_PAUSE_MS,
-  type MlAnalyzeResponse,
-} from "@/lib/api/ml";
+  getSessionLiveMetrics,
+  type LiveMetricsParticipant,
+  type SessionLiveMetrics,
+} from "@/lib/api/teacher";
 import {
   getSessionContent,
   getSessionMaterials,
@@ -165,6 +162,25 @@ function formatParticipantLabel(p?: Participant | null) {
 
 function formatPercentMetric(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
+function normalizeIdentity(value?: string | null) {
+  return String(value || "")
+      .trim()
+      .toLocaleLowerCase()
+      .replace(/\s+/g, " ");
+}
+
+function formatMetricsUpdatedAt(value?: string | null) {
+  if (!value) return "время обновления неизвестно";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "время обновления неизвестно";
+
+  return new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(date);
 }
 
 function CallControlButton({
@@ -402,10 +418,9 @@ export default function TeacherJoinSessionPage() {
     };
   }, [apiAvailable, live, sessionId]);
 
-  const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
-  const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
-  const [mlActive, setMlActive] = useState(false);
-  const [mlUnavailable, setMlUnavailable] = useState(false);
+  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
+  const [liveMetricsLoading, setLiveMetricsLoading] = useState(false);
+  const [liveMetricsUnavailable, setLiveMetricsUnavailable] = useState(false);
 
   const [connectionState, setConnectionState] = useState<
       "idle" | "connecting" | "connected" | "error"
@@ -421,25 +436,25 @@ export default function TeacherJoinSessionPage() {
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
-  const shouldRunMl = live && state.consent && mlApiAvailable;
   const roomId = sessionId;
 
   const teacherParticipant = useMemo(
-      () => participants.find((p) => p.role === "teacher") ?? participants[0] ?? null,
+      () => participants.find((p) => p.role === "teacher") ?? null,
       [participants]
   );
 
-  const currentStudentName = useMemo(
+  const currentUserName = useMemo(
       () =>
           formatPersonName({
             fullName: currentUser?.fullName,
             firstName: currentUser?.firstName,
             lastName: currentUser?.lastName,
             email: currentUser?.email,
-            role: "student",
+            role: "teacher",
           }),
       [currentUser]
   );
+
   useEffect(() => {
     setCurrentUser(getStoredAuth());
   }, []);
@@ -448,10 +463,11 @@ export default function TeacherJoinSessionPage() {
     const localTile = {
       id: "local",
       stream: localStream,
-      label: currentStudentName,
-      roleLabel: "Вы",
-      icon: "👤",
+      label: currentUserName,
+      roleLabel: "Вы · Преподаватель",
+      icon: "👩🏻‍🏫",
       isLocal: true,
+      participant: null as Participant | null,
     };
 
     const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
@@ -462,14 +478,15 @@ export default function TeacherJoinSessionPage() {
         id: peerId,
         stream,
         label: formatParticipantLabel(participant),
-        roleLabel: isTeacher ? "Преподаватель" : "Участник",
+        roleLabel: isTeacher ? "Преподаватель" : "Студент",
         icon: isTeacher ? "👩🏻‍🏫" : "🎓",
         isLocal: false,
+        participant,
       };
     });
 
     return [localTile, ...remoteTiles];
-  }, [currentStudentName, localStream, participants, remoteStreams]);
+  }, [currentUserName, localStream, participants, remoteStreams]);
 
   const selectedVideo = useMemo(() => {
     return (
@@ -480,6 +497,88 @@ export default function TeacherJoinSessionPage() {
         null
     );
   }, [selectedVideoId, videoTiles]);
+
+  const focusedStudentParticipant = useMemo(() => {
+    if (!selectedVideo || selectedVideo.isLocal) return null;
+
+    const participant =
+        selectedVideo.participant ??
+        participants.find((candidate) => candidate.id === selectedVideo.id) ??
+        null;
+
+    return participant?.role === "student" ? participant : null;
+  }, [participants, selectedVideo]);
+
+  const focusedStudentMetrics = useMemo<LiveMetricsParticipant | null>(() => {
+    if (!focusedStudentParticipant || !liveMetrics?.participants?.length) return null;
+
+    const userId = focusedStudentParticipant.userId?.trim();
+    const email = normalizeIdentity(focusedStudentParticipant.email);
+    const participantName = normalizeIdentity(
+        formatPersonName({
+          fullName: focusedStudentParticipant.fullName,
+          firstName: focusedStudentParticipant.firstName,
+          lastName: focusedStudentParticipant.lastName,
+          email: focusedStudentParticipant.email,
+          role: focusedStudentParticipant.role,
+        })
+    );
+    const selectedLabel = normalizeIdentity(selectedVideo?.label);
+
+    const exactMatch =
+        liveMetrics.participants.find(
+            (metric) => Boolean(userId) && metric.userId === userId
+        ) ??
+        liveMetrics.participants.find(
+            (metric) => Boolean(email) && normalizeIdentity(metric.email) === email
+        ) ??
+        liveMetrics.participants.find((metric) => {
+          const metricName = normalizeIdentity(
+              formatPersonName({
+                fullName: metric.fullName,
+                firstName: metric.firstName,
+                lastName: metric.lastName,
+                email: metric.email,
+                role: "student",
+              })
+          );
+
+          return Boolean(metricName) && (metricName === participantName || metricName === selectedLabel);
+        }) ??
+        null;
+
+    if (exactMatch) return exactMatch;
+
+    const studentTiles = videoTiles.filter(
+        (tile) => !tile.isLocal && tile.participant?.role === "student"
+    );
+
+    return studentTiles.length === 1 && liveMetrics.participants.length === 1
+        ? liveMetrics.participants[0] ?? null
+        : null;
+  }, [focusedStudentParticipant, liveMetrics, selectedVideo?.label, videoTiles]);
+
+  const focusedStudentName = useMemo(
+      () =>
+          focusedStudentMetrics
+              ? formatPersonName({
+                fullName: focusedStudentMetrics.fullName,
+                firstName: focusedStudentMetrics.firstName,
+                lastName: focusedStudentMetrics.lastName,
+                email: focusedStudentMetrics.email,
+                role: "student",
+              })
+              : selectedVideo?.label || "Студент",
+      [focusedStudentMetrics, selectedVideo?.label]
+  );
+
+  const focusedMetricsStale = useMemo(() => {
+    const value = focusedStudentMetrics?.updatedAt;
+    if (!value) return false;
+
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) && Date.now() - timestamp > 15000;
+  }, [focusedStudentMetrics, liveMetrics]);
 
 
   useEffect(() => {
@@ -505,10 +604,10 @@ export default function TeacherJoinSessionPage() {
   }, []);
 
   const teacherDisplayName = useMemo(() => {
-    const liveParticipantName = formatParticipantLabel(teacherParticipant);
     if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
-    return liveParticipantName;
-  }, [sessionTeacherName, teacherParticipant]);
+    if (currentUserName.trim()) return currentUserName;
+    return formatParticipantLabel(teacherParticipant);
+  }, [currentUserName, sessionTeacherName, teacherParticipant]);
 
   const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
   const sessionStartTime = useRef<number>(Date.now());
@@ -697,89 +796,70 @@ export default function TeacherJoinSessionPage() {
   };
 
   useEffect(() => {
-    if (!shouldRunMl || !localStream) return;
-
-    setMlActive(true);
-    setMlUnavailable(false);
+    if (!live || !sessionId || !apiAvailable) return;
 
     let cancelled = false;
-    let inflight = false;
-    let consecutiveFailures = 0;
-    let pausedUntil = 0;
-    const failureThreshold = 4;
 
-    const hiddenVideo = document.createElement("video");
-    hiddenVideo.muted = true;
-    hiddenVideo.playsInline = true;
-    hiddenVideo.autoplay = true;
-    hiddenVideo.srcObject = localStream;
-    hiddenVideo.play().catch(() => { });
+    const loadLiveMetrics = async (initial = false) => {
+      if (initial) setLiveMetricsLoading(true);
 
-    const timer = setInterval(async () => {
-      if (cancelled || inflight) return;
-      if (Date.now() < pausedUntil) return;
+      const metrics = await getSessionLiveMetrics(sessionId);
+      if (cancelled) return;
 
-      const frame = captureSquareFrameGrayscale(hiddenVideo, 192);
-      if (!frame) return;
+      setLiveMetrics(metrics);
+      setLiveMetricsUnavailable(metrics === null);
+      if (initial) setLiveMetricsLoading(false);
+    };
 
-      try {
-        inflight = true;
-        const result = await mlAnalyzeFrame(frame);
-        if (cancelled) return;
-
-        if (!result) {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
-          return;
-        }
-
-        consecutiveFailures = 0;
-        const hasFace = result.face_detected !== false;
-        setMlFaceDetected(hasFace);
-
-        if (!hasFace) {
-          setMlResult(null);
-          return;
-        }
-
-        setMlResult(result);
-
-        if (sessionId && apiAvailable) {
-          sendSessionMetrics(sessionId, {
-            emotion: result.emotion ?? "Neutral",
-            confidence: result.confidence ?? 0,
-            risk: result.risk ?? 0,
-            state: result.state ?? "NORMAL",
-            dominant_emotion: result.dominant_emotion ?? "Neutral",
-            engagement: result.engagement,
-            stress: result.stress,
-            fatigue: result.fatigue,
-          }).catch(() => { });
-        }
-      } catch (err) {
-        const e = err as Error & { status?: number };
-        if (e?.status === 429 || e?.message === "RATE_LIMIT") {
-          pausedUntil = Date.now() + ML_429_PAUSE_MS;
-        } else {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
-        }
-      } finally {
-        inflight = false;
-      }
-    }, ML_INTERVAL);
+    void loadLiveMetrics(true);
+    const timer = window.setInterval(() => {
+      void loadLiveMetrics(false);
+    }, 2000);
 
     return () => {
       cancelled = true;
-      clearInterval(timer);
-      hiddenVideo.pause();
-      hiddenVideo.srcObject = null;
-      setMlActive(false);
-      setMlResult(null);
-      setMlFaceDetected(null);
-      setMlUnavailable(false);
+      window.clearInterval(timer);
     };
-  }, [shouldRunMl, sessionId, apiAvailable, localStream]);
+  }, [apiAvailable, live, sessionId]);
+
+  const findStudentParticipantForPresence = useCallback(
+      (row: SessionPresenceRow) => {
+        const rowEmail = normalizeIdentity(row.email);
+        const rowName = normalizeIdentity(row.fullName);
+
+        return (
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(participant.userId) &&
+                    participant.userId === row.userId
+            ) ??
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(rowEmail) &&
+                    normalizeIdentity(participant.email) === rowEmail
+            ) ??
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(rowName) &&
+                    normalizeIdentity(formatParticipantLabel(participant)) === rowName
+            ) ??
+            null
+        );
+      },
+      [participants]
+  );
+
+  const focusStudentFromPresence = useCallback(
+      (row: SessionPresenceRow) => {
+        const participant = findStudentParticipantForPresence(row);
+        if (!participant || !remoteStreams[participant.id]) return;
+        setSelectedVideoId(participant.id);
+      },
+      [findStudentParticipantForPresence, remoteStreams]
+  );
 
   if (tab === "live") {
     return (
@@ -883,11 +963,16 @@ export default function TeacherJoinSessionPage() {
                     </button>
 
                     {selectedVideo?.stream && (
-                        <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[55%]">
+                        <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[65%]">
                           <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
                             {selectedVideo.icon}
                           </div>
                           <span className="truncate">{selectedVideo.label}</span>
+                          {focusedStudentParticipant && (
+                              <span className="rounded-full bg-[#7448FF] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                Фокус
+                              </span>
+                          )}
                         </div>
                     )}
 
@@ -1288,153 +1373,192 @@ export default function TeacherJoinSessionPage() {
                     <div>
                       <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
                       <div className="flex flex-col gap-3">
-                        {presence.length > 0 && (
+                        {presence.length > 0 ? (
                             <div className="space-y-2">
-                              {presence.map((p) => (
-                                  <div
-                                      key={p.userId}
-                                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="truncate text-[13px] font-semibold text-slate-900">
-                                        {p.fullName || p.email || p.userId}
+                              {presence.map((row) => {
+                                const participant = findStudentParticipantForPresence(row);
+                                const canFocus = Boolean(
+                                    participant && remoteStreams[participant.id]
+                                );
+                                const isFocused =
+                                    Boolean(participant) &&
+                                    focusedStudentParticipant?.id === participant?.id;
+                                const isCurrentTeacher =
+                                    (Boolean(currentUser?.id) && currentUser?.id === row.userId) ||
+                                    (Boolean(currentUser?.email) &&
+                                        normalizeIdentity(currentUser?.email) ===
+                                        normalizeIdentity(row.email));
+
+                                return (
+                                    <button
+                                        key={row.userId}
+                                        type="button"
+                                        onClick={() => focusStudentFromPresence(row)}
+                                        disabled={!canFocus}
+                                        className={cn(
+                                            "flex w-full items-center justify-between gap-3 rounded-2xl border p-3 text-left transition",
+                                            isFocused
+                                                ? "border-[#7448FF] bg-purple-50 ring-2 ring-[#7448FF]/15"
+                                                : "border-slate-100 bg-white",
+                                            canFocus
+                                                ? "cursor-pointer hover:border-purple-200 hover:bg-purple-50/40"
+                                                : "cursor-default"
+                                        )}
+                                        title={
+                                          canFocus
+                                              ? `Показать ${row.fullName || row.email || "студента"} и его ML-метрики`
+                                              : isCurrentTeacher
+                                                  ? "Это вы — метрики преподавателя не показываются"
+                                                  : "Видео участника пока не подключено"
+                                        }
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="truncate text-[13px] font-semibold text-slate-900">
+                                          {row.fullName || row.email || row.userId}
+                                        </div>
+                                        <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                          {row.email || ""}
+                                        </div>
+                                        <div className="mt-1 text-[10px] font-semibold text-[#7448FF]">
+                                          {isCurrentTeacher
+                                              ? "Преподаватель · вы"
+                                              : isFocused
+                                                  ? "Студент в фокусе"
+                                                  : canFocus
+                                                      ? "Нажмите для фокуса"
+                                                      : "Ожидание видео"}
+                                        </div>
                                       </div>
-                                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                                        {p.email || ""}
+                                      <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                        <span
+                                            className={cn(
+                                                "h-2 w-2 rounded-full",
+                                                row.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                                            )}
+                                        />
+                                        <span className={row.status === "online" ? "text-emerald-600" : "text-slate-500"}>
+                                          {row.status}
+                                        </span>
                                       </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[11px] font-semibold">
-                                <span
-                                    className={cn(
-                                        "h-2 w-2 rounded-full",
-                                        p.status === "online" ? "bg-emerald-500" : "bg-slate-300"
-                                    )}
-                                />
-                                      <span className={p.status === "online" ? "text-emerald-600" : "text-slate-500"}>
-                                  {p.status}
-                                </span>
-                                    </div>
-                                  </div>
-                              ))}
+                                    </button>
+                                );
+                              })}
+                            </div>
+                        ) : (
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[12px] text-slate-500">
+                              Список участников загружается...
                             </div>
                         )}
-                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
-                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
-                            👩🏻‍🏫
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-[13px] text-slate-900 truncate">
-                              {teacherDisplayName}
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-medium">
-                              Преподаватель
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
-                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
-                            👦🏻
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-[13px] text-slate-900 truncate">
-                              {currentStudentName}
-                            </div>
-                            <div className="text-[11px] text-[#7448FF] font-semibold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-[#7448FF] rounded-full" />
-                              Студент
-                            </div>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {mlResult && (
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                          Ваши локальные ML-метрики
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400">
+                          ML-метрики выбранного студента
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Эмоция
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {mlResult.dominant_emotion || mlResult.emotion || "—"}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Уверенность
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.confidence)}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Вовлечённость
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.engagement)}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Стресс
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.stress)}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Усталость
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.fatigue)}
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-100 bg-white p-3">
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              Риск
-                            </div>
-                            <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.risk)}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
-                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
-                        Состояние: {mlResult.state || "—"}
-                      </span>
-                          {typeof mlResult.face_detected === "boolean" && (
-                              <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
-                          Лицо в кадре: {mlResult.face_detected ? "обнаружено" : "не найдено"}
-                        </span>
-                          )}
+                        <div className="mt-1 text-sm font-semibold text-slate-900">
+                          {focusedStudentParticipant ? focusedStudentName : "Студент не выбран"}
                         </div>
                       </div>
-                  )}
+                      {focusedStudentParticipant && (
+                          <span className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1 text-[11px] font-bold text-[#7448FF]">
+                            Фокус активен
+                          </span>
+                      )}
+                    </div>
 
-                  {mlActive && mlFaceDetected === false && !mlUnavailable && (
-                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
-                        Лицо не найдено в кадре. Аналитика временно приостановлена, пока лицо не вернется.
-                      </div>
-                  )}
-
-                  {mlActive && !mlResult && mlFaceDetected !== false && !mlUnavailable && (
-                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
-                        ML-анализ активен. Ожидание первых результатов...
-                      </div>
-                  )}
-
-                  {mlUnavailable && (
-                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
-                        ML-анализ временно недоступен.
-                      </div>
-                  )}
+                    {!focusedStudentParticipant ? (
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-[13px] font-medium text-purple-700">
+                          Нажмите на мини-видео студента или на его имя в списке участников. Большое видео по нажатию по-прежнему открывается на весь экран.
+                        </div>
+                    ) : liveMetricsLoading ? (
+                        <div className="rounded-2xl border border-slate-100 bg-white p-4 text-[13px] font-medium text-slate-500">
+                          Загружаем метрики студента...
+                        </div>
+                    ) : focusedStudentMetrics ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Эмоция
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {focusedStudentMetrics.dominant_emotion ||
+                                    focusedStudentMetrics.emotion ||
+                                    "—"}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Уверенность
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.confidence)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Вовлечённость
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.engagement)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Стресс
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.stress)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Усталость
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.fatigue)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Риск
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.risk)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
+                            <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-slate-600">
+                              Состояние: {focusedStudentMetrics.state || "—"}
+                            </span>
+                            <span
+                                className={cn(
+                                    "rounded-full border px-3 py-1",
+                                    focusedMetricsStale
+                                        ? "border-amber-100 bg-amber-50 text-amber-700"
+                                        : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                                )}
+                            >
+                              {focusedMetricsStale ? "Данные устарели" : "Данные обновляются"} ·{" "}
+                              {formatMetricsUpdatedAt(focusedStudentMetrics.updatedAt)}
+                            </span>
+                          </div>
+                        </>
+                    ) : liveMetricsUnavailable ? (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] font-medium text-amber-700">
+                          Сервер live-метрик временно недоступен. Камера преподавателя на этот блок не влияет.
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] font-medium text-amber-700">
+                          Для выбранного студента пока нет метрик. Проверьте, что студент дал согласие, его камера включена и на его странице работает ML-анализ.
+                        </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 flex flex-col min-h-[160px]">
