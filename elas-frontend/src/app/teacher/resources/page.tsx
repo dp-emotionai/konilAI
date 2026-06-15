@@ -843,161 +843,196 @@ export default function TeacherResourcesPage() {
             onClose={() => setPreviewMaterial(null)}
         />
 
-        <Modal
-            open={createOpen}
-            onClose={closeCreateModal}
-            title="Создание материала"
-            size="lg"
-            footer={
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" onClick={closeCreateModal} disabled={working}>
-                  Отмена
-                </Button>
-                <Button
-                    type="button"
-                    onClick={() => void handleCreate()}
-                    disabled={working || !form.title.trim() || !selectedFile}
-                >
-                  {working ? "Создание..." : "Создать материал"}
-                </Button>
-              </div>
-            }
-        >
-          <div className="space-y-5">
-            <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">Название материала</span>
-              <input
-                  value={form.title}
-                  maxLength={160}
-                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                  placeholder="Введите название материала"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              />
-            </label>
+        {createOpen && (
+            <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/25 px-4 py-6 backdrop-blur-sm"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="create-material-title"
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) closeCreateModal();
+                }}
+            >
+              <div className="w-full max-w-[760px] rounded-[28px] bg-white p-8 shadow-[0_28px_90px_rgba(15,23,42,0.24)] sm:p-10">
+                <div className="mb-8 flex items-start justify-between gap-4">
+                  <h2 id="create-material-title" className="text-[32px] font-extrabold leading-tight tracking-[-0.03em] text-slate-900">
+                    Создание материала
+                  </h2>
+                  <button
+                      type="button"
+                      aria-label="Закрыть"
+                      onClick={closeCreateModal}
+                      disabled={working}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-50"
+                  >
+                    <X size={28} strokeWidth={2.1} />
+                  </button>
+                </div>
 
-            <div>
-              <div className="mb-2 text-sm font-semibold text-slate-700">Тип</div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {CREATE_TYPES.map((item) => {
-                  const Icon = item.icon;
-                  const active = createKind === item.id;
-                  return (
-                      <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => {
-                            setCreateKind(item.id);
-                            setSelectedFile(null);
-                            setMediaDetails("");
-                            setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
-                          }}
-                          className={cn(
-                              "flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
-                              active
-                                  ? "border-violet-400 bg-violet-50 text-violet-700 shadow-sm"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50/50"
-                          )}
-                      >
-                        <Icon size={16} />
-                        {item.label}
-                      </button>
-                  );
-                })}
-              </div>
-            </div>
+                <div className="space-y-6">
+                  <label className="block">
+                  <span className="mb-4 block text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">
+                    Название материала
+                  </span>
+                    <input
+                        value={form.title}
+                        maxLength={160}
+                        onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                        placeholder="Введите название материала"
+                        className="h-[58px] w-full rounded-xl border border-slate-200 bg-white px-5 text-[18px] text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    />
+                  </label>
 
-            <div>
-              <div className="mb-2 text-sm font-semibold text-slate-700">
-                {createConfig.uploadLabel}
-              </div>
-              <label
-                  className={cn(
-                      "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition",
-                      dragActive
-                          ? "border-violet-500 bg-violet-100/70"
-                          : "border-violet-300 bg-violet-50/45 hover:bg-violet-50"
-                  )}
-                  onDragEnter={(event) => {
-                    event.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setDragActive(false);
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragActive(false);
-                    applySelectedFile(event.dataTransfer.files?.[0] ?? null);
-                  }}
-              >
-                <CreateUploadIcon kind={createKind} />
-                <span className="mt-3 text-sm font-semibold text-slate-800">
-                {selectedFile ? selectedFile.name : createConfig.dropLabel}
-              </span>
-                <span className="mt-1 text-xs text-slate-500">{createConfig.hint}</span>
-                <input
-                    type="file"
-                    accept={CREATE_ACCEPT[createKind]}
-                    className="sr-only"
-                    onChange={(event) => applySelectedFile(event.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
+                  <div>
+                    <div className="mb-4 text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">Тип</div>
+                    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                      {CREATE_TYPES.map((item) => {
+                        const Icon = item.icon;
+                        const active = createKind === item.id;
+                        const inactiveIcon =
+                            item.id === "image"
+                                ? "text-emerald-500"
+                                : item.id === "video"
+                                    ? "text-red-500"
+                                    : "text-violet-500";
 
-            {(createKind === "audio" || createKind === "video") && (
-                <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">
-                {createConfig.detailsLabel}
-              </span>
-                  <input
-                      value={mediaDetails}
-                      maxLength={255}
-                      onChange={(event) => setMediaDetails(event.target.value)}
-                      placeholder={createConfig.detailsPlaceholder}
-                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-                  />
-                  <div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-400">
-                    <span>{createConfig.detailsHelp} Для скачивания нужен загруженный файл.</span>
-                    <span className="shrink-0">{mediaDetails.length}/255</span>
+                        return (
+                            <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setCreateKind(item.id);
+                                  setSelectedFile(null);
+                                  setMediaDetails("");
+                                  setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
+                                }}
+                                className={cn(
+                                    "flex h-[58px] items-center justify-center gap-3 rounded-xl border px-4 text-[17px] font-semibold transition",
+                                    active
+                                        ? "border-violet-500 bg-violet-50 text-violet-700 shadow-[0_0_0_1px_rgba(139,92,246,0.22)]"
+                                        : "border-slate-200 bg-white text-slate-700 hover:border-violet-200 hover:bg-violet-50/40"
+                                )}
+                            >
+                              <Icon size={24} className={active ? "text-violet-600" : inactiveIcon} />
+                              {item.label}
+                            </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </label>
-            )}
 
-            <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">Описание (необязательно)</span>
-              <textarea
-                  value={form.description}
-                  maxLength={500}
-                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                  placeholder="Введите описание материала"
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              />
-              <span className="mt-1 block text-right text-[11px] text-slate-400">{form.description.length}/500</span>
-            </label>
+                  <div>
+                    <div className="mb-4 text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">
+                      {createConfig.uploadLabel}
+                    </div>
+                    <label
+                        className={cn(
+                            "flex min-h-[184px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-8 text-center transition",
+                            dragActive
+                                ? "border-violet-500 bg-violet-100/80"
+                                : "border-violet-400 bg-violet-50/25 hover:bg-violet-50/60"
+                        )}
+                        onDragEnter={(event) => {
+                          event.preventDefault();
+                          setDragActive(true);
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          setDragActive(true);
+                        }}
+                        onDragLeave={(event) => {
+                          event.preventDefault();
+                          setDragActive(false);
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          setDragActive(false);
+                          applySelectedFile(event.dataTransfer.files?.[0] ?? null);
+                        }}
+                    >
+                      <CreateUploadIcon kind={createKind} />
+                      <span className="mt-5 text-[17px] font-semibold text-slate-900">
+                      {selectedFile ? selectedFile.name : createConfig.dropLabel.split(" нажмите")[0]}
+                        {!selectedFile && (
+                            <>
+                              {" "}
+                              или <span className="font-extrabold text-violet-600">нажмите для выбора</span>
+                            </>
+                        )}
+                    </span>
+                      <span className="mt-3 text-[16px] text-slate-500">{createConfig.hint}</span>
+                      <input
+                          type="file"
+                          accept={CREATE_ACCEPT[createKind]}
+                          className="sr-only"
+                          onChange={(event) => applySelectedFile(event.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  </div>
 
-            <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">
-              Назначить группе (необязательно)
-            </span>
-              <select
-                  value={createGroupId}
-                  onChange={(event) => setCreateGroupId(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              >
-                <option value="">Выберите группу</option>
-                {groupOptions.map((group) => (
-                    <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </Modal>
+                  <label className="block">
+                  <span className="mb-4 block text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">
+                    Описание
+                  </span>
+                    <div className="relative">
+                    <textarea
+                        value={form.description}
+                        maxLength={500}
+                        onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                        placeholder="Введите описание материала (необязательно)"
+                        rows={4}
+                        className="min-h-[128px] w-full resize-none rounded-xl border border-slate-200 bg-white px-5 py-4 pr-16 text-[18px] text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    />
+                      <span className="pointer-events-none absolute bottom-5 right-5 text-[16px] font-semibold text-slate-500">
+                      {form.description.length}/500
+                    </span>
+                    </div>
+                  </label>
+
+                  <label className="block">
+                  <span className="mb-4 block text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">
+                    Назначить группе
+                  </span>
+                    <div className="relative">
+                      <select
+                          value={createGroupId}
+                          onChange={(event) => setCreateGroupId(event.target.value)}
+                          className="h-[58px] w-full appearance-none rounded-xl border border-slate-200 bg-white px-5 pr-12 text-[18px] text-slate-500 outline-none transition hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                      >
+                        <option value="">Выберите группу (необязательно)</option>
+                        {groupOptions.map((group) => (
+                            <option key={group.id} value={group.id}>{group.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                          size={24}
+                          className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-slate-600"
+                      />
+                    </div>
+                  </label>
+
+                  <div className="flex items-center justify-end gap-6 pt-2">
+                    <button
+                        type="button"
+                        onClick={closeCreateModal}
+                        disabled={working}
+                        className="h-[58px] min-w-[126px] rounded-xl border border-slate-200 bg-white px-7 text-[17px] font-extrabold text-slate-800 transition hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => void handleCreate()}
+                        disabled={working || !form.title.trim() || !selectedFile}
+                        className="h-[58px] min-w-[230px] rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-8 text-[18px] font-extrabold text-white shadow-[0_14px_30px_rgba(124,58,237,0.28)] transition hover:from-violet-700 hover:to-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {working ? "Создание..." : "Создать материал"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+        )}
 
         <Modal
             open={assignOpen}
@@ -1134,13 +1169,10 @@ export default function TeacherResourcesPage() {
 function CreateUploadIcon({ kind }: { kind: CreateKind }) {
   if (kind === "image") {
     return (
-        <span className="relative flex h-16 w-20 items-center justify-center">
-        <span className="absolute left-1 top-2 h-11 w-14 rotate-[-7deg] rounded-xl border border-violet-200 bg-white/80 shadow-sm" />
-        <span className="relative flex h-12 w-16 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-600 shadow-sm">
-          <ImageIcon size={30} />
-        </span>
-        <span className="absolute -right-1 bottom-0 flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-white shadow-md">
-          <Upload size={16} />
+        <span className="relative flex h-[74px] w-[86px] items-center justify-center text-violet-600">
+        <ImageIcon size={58} strokeWidth={2.2} />
+        <span className="absolute -right-1 bottom-1 flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-white ring-4 ring-white">
+          <Plus size={22} strokeWidth={2.8} />
         </span>
       </span>
     );
@@ -1148,20 +1180,20 @@ function CreateUploadIcon({ kind }: { kind: CreateKind }) {
 
   if (kind === "video") {
     return (
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
-        <Video size={30} />
+        <span className="relative flex h-[74px] w-[86px] items-center justify-center text-violet-600">
+        <Video size={58} strokeWidth={2.2} />
+        <span className="absolute -right-1 bottom-1 flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-white ring-4 ring-white">
+          <Upload size={22} strokeWidth={2.8} />
+        </span>
       </span>
     );
   }
 
   if (kind === "audio") {
     return (
-        <span className="flex items-center gap-2 text-violet-600">
-        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
-          <Music2 size={28} />
-        </span>
-        <span aria-hidden="true" className="flex items-center gap-1">
-          {[14, 24, 34, 22, 30, 18].map((height, index) => (
+        <span className="relative flex h-[74px] w-[170px] items-center justify-center text-violet-600">
+        <span aria-hidden="true" className="absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-end justify-center gap-1 opacity-25">
+          {[18, 28, 40, 54, 34, 48, 62, 42, 26, 36, 22, 30, 18].map((height, index) => (
               <span
                   key={`${height}-${index}`}
                   className="w-1 rounded-full bg-violet-500"
@@ -1169,13 +1201,16 @@ function CreateUploadIcon({ kind }: { kind: CreateKind }) {
               />
           ))}
         </span>
+        <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white text-violet-600">
+          <Music2 size={42} strokeWidth={2.2} />
+        </span>
       </span>
     );
   }
 
   return (
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
-      <CloudUpload size={30} />
+      <span className="flex h-[74px] w-[86px] items-center justify-center text-violet-600">
+      <CloudUpload size={62} strokeWidth={2.1} />
     </span>
   );
 }
