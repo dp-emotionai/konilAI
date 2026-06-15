@@ -24,11 +24,6 @@ export const NAV_PUBLIC_LEFT: NavItem[] = [
     href: "/",
   },
   {
-    type: "link",
-    label: "Документация",
-    href: "/docs",
-  },
-  {
     type: "dropdown",
     label: "Политики",
     children: [
@@ -106,10 +101,8 @@ export const NAV_APP_BY_ROLE: Record<Role, AppNavItem[]> = {
       children: [
         { type: "link", label: "Сообщения", href: "/teacher/messages" },
         { type: "link", label: "Материалы", href: "/teacher/resources" },
-        { type: "link", label: "Документация", href: "/docs" },
         { type: "link", label: "Конфиденциальность", href: "/privacy" },
         { type: "link", label: "Этика", href: "/ethics" },
-        { type: "link", label: "Статус", href: "/status" },
       ],
     },
   ],
