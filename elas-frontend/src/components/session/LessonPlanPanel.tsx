@@ -7,10 +7,29 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Button from "@/components/ui/Button";
 import { lessonPlansApi, type LessonPlan } from "@/lib/api/lessonPlans";
+import { ChatClient } from "@/lib/ws/chatClient";
 
 function today() {
     return new Date().toISOString().slice(0, 10);
 }
+
+function dateKey(value: string | Date | null | undefined) {
+    if (!value) return "";
+
+    if (value instanceof Date) {
+        return value.toISOString().slice(0, 10);
+    }
+
+    return String(value).slice(0, 10);
+}
+
+type LessonPlanRealtimeEvent = {
+    type?: string;
+    sessionId?: string;
+    planId?: string;
+    date?: string;
+    plan?: LessonPlan;
+};
 
 const contentClass =
     "text-sm text-slate-700 " +
@@ -104,6 +123,42 @@ export default function LessonPlanPanel({
 
         return () => {
             cancelled = true;
+        };
+    }, [sessionId, date, editor]);
+
+
+    useEffect(() => {
+        if (!sessionId || !editor) return;
+
+        const client = new ChatClient((event) => {
+            const packet = event as LessonPlanRealtimeEvent;
+
+            if (packet.sessionId !== sessionId) return;
+
+            if (packet.type === "lesson-plan.updated" && packet.plan) {
+                if (dateKey(packet.plan.date) !== date) return;
+
+                setPlan(packet.plan);
+                setTitle(packet.plan.title ?? "");
+                editor.commands.setContent(packet.plan.description || "");
+                setError("");
+                return;
+            }
+
+            if (packet.type === "lesson-plan.deleted") {
+                if (dateKey(packet.date || packet.plan?.date) !== date) return;
+
+                setPlan(null);
+                setTitle("");
+                editor.commands.clearContent();
+                setError("");
+            }
+        });
+
+        client.joinSession(sessionId);
+
+        return () => {
+            client.disconnect();
         };
     }, [sessionId, date, editor]);
 
