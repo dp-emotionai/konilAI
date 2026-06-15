@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EditorContent, useEditor } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import Link from "@tiptap/extension-link";
 import Button from "@/components/ui/Button";
 import { lessonPlansApi, type LessonPlan } from "@/lib/api/lessonPlans";
 
@@ -18,40 +22,97 @@ export default function LessonPlanPanel({
     const [date, setDate] = useState(today());
     const [plan, setPlan] = useState<LessonPlan | null>(null);
     const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            Underline,
+            Link.configure({
+                openOnClick: true,
+                autolink: true,
+                linkOnPaste: true,
+            }),
+        ],
+        content: "",
+        editorProps: {
+            attributes: {
+                class:
+                    "min-h-[160px] rounded-b-2xl border border-t-0 border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base",
+            },
+        },
+        immediatelyRender: false,
+    });
 
     async function loadPlan() {
-        const data = await lessonPlansApi.getToday(sessionId, date);
-        setPlan(data);
-        setTitle(data?.title ?? "");
-        setDescription(data?.description ?? "");
+        if (!sessionId) return;
+
+        setLoading(true);
+
+        try {
+            const data = await lessonPlansApi.getToday(sessionId, date);
+
+            setPlan(data);
+            setTitle(data?.title ?? "");
+
+            editor?.commands.setContent(data?.description || "");
+        } finally {
+            setLoading(false);
+        }
     }
 
     useEffect(() => {
-        if (sessionId) loadPlan().catch(console.error);
-    }, [sessionId, date]);
+        if (!editor) return;
+        loadPlan().catch(console.error);
+    }, [sessionId, date, editor]);
 
     async function savePlan() {
         if (!title.trim()) return;
 
+        const description = editor?.getHTML() ?? "";
+
         const saved = plan
-            ? await lessonPlansApi.update(plan.id, { date, title, description })
-            : await lessonPlansApi.save(sessionId, { date, title, description });
+            ? await lessonPlansApi.update(plan.id, {
+                date,
+                title,
+                description,
+            })
+            : await lessonPlansApi.save(sessionId, {
+                date,
+                title,
+                description,
+            });
 
         setPlan(saved);
     }
 
     async function deletePlan() {
         if (!plan) return;
+
         await lessonPlansApi.remove(plan.id);
+
         setPlan(null);
         setTitle("");
-        setDescription("");
+        editor?.commands.clearContent();
+    }
+
+    function addLink() {
+        const previousUrl = editor?.getAttributes("link").href;
+        const url = window.prompt("Вставь ссылку", previousUrl || "");
+
+        if (url === null) return;
+
+        if (url === "") {
+            editor?.chain().focus().extendMarkRange("link").unsetLink().run();
+            return;
+        }
+
+        editor?.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
     }
 
     return (
         <div className="rounded-[28px] border border-slate-100 bg-white p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                     <h3 className="font-bold text-slate-900">План занятия</h3>
                     <p className="text-xs text-slate-500">План на выбранный день</p>
@@ -61,7 +122,7 @@ export default function LessonPlanPanel({
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-violet-300"
                 />
             </div>
 
@@ -71,18 +132,101 @@ export default function LessonPlanPanel({
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Тема занятия"
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-violet-300"
                     />
 
-                    <textarea
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Описание плана"
-                        className="min-h-[100px] w-full rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                    />
+                    <div>
+                        <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border border-slate-200 bg-white px-3 py-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    editor?.chain().focus().toggleHeading({ level: 1 }).run()
+                                }
+                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                H1
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    editor?.chain().focus().toggleHeading({ level: 2 }).run()
+                                }
+                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                H2
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    editor?.chain().focus().toggleHeading({ level: 3 }).run()
+                                }
+                                className="rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                H3
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => editor?.chain().focus().setParagraph().run()}
+                                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+                            >
+                                P
+                            </button>
+
+                            <div className="mx-1 h-7 w-px bg-slate-200" />
+
+                            <button
+                                type="button"
+                                onClick={() => editor?.chain().focus().toggleBold().run()}
+                                className="rounded-lg px-3 py-2 text-lg font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                                B
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => editor?.chain().focus().toggleItalic().run()}
+                                className="rounded-lg px-3 py-2 text-lg italic text-slate-600 hover:bg-slate-100"
+                            >
+                                I
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => editor?.chain().focus().toggleUnderline().run()}
+                                className="rounded-lg px-3 py-2 text-lg underline text-slate-600 hover:bg-slate-100"
+                            >
+                                U
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    editor?.chain().focus().toggleBulletList().run()
+                                }
+                                className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100"
+                            >
+                                ☷
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={addLink}
+                                className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100"
+                            >
+                                🔗
+                            </button>
+                        </div>
+
+                        <EditorContent editor={editor} />
+                    </div>
 
                     <div className="flex gap-2">
-                        <Button onClick={savePlan}>Сохранить</Button>
+                        <Button onClick={savePlan}>
+                            {plan ? "Обновить план" : "Создать план"}
+                        </Button>
 
                         {plan && (
                             <Button variant="danger" onClick={deletePlan}>
@@ -91,13 +235,17 @@ export default function LessonPlanPanel({
                         )}
                     </div>
                 </div>
+            ) : loading ? (
+                <p className="text-sm text-slate-500">Загрузка...</p>
             ) : plan ? (
                 <div>
                     <div className="font-semibold text-slate-900">{plan.title}</div>
+
                     {plan.description && (
-                        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">
-                            {plan.description}
-                        </p>
+                        <div
+                            className="prose prose-sm mt-3 max-w-none text-slate-600 prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base"
+                            dangerouslySetInnerHTML={{ __html: plan.description }}
+                        />
                     )}
                 </div>
             ) : (
