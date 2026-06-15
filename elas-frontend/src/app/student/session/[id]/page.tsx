@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import Reveal from "@/components/common/Reveal";
 import LessonPlanPanel from "@/components/session/LessonPlanPanel";
@@ -249,9 +249,8 @@ function deferStateUpdate(callback: () => void) {
 export default function StudentJoinSessionPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const sessionId = params?.id ?? "";
-    const autoStart = searchParams.get("autostart") === "1";
+    const autoStart = true;
     const { state, setConsent } = useUI();
     const chatSectionRef = useRef<HTMLDivElement | null>(null);
     const monitorRef = useRef<HTMLDivElement | null>(null);
