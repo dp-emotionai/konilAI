@@ -33,6 +33,29 @@ type Props = {
   className?: string;
 };
 
+type SessionPanelMaterial = AssignedMaterialRow & {
+  id?: string | null;
+  downloadUrl?: string | null;
+};
+
+function getMaterialPreviewId(material: SessionPanelMaterial | null): string {
+  if (!material) return "";
+  return String(material.materialId || material.id || "").trim();
+}
+
+function normalizePanelMaterial(
+    material: AssignedMaterialRow,
+): SessionPanelMaterial {
+  const row = material as SessionPanelMaterial;
+  const materialId = String(row.materialId || row.id || "").trim();
+
+  return {
+    ...row,
+    id: materialId || row.id || null,
+    materialId,
+  };
+}
+
 type PreviewState = {
   url: string;
   loading: boolean;
@@ -40,7 +63,8 @@ type PreviewState = {
 };
 
 function formatSize(size: number | null) {
-  if (typeof size !== "number" || !Number.isFinite(size)) return "Размер не указан";
+  if (typeof size !== "number" || !Number.isFinite(size))
+    return "Размер не указан";
   if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
@@ -58,7 +82,7 @@ function formatDate(value: string | null | undefined) {
   }).format(date);
 }
 
-function getKind(material: AssignedMaterialRow) {
+function getKind(material: SessionPanelMaterial) {
   const kind = String(material.kind || "").toLowerCase();
   const mime = String(material.mimeType || "").toLowerCase();
   const fileName = String(material.fileName || "").toLowerCase();
@@ -66,17 +90,24 @@ function getKind(material: AssignedMaterialRow) {
   if (kind === "video" || mime.startsWith("video/")) return "video";
   if (kind === "audio" || mime.startsWith("audio/")) return "audio";
   if (kind === "image" || mime.startsWith("image/")) return "image";
-  if (kind === "document" || mime.includes("pdf") || /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(fileName)) return "document";
+  if (
+      kind === "document" ||
+      mime.includes("pdf") ||
+      /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(fileName)
+  )
+    return "document";
   return "file";
 }
 
-function getFileExt(material: AssignedMaterialRow) {
+function getFileExt(material: SessionPanelMaterial) {
   const fileName = String(material.fileName || "");
   const ext = fileName.includes(".") ? fileName.split(".").pop() : "file";
-  return String(ext || "file").slice(0, 5).toUpperCase();
+  return String(ext || "file")
+      .slice(0, 5)
+      .toUpperCase();
 }
 
-function isOfficeDocument(material: AssignedMaterialRow) {
+function isOfficeDocument(material: SessionPanelMaterial) {
   const fileName = String(material.fileName || "").toLowerCase();
   const mime = String(material.mimeType || "").toLowerCase();
   return (
@@ -89,13 +120,13 @@ function isOfficeDocument(material: AssignedMaterialRow) {
   );
 }
 
-function isPdf(material: AssignedMaterialRow) {
+function isPdf(material: SessionPanelMaterial) {
   const fileName = String(material.fileName || "").toLowerCase();
   const mime = String(material.mimeType || "").toLowerCase();
   return mime.includes("pdf") || fileName.endsWith(".pdf");
 }
 
-function kindLabel(material: AssignedMaterialRow) {
+function kindLabel(material: SessionPanelMaterial) {
   const kind = getKind(material);
   if (kind === "video") return "Видеоурок";
   if (kind === "audio") return "Аудиозапись";
@@ -104,34 +135,56 @@ function kindLabel(material: AssignedMaterialRow) {
   return "Файл";
 }
 
-function MaterialIcon({ material }: { material: AssignedMaterialRow }) {
+function MaterialIcon({ material }: { material: SessionPanelMaterial }) {
   const kind = getKind(material);
-  const base = "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm";
+  const base =
+      "flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm";
 
   if (kind === "video") {
-    return <div className={`${base} bg-rose-50 text-rose-500`}><Video size={20} /></div>;
+    return (
+        <div className={`${base} bg-rose-50 text-rose-500`}>
+          <Video size={20} />
+        </div>
+    );
   }
   if (kind === "audio") {
-    return <div className={`${base} bg-violet-50 text-[#7448FF]`}><Music size={20} /></div>;
+    return (
+        <div className={`${base} bg-violet-50 text-[#7448FF]`}>
+          <Music size={20} />
+        </div>
+    );
   }
   if (kind === "image") {
-    return <div className={`${base} bg-emerald-50 text-emerald-500`}><ImageIcon size={20} /></div>;
+    return (
+        <div className={`${base} bg-emerald-50 text-emerald-500`}>
+          <ImageIcon size={20} />
+        </div>
+    );
   }
   return (
       <div className={`${base} bg-blue-50 text-blue-500`}>
-        <div className="text-[10px] font-black leading-none">{getFileExt(material)}</div>
+        <div className="text-[10px] font-black leading-none">
+          {getFileExt(material)}
+        </div>
       </div>
   );
 }
 
-function PreviewContent({ material, preview }: { material: AssignedMaterialRow; preview: PreviewState }) {
+function PreviewContent({
+                          material,
+                          preview,
+                        }: {
+  material: SessionPanelMaterial;
+  preview: PreviewState;
+}) {
   const kind = getKind(material);
   const url = preview.url;
 
   if (preview.loading) {
     return (
         <div className="grid min-h-[240px] place-items-center rounded-3xl border border-slate-100 bg-slate-50 text-sm font-semibold text-slate-400">
-          <Loader2 className="mr-2 inline animate-spin" size={18} /> Предпросмотр загружается...
+          <Loader2 className="mr-2 inline animate-spin" size={18} /> Предпросмотр
+          загружается...
         </div>
     );
   }
@@ -153,7 +206,13 @@ function PreviewContent({ material, preview }: { material: AssignedMaterialRow; 
   }
 
   if (kind === "video") {
-    return <video src={url} controls className="max-h-[440px] w-full rounded-3xl border border-slate-100 bg-black" />;
+    return (
+        <video
+            src={url}
+            controls
+            className="max-h-[440px] w-full rounded-3xl border border-slate-100 bg-black"
+        />
+    );
   }
 
   if (kind === "audio") {
@@ -164,8 +223,12 @@ function PreviewContent({ material, preview }: { material: AssignedMaterialRow; 
               <PlayCircle size={30} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-sm font-extrabold text-slate-900">{material.title}</div>
-              <div className="mt-1 text-xs font-semibold text-violet-500">{material.fileName || "Аудиофайл"}</div>
+              <div className="truncate text-sm font-extrabold text-slate-900">
+                {material.title}
+              </div>
+              <div className="mt-1 text-xs font-semibold text-violet-500">
+                {material.fileName || "Аудиофайл"}
+              </div>
             </div>
           </div>
           <audio src={url} controls className="w-full" />
@@ -176,32 +239,54 @@ function PreviewContent({ material, preview }: { material: AssignedMaterialRow; 
   if (kind === "image") {
     return (
         <div className="rounded-3xl border border-slate-100 bg-slate-50 p-3">
-          <img src={url} alt={material.title} className="max-h-[520px] w-full rounded-2xl object-contain" />
+          <img
+              src={url}
+              alt={material.title}
+              className="max-h-[520px] w-full rounded-2xl object-contain"
+          />
         </div>
     );
   }
 
   if (isOfficeDocument(material)) {
     const officeUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
-    return <iframe src={officeUrl} title={material.title} className="h-[520px] w-full rounded-3xl border border-slate-100 bg-white" />;
+    return (
+        <iframe
+            src={officeUrl}
+            title={material.title}
+            className="h-[520px] w-full rounded-3xl border border-slate-100 bg-white"
+        />
+    );
   }
 
   if (isPdf(material) || kind === "document") {
-    return <iframe src={url} title={material.title} className="h-[520px] w-full rounded-3xl border border-slate-100 bg-white" />;
+    return (
+        <iframe
+            src={url}
+            title={material.title}
+            className="h-[520px] w-full rounded-3xl border border-slate-100 bg-white"
+        />
+    );
   }
 
   return (
       <div className="rounded-3xl border border-slate-100 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
-        Предпросмотр для этого типа файла недоступен. Используйте кнопку скачивания.
+        Предпросмотр для этого типа файла недоступен. Используйте кнопку
+        скачивания.
       </div>
   );
 }
 
 export function SessionMaterialsPanel({ sessionId, className }: Props) {
-  const [materials, setMaterials] = useState<AssignedMaterialRow[]>([]);
-  const [selected, setSelected] = useState<AssignedMaterialRow | null>(null);
-  const [previewMaterial, setPreviewMaterial] = useState<AssignedMaterialRow | null>(null);
-  const [preview, setPreview] = useState<PreviewState>({ url: "", loading: false, error: null });
+  const [materials, setMaterials] = useState<SessionPanelMaterial[]>([]);
+  const [selected, setSelected] = useState<SessionPanelMaterial | null>(null);
+  const [previewMaterial, setPreviewMaterial] =
+      useState<SessionPanelMaterial | null>(null);
+  const [preview, setPreview] = useState<PreviewState>({
+    url: "",
+    loading: false,
+    error: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
@@ -220,20 +305,26 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
         setError(null);
         try {
           const list = await getSessionMaterials(sessionId, { signal });
-          const normalized = Array.isArray(list) ? list : [];
+          const normalized = Array.isArray(list)
+              ? list.map(normalizePanelMaterial)
+              : [];
           setMaterials(normalized);
           setSelected((current) => current ?? normalized[0] ?? null);
         } catch (err) {
           if (!signal?.aborted) {
             setMaterials([]);
             setSelected(null);
-            setError(err instanceof Error ? err.message : "Не удалось загрузить материалы");
+            setError(
+                err instanceof Error
+                    ? err.message
+                    : "Не удалось загрузить материалы",
+            );
           }
         } finally {
           if (!signal?.aborted) setLoading(false);
         }
       },
-      [sessionId]
+      [sessionId],
   );
 
   useEffect(() => {
@@ -246,7 +337,8 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
     const client = new ChatClient((packet) => {
       if (!packet || typeof packet !== "object") return;
       const type = (packet as { type?: string }).type;
-      if (type === "material.assigned" || type === "material.unassigned") void load();
+      if (type === "material.assigned" || type === "material.unassigned")
+        void load();
     });
 
     client.connect();
@@ -256,25 +348,37 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
   }, [load, sessionId]);
 
   useEffect(() => {
-    if (!selected?.materialId) {
-      setPreview({ url: "", loading: false, error: null });
+    const selectedMaterialId = getMaterialPreviewId(selected);
+
+    if (!selectedMaterialId) {
+      setPreview({ url: "", loading: false, error: "ID материала не найден." });
       return;
     }
 
     const controller = new AbortController();
     setPreview({ url: "", loading: true, error: null });
 
-    getMaterialDownload(selected.materialId, { signal: controller.signal, mode: "inline" })
+    getMaterialDownload(selectedMaterialId, {
+      signal: controller.signal,
+      mode: "inline",
+    })
         .then((info) => {
           const url = info?.url || info?.downloadUrl || "";
-          setPreview({ url: resolveDownloadUrl(url), loading: false, error: null });
+          setPreview({
+            url: resolveDownloadUrl(url),
+            loading: false,
+            error: null,
+          });
         })
         .catch((err) => {
           if (!controller.signal.aborted) {
             setPreview({
               url: "",
               loading: false,
-              error: err instanceof Error ? err.message : "Не удалось открыть предпросмотр",
+              error:
+                  err instanceof Error
+                      ? err.message
+                      : "Не удалось открыть предпросмотр",
             });
           }
         });
@@ -297,7 +401,7 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
           acc[kind] = (acc[kind] || 0) + 1;
           return acc;
         },
-        { all: 0 } as Record<string, number>
+        { all: 0 } as Record<string, number>,
     );
   }, [materials]);
 
@@ -315,7 +419,8 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
   }, [selected?.description, selected?.title]);
 
   const saveEdit = useCallback(async () => {
-    if (!selected?.materialId || editSaving) return;
+    const selectedMaterialId = getMaterialPreviewId(selected);
+    if (!selectedMaterialId || editSaving) return;
 
     const title = editTitle.trim();
     const description = editDescription.trim();
@@ -329,44 +434,55 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
     setEditError(null);
 
     try {
-      const updated = await updateMaterial(selected.materialId, {
+      const updated = await updateMaterial(selectedMaterialId, {
         title,
         description: description || null,
       });
 
       setMaterials((current) =>
           current.map((item) =>
-              item.materialId === selected.materialId
+              getMaterialPreviewId(item) === selectedMaterialId
                   ? {
                     ...item,
                     title: updated.title,
                     description: updated.description,
                   }
-                  : item
-          )
+                  : item,
+          ),
       );
 
-      setSelected((current) =>
-          current?.materialId === selected.materialId
-              ? {
-                ...current,
-                title: updated.title,
-                description: updated.description,
-              }
-              : current
-      );
+      setSelected((current) => {
+        if (!current) return current;
+
+        if (getMaterialPreviewId(current) !== selectedMaterialId) {
+          return current;
+        }
+
+        return {
+          ...current,
+          title: updated.title,
+          description: updated.description,
+        };
+      });
 
       setEditing(false);
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Не удалось сохранить материал");
+      setEditError(
+          err instanceof Error ? err.message : "Не удалось сохранить материал",
+      );
     } finally {
       setEditSaving(false);
     }
-  }, [editDescription, editSaving, editTitle, selected?.materialId]);
+  }, [editDescription, editSaving, editTitle, selected]);
 
   return (
       <>
-        <div className={cn("flex h-full min-h-[520px] flex-col rounded-[24px] border border-slate-100 bg-white", className)}>
+        <div
+            className={cn(
+                "flex h-full min-h-[520px] flex-col rounded-[24px] border border-slate-100 bg-white",
+                className,
+            )}
+        >
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <div className="text-sm font-bold text-slate-900">Материалы</div>
@@ -374,18 +490,37 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
                 {loading ? "Загружаем..." : `${materials.length} файлов`}
               </div>
             </div>
-            <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void load()}
+                disabled={loading}
+            >
+              {loading ? (
+                  <Loader2 size={14} className="animate-spin" />
+              ) : (
+                  <RefreshCw size={14} />
+              )}
               Обновить
             </Button>
           </div>
 
           <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3 text-xs font-bold">
-            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-[#7448FF]">Все {counts.all || 0}</span>
-            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-500">Документы {counts.document || 0}</span>
-            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-500">Изображения {counts.image || 0}</span>
-            <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-500">Видео {counts.video || 0}</span>
-            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-500">Аудио {counts.audio || 0}</span>
+          <span className="rounded-full bg-violet-50 px-3 py-1.5 text-[#7448FF]">
+            Все {counts.all || 0}
+          </span>
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-500">
+            Документы {counts.document || 0}
+          </span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-500">
+            Изображения {counts.image || 0}
+          </span>
+            <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-500">
+            Видео {counts.video || 0}
+          </span>
+            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-500">
+            Аудио {counts.audio || 0}
+          </span>
           </div>
 
           <div className="grid flex-1 min-h-0 gap-0 lg:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.3fr)]">
@@ -404,7 +539,9 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
                       <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
                         <FileText size={24} />
                       </div>
-                      <div className="text-sm font-bold text-slate-700">Материалов пока нет</div>
+                      <div className="text-sm font-bold text-slate-700">
+                        Материалов пока нет
+                      </div>
                       <div className="mt-1 text-xs font-medium text-slate-400">
                         Когда преподаватель назначит файлы, они появятся здесь.
                       </div>
@@ -413,26 +550,34 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
               ) : (
                   <div className="grid gap-3">
                     {materials.map((material) => {
-                      const active = selected?.assignmentId === material.assignmentId;
+                      const active =
+                          selected?.assignmentId === material.assignmentId;
                       return (
                           <button
                               key={material.assignmentId}
                               type="button"
                               onClick={() => {
-                                setSelected(material);
-                                setPreviewMaterial(material);
+                                const normalizedMaterial =
+                                    normalizePanelMaterial(material);
+                                setSelected(normalizedMaterial);
+                                setPreviewMaterial(normalizedMaterial);
                               }}
                               className={cn(
                                   "group rounded-2xl border px-4 py-4 text-left transition hover:border-[#7448FF]/20 hover:bg-white hover:shadow-sm",
-                                  active ? "border-[#7448FF]/25 bg-violet-50/80 shadow-sm" : "border-slate-100 bg-slate-50/70"
+                                  active
+                                      ? "border-[#7448FF]/25 bg-violet-50/80 shadow-sm"
+                                      : "border-slate-100 bg-slate-50/70",
                               )}
                           >
                             <div className="flex items-start gap-3">
                               <MaterialIcon material={material} />
                               <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-bold text-slate-900">{material.title}</div>
+                                <div className="truncate text-sm font-bold text-slate-900">
+                                  {material.title}
+                                </div>
                                 <div className="mt-1 truncate text-xs font-medium text-slate-500">
-                                  {material.fileName || "Файл"} · {formatSize(material.size)}
+                                  {material.fileName || "Файл"} ·{" "}
+                                  {formatSize(material.size)}
                                 </div>
                                 {material.description && (
                                     <div className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
@@ -463,11 +608,15 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
                                   placeholder="Название материала"
                               />
                           ) : (
-                              <div className="truncate text-base font-extrabold text-slate-900">{selected.title}</div>
+                              <div className="truncate text-base font-extrabold text-slate-900">
+                                {selected.title}
+                              </div>
                           )}
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
                             <span>{kindLabel(selected)}</span>
-                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[#7448FF]">{getFileExt(selected)}</span>
+                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[#7448FF]">
+                          {getFileExt(selected)}
+                        </span>
                           </div>
                         </div>
                       </div>
@@ -484,16 +633,33 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
                         <div className="flex flex-wrap gap-2">
                           {editing ? (
                               <>
-                                <Button size="sm" onClick={() => void saveEdit()} disabled={editSaving}>
-                                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                <Button
+                                    size="sm"
+                                    onClick={() => void saveEdit()}
+                                    disabled={editSaving}
+                                >
+                                  {editSaving ? (
+                                      <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                      <Save size={14} />
+                                  )}
                                   Сохранить
                                 </Button>
-                                <Button size="sm" variant="outline" onClick={cancelEdit} disabled={editSaving}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={cancelEdit}
+                                    disabled={editSaving}
+                                >
                                   Отмена
                                 </Button>
                               </>
                           ) : (
-                              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                              <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditing(true)}
+                              >
                                 <Edit3 size={14} />
                                 Редактировать
                               </Button>
@@ -503,49 +669,82 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
 
                     {editing ? (
                         <div>
-                          <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
+                          <div className="mb-2 text-sm font-extrabold text-slate-900">
+                            Описание
+                          </div>
                           <textarea
                               value={editDescription}
-                              onChange={(event) => setEditDescription(event.target.value)}
+                              onChange={(event) =>
+                                  setEditDescription(event.target.value)
+                              }
                               rows={4}
                               className="w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#7448FF]/40 focus:ring-4 focus:ring-[#7448FF]/10"
                               placeholder="Описание материала"
                           />
-                          {editError && <div className="mt-2 text-xs font-bold text-rose-500">{editError}</div>}
+                          {editError && (
+                              <div className="mt-2 text-xs font-bold text-rose-500">
+                                {editError}
+                              </div>
+                          )}
                         </div>
                     ) : selected.description ? (
                         <div>
-                          <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
-                          <div className="text-sm font-medium leading-6 text-slate-500">{selected.description}</div>
+                          <div className="mb-2 text-sm font-extrabold text-slate-900">
+                            Описание
+                          </div>
+                          <div className="text-sm font-medium leading-6 text-slate-500">
+                            {selected.description}
+                          </div>
                         </div>
                     ) : null}
 
                     <div>
-                      <div className="mb-3 text-sm font-extrabold text-slate-900">Предпросмотр</div>
+                      <div className="mb-3 text-sm font-extrabold text-slate-900">
+                        Предпросмотр
+                      </div>
                       <PreviewContent material={selected} preview={preview} />
                     </div>
 
                     <div className="grid gap-3 rounded-3xl border border-slate-100 bg-slate-50/70 p-4 text-sm sm:grid-cols-3">
                       <div>
-                        <div className="text-xs font-bold text-slate-400">Размер</div>
-                        <div className="mt-1 font-extrabold text-slate-700">{formatSize(selected.size)}</div>
+                        <div className="text-xs font-bold text-slate-400">
+                          Размер
+                        </div>
+                        <div className="mt-1 font-extrabold text-slate-700">
+                          {formatSize(selected.size)}
+                        </div>
                       </div>
                       <div>
                         <div className="text-xs font-bold text-slate-400">Тип</div>
-                        <div className="mt-1 font-extrabold text-slate-700">{kindLabel(selected)}</div>
+                        <div className="mt-1 font-extrabold text-slate-700">
+                          {kindLabel(selected)}
+                        </div>
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-slate-400">Дата добавления</div>
-                        <div className="mt-1 font-extrabold text-slate-700">{formatDate(selected.createdAt)}</div>
+                        <div className="text-xs font-bold text-slate-400">
+                          Дата добавления
+                        </div>
+                        <div className="mt-1 font-extrabold text-slate-700">
+                          {formatDate(selected.createdAt)}
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button onClick={() => setPreviewMaterial(selected)} className="w-full sm:w-auto">
+                      <Button
+                          onClick={() => setPreviewMaterial(selected)}
+                          className="w-full sm:w-auto"
+                      >
                         <PlayCircle size={16} />
                         Открыть материал
                       </Button>
-                      <Button variant="outline" onClick={() => void download(selected.materialId)} className="w-full sm:w-auto">
+                      <Button
+                          variant="outline"
+                          onClick={() =>
+                              void download(getMaterialPreviewId(selected))
+                          }
+                          className="w-full sm:w-auto"
+                      >
                         <Download size={16} />
                         Скачать файл
                       </Button>
@@ -557,8 +756,12 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
                       <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-3xl bg-slate-50 text-slate-300">
                         <FileText size={26} />
                       </div>
-                      <div className="text-sm font-bold text-slate-700">Выберите материал</div>
-                      <div className="mt-1 text-xs font-medium text-slate-400">Файл откроется справа без скачивания.</div>
+                      <div className="text-sm font-bold text-slate-700">
+                        Выберите материал
+                      </div>
+                      <div className="mt-1 text-xs font-medium text-slate-400">
+                        Файл откроется справа без скачивания.
+                      </div>
                     </div>
                   </div>
               )}
