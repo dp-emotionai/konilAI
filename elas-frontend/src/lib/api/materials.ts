@@ -26,13 +26,9 @@ export type MaterialRow = {
 export type MaterialAssignmentRow = {
   id: string;
   materialId: string;
-  groupId: string;
-  sessionId: string | null;
-  groupId?: string | null;
+  groupId: string | null;
   groupName?: string | null;
-  group?: MaterialGroupInfo | null;
-  sessionId?: string | null;
-  assignedAt?: string | null;
+  sessionId: string | null;
   visibleFrom: string | null;
   visibleTo: string | null;
   createdAt: string;
