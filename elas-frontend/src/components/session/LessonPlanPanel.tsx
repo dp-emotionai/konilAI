@@ -52,6 +52,8 @@ export default function LessonPlanPanel({
                     keepMarks: true,
                     keepAttributes: false,
                 },
+                link: false,
+                underline: false,
             }),
             Underline,
             Link.configure({
