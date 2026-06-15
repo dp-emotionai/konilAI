@@ -193,12 +193,6 @@ export default function LessonPlanPanel({
                 />
             </div>
 
-            {error && (
-                <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
-                    {error}
-                </div>
-            )}
-
             {role === "teacher" ? (
                 <div className="space-y-3">
                     <input
