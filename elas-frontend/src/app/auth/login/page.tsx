@@ -1,29 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useEffect, useState, type ReactNode } from "react";
 import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
-  Eye,
-  EyeOff,
-  ChevronRight,
   AlertCircle,
   ArrowLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  GraduationCap,
   LoaderCircle,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/Card";
-import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useUI } from "@/components/layout/Providers";
 import { ROLE_HOME } from "@/lib/nav";
-import {
-  api,
-  getStoredAuth,
-  setAuth,
-} from "@/lib/api/client";
+import { api, getStoredAuth, setAuth } from "@/lib/api/client";
 import {
   extractAuthSession,
   type AuthApiResponse,
@@ -32,14 +31,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-
-  const {
-    state,
-    setLoggedIn,
-    setRole,
-    setStatus,
-    setUserInfo,
-  } = useUI();
+  const { state, setLoggedIn, setRole, setStatus, setUserInfo } = useUI();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,24 +40,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
 
-  /*
-   * Если пользователь уже авторизован, страницу входа не показываем.
-   *
-   * Проверяем одновременно:
-   * 1. состояние UI, восстановленное AuthRestore;
-   * 2. данные в localStorage, потому что UI может ещё не успеть восстановиться.
-   */
   useEffect(() => {
     const stored = getStoredAuth();
-
-    const isAuthenticated =
-      state.loggedIn || Boolean(stored?.token);
-
+    const isAuthenticated = state.loggedIn || Boolean(stored?.token);
     const role = state.role ?? stored?.role ?? null;
 
     if (isAuthenticated && role) {
-      const home = ROLE_HOME[role] || "/";
-      router.replace(home);
+      router.replace(ROLE_HOME[role] || "/");
       return;
     }
 
@@ -83,8 +64,6 @@ export default function LoginPage() {
     avatarUrl,
     status,
   }: AuthSession) => {
-    const safeHome = ROLE_HOME[role] || "/";
-
     setAuth({
       token,
       role,
@@ -100,7 +79,6 @@ export default function LoginPage() {
     setRole(role);
     setStatus(status ?? null);
     setLoggedIn(true);
-
     setUserInfo({
       firstName: firstName ?? undefined,
       lastName: lastName ?? undefined,
@@ -108,11 +86,7 @@ export default function LoginPage() {
       avatarUrl: avatarUrl ?? undefined,
     });
 
-    /*
-     * replace не оставляет страницу login в истории браузера.
-     * После входа кнопка «Назад» не вернёт пользователя на форму.
-     */
-    router.replace(safeHome);
+    router.replace(ROLE_HOME[role] || "/");
   };
 
   const handleLogin = async () => {
@@ -134,226 +108,286 @@ export default function LoginPage() {
         password,
       });
 
-      const session = extractAuthSession(data);
-      finishLogin(session);
-    } catch (err) {
-      console.error("Login failed:", err);
-
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Не удалось выполнить вход. Попробуйте ещё раз."
-      );
+      finishLogin(extractAuthSession(data));
+    } catch (reason: unknown) {
+      console.error("Login failed:", reason);
+      setError(formatLoginError(reason));
     } finally {
       setLoading(false);
     }
   };
 
-  /*
-   * Пока проверяется localStorage/AuthRestore, форму не показываем.
-   * Это устраняет мигание страницы входа после обновления сайта.
-   */
   if (checkingSession) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50/30">
+      <div className="flex min-h-screen items-center justify-center bg-[#faf9ff]">
         <div className="flex flex-col items-center gap-3 text-slate-500">
-          <LoaderCircle
-            size={28}
-            className="animate-spin text-[#7448FF]"
-          />
-          <p className="text-sm font-medium">
-            Проверяем сессию...
-          </p>
+          <LoaderCircle size={30} className="animate-spin text-[#7448ff]" />
+          <p className="text-sm font-semibold">Проверяем сессию...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(116,72,255,0.18),transparent_34%),linear-gradient(135deg,#fbfaff_0%,#f8fbff_48%,#ffffff_100%)] px-4 py-10 font-sans text-slate-900">
-      <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-[#7448FF]/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 bottom-8 h-80 w-80 rounded-full bg-sky-300/20 blur-3xl" />
+    <main className="min-h-screen bg-white text-slate-950">
+      <div className="grid min-h-screen lg:grid-cols-[46%_54%]">
+        <section className="relative flex min-h-screen flex-col px-5 py-6 sm:px-8 md:px-12 lg:px-14 xl:px-20">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-24 top-24 h-72 w-72 rounded-full bg-violet-100/70 blur-3xl"
+          />
 
-      <Card className="relative z-10 w-full max-w-[1120px] overflow-hidden border border-white/70 bg-white/85 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-2xl">
-        <CardContent className="p-0">
-          <div className="grid min-h-[680px] gap-0 lg:grid-cols-[0.95fr_1.05fr]">
-            <div className="flex flex-col p-7 md:p-10 lg:p-12">
-              <Link href="/" className="mb-10 flex w-fit items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#7448FF] to-[#9B6DFF] text-sm font-black text-white shadow-lg shadow-[#7448FF]/25">
-                  K
-                </div>
-                <div>
-                  <span className="block text-base font-black tracking-tight text-slate-950">KonilAI</span>
-                  <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">learning analytics</span>
-                </div>
-              </Link>
+          <div className="relative z-10 flex items-center justify-between">
+            <Link href="/" className="inline-flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[linear-gradient(135deg,#5b2cff,#8b5cf6)] text-sm font-black text-white shadow-lg shadow-violet-300/40">
+                K
+              </span>
+              <span className="text-xl font-black tracking-[-0.03em]">KonilAI</span>
+            </Link>
 
-              <div className="mx-auto flex w-full max-w-[410px] flex-1 flex-col justify-center lg:mx-0">
-                <div className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-[#7448FF]/15 bg-[#7448FF]/8 px-3 py-1.5 text-xs font-bold text-[#7448FF]">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  Безопасный вход в платформу
-                </div>
+            <Link
+              href="/"
+              className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-violet-200 hover:text-violet-700 sm:inline-flex"
+            >
+              <ArrowLeft size={16} />
+              На главную
+            </Link>
+          </div>
 
-                <h1 className="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
-                  Добро пожаловать обратно
-                </h1>
+          <div className="relative z-10 mx-auto flex w-full max-w-[470px] flex-1 flex-col justify-center py-12">
+            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.13em] text-violet-600">
+              <ShieldCheck size={14} />
+              Безопасный вход
+            </div>
 
-                <p className="mt-3 text-sm font-medium leading-6 text-slate-500">
-                  Войдите в KonilAI, чтобы открыть сессии, материалы и аналитику обучения.
-                </p>
+            <h1 className="mt-5 text-3xl font-black tracking-[-0.045em] text-slate-950 sm:text-4xl">
+              Добро пожаловать в KonilAI
+            </h1>
 
-                <div className="mt-9 space-y-5">
-                  <div>
-                    <label htmlFor="login-email" className="mb-2 block text-[13px] font-bold text-slate-600">
-                      Email
-                    </label>
-                    <Input
-                      id="login-email"
-                      placeholder="example@mail.ru"
-                      type="email"
-                      autoComplete="email"
-                      value={email}
-                      onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (error) setError("");
-                      }}
-                      className="h-13 rounded-2xl border-slate-200 bg-white/90 px-4 shadow-sm transition focus:ring-2 focus:ring-[#7448FF]/20"
-                      disabled={loading}
-                    />
-                  </div>
+            <p className="mt-3 max-w-md text-[15px] leading-7 text-slate-500">
+              Используйте свои учётные данные для доступа к платформе, учебным сессиям и аналитике.
+            </p>
 
-                  <div>
-                    <label htmlFor="login-password" className="mb-2 flex items-center justify-between text-[13px] font-bold text-slate-600">
-                      <span>Пароль</span>
-                      <Link href="/auth/forgot-password" className="text-[12px] font-bold text-[#7448FF] hover:underline">
-                        Забыли?
-                      </Link>
-                    </label>
-                    <Input
-                      id="login-password"
-                      placeholder="••••••••••"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={password}
-                      onChange={(event) => {
-                        setPassword(event.target.value);
-                        if (error) setError("");
-                      }}
-                      className="h-13 rounded-2xl border-slate-200 bg-white/90 px-4 shadow-sm transition focus:ring-2 focus:ring-[#7448FF]/20"
-                      disabled={loading}
-                      suffix={
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((value) => !value)}
-                          className="text-slate-400 transition-colors hover:text-slate-700"
-                          aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void handleLogin();
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
+            <div className="mt-9 space-y-5">
+              <div>
+                <label htmlFor="login-email" className="mb-2 block text-sm font-bold text-slate-700">
+                  Email
+                </label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  disabled={loading}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    if (error) setError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleLogin();
+                    }
+                  }}
+                  className="h-14 rounded-2xl border-slate-200 bg-white px-4 text-[15px] shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                />
+              </div>
 
-                {error && (
-                  <div role="alert" className="mt-6 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/90 p-4 text-[13px] font-semibold text-red-600 shadow-sm">
-                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                    <span>{error}</span>
-                  </div>
-                )}
-
-                <Button
-                  type="button"
-                  onClick={() => void handleLogin()}
-                  disabled={loading || !email.trim() || !password}
-                  className="mt-8 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#7448FF] to-[#925CFF] text-[15px] font-black text-white shadow-xl shadow-[#7448FF]/25 transition hover:translate-y-[-1px] hover:shadow-2xl hover:shadow-[#7448FF]/25"
-                >
-                  {loading ? (
-                    <>
-                      <LoaderCircle size={18} className="animate-spin" />
-                      Входим...
-                    </>
-                  ) : (
-                    <>
-                      Войти в аккаунт
-                      <ChevronRight size={18} />
-                    </>
-                  )}
-                </Button>
-
-                <div className="mt-8 border-t border-slate-100 pt-7">
-                  <SocialAuthButtons mode="login" onSuccess={finishLogin} onError={setError} />
-                </div>
-
-                <div className="mt-8 rounded-2xl bg-slate-50 px-4 py-4 text-center text-[13px] font-medium text-slate-500">
-                  Нет аккаунта?{" "}
-                  <Link href="/auth/register" className="font-black text-[#7448FF] hover:underline">
-                    Зарегистрироваться
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label htmlFor="login-password" className="text-sm font-bold text-slate-700">
+                    Пароль
+                  </label>
+                  <Link
+                    href="/auth/forgot-password"
+                    className="text-sm font-bold text-violet-600 transition hover:text-violet-700 hover:underline"
+                  >
+                    Забыли пароль?
                   </Link>
                 </div>
+
+                <Input
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  placeholder="Введите пароль"
+                  value={password}
+                  disabled={loading}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    if (error) setError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void handleLogin();
+                    }
+                  }}
+                  suffix={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      disabled={loading}
+                      aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                      className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                    </button>
+                  }
+                  className="h-14 rounded-2xl border-slate-200 bg-white px-4 text-[15px] shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                />
               </div>
             </div>
 
-            <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#7448FF] via-[#8760FF] to-[#B28CFF] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-              <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-white/20 blur-3xl" />
-              <div className="pointer-events-none absolute -bottom-28 left-10 h-72 w-72 rounded-full bg-indigo-950/20 blur-3xl" />
-
-              <div className="relative z-10 flex items-center justify-between">
-                <div className="rounded-full bg-white/15 px-4 py-2 text-xs font-bold ring-1 ring-white/25 backdrop-blur">
-                  Consent-first analytics
-                </div>
-                <div className="rounded-full bg-emerald-400/20 px-4 py-2 text-xs font-bold ring-1 ring-emerald-200/30">
-                  Secure
-                </div>
+            {error && (
+              <div
+                role="alert"
+                className="mt-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm font-semibold leading-6 text-red-600"
+              >
+                <AlertCircle size={19} className="mt-0.5 shrink-0" />
+                <span>{error}</span>
               </div>
+            )}
 
-              <div className="relative z-10 mx-auto flex w-full max-w-[440px] flex-col items-center text-center">
-                <div className="relative mb-8 aspect-square w-full max-w-[340px] drop-shadow-2xl">
-                  <Image
-                    src="/auth_login_illustration_1776719102544.png"
-                    alt="Безопасный вход в KonilAI"
-                    fill
-                    priority
-                    sizes="340px"
-                    className="object-contain"
-                  />
-                </div>
+            <Button
+              type="button"
+              onClick={() => void handleLogin()}
+              disabled={loading || !email.trim() || !password}
+              className="mt-7 flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(90deg,#5f2cff,#7c3aed,#6d28d9)] text-[15px] font-black text-white shadow-xl shadow-violet-300/40 transition hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-violet-300/50 disabled:translate-y-0 disabled:shadow-none"
+            >
+              {loading ? (
+                <>
+                  <LoaderCircle size={19} className="animate-spin" />
+                  Выполняем вход...
+                </>
+              ) : (
+                <>
+                  Войти
+                  <ChevronRight size={19} />
+                </>
+              )}
+            </Button>
 
-                <h2 className="text-3xl font-black tracking-tight">Учебная аналитика без лишнего шума</h2>
-                <p className="mt-4 max-w-sm text-sm font-medium leading-6 text-white/80">
-                  KonilAI помогает преподавателям видеть динамику группы, а студентам — контролировать прогресс и согласие на обработку данных.
-                </p>
-              </div>
+            <div className="my-7 flex items-center gap-4">
+              <span className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-semibold text-slate-400">или продолжить через</span>
+              <span className="h-px flex-1 bg-slate-200" />
+            </div>
 
-              <div className="relative z-10 grid grid-cols-3 gap-3 text-center">
-                <div className="rounded-3xl bg-white/12 p-4 ring-1 ring-white/15 backdrop-blur">
-                  <div className="text-lg font-black">Live</div>
-                  <div className="mt-1 text-[11px] text-white/70">сессии</div>
-                </div>
-                <div className="rounded-3xl bg-white/12 p-4 ring-1 ring-white/15 backdrop-blur">
-                  <div className="text-lg font-black">AI</div>
-                  <div className="mt-1 text-[11px] text-white/70">метрики</div>
-                </div>
-                <div className="rounded-3xl bg-white/12 p-4 ring-1 ring-white/15 backdrop-blur">
-                  <div className="text-lg font-black">CSV</div>
-                  <div className="mt-1 text-[11px] text-white/70">экспорт</div>
-                </div>
-              </div>
+            <SocialAuthButtons
+              mode="login"
+              onSuccess={finishLogin}
+              onError={(message) => setError(formatLoginError(message))}
+            />
+
+            <div className="mt-7 text-center text-sm font-medium text-slate-500">
+              Нет аккаунта?{" "}
+              <Link href="/auth/register" className="font-black text-violet-600 hover:underline">
+                Зарегистрироваться
+              </Link>
+            </div>
+
+            <div className="mt-8 grid grid-cols-2 gap-3">
+              <InfoChip icon={<LockKeyhole size={16} />} text="Защищённая авторизация" />
+              <InfoChip icon={<ShieldCheck size={16} />} text="Контроль согласия" />
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      <Link href="/" className="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-sm font-bold text-slate-500 shadow-lg ring-1 ring-slate-200/70 backdrop-blur transition-colors hover:text-slate-900">
-        <ArrowLeft size={16} />
-        Вернуться на главную
-      </Link>
+          <div className="relative z-10 flex items-center justify-between border-t border-slate-100 pt-5 text-[11px] font-medium text-slate-400">
+            <span>© 2026 KonilAI</span>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="hover:text-violet-600">Конфиденциальность</Link>
+              <Link href="/ethics" className="hover:text-violet-600">Этика</Link>
+            </div>
+          </div>
+        </section>
+
+        <aside className="relative hidden min-h-screen overflow-hidden border-l border-violet-100 bg-[radial-gradient(circle_at_70%_18%,rgba(139,92,246,0.18),transparent_26%),linear-gradient(145deg,#fbfaff_0%,#f6f1ff_58%,#ffffff_100%)] lg:flex lg:flex-col lg:justify-center">
+          <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[10%] h-[440px] w-[440px] -translate-x-1/2 rounded-full bg-white/70 blur-3xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-10 bottom-10 h-52 w-52 rounded-full bg-violet-200/60 blur-3xl" />
+
+          <div className="relative z-10 mx-auto flex w-full max-w-[720px] flex-col items-center px-10 py-12 text-center">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-4 py-2 text-xs font-bold text-violet-600 shadow-sm backdrop-blur">
+              <GraduationCap size={16} />
+              Платформа современного обучения
+            </div>
+
+            <div className="relative aspect-[1.18/1] w-full max-w-[610px]">
+              <Image
+                src="/auth_login_illustration_1776719102544.png"
+                alt="Учебная платформа KonilAI"
+                fill
+                priority
+                sizes="(min-width: 1024px) 54vw, 0px"
+                className="object-contain drop-shadow-[0_28px_45px_rgba(76,29,149,0.16)]"
+              />
+            </div>
+
+            <h2 className="mt-2 max-w-xl text-3xl font-black tracking-[-0.035em] text-slate-950">
+              Учитесь, взаимодействуйте и отслеживайте прогресс
+            </h2>
+
+            <p className="mt-4 max-w-xl text-[15px] leading-7 text-slate-600">
+              Инструменты для интерактивных занятий, материалов, аналитики и эффективного взаимодействия между преподавателями и студентами.
+            </p>
+
+            <div className="mt-8 grid w-full max-w-[560px] grid-cols-3 gap-3">
+              <FeatureCard icon={<Sparkles size={20} />} title="AI-аналитика" text="Понятные метрики" />
+              <FeatureCard icon={<GraduationCap size={20} />} title="Live-сессии" text="Обучение в реальном времени" />
+              <FeatureCard icon={<ShieldCheck size={20} />} title="Приватность" text="Consent-first подход" />
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  );
+}
+
+function InfoChip({ icon, text }: { icon: ReactNode; text: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[11px] font-semibold text-slate-500">
+      <span className="text-violet-500">{icon}</span>
+      <span className="truncate">{text}</span>
     </div>
   );
+}
+
+function FeatureCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <article className="rounded-2xl border border-white/80 bg-white/75 p-4 shadow-[0_12px_35px_rgba(76,29,149,0.08)] backdrop-blur">
+      <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+        {icon}
+      </div>
+      <div className="mt-3 text-sm font-black text-slate-900">{title}</div>
+      <div className="mt-1 text-[11px] leading-4 text-slate-500">{text}</div>
+    </article>
+  );
+}
+
+function formatLoginError(reason: unknown): string {
+  const message =
+    typeof reason === "string"
+      ? reason
+      : reason instanceof Error
+        ? reason.message
+        : "";
+
+  if (!message) {
+    return "Не удалось выполнить вход. Попробуйте ещё раз.";
+  }
+
+  if (/failed to fetch|networkerror|network request failed/i.test(message)) {
+    return "Не удалось связаться с сервером. Проверьте подключение и доступность API.";
+  }
+
+  if (/401|unauthorized|invalid credentials|неверн/i.test(message)) {
+    return "Неверный email или пароль.";
+  }
+
+  if (/403|forbidden|blocked/i.test(message)) {
+    return "Доступ к аккаунту ограничен. Обратитесь к администратору.";
+  }
+
+  return message;
 }
