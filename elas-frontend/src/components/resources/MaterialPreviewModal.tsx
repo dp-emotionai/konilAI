@@ -24,7 +24,7 @@ import {
   type MaterialRow,
 } from "@/lib/api/materials";
 
-type PreviewMaterial = (MaterialRow | AssignedMaterialRow | {
+type PreviewMaterial = MaterialRow | AssignedMaterialRow | {
   id?: string;
   materialId?: string;
   title: string;
@@ -37,7 +37,8 @@ type PreviewMaterial = (MaterialRow | AssignedMaterialRow | {
   groupId?: string | null;
   groupName?: string | null;
   group?: { name?: string | null } | null;
-});
+};
+
 type PreviewKind = MaterialKind;
 
 type Props = {
@@ -51,6 +52,8 @@ type PreviewInfo = {
   downloadUrl: string;
   fileName: string;
 };
+
+const EMPTY_PREVIEW: PreviewInfo | null = null;
 
 function getMaterialId(material: PreviewMaterial): string {
   const row = material as { id?: string | null; materialId?: string | null };
@@ -86,13 +89,6 @@ function getLabel(kind: PreviewKind): string {
   if (kind === "audio") return "Аудиозапись";
   if (kind === "document") return "Документ";
   return "Файл";
-}
-
-function getIcon(kind: PreviewKind) {
-  if (kind === "image") return ImageIcon;
-  if (kind === "video") return Video;
-  if (kind === "audio") return Music2;
-  return FileText;
 }
 
 function getIconClass(kind: PreviewKind): string {
@@ -166,35 +162,36 @@ function formatDate(value: string | null | undefined): string {
   }).format(date);
 }
 
+function PreviewIcon({ kind, size = 35 }: { kind: PreviewKind; size?: number }) {
+  if (kind === "image") return <ImageIcon size={size} />;
+  if (kind === "video") return <Video size={size} />;
+  if (kind === "audio") return <Music2 size={size} />;
+  return <FileText size={size} />;
+}
+
 export default function MaterialPreviewModal({ material, open, onClose }: Props) {
-  const [preview, setPreview] = useState<PreviewInfo | null>(null);
+  const [preview, setPreview] = useState<PreviewInfo | null>(EMPTY_PREVIEW);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const kind = material ? getKind(material) : "file";
-  const Icon = getIcon(kind);
 
   useEffect(() => {
-    if (!open || !material) {
-      setPreview(null);
-      setError(null);
-      setLoading(false);
-      return;
-    }
+    if (!open || !material) return;
 
     const controller = new AbortController();
     const materialId = getMaterialId(material);
 
-    if (!materialId) {
-      setLoading(false);
-      setError("ID материала не найден.");
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
       setPreview(null);
+      setError(materialId ? null : "ID материала не найден.");
+      setLoading(Boolean(materialId));
+    });
+
+    if (!materialId) {
       return () => controller.abort();
     }
-
-    setLoading(true);
-    setError(null);
-    setPreview(null);
 
     getMaterialDownload(materialId, { signal: controller.signal, mode: "inline" })
         .then((info) => {
@@ -281,7 +278,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                 <div className={cn("grid h-20 w-20 shrink-0 place-items-center rounded-3xl ring-1", getIconClass(kind))}>
-                  <Icon size={35} />
+                  <PreviewIcon kind={kind} size={35} />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -383,7 +380,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                   <div className="mt-2 font-black text-slate-700">{formatBytes(material.size ?? null)}</div>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-xs font-black text-slate-400"><Icon size={15} /> Тип</div>
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-400"><PreviewIcon kind={kind} size={15} /> Тип</div>
                   <div className="mt-2 font-black text-slate-700">{getLabel(kind)} ({fileType})</div>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">

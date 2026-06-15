@@ -397,8 +397,27 @@ export type GroupMemberRow = {
 export type GroupMembersResponse = { teacher: { id: string; email: string; fullName: string | null }; students: GroupMemberRow[] };
 
 export async function getGroupMembers(groupId: string, includeRemoved = false): Promise<GroupMembersResponse> {
-  const url = includeRemoved ? `groups/${groupId}/members?includeRemoved=true` : `groups/${groupId}/members`;
-  return api.get<GroupMembersResponse>(url);
+  const url = includeRemoved
+      ? `groups/${groupId}/members?includeRemoved=true`
+      : `groups/${groupId}/members`;
+
+  const data = await api.get<any>(url);
+
+  if (Array.isArray(data)) {
+    return {
+      teacher: { id: "", email: "", fullName: null },
+      students: data.map((m) => ({
+        id: m.id,
+        email: m.email,
+        fullName: m.name || m.fullName || m.email,
+        addedAt: "",
+        status: m.removed ? "removed" : "active",
+        removedAt: m.removed ? new Date().toISOString() : null,
+      })),
+    };
+  }
+
+  return data;
 }
 
 export async function removeMemberFromGroup(groupId: string, userId: string): Promise<void> {
