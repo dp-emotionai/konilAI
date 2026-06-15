@@ -845,7 +845,7 @@ export default function TeacherResourcesPage() {
 
         {createOpen && (
             <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/25 px-4 py-6 backdrop-blur-sm"
+                className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/25 px-4 py-6 backdrop-blur-sm sm:items-center"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="create-material-title"
@@ -853,7 +853,7 @@ export default function TeacherResourcesPage() {
                   if (event.target === event.currentTarget) closeCreateModal();
                 }}
             >
-              <div className="w-full max-w-[760px] rounded-[28px] bg-white p-8 shadow-[0_28px_90px_rgba(15,23,42,0.24)] sm:p-10">
+              <div className="my-auto flex max-h-[calc(100vh-48px)] w-full max-w-[760px] flex-col rounded-[28px] bg-white p-8 shadow-[0_28px_90px_rgba(15,23,42,0.24)] sm:p-10">
                 <div className="mb-8 flex items-start justify-between gap-4">
                   <h2 id="create-material-title" className="text-[32px] font-extrabold leading-tight tracking-[-0.03em] text-slate-900">
                     Создание материала
@@ -869,7 +869,7 @@ export default function TeacherResourcesPage() {
                   </button>
                 </div>
 
-                <div className="space-y-6">
+                <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-2">
                   <label className="block">
                   <span className="mb-4 block text-[18px] font-extrabold tracking-[-0.01em] text-slate-900">
                     Название материала
