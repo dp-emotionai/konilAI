@@ -233,16 +233,19 @@ export class PeerConnectionManager {
           );
 
           /**
-           * В текущей архитектуре преподаватель является инициатором offer.
+           * Mesh WebRTC:
+           * каждый участник соединяется с каждым.
+           *
+           * Чтобы два браузера не отправили offer одновременно,
+           * offer создаёт только участник с меньшим socket.id.
            */
-          if (
-              this.role === "teacher" &&
-              this.localStream
-          ) {
+          if (this.localStream) {
             for (const participant of this.participants) {
-              void this.createPeerAndOffer(
-                  participant.id
-              );
+              if (this.shouldInitiateOffer(participant.id)) {
+                void this.createPeerAndOffer(
+                    participant.id
+                );
+              }
             }
           }
         }
@@ -272,8 +275,8 @@ export class PeerConnectionManager {
           );
 
           if (
-              this.role === "teacher" &&
-              this.localStream
+              this.localStream &&
+              this.shouldInitiateOffer(safe.id)
           ) {
             void this.createPeerAndOffer(
                 safe.id
@@ -471,6 +474,16 @@ export class PeerConnectionManager {
     }
 
     await Promise.all(tasks);
+  }
+
+  private shouldInitiateOffer(
+      peerId: ClientId
+  ): boolean {
+    if (!this.selfId) {
+      return false;
+    }
+
+    return this.selfId < peerId;
   }
 
   private async handleOffer(
@@ -736,7 +749,7 @@ export class PeerConnectionManager {
 
       if (
           state === "failed" &&
-          this.role === "teacher"
+          this.shouldInitiateOffer(peerId)
       ) {
         void this.restartIce(
             peerId,
@@ -747,7 +760,7 @@ export class PeerConnectionManager {
 
     pc.onnegotiationneeded = () => {
       if (
-          this.role === "teacher" &&
+          this.shouldInitiateOffer(peerId) &&
           pc.signalingState === "stable"
       ) {
         void this.createPeerAndOffer(
@@ -842,7 +855,7 @@ export class PeerConnectionManager {
       );
 
       if (
-          this.role === "teacher"
+          this.shouldInitiateOffer(peerId)
       ) {
         void this.restartIce(
             peerId,
@@ -891,7 +904,7 @@ export class PeerConnectionManager {
               "disconnected"
           ) {
             if (
-                this.role === "teacher"
+                this.shouldInitiateOffer(peerId)
             ) {
               void this.restartIce(
                   peerId,
@@ -931,7 +944,7 @@ export class PeerConnectionManager {
       pc: RTCPeerConnection
   ) {
     if (
-        this.role !== "teacher" ||
+        !this.shouldInitiateOffer(peerId) ||
         this.offerInProgress.has(peerId) ||
         pc.signalingState !== "stable" ||
         pc.connectionState === "closed"
@@ -977,7 +990,7 @@ export class PeerConnectionManager {
       peerId: ClientId
   ) {
     if (
-        this.role !== "teacher" ||
+        !this.shouldInitiateOffer(peerId) ||
         !this.localStream ||
         this.offerInProgress.has(peerId)
     ) {
