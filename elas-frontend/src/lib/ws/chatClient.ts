@@ -14,6 +14,7 @@ type ChatServerPacket =
 
 const REALTIME_EVENT_TYPES = new Set([
   "message.new",
+  "typing",
   "notification.new",
   "calendar.event.created",
   "calendar.event.updated",
@@ -220,6 +221,21 @@ export class ChatClient {
 
     if (!this.socket) this.connect();
     this.flushSubscriptions();
+  }
+
+  sendTyping(sessionId: string, isTyping: boolean, user?: { name?: string | null; email?: string | null }) {
+    if (!sessionId) return;
+
+    if (!this.socket) this.connect();
+
+    this.send({
+      type: "typing",
+      roomId: `session:${sessionId}`,
+      sessionId,
+      isTyping,
+      name: user?.name || user?.email || "Участник",
+      email: user?.email || null,
+    });
   }
 
   joinUser() {
