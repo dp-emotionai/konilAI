@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,6 +12,14 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
+  Mail,
+  Lock,
+  ShieldCheck,
+  BarChart3,
+  Users,
+  BookOpen,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/Card";
@@ -54,7 +61,6 @@ export default function RegisterWizardPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
   const [role, setRoleValue] = useState<"student" | "teacher" | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -120,6 +126,7 @@ export default function RegisterWizardPage() {
     if (!isPasswordValid) return;
 
     const normalizedEmail = email.trim().toLowerCase();
+
     if (!isApiAvailable()) {
       setError("Сервер недоступен. Обратитесь к администратору.");
       return;
@@ -153,51 +160,170 @@ export default function RegisterWizardPage() {
     }
   };
 
-  const renderWelcome = () => (
-    <div className="grid w-full gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500 lg:grid-cols-[1.1fr_0.9fr]">
-      <div className="flex flex-col justify-center py-8">
-        <div className="mb-10 flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7448FF] font-bold text-white">K</div>
-          <span className="text-xl font-bold text-slate-900">KonilAI</span>
+  const FeatureCard = ({
+    icon,
+    title,
+    text,
+  }: {
+    icon: React.ReactNode;
+    title: string;
+    text: string;
+  }) => (
+    <div className="flex items-start gap-4 rounded-[22px] bg-white/75 p-4 shadow-[0_14px_35px_rgba(116,72,255,0.08)] ring-1 ring-white/70 backdrop-blur">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#7448FF] shadow-sm">
+        {icon}
+      </div>
+      <div>
+        <h3 className="text-sm font-extrabold text-slate-900">{title}</h3>
+        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">{text}</p>
+      </div>
+    </div>
+  );
+
+  const MarketingPanel = () => (
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#F8F4FF] via-white to-[#EFE8FF] p-10 lg:block">
+      <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-purple-200/35 blur-3xl" />
+      <div className="absolute -bottom-20 left-12 h-72 w-72 rounded-full bg-indigo-200/30 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-full w-full bg-[radial-gradient(circle_at_80%_20%,rgba(116,72,255,0.12),transparent_28%),radial-gradient(circle_at_25%_70%,rgba(167,139,250,0.14),transparent_30%)]" />
+
+      <div className="relative z-10 flex h-full flex-col justify-center">
+        <div className="mb-8 inline-flex w-fit items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-[#7448FF] shadow-sm">
+          <GraduationCap size={16} />
+          Платформа современного обучения
         </div>
 
-        <h1 className="mb-4 text-4xl font-extrabold leading-tight tracking-tight text-slate-900">
-          Привет!
-          <br />
-          <span className="text-slate-400">Начните учиться и достигать новых целей.</span>
-        </h1>
+        <div className="relative mb-10 flex justify-center">
+          <div className="relative h-64 w-full max-w-md">
+            <div className="absolute left-10 top-20 h-24 w-24 rotate-[-8deg] rounded-[26px] bg-white p-4 shadow-[0_18px_50px_rgba(116,72,255,0.18)]">
+              <BookOpen className="h-full w-full text-[#7448FF]" strokeWidth={1.5} />
+            </div>
 
-        <div className="mt-8 max-w-sm space-y-4">
-          <Button onClick={() => router.push("/auth/login")} className="h-12 w-full text-base">
-            Войти
-          </Button>
-          <Button variant="outline" onClick={nextStep} className="h-12 w-full text-base">
-            Зарегистрироваться
-          </Button>
-        </div>
+            <div className="absolute left-28 top-6 h-44 w-64 rounded-[28px] border border-white/80 bg-white/85 p-5 shadow-[0_24px_70px_rgba(116,72,255,0.18)] backdrop-blur">
+              <div className="mb-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">Прогресс</span>
+                <span className="rounded-full bg-purple-50 px-2 py-1 text-xs font-bold text-[#7448FF]">84%</span>
+              </div>
+              <div className="mb-4 h-16 rounded-2xl bg-gradient-to-br from-purple-50 to-white p-3">
+                <div className="flex h-full items-end gap-2">
+                  {[30, 45, 38, 70, 58, 82, 76].map((height, index) => (
+                    <div
+                      key={index}
+                      className="w-full rounded-full bg-gradient-to-t from-[#7448FF] to-[#A78BFA]"
+                      style={{ height: `${height}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="h-12 rounded-xl bg-slate-50" />
+                <div className="h-12 rounded-xl bg-slate-50" />
+                <div className="h-12 rounded-xl bg-slate-50" />
+              </div>
+            </div>
 
-        <div className="mt-10 rounded-[24px] border border-slate-100 bg-white/70 p-5">
-          <div className="text-[13px] font-medium text-slate-400">
-            Google уже можно использовать для регистрации. GitHub появится здесь сразу после включения backend route.
+            <div className="absolute bottom-4 right-8 flex h-24 w-24 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#7448FF] to-[#5B21F6] text-white shadow-[0_20px_45px_rgba(116,72,255,0.32)]">
+              <ShieldCheck size={44} />
+            </div>
+
+            <div className="absolute right-2 top-12 flex h-20 w-20 items-center justify-center rounded-full bg-white/80 shadow-xl">
+              <Sparkles size={32} className="text-[#7448FF]" />
+            </div>
           </div>
         </div>
 
-        <p className="mt-12 max-w-xs text-[12px] leading-relaxed text-slate-400">
-          Продолжая, вы соглашаетесь с{" "}
-          <Link href="/terms" className="font-semibold text-[#7448FF] underline">
-            условиями использования
-          </Link>{" "}
-          и{" "}
-          <Link href="/privacy" className="font-semibold text-[#7448FF] underline">
-            политикой конфиденциальности
+        <h2 className="max-w-xl text-center text-4xl font-black leading-tight tracking-tight text-slate-950">
+          Учитесь, взаимодействуйте
+          <br />
+          и отслеживайте прогресс
+        </h2>
+
+        <p className="mx-auto mt-5 max-w-xl text-center text-[15px] font-medium leading-7 text-slate-600">
+          Инструменты для интерактивных занятий, материалов, аналитики и эффективного взаимодействия между преподавателями и студентами.
+        </p>
+
+        <div className="mt-10 grid grid-cols-3 gap-5">
+          <FeatureCard
+            icon={<BarChart3 size={24} />}
+            title="AI-аналитика"
+            text="Понятные метрики и персональные рекомендации"
+          />
+          <FeatureCard
+            icon={<Users size={24} />}
+            title="Live-сессии"
+            text="Обучение в реальном времени с интерактивом"
+          />
+          <FeatureCard
+            icon={<ShieldCheck size={24} />}
+            title="Приватность"
+            text="Consent-first подход и защита ваших данных"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderWelcome = () => (
+    <div className="grid min-h-[720px] overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 lg:grid-cols-[0.86fr_1.14fr]">
+      <div className="flex flex-col justify-center px-8 py-10 md:px-14 lg:px-16">
+        <div className="mb-7 inline-flex w-fit items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-[#7448FF]">
+          <ShieldCheck size={16} />
+          Безопасная регистрация
+        </div>
+
+        <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-950 md:text-5xl">
+          Добро пожаловать
+          <br />в KoniAI
+        </h1>
+
+        <p className="mt-5 max-w-md text-[15px] font-medium leading-7 text-slate-500">
+          Создайте аккаунт для доступа к платформе, учебным сессиям и аналитике обучения.
+        </p>
+
+        <div className="mt-10 space-y-4">
+          <Button onClick={nextStep} className="h-14 w-full rounded-2xl text-[15px] font-extrabold shadow-[0_14px_30px_rgba(116,72,255,0.28)]">
+            Зарегистрироваться
+            <ArrowRight size={18} />
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => router.push("/auth/login")}
+            className="h-14 w-full rounded-2xl border-slate-200 bg-white text-[15px] font-extrabold"
+          >
+            Уже есть аккаунт? Войти
+          </Button>
+        </div>
+
+        <div className="mt-8 rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
+          <SocialAuthButtons mode="register" role={role} onSuccess={finishSocialRegister} onError={setError} />
+        </div>
+
+        {error && (
+          <div className="mt-6 flex items-center gap-2.5 rounded-2xl border border-red-100 bg-red-50 p-4 text-[13px] font-medium text-red-600">
+            <AlertCircle size={18} /> {error}
+          </div>
+        )}
+
+        <div className="mt-10 grid grid-cols-2 gap-3">
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+            <Lock size={16} className="text-[#7448FF]" />
+            Защищённый вход
+          </div>
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+            <ShieldCheck size={16} className="text-[#7448FF]" />
+            Контроль согласия
+          </div>
+        </div>
+
+        <p className="mt-8 text-center text-sm font-medium text-slate-500">
+          Уже есть аккаунт?{" "}
+          <Link href="/auth/login" className="font-extrabold text-[#7448FF] hover:underline">
+            Войти
           </Link>
-          .
         </p>
       </div>
 
-      <div className="relative hidden items-center justify-center overflow-hidden rounded-[40px] border border-slate-100 bg-slate-50/50 lg:flex">
-        <Image src="/auth_onboarding_illustration_1776717858308.png" alt="Illustration" fill className="object-contain p-12" />
-      </div>
+      <MarketingPanel />
     </div>
   );
 
@@ -232,7 +358,9 @@ export default function RegisterWizardPage() {
               onClick={() => setRoleValue(item.value)}
               className={cn(
                 "group relative flex cursor-pointer items-center gap-5 rounded-[28px] border-2 p-5 transition-all",
-                active ? "border-[#7448FF] bg-purple-50/30" : "border-slate-100 bg-white hover:border-slate-200"
+                active
+                  ? "border-[#7448FF] bg-purple-50/40 shadow-[0_18px_45px_rgba(116,72,255,0.12)]"
+                  : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
               )}
             >
               <div
@@ -243,10 +371,12 @@ export default function RegisterWizardPage() {
               >
                 {item.icon}
               </div>
+
               <div className="flex-1">
                 <h3 className="font-bold text-slate-900">{item.title}</h3>
                 <p className="text-sm text-slate-500">{item.description}</p>
               </div>
+
               <div
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all",
@@ -270,7 +400,7 @@ export default function RegisterWizardPage() {
         </div>
       )}
 
-      <Button onClick={nextStep} disabled={!role} className="mt-12 h-14 w-full text-[15px] font-bold">
+      <Button onClick={nextStep} disabled={!role} className="mt-12 h-14 w-full rounded-2xl text-[15px] font-bold">
         Продолжить
       </Button>
     </div>
@@ -289,21 +419,26 @@ export default function RegisterWizardPage() {
           <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Имя</label>
           <Input placeholder="Введите имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-12 bg-white" />
         </div>
+
         <div>
           <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Фамилия</label>
           <Input placeholder="Введите фамилию" value={lastName} onChange={(e) => setLastName(e.target.value)} className="h-12 bg-white" />
         </div>
+
         <div>
           <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Email</label>
-          <Input placeholder="example@mail.ru" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-12 bg-white" />
-        </div>
-        <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Телефон</label>
-          <Input placeholder="+7 000 000 00 00" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12 bg-white" />
+          <Input
+            placeholder="example@mail.ru"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 bg-white"
+            prefix={<Mail size={18} />}
+          />
         </div>
       </div>
 
-      <Button onClick={nextStep} disabled={!firstName || !lastName || !email} className="mt-12 h-14 w-full text-[15px] font-bold">
+      <Button onClick={nextStep} disabled={!firstName || !lastName || !email} className="mt-12 h-14 w-full rounded-2xl text-[15px] font-bold">
         Продолжить
       </Button>
     </div>
@@ -327,6 +462,7 @@ export default function RegisterWizardPage() {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
             className="h-12 bg-white"
+            prefix={<Lock size={18} />}
             suffix={
               <button type="button" onClick={() => setShowPassword((value) => !value)} className="transition-colors hover:text-slate-600">
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -342,14 +478,8 @@ export default function RegisterWizardPage() {
             { ok: hasNumber, text: "Хотя бы одна цифра" },
           ].map((item) => (
             <div key={item.text} className="flex items-center gap-2.5 transition-colors">
-              {item.ok ? (
-                <CheckCircle2 size={16} className="text-emerald-500" />
-              ) : (
-                <div className="h-4 w-4 rounded-full border border-slate-200" />
-              )}
-              <span className={cn("text-[13px] font-medium", item.ok ? "text-emerald-600" : "text-slate-400")}>
-                {item.text}
-              </span>
+              {item.ok ? <CheckCircle2 size={16} className="text-emerald-500" /> : <div className="h-4 w-4 rounded-full border border-slate-200" />}
+              <span className={cn("text-[13px] font-medium", item.ok ? "text-emerald-600" : "text-slate-400")}>{item.text}</span>
             </div>
           ))}
         </div>
@@ -362,7 +492,9 @@ export default function RegisterWizardPage() {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             className="h-12 bg-white"
+            prefix={<Lock size={18} />}
           />
+
           {confirmPassword && !passwordsMatch && (
             <p className="ml-1 mt-1.5 flex items-center gap-1 text-xs font-medium text-red-500">
               <AlertCircle size={12} /> Пароли не совпадают
@@ -380,7 +512,7 @@ export default function RegisterWizardPage() {
       <Button
         onClick={handleRegister}
         disabled={!isPasswordValid || loading}
-        className="mt-12 flex h-14 w-full items-center justify-center gap-2 text-[15px] font-bold"
+        className="mt-12 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-bold"
       >
         {loading ? "Обработка..." : "Завершить регистрацию"}
         {!loading && <ChevronRight size={18} />}
@@ -389,17 +521,20 @@ export default function RegisterWizardPage() {
   );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50/30 px-4 py-12">
-      <Card className="w-full max-w-[1000px] overflow-hidden border-white/50 bg-white shadow-[0_8px_40px_rgba(0,0,0,0.04)]">
-        <CardContent className="p-0">
-          <div className={cn("p-6 md:p-10", step > 1 && "bg-white")}>
-            {step === 1 && renderWelcome()}
-            {step === 2 && renderRoleSelection()}
-            {step === 3 && renderBasicInfo()}
-            {step === 4 && renderPasswordSetup()}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <main className="min-h-[calc(100vh-80px)] bg-gradient-to-br from-white via-slate-50 to-purple-50/60 px-4 py-10 md:px-8 md:py-14">
+      <div className="mx-auto w-full max-w-[1500px]">
+        {step === 1 ? (
+          renderWelcome()
+        ) : (
+          <Card className="mx-auto w-full max-w-[760px] overflow-hidden rounded-[32px] border-white/70 bg-white/90 shadow-[0_28px_90px_rgba(15,23,42,0.08)] backdrop-blur">
+            <CardContent className="p-8 md:p-12">
+              {step === 2 && renderRoleSelection()}
+              {step === 3 && renderBasicInfo()}
+              {step === 4 && renderPasswordSetup()}
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </main>
   );
 }
