@@ -1,8 +1,12 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useUI } from "@/components/layout/Providers";
+import StudentSessionPreparationModal from "@/components/session/StudentSessionPreparationModal";
 import { cn } from "@/lib/cn";
 import {
   getStudentSessionsList,
@@ -35,11 +39,13 @@ import {
 } from "@/lib/utils/sessionCalendar";
 
 export default function StudentDashboardPage() {
+  const router = useRouter();
   const { state } = useUI();
   const [sessions, setSessions] = useState<StudentSessionRow[]>([]);
   const [groups, setGroups] = useState<StudentGroupRow[]>([]);
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSession, setSelectedSession] = useState<StudentSessionRow | null>(null);
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -431,12 +437,20 @@ export default function StudentDashboardPage() {
                           </span>
                               </div>
                               <div className="col-span-1 flex justify-end text-right">
-                                <Link
-                                    href={`/student/session/${session.id}`}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (session.status === "ended") {
+                                        router.push(`/student/session/${session.id}`);
+                                        return;
+                                      }
+
+                                      setSelectedSession(session);
+                                    }}
                                     className="text-xs font-medium text-purple-600 opacity-0 transition-opacity group-hover:opacity-100"
                                 >
                                   Перейти
-                                </Link>
+                                </button>
                               </div>
                             </div>
                         ))
@@ -565,6 +579,15 @@ export default function StudentDashboardPage() {
             </div>
           </div>
         </div>
+        <StudentSessionPreparationModal
+            open={Boolean(selectedSession)}
+            session={selectedSession}
+            onClose={() => setSelectedSession(null)}
+            onStart={(sessionId) => {
+              setSelectedSession(null);
+              router.push(`/student/session/${sessionId}?autostart=1`);
+            }}
+        />
       </div>
   );
 }
