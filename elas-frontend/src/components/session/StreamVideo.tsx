@@ -1,8 +1,18 @@
 import { useEffect, useRef } from "react";
 
+function playElement(element: HTMLMediaElement) {
+  const playPromise = element.play();
+  if (playPromise) {
+    playPromise.catch(() => {
+      // Browser can temporarily block autoplay. We retry on metadata/canplay
+      // and after user interaction without breaking the session UI.
+    });
+  }
+}
+
 export function StreamVideo({
                               stream,
-                              muted,
+                              muted = true,
                               autoPlay = true,
                               playsInline = true,
                               ...props
@@ -23,27 +33,28 @@ export function StreamVideo({
       return;
     }
 
-    if (video.srcObject !== stream) {
-      video.srcObject = stream;
-    }
+    // Force re-attach. Some browsers keep the old rendering pipeline when the
+    // same MediaStream is moved from a thumbnail video to the main video. That
+    // can leave the main element black while audio continues.
+    video.pause();
+    video.srcObject = null;
+    video.load();
+    video.srcObject = stream;
 
-    const tryPlay = () => {
-      const playPromise = video.play();
-      if (playPromise) {
-        playPromise.catch(() => {
-          // Browser can temporarily block autoplay. The next metadata/canplay event
-          // or user click will retry, so do not break the video tile.
-        });
-      }
-    };
+    const tryPlay = () => playElement(video);
+    const retryOnUserGesture = () => tryPlay();
 
-    tryPlay();
+    requestAnimationFrame(tryPlay);
     video.addEventListener("loadedmetadata", tryPlay);
     video.addEventListener("canplay", tryPlay);
+    window.addEventListener("click", retryOnUserGesture, { once: true });
+    window.addEventListener("touchstart", retryOnUserGesture, { once: true });
 
     return () => {
       video.removeEventListener("loadedmetadata", tryPlay);
       video.removeEventListener("canplay", tryPlay);
+      window.removeEventListener("click", retryOnUserGesture);
+      window.removeEventListener("touchstart", retryOnUserGesture);
     };
   }, [stream, muted, autoPlay, playsInline]);
 
@@ -56,4 +67,41 @@ export function StreamVideo({
           {...props}
       />
   );
+}
+
+export function StreamAudio({ stream }: { stream: MediaStream | null }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (!stream) {
+      audio.pause();
+      audio.srcObject = null;
+      return;
+    }
+
+    if (audio.srcObject !== stream) {
+      audio.srcObject = stream;
+    }
+
+    const tryPlay = () => playElement(audio);
+    const retryOnUserGesture = () => tryPlay();
+
+    tryPlay();
+    audio.addEventListener("loadedmetadata", tryPlay);
+    audio.addEventListener("canplay", tryPlay);
+    window.addEventListener("click", retryOnUserGesture, { once: true });
+    window.addEventListener("touchstart", retryOnUserGesture, { once: true });
+
+    return () => {
+      audio.removeEventListener("loadedmetadata", tryPlay);
+      audio.removeEventListener("canplay", tryPlay);
+      window.removeEventListener("click", retryOnUserGesture);
+      window.removeEventListener("touchstart", retryOnUserGesture);
+    };
+  }, [stream]);
+
+  return <audio ref={audioRef} autoPlay className="hidden" />;
 }

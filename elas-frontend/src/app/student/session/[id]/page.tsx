@@ -54,7 +54,7 @@ import { SignalingClient } from "@/lib/webrtc/signalingClient";
 import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
 import type { Participant } from "@/lib/webrtc/types";
 import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
-import { StreamVideo } from "@/components/session/StreamVideo";
+import { StreamAudio, StreamVideo } from "@/components/session/StreamVideo";
 
 import {
   Mic,
@@ -905,6 +905,12 @@ export default function StudentJoinSessionPage() {
                       ref={monitorRef}
                       className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
                   >
+                    <div className="sr-only" aria-hidden="true">
+                      {Object.entries(remoteStreams).map(([peerId, stream]) => (
+                          <StreamAudio key={peerId} stream={stream} />
+                      ))}
+                    </div>
+
                     {selectedVideo?.stream ? (
                         <button
                             type="button"
@@ -913,12 +919,12 @@ export default function StudentJoinSessionPage() {
                             title="Открыть видео на весь экран"
                         >
                           <StreamVideo
-                              key={selectedVideo.id}
+                              key={`${selectedVideo.id}-${selectedVideo.stream.id}`}
                               stream={selectedVideo.stream}
                               className="h-full w-full object-cover"
                               autoPlay
                               playsInline
-                              muted={selectedVideo.isLocal}
+                              muted
                           />
                         </button>
                     ) : (
@@ -972,7 +978,7 @@ export default function StudentJoinSessionPage() {
                                         className="h-full w-full object-cover"
                                         autoPlay
                                         playsInline
-                                        muted={tile.isLocal}
+                                        muted
                                     />
                                 ) : (
                                     <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
