@@ -1050,13 +1050,6 @@ export default function StudentJoinSessionPage() {
                                             });
                                         }}
                                     />
-                                    <CallControlButton
-                                        active={false}
-                                        disabled
-                                        icon={<MoreHorizontal size={22} />}
-                                        label="Еще"
-                                    />
-
                                     <div className="flex flex-col items-center gap-2 mx-1">
                                         <button
                                             type="button"
