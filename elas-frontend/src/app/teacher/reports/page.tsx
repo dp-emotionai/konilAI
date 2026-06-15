@@ -55,8 +55,8 @@ function TabButton({
       className={cn(
         "rounded-full px-3 py-2 text-sm transition",
         active
-          ? "bg-surface text-fg shadow-soft"
-          : "text-muted hover:bg-surface-subtle hover:text-fg"
+          ? "bg-white text-[#7448FF] shadow-[0_8px_24px_rgba(116,72,255,0.12)] ring-1 ring-[#7448FF]/15"
+          : "text-slate-500 hover:bg-white hover:text-slate-900"
       )}
     >
       {children}
@@ -67,7 +67,7 @@ function TabButton({
 function StatusBadge({ status }: { status: string }) {
   if (status === "active") {
     return (
-      <Badge className="bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-400/20">
+      <Badge className="rounded-xl bg-emerald-50 px-3 py-1.5 text-emerald-600 ring-1 ring-emerald-200">
         Live
       </Badge>
     );
@@ -75,14 +75,14 @@ function StatusBadge({ status }: { status: string }) {
 
   if (status === "finished") {
     return (
-      <Badge className="bg-surface-subtle text-muted ring-1 ring-[color:var(--border)]/25">
+      <Badge className="rounded-xl bg-slate-100 px-3 py-1.5 text-slate-600 ring-1 ring-slate-200">
         Завершена
       </Badge>
     );
   }
 
   return (
-    <Badge className="bg-amber-500/10 text-amber-700 ring-1 ring-amber-400/20">
+    <Badge className="rounded-xl bg-amber-50 px-3 py-1.5 text-amber-600 ring-1 ring-amber-200">
       Черновик
     </Badge>
   );
@@ -100,23 +100,23 @@ function MetricPill({
   return (
     <div
       className={cn(
-        "rounded-2xl p-3 ring-1",
+        "rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]",
         accent
-          ? "bg-primary/10 ring-[rgb(var(--primary))]/20"
-          : "bg-surface-subtle ring-[color:var(--border)]/20"
+          ? "border-purple-200"
+          : "border-slate-200"
       )}
     >
-      <div className="text-xs text-muted">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-fg">{value}</div>
+      <div className="text-sm text-slate-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">{value}</div>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <GlassCard className="p-10 text-center">
-      <div className="text-lg font-semibold text-fg">Отчётов пока нет</div>
-      <p className="mt-2 text-sm text-muted">
+    <GlassCard className="rounded-[28px] border border-slate-200 bg-white p-12 text-center shadow-[0_18px_55px_rgba(15,23,42,0.05)]">
+      <div className="text-xl font-semibold text-slate-900">Отчётов пока нет</div>
+      <p className="mt-2 text-sm leading-6 text-slate-500">
         Проведите сессию или дождитесь первых live-данных, и здесь появятся
         реальные аналитические карточки.
       </p>
@@ -126,11 +126,11 @@ function EmptyState() {
 
 function LoadingGrid() {
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid gap-6">
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="h-[320px] animate-pulse rounded-elas-lg bg-surface-subtle"
+          className="h-[520px] animate-pulse rounded-[28px] bg-slate-100"
         />
       ))}
     </div>
@@ -391,18 +391,20 @@ export default function TeacherReportsPage() {
   }
 
   return (
-    <div className="relative pb-16">
+    <div className="relative -m-4 min-h-[calc(100vh-72px)] bg-gradient-to-br from-white via-slate-50 to-purple-50/40 pb-16 md:-m-6 lg:-m-8">
       <Glow />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_50%_0%,rgba(116,72,255,0.14),transparent_65%)]" />
 
       <PageHero
         title="Отчёты"
         subtitle="Сводка по live-сессиям и завершённым занятиям с реальными участниками, таймлайном и экспортом."
         right={
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-primary/10 text-[rgb(var(--primary))]">
+            <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
               {filtered.length} сессий
             </Badge>
-            <Button variant="outline" className="gap-2" onClick={loadReports}>
+            <Button variant="outline" className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5 shadow-sm" onClick={loadReports}>
               <RefreshCw size={14} />
               Обновить
             </Button>
@@ -410,9 +412,9 @@ export default function TeacherReportsPage() {
         }
       />
 
-      <Section spacing="normal" className="mt-10 space-y-6">
+      <Section spacing="normal" className="relative mt-8 space-y-6">
         <Reveal>
-          <GlassCard className="p-6 md:p-7">
+          <GlassCard className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.05)] md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-[260px] flex-1">
                 <div className="relative">
@@ -424,12 +426,12 @@ export default function TeacherReportsPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Поиск по названию, группе, коду…"
-                    className="pl-10"
+                    className="h-12 rounded-2xl border-slate-200 bg-white pl-11 shadow-none focus:border-[#7448FF]"
                   />
                 </div>
               </div>
 
-              <div className="inline-flex items-center gap-1 rounded-full bg-surface-subtle p-1 shadow-soft">
+              <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
                 <TabButton active={tab === "all"} onClick={() => setTab("all")}>
                   Все {counts.all ? `(${counts.all})` : ""}
                 </TabButton>
@@ -466,7 +468,7 @@ export default function TeacherReportsPage() {
           ) : filtered.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="grid gap-4 xl:grid-cols-2">
+            <div className="grid gap-6">
               {filtered.map((row) => {
                 const live = liveCache[row.id];
                 const analytics = analyticsCache[row.id] ?? null;
@@ -475,14 +477,14 @@ export default function TeacherReportsPage() {
                 const canExport = row.status === "finished";
 
                 return (
-                  <GlassCard key={row.id} className="overflow-hidden p-0">
-                    <div className="border-b border-[color:var(--border)]/15 bg-[linear-gradient(180deg,rgba(116,72,255,0.08),rgba(255,255,255,0))] px-6 py-6 md:px-7">
+                  <GlassCard key={row.id} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-0 shadow-[0_20px_65px_rgba(15,23,42,0.06)]">
+                    <div className="border-b border-slate-100 bg-[linear-gradient(180deg,rgba(116,72,255,0.05),rgba(255,255,255,0))] px-6 py-6 md:px-8">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
-                          <div className="truncate text-lg font-semibold text-fg">
+                          <div className="truncate text-2xl font-semibold tracking-tight text-slate-900">
                             {row.title}
                           </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-500">
                             <span>{row.groupName}</span>
                             <span>•</span>
                             <span>{formatDateTime(row.startedAt || row.createdAt)}</span>
@@ -497,11 +499,11 @@ export default function TeacherReportsPage() {
                         </div>
                       </div>
 
-                      <div className="mt-4 text-sm leading-6 text-muted">
+                      <div className="mt-5 text-sm leading-6 text-slate-600">
                         {buildSessionStory(row, analytics, live)}
                       </div>
 
-                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                      <div className="mt-5 grid gap-4 sm:grid-cols-3">
                         {row.status === "active" ? (
                           <>
                             <MetricPill
@@ -538,10 +540,10 @@ export default function TeacherReportsPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-5 px-6 py-6 md:px-7">
-                      <div className="grid gap-5 lg:grid-cols-[1.2fr,0.8fr]">
-                        <div className="rounded-2xl bg-surface-subtle p-4 ring-1 ring-[color:var(--border)]/20">
-                          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                    <div className="space-y-6 px-6 py-6 md:px-8">
+                      <div className="grid gap-5 lg:grid-cols-2">
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
                             {row.status === "active" ? <Radio size={14} /> : <Clock3 size={14} />}
                             {row.status === "active" ? "Состояние сейчас" : "Ход сессии"}
                           </div>
@@ -552,12 +554,12 @@ export default function TeacherReportsPage() {
                                 {live.participants.slice(0, 4).map((participant) => (
                                   <div
                                     key={participant.userId}
-                                    className="rounded-xl bg-surface px-3 py-3 text-sm ring-1 ring-[color:var(--border)]/15"
+                                    className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm"
                                   >
-                                    <div className="font-medium text-fg">
+                                    <div className="font-medium text-slate-900">
                                       {participant.fullName}
                                     </div>
-                                    <div className="mt-1 text-muted">
+                                    <div className="mt-1 text-slate-500">
                                       {formatEmotionLabel(
                                         participant.dominant_emotion || participant.emotion
                                       )}{" "}
@@ -568,7 +570,7 @@ export default function TeacherReportsPage() {
                                 ))}
                               </div>
                             ) : (
-                              <div className="text-sm text-muted">
+                              <div className="text-sm leading-6 text-slate-500">
                                 Участники подключены, но live-модель ещё не вернула свежие персональные метрики.
                               </div>
                             )
@@ -577,26 +579,26 @@ export default function TeacherReportsPage() {
                               {timelineHighlights.map((item) => (
                                 <div
                                   key={item.id}
-                                  className="rounded-xl bg-surface px-3 py-3 ring-1 ring-[color:var(--border)]/15"
+                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
                                 >
-                                  <div className="text-sm font-medium text-fg">
+                                  <div className="text-sm font-medium text-slate-900">
                                     {item.window}
                                   </div>
-                                  <div className="mt-1 text-sm text-muted">
+                                  <div className="mt-1 text-sm text-slate-500">
                                     {item.description}
                                   </div>
                                 </div>
                               ))}
                             </div>
                           ) : (
-                            <div className="text-sm text-muted">
+                            <div className="text-sm leading-6 text-slate-500">
                               Backend пока не вернул достаточно timeline-точек, чтобы построить красивую покадровую историю этой сессии.
                             </div>
                           )}
                         </div>
 
-                        <div className="rounded-2xl bg-surface-subtle p-4 ring-1 ring-[color:var(--border)]/20">
-                          <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                        <div className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                          <div className="mb-4 flex items-center gap-2 text-sm font-medium text-slate-700">
                             <Users size={14} />
                             Участники и эмоции
                           </div>
@@ -606,17 +608,17 @@ export default function TeacherReportsPage() {
                               {analytics.participants.slice(0, 4).map((participant) => (
                                 <div
                                   key={participant.userId}
-                                  className="rounded-xl bg-surface px-3 py-3 ring-1 ring-[color:var(--border)]/15"
+                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
                                 >
-                                  <div className="text-sm font-medium text-fg">
+                                  <div className="text-sm font-medium text-slate-900">
                                     {participant.fullName}
                                   </div>
-                                  <div className="mt-1 text-sm text-muted">
+                                  <div className="mt-1 text-sm text-slate-500">
                                     {formatEmotionLabel(
                                       participant.dominantEmotion || participant.emotion
                                     )}
                                   </div>
-                                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
+                                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                                     {typeof participant.engagement === "number" && (
                                       <span>вовлечённость {participant.engagement}%</span>
                                     )}
@@ -635,12 +637,12 @@ export default function TeacherReportsPage() {
                               {live.participants.slice(0, 4).map((participant) => (
                                 <div
                                   key={participant.userId}
-                                  className="rounded-xl bg-surface px-3 py-3 ring-1 ring-[color:var(--border)]/15"
+                                  className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3"
                                 >
-                                  <div className="text-sm font-medium text-fg">
+                                  <div className="text-sm font-medium text-slate-900">
                                     {participant.fullName}
                                   </div>
-                                  <div className="mt-1 text-sm text-muted">
+                                  <div className="mt-1 text-sm text-slate-500">
                                     {formatEmotionLabel(
                                       participant.dominant_emotion || participant.emotion
                                     )}
@@ -649,7 +651,7 @@ export default function TeacherReportsPage() {
                               ))}
                             </div>
                           ) : (
-                            <div className="text-sm text-muted">
+                            <div className="text-sm leading-6 text-slate-500">
                               Персональные данные по участникам пока недоступны для этой сессии.
                             </div>
                           )}
@@ -658,26 +660,26 @@ export default function TeacherReportsPage() {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <Link href={`/teacher/session/${row.id}/analytics`}>
-                          <Button className="gap-2">
-                            <Activity size={14} />
+                          <Button className="h-12 gap-2 rounded-xl bg-gradient-to-r from-[#6D3DF5] to-[#7C4DFF] px-6 shadow-[0_12px_30px_rgba(116,72,255,0.25)]">
+                            <Activity size={16} />
                             Открыть аналитику
                           </Button>
                         </Link>
 
                         <Link href={`/teacher/session/${row.id}`}>
-                          <Button variant="outline">Открыть монитор</Button>
+                          <Button variant="outline" className="h-12 rounded-xl border-slate-200 bg-white px-6">Открыть монитор</Button>
                         </Link>
 
                         {analytics?.quality && (
-                          <Badge className="bg-primary/10 text-[rgb(var(--primary))]">
+                          <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
                             <Sparkles size={12} className="mr-1" />
                             quality: {analytics.quality}
                           </Badge>
                         )}
                       </div>
 
-                      <div className="border-t border-[color:var(--border)]/20 pt-4">
-                        <div className="mb-3 flex items-center gap-2">
+                      <div className="border-t border-slate-100 pt-5">
+                        <div className="mb-4 flex items-center gap-3">
                           <div className="text-xs font-bold uppercase tracking-wide text-slate-400">
                             Экспорт
                           </div>
@@ -692,7 +694,7 @@ export default function TeacherReportsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1.5"
+                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
                             onClick={() => handleExport(row.id, "json")}
                             disabled={!canExport || exportState !== null}
                           >
@@ -707,7 +709,7 @@ export default function TeacherReportsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1.5"
+                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
                             onClick={() => handleExport(row.id, "csv")}
                             disabled={!canExport || exportState !== null}
                           >
@@ -722,7 +724,7 @@ export default function TeacherReportsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="gap-1.5"
+                            className="h-11 gap-2 rounded-xl border-slate-200 bg-white px-5"
                             onClick={() => handleExport(row.id, "pdf")}
                             disabled={!canExport || exportState !== null}
                           >
@@ -735,7 +737,7 @@ export default function TeacherReportsPage() {
                           </Button>
 
                           {canExport && (
-                            <Badge className="bg-primary/10 text-[rgb(var(--primary))]">
+                            <Badge className="rounded-xl bg-white px-4 py-2 text-[#7448FF] ring-1 ring-purple-200 shadow-sm">
                               <Download size={12} className="mr-1" />
                               backend export route включён
                             </Badge>
