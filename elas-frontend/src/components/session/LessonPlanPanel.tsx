@@ -74,6 +74,7 @@ export default function LessonPlanPanel({
     useEffect(() => {
         if (!sessionId || !editor) return;
 
+        const currentEditor = editor;
         let cancelled = false;
 
         async function loadPlan() {
@@ -87,7 +88,7 @@ export default function LessonPlanPanel({
 
                 setPlan(data);
                 setTitle(data?.title ?? "");
-                editor.commands.setContent(data?.description || "");
+                currentEditor.commands.setContent(data?.description || "");
             } catch (err) {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : "Ошибка загрузки плана");
