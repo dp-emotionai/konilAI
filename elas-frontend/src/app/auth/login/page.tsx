@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import Image from "next/image";
+import {
+  useEffect,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,13 +18,12 @@ import {
   LockKeyhole,
   Mail,
   ShieldCheck,
-  Sparkles,
   BarChart3,
   Users,
+  BookOpen,
 } from "lucide-react";
 
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import { SocialAuthButtons } from "@/components/auth/SocialAuthButtons";
 import { useUI } from "@/components/layout/Providers";
 import { ROLE_HOME } from "@/lib/nav";
@@ -30,6 +33,7 @@ import {
   type AuthApiResponse,
   type AuthSession,
 } from "@/lib/auth/authSession";
+import { cn } from "@/lib/cn";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -145,22 +149,26 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-5 max-w-md text-[15px] font-normal leading-7 text-slate-500">
-            Используйте свои учётные данные для доступа к платформе, учебным сессиям и аналитике.
+            Используйте свои учётные данные для доступа к платформе, учебным
+            сессиям и аналитике.
           </p>
 
           <div className="mt-9 space-y-5">
             <div>
-              <label htmlFor="login-email" className="mb-2 block text-sm font-semibold text-slate-800">
+              <label
+                htmlFor="login-email"
+                className="mb-2 block text-sm font-semibold text-slate-800"
+              >
                 Email
               </label>
-              <Input
+              <AuthInput
                 id="login-email"
                 type="email"
                 autoComplete="email"
                 placeholder="name@example.com"
                 value={email}
                 disabled={loading}
-                prefix={<Mail size={18} />}
+                icon={<Mail size={18} />}
                 onChange={(event) => {
                   setEmail(event.target.value);
                   if (error) setError("");
@@ -171,13 +179,15 @@ export default function LoginPage() {
                     void handleLogin();
                   }
                 }}
-                className="h-14 rounded-2xl border-slate-200 bg-white px-4 text-[15px] font-normal shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition focus:border-[#7448FF] focus:ring-4 focus:ring-purple-100"
               />
             </div>
 
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
-                <label htmlFor="login-password" className="text-sm font-semibold text-slate-800">
+                <label
+                  htmlFor="login-password"
+                  className="text-sm font-semibold text-slate-800"
+                >
                   Пароль
                 </label>
                 <Link
@@ -188,14 +198,14 @@ export default function LoginPage() {
                 </Link>
               </div>
 
-              <Input
+              <AuthInput
                 id="login-password"
                 type={showPassword ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="Введите пароль"
                 value={password}
                 disabled={loading}
-                prefix={<LockKeyhole size={18} />}
+                icon={<LockKeyhole size={18} />}
                 onChange={(event) => {
                   setPassword(event.target.value);
                   if (error) setError("");
@@ -211,13 +221,14 @@ export default function LoginPage() {
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
                     disabled={loading}
-                    aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+                    aria-label={
+                      showPassword ? "Скрыть пароль" : "Показать пароль"
+                    }
                     className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                   </button>
                 }
-                className="h-14 rounded-2xl border-slate-200 bg-white px-4 text-[15px] font-normal shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition focus:border-[#7448FF] focus:ring-4 focus:ring-purple-100"
               />
             </div>
           </div>
@@ -253,7 +264,9 @@ export default function LoginPage() {
 
           <div className="my-7 flex items-center gap-4">
             <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-medium text-slate-400">или продолжить через</span>
+            <span className="text-xs font-medium text-slate-400">
+              или продолжить через
+            </span>
             <span className="h-px flex-1 bg-slate-200" />
           </div>
 
@@ -265,14 +278,23 @@ export default function LoginPage() {
 
           <div className="mt-7 text-center text-sm font-normal text-slate-500">
             Нет аккаунта?{" "}
-            <Link href="/auth/register" className="font-semibold text-[#7448FF] hover:underline">
+            <Link
+              href="/auth/register"
+              className="font-semibold text-[#7448FF] hover:underline"
+            >
               Зарегистрироваться
             </Link>
           </div>
 
           <div className="mt-8 grid grid-cols-2 gap-3">
-            <InfoChip icon={<LockKeyhole size={16} />} text="Защищённая авторизация" />
-            <InfoChip icon={<ShieldCheck size={16} />} text="Контроль согласия" />
+            <InfoChip
+              icon={<LockKeyhole size={16} />}
+              text="Защищённая авторизация"
+            />
+            <InfoChip
+              icon={<ShieldCheck size={16} />}
+              text="Контроль согласия"
+            />
           </div>
         </section>
 
@@ -287,15 +309,50 @@ export default function LoginPage() {
               Платформа современного обучения
             </div>
 
-            <div className="relative mx-auto mb-7 aspect-[1.45/1] w-full max-w-[650px]">
-              <Image
-                src="/auth_login_illustration_1776719102544.png"
-                alt="Учебная платформа KoniAI"
-                fill
-                priority
-                sizes="(min-width: 1024px) 54vw, 0px"
-                className="object-contain drop-shadow-[0_28px_45px_rgba(76,29,149,0.16)]"
-              />
+            <div className="relative mx-auto mb-8 h-[300px] w-full max-w-[620px]">
+              <div className="absolute left-8 top-24 h-24 w-28 rotate-[-8deg] rounded-[26px] bg-white p-5 shadow-[0_20px_55px_rgba(116,72,255,0.18)]">
+                <BookOpen
+                  className="h-full w-full text-[#7448FF]"
+                  strokeWidth={1.6}
+                />
+              </div>
+
+              <div className="absolute left-[150px] top-6 h-52 w-80 rounded-[30px] border border-white/80 bg-white/90 p-5 shadow-[0_28px_80px_rgba(116,72,255,0.2)]">
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Прогресс
+                  </span>
+                  <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-[#7448FF]">
+                    84%
+                  </span>
+                </div>
+
+                <div className="mb-4 h-20 rounded-2xl bg-gradient-to-br from-purple-50 to-white p-3">
+                  <div className="flex h-full items-end gap-2">
+                    {[32, 48, 42, 68, 57, 86, 78].map((height, index) => (
+                      <div
+                        key={index}
+                        className="w-full rounded-full bg-gradient-to-t from-[#7448FF] to-[#A78BFA]"
+                        style={{ height: `${height}%` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="h-12 rounded-xl bg-slate-50" />
+                  <div className="h-12 rounded-xl bg-slate-50" />
+                  <div className="h-12 rounded-xl bg-slate-50" />
+                </div>
+              </div>
+
+              <div className="absolute right-10 top-16 flex h-32 w-28 items-center justify-center rounded-[30px] bg-white shadow-[0_20px_55px_rgba(116,72,255,0.18)]">
+                <Users size={46} className="text-[#7448FF]" />
+              </div>
+
+              <div className="absolute bottom-6 right-20 flex h-24 w-24 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#7448FF] to-[#5B21F6] text-white shadow-[0_20px_45px_rgba(116,72,255,0.32)]">
+                <ShieldCheck size={42} />
+              </div>
             </div>
 
             <h2 className="mx-auto max-w-2xl text-center text-4xl font-semibold leading-tight tracking-[-0.035em] text-slate-950">
@@ -304,18 +361,63 @@ export default function LoginPage() {
             </h2>
 
             <p className="mx-auto mt-5 max-w-xl text-center text-[15px] font-normal leading-7 text-slate-600">
-              Инструменты для интерактивных занятий, материалов, аналитики и эффективного взаимодействия между преподавателями и студентами.
+              Инструменты для интерактивных занятий, материалов, аналитики и
+              эффективного взаимодействия между преподавателями и студентами.
             </p>
 
             <div className="mt-9 grid grid-cols-3 gap-5">
-              <FeatureCard icon={<BarChart3 size={24} />} title="AI-аналитика" text="Понятные метрики и персональные рекомендации" />
-              <FeatureCard icon={<Users size={24} />} title="Live-сессии" text="Обучение в реальном времени с интерактивом" />
-              <FeatureCard icon={<ShieldCheck size={24} />} title="Приватность" text="Consent-first подход и защита ваших данных" />
+              <FeatureCard
+                icon={<BarChart3 size={24} />}
+                title="AI-аналитика"
+                text="Понятные метрики и персональные рекомендации"
+              />
+              <FeatureCard
+                icon={<Users size={24} />}
+                title="Live-сессии"
+                text="Обучение в реальном времени с интерактивом"
+              />
+              <FeatureCard
+                icon={<ShieldCheck size={24} />}
+                title="Приватность"
+                text="Consent-first подход и защита ваших данных"
+              />
             </div>
           </div>
         </aside>
       </div>
     </main>
+  );
+}
+
+function AuthInput({
+  icon,
+  suffix,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & {
+  icon: ReactNode;
+  suffix?: ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <div className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-400">
+        {icon}
+      </div>
+
+      <input
+        {...props}
+        className={cn(
+          "h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-normal text-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#7448FF] focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:bg-slate-50",
+          className,
+        )}
+      />
+
+      {suffix && (
+        <div className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
+          {suffix}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -328,14 +430,24 @@ function InfoChip({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-function FeatureCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+function FeatureCard({
+  icon,
+  title,
+  text,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+}) {
   return (
     <article className="rounded-[24px] bg-white/78 p-5 shadow-[0_16px_45px_rgba(76,29,149,0.08)] ring-1 ring-white/80 backdrop-blur">
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-[#7448FF]">
         {icon}
       </div>
       <h3 className="mt-4 text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-2 text-xs font-normal leading-5 text-slate-500">{text}</p>
+      <p className="mt-2 text-xs font-normal leading-5 text-slate-500">
+        {text}
+      </p>
     </article>
   );
 }
