@@ -18,18 +18,15 @@ import {
   getSessionJoinInfo,
   getStudentSessionDetails,
   recordSessionConsent,
-  sendSessionMetrics,
   type SessionJoinInfo,
 } from "@/lib/api/student";
-import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
 import {
-  getMlApiBaseUrl,
-  mlAnalyzeFrame,
-  captureSquareFrameGrayscale,
-  ML_INTERVAL,
-  ML_429_PAUSE_MS,
-  type MlAnalyzeResponse,
-} from "@/lib/api/ml";
+  getSessionLiveMetrics,
+  type LiveMetricsParticipant,
+  type SessionLiveMetrics,
+} from "@/lib/api/teacher";
+import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import { getMlApiBaseUrl } from "@/lib/api/ml";
 import {
   getSessionContent,
   getSessionMaterials,
@@ -167,6 +164,39 @@ function formatPercentMetric(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
 }
 
+function normalizeIdentity(value?: string | null) {
+  return value?.trim().toLowerCase() || "";
+}
+
+function isMetricStale(updatedAt?: string | null) {
+  if (!updatedAt) return true;
+  const timestamp = Date.parse(updatedAt);
+  if (!Number.isFinite(timestamp)) return true;
+  return Date.now() - timestamp > 15_000;
+}
+
+type VideoTile = {
+  id: string;
+  stream: MediaStream | null;
+  label: string;
+  roleLabel: string;
+  icon: string;
+  isLocal: boolean;
+  role: "teacher" | "student";
+  userId?: string;
+  email?: string;
+};
+
+type StudentFocusItem = {
+  key: string;
+  userId?: string;
+  email?: string;
+  fullName: string;
+  status: "online" | "offline" | "stale";
+  peerId?: string;
+  hasStream: boolean;
+};
+
 function CallControlButton({
                              active = true,
                              icon,
@@ -203,7 +233,7 @@ function CallControlButton({
   );
 }
 
-export default function StudentJoinSessionPage() {
+export default function TeacherJoinSessionPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
   const { state, setConsent } = useUI();
@@ -405,10 +435,10 @@ export default function StudentJoinSessionPage() {
     };
   }, [apiAvailable, live, sessionId]);
 
-  const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
-  const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
-  const [mlActive, setMlActive] = useState(false);
-  const [mlUnavailable, setMlUnavailable] = useState(false);
+  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
+  const [liveMetricsLoading, setLiveMetricsLoading] = useState(false);
+  const [liveMetricsError, setLiveMetricsError] = useState<string | null>(null);
+  const [focusedStudentKey, setFocusedStudentKey] = useState<string | null>(null);
 
   const [connectionState, setConnectionState] = useState<
       "idle" | "connecting" | "connected" | "error"
@@ -424,22 +454,16 @@ export default function StudentJoinSessionPage() {
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
-  const shouldRunMl = live && state.consent && mlApiAvailable;
   const roomId = sessionId;
 
-  const teacherParticipant = useMemo(
-      () => participants.find((p) => p.role === "teacher") ?? participants[0] ?? null,
-      [participants]
-  );
-
-  const currentStudentName = useMemo(
+  const currentTeacherName = useMemo(
       () =>
           formatPersonName({
             fullName: currentUser?.fullName,
             firstName: currentUser?.firstName,
             lastName: currentUser?.lastName,
             email: currentUser?.email,
-            role: "student",
+            role: "teacher",
           }),
       [currentUser]
   );
@@ -447,32 +471,38 @@ export default function StudentJoinSessionPage() {
     setCurrentUser(getStoredAuth());
   }, []);
 
-  const videoTiles = useMemo(() => {
-    const localTile = {
+  const videoTiles = useMemo<VideoTile[]>(() => {
+    const localTile: VideoTile = {
       id: "local",
       stream: localStream,
-      label: currentStudentName,
-      roleLabel: "Вы",
-      icon: "👤",
+      label: currentTeacherName,
+      roleLabel: "Вы · преподаватель",
+      icon: "👩🏻‍🏫",
       isLocal: true,
+      role: "teacher",
+      userId: currentUser?.id ?? undefined,
+      email: currentUser?.email ?? undefined,
     };
 
-    const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
+    const remoteTiles: VideoTile[] = Object.entries(remoteStreams).map(([peerId, stream]) => {
       const participant = participants.find((p) => p.id === peerId) ?? null;
-      const isTeacher = participant?.role === "teacher";
+      const role = participant?.role === "teacher" ? "teacher" : "student";
 
       return {
         id: peerId,
         stream,
         label: formatParticipantLabel(participant),
-        roleLabel: isTeacher ? "Преподаватель" : "Участник",
-        icon: isTeacher ? "👩🏻‍🏫" : "🎓",
+        roleLabel: role === "teacher" ? "Преподаватель" : "Студент",
+        icon: role === "teacher" ? "👩🏻‍🏫" : "🎓",
         isLocal: false,
+        role,
+        userId: participant?.userId,
+        email: participant?.email,
       };
     });
 
     return [localTile, ...remoteTiles];
-  }, [currentStudentName, localStream, participants, remoteStreams]);
+  }, [currentTeacherName, currentUser?.email, currentUser?.id, localStream, participants, remoteStreams]);
 
   const selectedVideo = useMemo(() => {
     return (
@@ -508,10 +538,9 @@ export default function StudentJoinSessionPage() {
   }, []);
 
   const teacherDisplayName = useMemo(() => {
-    const liveParticipantName = formatParticipantLabel(teacherParticipant);
     if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
-    return liveParticipantName;
-  }, [sessionTeacherName, teacherParticipant]);
+    return currentTeacherName;
+  }, [currentTeacherName, sessionTeacherName]);
 
   const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
   const sessionStartTime = useRef<number>(Date.now());
@@ -700,89 +729,187 @@ export default function StudentJoinSessionPage() {
   };
 
   useEffect(() => {
-    if (!shouldRunMl || !localStream) return;
+    if (!apiAvailable || !sessionId || !live) {
+      setLiveMetrics(null);
+      setLiveMetricsLoading(false);
+      setLiveMetricsError(null);
+      return;
+    }
 
-    setMlActive(true);
-    setMlUnavailable(false);
-
-    let cancelled = false;
+    let closed = false;
     let inflight = false;
-    let consecutiveFailures = 0;
-    let pausedUntil = 0;
-    const failureThreshold = 4;
 
-    const hiddenVideo = document.createElement("video");
-    hiddenVideo.muted = true;
-    hiddenVideo.playsInline = true;
-    hiddenVideo.autoplay = true;
-    hiddenVideo.srcObject = localStream;
-    hiddenVideo.play().catch(() => { });
+    const load = async (initial = false) => {
+      if (closed || inflight) return;
+      inflight = true;
 
-    const timer = setInterval(async () => {
-      if (cancelled || inflight) return;
-      if (Date.now() < pausedUntil) return;
-
-      const frame = captureSquareFrameGrayscale(hiddenVideo, 192);
-      if (!frame) return;
+      if (initial) {
+        setLiveMetricsLoading(true);
+      }
 
       try {
-        inflight = true;
-        const result = await mlAnalyzeFrame(frame);
-        if (cancelled) return;
+        const data = await getSessionLiveMetrics(sessionId);
 
-        if (!result) {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
-          return;
-        }
+        if (closed) return;
 
-        consecutiveFailures = 0;
-        const hasFace = result.face_detected !== false;
-        setMlFaceDetected(hasFace);
-
-        if (!hasFace) {
-          setMlResult(null);
-          return;
-        }
-
-        setMlResult(result);
-
-        if (sessionId && apiAvailable) {
-          sendSessionMetrics(sessionId, {
-            emotion: result.emotion ?? "Neutral",
-            confidence: result.confidence ?? 0,
-            risk: result.risk ?? 0,
-            state: result.state ?? "NORMAL",
-            dominant_emotion: result.dominant_emotion ?? "Neutral",
-            engagement: result.engagement,
-            stress: result.stress,
-            fatigue: result.fatigue,
-          }).catch(() => { });
-        }
-      } catch (err) {
-        const e = err as Error & { status?: number };
-        if (e?.status === 429 || e?.message === "RATE_LIMIT") {
-          pausedUntil = Date.now() + ML_429_PAUSE_MS;
+        if (data) {
+          setLiveMetrics(data);
+          setLiveMetricsError(null);
         } else {
-          consecutiveFailures += 1;
-          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+          setLiveMetricsError("Не удалось получить ML-метрики студентов.");
         }
       } finally {
         inflight = false;
+        if (!closed) {
+          setLiveMetricsLoading(false);
+        }
       }
-    }, ML_INTERVAL);
+    };
+
+    void load(true);
+    const interval = window.setInterval(() => {
+      void load();
+    }, 2000);
 
     return () => {
-      cancelled = true;
-      clearInterval(timer);
-      hiddenVideo.pause();
-      hiddenVideo.srcObject = null;
-      setMlActive(false);
-      setMlResult(null);
-      setMlFaceDetected(null);
-      setMlUnavailable(false);
+      closed = true;
+      window.clearInterval(interval);
     };
-  }, [shouldRunMl, sessionId, apiAvailable, localStream]);
+  }, [apiAvailable, live, sessionId]);
+
+  const studentFocusItems = useMemo<StudentFocusItem[]>(() => {
+    const map = new Map<string, StudentFocusItem>();
+    const ownUserId = normalizeIdentity(currentUser?.id);
+    const ownEmail = normalizeIdentity(currentUser?.email);
+
+    const upsert = (item: StudentFocusItem) => {
+      const current = map.get(item.key);
+      map.set(item.key, current ? { ...current, ...item } : item);
+    };
+
+    for (const row of presence) {
+      const userId = normalizeIdentity(row.userId);
+      const email = normalizeIdentity(row.email);
+      if ((ownUserId && userId === ownUserId) || (ownEmail && email === ownEmail)) {
+        continue;
+      }
+
+      const key = userId || email;
+      if (!key) continue;
+
+      upsert({
+        key,
+        userId: row.userId || undefined,
+        email: row.email || undefined,
+        fullName: row.fullName || row.email || "Студент",
+        status: row.status === "online" ? "online" : "offline",
+        hasStream: false,
+      });
+    }
+
+    for (const participant of participants) {
+      if (participant.role !== "student") continue;
+
+      const userId = normalizeIdentity(participant.userId);
+      const email = normalizeIdentity(participant.email);
+      const key = userId || email || participant.id;
+      const hasStream = Boolean(remoteStreams[participant.id]);
+
+      upsert({
+        key,
+        userId: participant.userId,
+        email: participant.email,
+        fullName: formatParticipantLabel(participant),
+        status: "online",
+        peerId: participant.id,
+        hasStream,
+      });
+    }
+
+    for (const metric of liveMetrics?.participants ?? []) {
+      const userId = normalizeIdentity(metric.userId);
+      const email = normalizeIdentity(metric.email);
+      const key = userId || email;
+      if (!key) continue;
+
+      upsert({
+        key,
+        userId: metric.userId,
+        email: metric.email || undefined,
+        fullName: formatPersonName(metric),
+        status: isMetricStale(metric.updatedAt) ? "stale" : "online",
+        hasStream: map.get(key)?.hasStream ?? false,
+        peerId: map.get(key)?.peerId,
+      });
+    }
+
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.status !== b.status) {
+        const order = { online: 0, stale: 1, offline: 2 } as const;
+        return order[a.status] - order[b.status];
+      }
+      return a.fullName.localeCompare(b.fullName, "ru");
+    });
+  }, [currentUser?.email, currentUser?.id, liveMetrics?.participants, participants, presence, remoteStreams]);
+
+  const selectedStudentFromVideo = useMemo(() => {
+    if (!selectedVideo || selectedVideo.role !== "student") return null;
+
+    const userId = normalizeIdentity(selectedVideo.userId);
+    const email = normalizeIdentity(selectedVideo.email);
+    const key = userId || email || selectedVideo.id;
+
+    return studentFocusItems.find((item) => item.key === key) ?? null;
+  }, [selectedVideo, studentFocusItems]);
+
+  const effectiveFocusedStudentKey = focusedStudentKey ?? selectedStudentFromVideo?.key ?? null;
+
+  const focusedStudent = useMemo(
+      () =>
+          studentFocusItems.find((item) => item.key === effectiveFocusedStudentKey) ??
+          selectedStudentFromVideo,
+      [effectiveFocusedStudentKey, selectedStudentFromVideo, studentFocusItems]
+  );
+
+  const focusedMetrics = useMemo<LiveMetricsParticipant | null>(() => {
+    if (!focusedStudent) return null;
+
+    const userId = normalizeIdentity(focusedStudent.userId);
+    const email = normalizeIdentity(focusedStudent.email);
+
+    return (
+        liveMetrics?.participants.find((metric) => {
+          const metricUserId = normalizeIdentity(metric.userId);
+          const metricEmail = normalizeIdentity(metric.email);
+          return Boolean(
+              (userId && metricUserId === userId) ||
+              (email && metricEmail === email)
+          );
+        }) ?? null
+    );
+  }, [focusedStudent, liveMetrics?.participants]);
+
+  const focusStudent = useCallback(
+      (student: StudentFocusItem) => {
+        setFocusedStudentKey(student.key);
+        if (student.peerId && remoteStreams[student.peerId]) {
+          setSelectedVideoId(student.peerId);
+        }
+      },
+      [remoteStreams]
+  );
+
+  const focusVideoTile = useCallback((tile: VideoTile) => {
+    setSelectedVideoId(tile.id);
+
+    if (tile.role !== "student") {
+      setFocusedStudentKey(null);
+      return;
+    }
+
+    const key = normalizeIdentity(tile.userId) || normalizeIdentity(tile.email) || tile.id;
+    setFocusedStudentKey(key);
+  }, []);
 
   if (tab === "live") {
     return (
@@ -904,7 +1031,7 @@ export default function StudentJoinSessionPage() {
                               <button
                                   key={tile.id}
                                   type="button"
-                                  onClick={() => setSelectedVideoId(tile.id)}
+                                  onClick={() => focusVideoTile(tile)}
                                   className={cn(
                                       "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
                                       selectedVideo?.id === tile.id
@@ -1047,7 +1174,7 @@ export default function StudentJoinSessionPage() {
                           </div>
                       )}
 
-                      {activeBottomTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="student" />}
+                      {activeBottomTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="teacher" />}
 
                       {activeBottomTab === "notes" && false && (
                           <div className="flex h-full w-full flex-col text-left">
@@ -1268,11 +1395,11 @@ export default function StudentJoinSessionPage() {
                   <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                     <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                     <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
-                      <Users2 size={12} /> {participants.length || 1}
+                      <Users2 size={12} /> {studentFocusItems.length + 1}
                     </Badge>
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
-                    <SessionChatPanel sessionId={roomId} role="student" type={sessionType} />
+                    <SessionChatPanel sessionId={roomId} role="teacher" type={sessionType} />
                   </div>
                 </div>
 
@@ -1295,73 +1422,109 @@ export default function StudentJoinSessionPage() {
 
                     <div>
                       <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
-                      <div className="flex flex-col gap-3">
-                        {presence.length > 0 && (
-                            <div className="space-y-2">
-                              {presence.map((p) => (
-                                  <div
-                                      key={p.userId}
-                                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="truncate text-[13px] font-semibold text-slate-900">
-                                        {p.fullName || p.email || p.userId}
-                                      </div>
-                                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                                        {p.email || ""}
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-[11px] font-semibold">
-                                <span
-                                    className={cn(
-                                        "h-2 w-2 rounded-full",
-                                        p.status === "online" ? "bg-emerald-500" : "bg-slate-300"
-                                    )}
-                                />
-                                      <span className={p.status === "online" ? "text-emerald-600" : "text-slate-500"}>
-                                  {p.status}
-                                </span>
-                                    </div>
-                                  </div>
-                              ))}
-                            </div>
-                        )}
-                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
+                      <div className="flex flex-col gap-2">
+                        <button
+                            type="button"
+                            onClick={() => focusVideoTile(videoTiles[0])}
+                            className={cn(
+                                "flex items-center gap-3 rounded-2xl border p-2.5 text-left transition",
+                                selectedVideo?.isLocal
+                                    ? "border-[#7448FF]/30 bg-purple-50/70 ring-2 ring-[#7448FF]/10"
+                                    : "border-slate-100 bg-slate-50 hover:border-slate-200"
+                            )}
+                        >
                           <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
                             👩🏻‍🏫
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <div className="font-semibold text-[13px] text-slate-900 truncate">
                               {teacherDisplayName}
                             </div>
                             <div className="text-[11px] text-slate-500 font-medium">
-                              Преподаватель
+                              Вы · преподаватель
                             </div>
                           </div>
-                        </div>
+                        </button>
 
-                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
-                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
-                            👦🏻
-                          </div>
-                          <div className="min-w-0">
-                            <div className="font-semibold text-[13px] text-slate-900 truncate">
-                              {currentStudentName}
+                        {studentFocusItems.length > 0 ? (
+                            studentFocusItems.map((student) => {
+                              const isFocused = student.key === effectiveFocusedStudentKey;
+                              const statusLabel =
+                                  student.status === "online"
+                                      ? "online"
+                                      : student.status === "stale"
+                                          ? "данные устарели"
+                                          : "offline";
+
+                              return (
+                                  <button
+                                      key={student.key}
+                                      type="button"
+                                      onClick={() => focusStudent(student)}
+                                      className={cn(
+                                          "flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition",
+                                          isFocused
+                                              ? "border-[#7448FF]/35 bg-purple-50/70 ring-2 ring-[#7448FF]/10"
+                                              : "border-slate-100 bg-white hover:border-purple-200 hover:bg-purple-50/30"
+                                      )}
+                                  >
+                                    <div className="flex min-w-0 items-center gap-3">
+                                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-100 bg-white shadow-sm">
+                                        🎓
+                                      </div>
+                                      <div className="min-w-0">
+                                        <div className="truncate text-[13px] font-semibold text-slate-900">
+                                          {student.fullName}
+                                        </div>
+                                        <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                          {student.email || (student.hasStream ? "Видео подключено" : "Студент")}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-semibold">
+                                      <span
+                                          className={cn(
+                                              "h-2 w-2 rounded-full",
+                                              student.status === "online"
+                                                  ? "bg-emerald-500"
+                                                  : student.status === "stale"
+                                                      ? "bg-amber-400"
+                                                      : "bg-slate-300"
+                                          )}
+                                      />
+                                      <span
+                                          className={cn(
+                                              student.status === "online"
+                                                  ? "text-emerald-600"
+                                                  : student.status === "stale"
+                                                      ? "text-amber-600"
+                                                      : "text-slate-500"
+                                          )}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                    </div>
+                                  </button>
+                              );
+                            })
+                        ) : (
+                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs font-medium text-slate-500">
+                              Студенты ещё не подключились к сессии.
                             </div>
-                            <div className="text-[11px] text-[#7448FF] font-semibold flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-[#7448FF] rounded-full" />
-                              Студент
-                            </div>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>
 
-                  {mlResult && (
+                  {focusedStudent && focusedMetrics && (
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400 mb-2">
-                          Ваши локальные ML-метрики
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-[12px] font-black uppercase tracking-widest text-slate-400">
+                            ML-метрики студента
+                          </div>
+                          <div className="max-w-full truncate text-[12px] font-bold text-[#7448FF]">
+                            {focusedStudent.fullName}
+                          </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1369,7 +1532,7 @@ export default function StudentJoinSessionPage() {
                               Эмоция
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {mlResult.dominant_emotion || mlResult.emotion || "—"}
+                              {focusedMetrics.dominant_emotion || focusedMetrics.emotion || "—"}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1377,7 +1540,7 @@ export default function StudentJoinSessionPage() {
                               Уверенность
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.confidence)}
+                              {formatPercentMetric(focusedMetrics.confidence)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1385,7 +1548,7 @@ export default function StudentJoinSessionPage() {
                               Вовлечённость
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.engagement)}
+                              {formatPercentMetric(focusedMetrics.engagement)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1393,7 +1556,7 @@ export default function StudentJoinSessionPage() {
                               Стресс
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.stress)}
+                              {formatPercentMetric(focusedMetrics.stress)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1401,7 +1564,7 @@ export default function StudentJoinSessionPage() {
                               Усталость
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.fatigue)}
+                              {formatPercentMetric(focusedMetrics.fatigue)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1409,38 +1572,47 @@ export default function StudentJoinSessionPage() {
                               Риск
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(mlResult.risk)}
+                              {formatPercentMetric(focusedMetrics.risk)}
                             </div>
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
-                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
-                        Состояние: {mlResult.state || "—"}
-                      </span>
-                          {typeof mlResult.face_detected === "boolean" && (
-                              <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
-                          Лицо в кадре: {mlResult.face_detected ? "обнаружено" : "не найдено"}
-                        </span>
-                          )}
+                          <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-slate-600">
+                            Состояние: {focusedMetrics.state || "—"}
+                          </span>
+                          <span
+                              className={cn(
+                                  "rounded-full border px-3 py-1",
+                                  isMetricStale(focusedMetrics.updatedAt)
+                                      ? "border-amber-100 bg-amber-50 text-amber-700"
+                                      : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                              )}
+                          >
+                            {isMetricStale(focusedMetrics.updatedAt) ? "Данные временно не обновляются" : "Данные обновляются"}
+                          </span>
                         </div>
                       </div>
                   )}
 
-                  {mlActive && mlFaceDetected === false && !mlUnavailable && (
-                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
-                        Лицо не найдено в кадре. Аналитика временно приостановлена, пока лицо не вернется.
+                  {focusedStudent && !focusedMetrics && (
+                      <div
+                          className={cn(
+                              "rounded-2xl border p-4 text-[13px] font-medium",
+                              liveMetricsError
+                                  ? "border-amber-100 bg-amber-50 text-amber-700"
+                                  : "border-purple-100 bg-purple-50 text-purple-700"
+                          )}
+                      >
+                        {liveMetricsLoading
+                            ? `Загружаем ML-метрики студента ${focusedStudent.fullName}…`
+                            : liveMetricsError ||
+                              `Ожидание первых ML-метрик студента ${focusedStudent.fullName}…`}
                       </div>
                   )}
 
-                  {mlActive && !mlResult && mlFaceDetected !== false && !mlUnavailable && (
-                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
-                        ML-анализ активен. Ожидание первых результатов...
-                      </div>
-                  )}
-
-                  {mlUnavailable && (
-                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
-                        ML-анализ временно недоступен.
+                  {!focusedStudent && (
+                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[13px] font-medium text-slate-600">
+                        Выберите студента в списке или нажмите на его видео, чтобы увидеть ML-метрики.
                       </div>
                   )}
                 </div>
@@ -1478,14 +1650,14 @@ export default function StudentJoinSessionPage() {
       <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
         <Breadcrumbs
             items={[
-              { label: "Студент", href: "/student/dashboard" },
-              { label: "Сессии", href: "/student/sessions" },
+              { label: "Преподаватель", href: "/teacher/dashboard" },
+              { label: "Сессии", href: "/teacher/sessions" },
               { label: title },
             ]}
         />
 
         <Link
-            href="/student/sessions"
+            href="/teacher/sessions"
             className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
         >
           ← К списку сессий
@@ -1493,7 +1665,7 @@ export default function StudentJoinSessionPage() {
 
         {!live && (
             <PageHero
-                overline="Студент · Сессия"
+                overline="Преподаватель · Сессия"
                 title={title}
                 subtitle={
                   joinInfo?.groupName
@@ -1506,7 +1678,7 @@ export default function StudentJoinSessionPage() {
                     <Badge variant={state.consent ? "success" : "warning"}>
                       {state.consent ? "Согласие: да" : "Согласие: нет"}
                     </Badge>
-                    <Link href="/student/sessions">
+                    <Link href="/teacher/sessions">
                       <Button variant="outline">Назад</Button>
                     </Link>
                   </div>
@@ -1566,7 +1738,7 @@ export default function StudentJoinSessionPage() {
                                     : "Дождитесь, когда преподаватель запустит сессию."}
                               </div>
 
-                              <Link href="/student/sessions" className="mt-2 inline-block">
+                              <Link href="/teacher/sessions" className="mt-2 inline-block">
                                 <Button variant="outline">К списку</Button>
                               </Link>
                             </>
@@ -1599,7 +1771,7 @@ export default function StudentJoinSessionPage() {
                         Подготовка (согласие и камера)
                       </div>
                       <Link
-                          href="/student/sessions"
+                          href="/teacher/sessions"
                           aria-label="Назад"
                           className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                       >
