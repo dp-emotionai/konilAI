@@ -6,13 +6,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
-import Section from "@/components/common/Section";
 import LessonPlanPanel from "@/components/session/LessonPlanPanel";
 
-import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 
@@ -1554,108 +1550,7 @@ export default function StudentJoinSessionPage() {
     }
 
     return (
-        <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
-            <Breadcrumbs
-                items={[
-                    { label: "Студент", href: "/student/dashboard" },
-                    { label: "Сессии", href: "/student/sessions" },
-                    { label: title },
-                ]}
-            />
-
-            <Link
-                href="/student/sessions"
-                className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
-            >
-                ← К списку сессий
-            </Link>
-
-            {!live && (
-                <PageHero
-                    overline="Студент · Сессия"
-                    title={title}
-                    subtitle={
-                        joinInfo?.groupName
-                            ? `${joinInfo.groupName}. Сначала согласие и проверка камеры, затем подключение.`
-                            : "Сначала согласие и проверка камеры, затем подключение к эфиру."
-                    }
-                    right={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Badge>{joinInfo?.type === "exam" ? "Экзамен" : "Лекция"}</Badge>
-                            <Badge variant={state.consent ? "success" : "warning"}>
-                                {state.consent ? "Согласие: да" : "Согласие: нет"}
-                            </Badge>
-                            <Link href="/student/sessions">
-                                <Button variant="outline">Назад</Button>
-                            </Link>
-                        </div>
-                    }
-                />
-            )}
-
-            {joinInfoLoading && (
-                <Section spacing="none" className="mt-6">
-                    <Card>
-                        <CardContent className="p-6 md:p-7">
-                            <div className="h-24 animate-pulse rounded-[20px] bg-slate-50" />
-                        </CardContent>
-                    </Card>
-                </Section>
-            )}
-
-            {joinInfoError && (
-                <Section spacing="none" className="mt-6">
-                    <Card className="border-amber-200 bg-amber-50">
-                        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
-                            <div className="flex items-center gap-3">
-                                <AlertTriangle size={20} className="shrink-0 text-amber-600" />
-                                <div>
-                                    <div className="font-semibold text-slate-900">Ошибка загрузки</div>
-                                    <div className="mt-0.5 text-sm text-amber-800">{joinInfoError}</div>
-                                </div>
-                            </div>
-                            <Button variant="outline" onClick={() => void loadJoinInfo()} className="bg-white">
-                                Повторить
-                            </Button>
-                        </CardContent>
-                    </Card>
-                </Section>
-            )}
-
-            {!joinInfoLoading &&
-                !joinInfoError &&
-                !canJoin &&
-                blockReason &&
-                blockReason !== "consent_required" && (
-                    <Section spacing="none" className="mt-6">
-                        <Reveal>
-                            <Card className="mx-auto max-w-3xl border-slate-100">
-                                <CardContent className="space-y-3 p-6 md:p-7">
-                                    {(blockReason === "session_not_started" || blockReason === "session_ended") && (
-                                        <>
-                                            <div className="text-sm text-slate-500">Статус сессии</div>
-                                            <div className="text-lg font-semibold text-slate-900">
-                                                {blockReason === "session_ended"
-                                                    ? "Сессия завершена."
-                                                    : "Сессия ещё не началась."}
-                                            </div>
-                                            <div className="text-sm text-slate-500">
-                                                {blockReason === "session_ended"
-                                                    ? "Преподаватель завершил эфир. Подключение недоступно."
-                                                    : "Дождитесь, когда преподаватель запустит сессию."}
-                                            </div>
-
-                                            <Link href="/student/sessions" className="mt-2 inline-block">
-                                                <Button variant="outline">К списку</Button>
-                                            </Link>
-                                        </>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </Reveal>
-                    </Section>
-                )}
-
+        <div>
             {showPreparation && tab === "prepare" && !consentModalOpen && (
                 <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
                     <div className="flex min-h-full items-center justify-center">
