@@ -913,6 +913,7 @@ export default function StudentJoinSessionPage() {
                             title="Открыть видео на весь экран"
                         >
                           <StreamVideo
+                              key={selectedVideo.id}
                               stream={selectedVideo.stream}
                               className="h-full w-full object-cover"
                               autoPlay
