@@ -229,20 +229,20 @@ export async function getSessionLiveMetrics(sessionId: string): Promise<SessionL
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
   try {
     const raw = await api.get<
-      Omit<SessionLiveMetrics, "participants"> & {
-        participants?: RawLiveMetricsParticipant[] | null;
-      }
+        Omit<SessionLiveMetrics, "participants"> & {
+      participants?: RawLiveMetricsParticipant[] | null;
+    }
     >(`sessions/${sessionId}/live-metrics`);
 
     const participants = Array.isArray(raw?.participants)
-      ? raw.participants.map((participant) => {
+        ? raw.participants.map((participant) => {
           const firstName = participant.firstName?.trim() || null;
           const lastName = participant.lastName?.trim() || null;
           const fullName =
-            participant.fullName?.trim() ||
-            participant.name?.trim() ||
-            [firstName, lastName].filter(Boolean).join(" ").trim() ||
-            null;
+              participant.fullName?.trim() ||
+              participant.name?.trim() ||
+              [firstName, lastName].filter(Boolean).join(" ").trim() ||
+              null;
 
           return {
             ...participant,
@@ -251,7 +251,7 @@ export async function getSessionLiveMetrics(sessionId: string): Promise<SessionL
             lastName,
           };
         })
-      : [];
+        : [];
 
     return {
       ...raw,
@@ -273,25 +273,27 @@ export type SessionSummary = {
   durationMinutes?: number | null;
 };
 
+type SessionSummaryResponse = SessionSummary & { id?: string };
+
 export async function getSessionSummary(sessionId: string): Promise<SessionSummary | null> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return null;
   try {
     // Ожидаемый endpoint партнёра: GET /sessions/:id/summary
-    const raw = await api.get<SessionSummary | (SessionSummary & { id?: string })>(
-      `sessions/${sessionId}/summary`
+    const raw = await api.get<SessionSummaryResponse>(
+        `sessions/${sessionId}/summary`
     );
     if (!raw) return null;
-    const baseId = (raw as any).sessionId ?? (raw as any).id ?? sessionId;
+    const baseId = raw.sessionId ?? raw.id ?? sessionId;
     return {
       sessionId: baseId,
       avgEngagement: typeof raw.avgEngagement === "number" ? raw.avgEngagement : 0,
       attentionDrops:
-        typeof raw.attentionDrops === "number" ? raw.attentionDrops : 0,
-      quality: (raw.quality as any) ?? "medium",
+          typeof raw.attentionDrops === "number" ? raw.attentionDrops : 0,
+      quality: raw.quality ?? "medium",
       avgStress:
-        typeof raw.avgStress === "number" ? raw.avgStress : null,
+          typeof raw.avgStress === "number" ? raw.avgStress : null,
       durationMinutes:
-        typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
+          typeof raw.durationMinutes === "number" ? raw.durationMinutes : null,
     };
   } catch {
     return null;
@@ -338,8 +340,8 @@ export async function createSession(body: CreateSessionBody): Promise<CreateSess
 
 /** Start (active), end (finished), or reopen (draft). */
 export async function updateSessionStatus(
-  sessionId: string,
-  status: "active" | "finished" | "draft"
+    sessionId: string,
+    status: "active" | "finished" | "draft"
 ): Promise<void> {
   await api.patch(`sessions/${sessionId}`, { status });
 }
@@ -348,6 +350,22 @@ export async function updateSessionStatus(
 export async function createInvitations(groupId: string, emails: string[]): Promise<{ created: { email: string; invitationId: string }[] }> {
   const res = await api.post<{ created: { email: string; invitationId: string }[] }>(`groups/${groupId}/invitations`, { emails });
   return res;
+}
+
+export type InvitableStudentRow = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string;
+  status: string;
+  alreadyInvited: boolean;
+  createdAt: string;
+};
+
+export async function getInvitableStudents(groupId: string): Promise<InvitableStudentRow[]> {
+  const list = await api.get<InvitableStudentRow[]>(`groups/${groupId}/invitable-students`);
+  return Array.isArray(list) ? list : [];
 }
 
 export type GroupInvitationRow = {
@@ -413,8 +431,8 @@ export async function getGroupMessages(groupId: string, tab: "announcements" | "
 }
 
 export async function postGroupMessage(
-  groupId: string,
-  payload: { type: "message" | "announcement" | "question" | "answer"; text: string; replyToId?: string | null }
+    groupId: string,
+    payload: { type: "message" | "announcement" | "question" | "answer"; text: string; replyToId?: string | null }
 ): Promise<GroupMessage> {
   return api.post<GroupMessage>(`groups/${groupId}/messages`, payload);
 }
@@ -444,8 +462,8 @@ export type SessionMessage = {
 };
 
 export async function getSessionMessages(
-  sessionId: string,
-  opts: { channel?: "public" | "help"; helpStudentId?: string } = {}
+    sessionId: string,
+    opts: { channel?: "public" | "help"; helpStudentId?: string } = {}
 ): Promise<SessionMessage[]> {
   if (!getApiBaseUrl() || !hasAuth()) return [];
   const params = new URLSearchParams();
@@ -462,19 +480,19 @@ export async function getSessionMessages(
 }
 
 export async function postSessionMessage(
-  sessionId: string,
-  payload: {
-    type: string;
-    text: string;
-    channel?: "public" | "help";
-    helpStudentId?: string | null;
-    attachment?: {
-      storageKey: string;
-      fileName: string;
-      mimeType?: string | null;
-      size?: number | null;
-    } | null;
-  }
+    sessionId: string,
+    payload: {
+      type: string;
+      text: string;
+      channel?: "public" | "help";
+      helpStudentId?: string | null;
+      attachment?: {
+        storageKey: string;
+        fileName: string;
+        mimeType?: string | null;
+        size?: number | null;
+      } | null;
+    }
 ): Promise<SessionMessage | null> {
   try {
     return await api.post<SessionMessage>(`sessions/${sessionId}/messages`, payload);
@@ -501,8 +519,8 @@ export async function getSessionChatPolicy(sessionId: string): Promise<SessionCh
 }
 
 export async function updateSessionChatPolicy(
-  sessionId: string,
-  payload: { mode?: SessionChatPolicy["mode"]; slowmodeSec?: number }
+    sessionId: string,
+    payload: { mode?: SessionChatPolicy["mode"]; slowmodeSec?: number }
 ): Promise<SessionChatPolicy> {
   return api.patch<SessionChatPolicy>(`sessions/${sessionId}/chat-policy`, payload);
 }

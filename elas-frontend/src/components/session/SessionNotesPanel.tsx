@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Save, Trash2, StickyNote, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/cn";
+import { ChatClient } from "@/lib/ws/chatClient";
 import {
   createSessionNote,
   deleteSessionNote,
@@ -29,10 +30,22 @@ function getNotePreview(note: SessionNote) {
   return compact || "Пустая заметка";
 }
 
+function sortNotes(items: SessionNote[]) {
+  return [...items].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+}
+
+type SessionNoteRealtimeEvent = {
+  type?: string;
+  id?: string;
+  sessionId?: string;
+} & Partial<SessionNote>;
+
 export function SessionNotesPanel({
-  sessionId,
-  role,
-}: {
+                                    sessionId,
+                                    role,
+                                  }: {
   sessionId: string;
   role: "teacher" | "student";
 }) {
@@ -45,8 +58,8 @@ export function SessionNotesPanel({
   const [error, setError] = useState<string | null>(null);
 
   const selectedNote = useMemo(
-    () => notes.find((note) => note.id === selectedId) ?? null,
-    [notes, selectedId]
+      () => notes.find((note) => note.id === selectedId) ?? null,
+      [notes, selectedId]
   );
 
   const loadNotes = useCallback(async () => {
@@ -57,7 +70,7 @@ export function SessionNotesPanel({
 
     try {
       const data = await getSessionNotes(sessionId);
-      setNotes(data);
+      setNotes(sortNotes(data));
       setSelectedId((current) => {
         if (current === "new") return current;
         return data.some((note) => note.id === current) ? current : data[0]?.id ?? "new";
@@ -74,6 +87,57 @@ export function SessionNotesPanel({
   useEffect(() => {
     void loadNotes();
   }, [loadNotes]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const client = new ChatClient((event) => {
+      const packet = event as SessionNoteRealtimeEvent;
+
+      if (packet.sessionId && packet.sessionId !== sessionId) return;
+
+      if (packet.type === "session:note_created" && packet.id && typeof packet.text === "string") {
+        const created: SessionNote = {
+          id: packet.id,
+          text: packet.text,
+          createdAt: packet.createdAt || new Date().toISOString(),
+          updatedAt: packet.updatedAt || packet.createdAt || new Date().toISOString(),
+          authorId: packet.authorId || null,
+          authorName: packet.authorName || null,
+        };
+
+        setNotes((prev) => sortNotes([created, ...prev.filter((note) => note.id !== created.id)]));
+        return;
+      }
+
+      if (packet.type === "session:note_updated" && packet.id && typeof packet.text === "string") {
+        const updated: SessionNote = {
+          id: packet.id,
+          text: packet.text,
+          createdAt: packet.createdAt || packet.updatedAt || new Date().toISOString(),
+          updatedAt: packet.updatedAt || packet.createdAt || new Date().toISOString(),
+          authorId: packet.authorId || null,
+          authorName: packet.authorName || null,
+        };
+
+        setNotes((prev) => sortNotes([updated, ...prev.filter((note) => note.id !== updated.id)]));
+        setSelectedId((current) => current);
+        return;
+      }
+
+      if (packet.type === "session:note_deleted" && packet.id) {
+        setNotes((prev) => prev.filter((note) => note.id !== packet.id));
+        setSelectedId((current) => (current === packet.id ? "new" : current));
+        return;
+      }
+    });
+
+    client.joinSession(sessionId);
+
+    return () => {
+      client.disconnect();
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     if (selectedNote) {
@@ -103,11 +167,7 @@ export function SessionNotesPanel({
       if (selectedNote) {
         const updated = await updateSessionNote(sessionId, selectedNote.id, text);
         if (updated) {
-          setNotes((prev) =>
-            [updated, ...prev.filter((note) => note.id !== updated.id)].sort(
-              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-            )
-          );
+          setNotes((prev) => sortNotes([updated, ...prev.filter((note) => note.id !== updated.id)]));
           setSelectedId(updated.id);
         } else {
           await loadNotes();
@@ -115,11 +175,7 @@ export function SessionNotesPanel({
       } else {
         const created = await createSessionNote(sessionId, text);
         if (created) {
-          setNotes((prev) =>
-            [created, ...prev.filter((note) => note.id !== created.id)].sort(
-              (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-            )
-          );
+          setNotes((prev) => sortNotes([created, ...prev.filter((note) => note.id !== created.id)]));
           setSelectedId(created.id);
         } else {
           await loadNotes();
@@ -152,134 +208,134 @@ export function SessionNotesPanel({
 
   if (loading) {
     return (
-      <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-slate-100 bg-slate-50/50 text-sm font-medium text-slate-400">
-        Загрузка заметок...
-      </div>
+        <div className="flex min-h-[260px] items-center justify-center rounded-[24px] border border-slate-100 bg-slate-50/50 text-sm font-medium text-slate-400">
+          Загрузка заметок...
+        </div>
     );
   }
 
   return (
-    <div className="grid min-h-[320px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <div className="flex min-h-0 flex-col rounded-[24px] border border-slate-100 bg-slate-50/60">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div>
-            <div className="text-sm font-bold text-slate-900">Заметки сессии</div>
-            <div className="text-xs text-slate-400">
-              {notes.length > 0 ? `${notes.length} шт.` : "Пока без заметок"}
+      <div className="grid min-h-[320px] gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-col rounded-[24px] border border-slate-100 bg-slate-50/60">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div>
+              <div className="text-sm font-bold text-slate-900">Заметки сессии</div>
+              <div className="text-xs text-slate-400">
+                {notes.length > 0 ? `${notes.length} шт.` : "Пока без заметок"}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => void loadNotes()}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-              aria-label="Обновить заметки"
-            >
-              <RefreshCw size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleCreateNew}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-              aria-label="Создать заметку"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-          {notes.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
-              У этой сессии пока нет сохранённых заметок.
-            </div>
-          ) : (
-            notes.map((note) => {
-              const active = selectedId === note.id;
-
-              return (
-                <button
-                  key={note.id}
+            <div className="flex items-center gap-2">
+              <button
                   type="button"
-                  onClick={() => setSelectedId(note.id)}
-                  className={cn(
-                    "w-full rounded-2xl border px-4 py-3 text-left transition",
-                    active
-                      ? "border-[#7448FF]/40 bg-white shadow-sm"
-                      : "border-transparent bg-white/80 hover:border-slate-200"
-                  )}
-                >
-                  <div className="line-clamp-2 text-sm font-semibold text-slate-800">
-                    {getNotePreview(note)}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                  onClick={() => void loadNotes()}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                  aria-label="Обновить заметки"
+              >
+                <RefreshCw size={16} />
+              </button>
+              <button
+                  type="button"
+                  onClick={handleCreateNew}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                  aria-label="Создать заметку"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+          </div>
+
+          <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+            {notes.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-400">
+                  У этой сессии пока нет сохранённых заметок.
+                </div>
+            ) : (
+                notes.map((note) => {
+                  const active = selectedId === note.id;
+
+                  return (
+                      <button
+                          key={note.id}
+                          type="button"
+                          onClick={() => setSelectedId(note.id)}
+                          className={cn(
+                              "w-full rounded-2xl border px-4 py-3 text-left transition",
+                              active
+                                  ? "border-[#7448FF]/40 bg-white shadow-sm"
+                                  : "border-transparent bg-white/80 hover:border-slate-200"
+                          )}
+                      >
+                        <div className="line-clamp-2 text-sm font-semibold text-slate-800">
+                          {getNotePreview(note)}
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
                     <span className="truncate">
                       {note.authorName || (role === "teacher" ? "Преподаватель" : "Студент")}
                     </span>
-                    <span className="shrink-0">{formatNoteTime(note.updatedAt)}</span>
-                  </div>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-col rounded-[24px] border border-slate-100 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
-          <div>
-            <div className="text-sm font-bold text-slate-900">
-              {selectedNote ? "Редактирование заметки" : "Новая заметка"}
-            </div>
-            <div className="text-xs text-slate-400">
-              {selectedNote
-                ? `Обновлено ${formatNoteTime(selectedNote.updatedAt)}`
-                : "Сохранение идёт через backend API"}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {selectedNote && (
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={deleting || saving}
-                className="inline-flex items-center gap-2 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
-              >
-                {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                Удалить
-              </button>
+                          <span className="shrink-0">{formatNoteTime(note.updatedAt)}</span>
+                        </div>
+                      </button>
+                  );
+                })
             )}
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={!draft.trim() || saving || deleting}
-              className="inline-flex items-center gap-2 rounded-2xl bg-[#7448FF] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6737ff] disabled:opacity-50"
-            >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-              {selectedNote ? "Сохранить" : "Создать"}
-            </button>
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col p-5">
-          {error && (
-            <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              <div className="flex items-start gap-3">
-                <StickyNote size={16} className="mt-0.5 shrink-0" />
-                <div>{error}</div>
+        <div className="flex min-h-0 flex-col rounded-[24px] border border-slate-100 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+            <div>
+              <div className="text-sm font-bold text-slate-900">
+                {selectedNote ? "Редактирование заметки" : "Новая заметка"}
+              </div>
+              <div className="text-xs text-slate-400">
+                {selectedNote
+                    ? `Обновлено ${formatNoteTime(selectedNote.updatedAt)}`
+                    : "Сохранение идёт через backend API"}
               </div>
             </div>
-          )}
 
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            className="min-h-[220px] flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-5 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-300 focus:ring-2 focus:ring-[#7448FF]/10"
-            placeholder="Напишите заметку по сессии. Она будет сохранена на сервере и останется доступной после перезагрузки."
-          />
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedNote && (
+                  <button
+                      type="button"
+                      onClick={() => void handleDelete()}
+                      disabled={deleting || saving}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Удалить
+                  </button>
+              )}
+              <button
+                  type="button"
+                  onClick={() => void handleSave()}
+                  disabled={!draft.trim() || saving || deleting}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-[#7448FF] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6737ff] disabled:opacity-50"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {selectedNote ? "Сохранить" : "Создать"}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col p-5">
+            {error && (
+                <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <div className="flex items-start gap-3">
+                    <StickyNote size={16} className="mt-0.5 shrink-0" />
+                    <div>{error}</div>
+                  </div>
+                </div>
+            )}
+
+            <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                className="min-h-[220px] flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-5 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-300 focus:ring-2 focus:ring-[#7448FF]/10"
+                placeholder="Напишите заметку по сессии. Она будет сохранена на сервере и останется доступной после перезагрузки."
+            />
+          </div>
         </div>
       </div>
-    </div>
   );
 }

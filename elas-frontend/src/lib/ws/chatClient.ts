@@ -26,6 +26,9 @@ const REALTIME_EVENT_TYPES = new Set([
   "material.deleted",
   "lesson-plan.updated",
   "lesson-plan.deleted",
+  "session:note_created",
+  "session:note_updated",
+  "session:note_deleted",
 ]);
 
 const READY_EVENT_TYPES = new Set(["auth-ok", "auth_ok", "ready", "connect"]);

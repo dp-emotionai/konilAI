@@ -1,1337 +1,2062 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import Section from "@/components/common/Section";
+import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
+import Section from "@/components/common/Section";
+import LessonPlanPanel from "@/components/session/LessonPlanPanel";
+
+import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import Modal from "@/components/ui/Modal";
-import { Card, CardContent } from "@/components/ui/Card";
-import Input from "@/components/ui/Input";
-import { cn } from "@/lib/cn";
-import { getApiBaseUrl, getToken, hasAuth } from "@/lib/api/client";
+
+import { useUI } from "@/components/layout/Providers";
 import {
-  createInvitations,
-  getGroupById as getGroupByIdApi,
-  updateSessionStatus,
-  getGroupInvitations,
-  revokeInvitation,
-  getGroupMembers,
-  removeMemberFromGroup,
-  blockMemberInGroup,
-  getGroupMessages,
-  postGroupMessage,
-  type GroupInvitationRow,
-  type GroupMemberRow,
-  type GroupMessage,
-  type FullGroup,
-  type GroupSession,
+  getSessionJoinInfo,
+  getStudentSessionDetails,
+  type SessionJoinInfo,
+} from "@/lib/api/student";
+import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
+import { getMlApiBaseUrl } from "@/lib/api/ml";
+import {
+  getSessionLiveMetrics,
+  type LiveMetricsParticipant,
+  type SessionLiveMetrics,
 } from "@/lib/api/teacher";
-import Glow from "@/components/common/Glow";
-import { GroupAnalyticsSection } from "@/components/analytics/GroupAnalyticsSection";
 import {
-  Edit3,
-  Mail,
-  ImagePlus,
-  Users,
-  Megaphone,
-  CalendarDays,
-  UserPlus,
-  Clock3,
-  BookOpen,
-  GraduationCap,
+  getSessionContent,
+  getSessionMaterials,
+  type SessionContent,
+  type SessionContentFile,
+} from "@/lib/api/sessionContent";
+import {
+  assignMaterial,
+  createMaterial,
+  deleteMaterial,
+  getMaterialDownload,
+  resolveDownloadUrl,
+  uploadMaterialFile,
+} from "@/lib/api/materials";
+import {
+  getSessionPresence,
+  joinSessionPresence,
+  leaveSessionPresence,
+  type SessionPresenceRow,
+} from "@/lib/api/presence";
+
+import CameraCheck from "@/components/session/CameraCheck";
+import { SessionNotesPanel } from "@/components/session/SessionNotesPanel";
+import { SessionWhiteboard } from "@/components/session/SessionWhiteboard";
+import { SignalingClient } from "@/lib/webrtc/signalingClient";
+import { PeerConnectionManager } from "@/lib/webrtc/peerConnectionManager";
+import type { Participant } from "@/lib/webrtc/types";
+import { SessionChatPanel } from "@/components/chat/SessionChatPanel";
+import { StreamAudio, StreamVideo } from "@/components/session/StreamVideo";
+
+import {
+  Mic,
+  Video,
+  Share2,
+  PhoneOff,
+  AlertTriangle,
+  Activity,
+  AlertCircle,
+  MicOff,
+  VideoOff,
+  MonitorUp,
+  Sparkles,
+  ShieldCheck,
+  Maximize2,
+  MessageSquare,
+  MoreHorizontal,
+  Users2,
+  FileText,
+  Clock,
+  PenTool,
+  CheckSquare,
+  CheckCircle2,
+  ArrowLeft,
+  LockKeyhole,
+  X,
+  Download,
+  UploadCloud,
+  Loader2,
   Trash2,
-  ShieldAlert,
-  Send,
 } from "lucide-react";
+import { getWsBaseUrl } from "@/lib/env";
+import { cn } from "@/lib/cn";
 
-type Tone = "neutral" | "success" | "info" | "warning" | "purple";
-type TabId = "sessions" | "announcements" | "members" | "invitations";
-
-function ToneBadge({
-  children,
-  tone = "neutral",
-}: {
-  children: React.ReactNode;
-  tone?: Tone;
-}) {
-  const toneClass =
-    tone === "success"
-      ? "bg-success/15 text-success ring-1 ring-success/30"
-      : tone === "info"
-        ? "bg-[rgb(var(--primary))]/15 text-[rgb(var(--primary))] ring-1 ring-[rgb(var(--primary))]/25"
-        : tone === "warning"
-          ? "bg-warning/15 text-warning ring-1 ring-warning/30"
-          : tone === "purple"
-            ? "bg-fuchsia-500/15 text-fuchsia-300 ring-1 ring-fuchsia-400/25"
-            : "bg-surface-subtle text-muted ring-1 ring-[color:var(--border)]/30";
-
+function StatusPill({ label, value }: { label: string; value: string }) {
   return (
-    <Badge className={cn("rounded-full px-2.5 py-1 text-xs font-medium", toneClass)}>
-      {children}
-    </Badge>
+      <div className="rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-[0_8px_28px_rgba(15,23,42,0.05)]">
+        <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+          {label}
+        </div>
+        <div className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <span className="h-2 w-2 rounded-full bg-[#7448FF] shadow-[0_0_0_4px_rgba(116,72,255,0.10)]" />
+          {value}
+        </div>
+      </div>
   );
 }
 
-function fmtDateTime(iso?: string) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "2-digit",
+function PreparationStepper({ step }: { step: 1 | 2 }) {
+  return (
+      <div className="mx-auto flex w-full max-w-[190px] items-center">
+        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#7448FF] text-[11px] font-bold text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]">
+          {step === 2 ? <CheckCircle2 size={15} /> : 1}
+        </div>
+        <div className="relative h-[3px] flex-1 overflow-hidden rounded-full bg-slate-200">
+          <div
+              className={cn(
+                  "absolute inset-y-0 left-0 rounded-full bg-[#7448FF] transition-all duration-300",
+                  step === 2 ? "w-full" : "w-0"
+              )}
+          />
+        </div>
+        <div
+            className={cn(
+                "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[11px] font-bold transition-all duration-300",
+                step === 2
+                    ? "border-[#7448FF] bg-[#7448FF] text-white shadow-[0_7px_18px_rgba(116,72,255,0.28)]"
+                    : "border-slate-200 bg-white text-slate-400"
+            )}
+        >
+          2
+        </div>
+      </div>
+  );
+}
+
+function formatPersonName(
+    input?: {
+      fullName?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      email?: string | null;
+      role?: string | null;
+      id?: string | null;
+    } | null
+) {
+  if (!input) return "Участник";
+
+  const fullName = input.fullName?.trim();
+  if (fullName) return fullName;
+
+  const first = input.firstName?.trim() || "";
+  const last = input.lastName?.trim() || "";
+  const composed = `${first} ${last}`.trim();
+  if (composed) return composed;
+
+  if (input.email) return input.email;
+  if (input.role) return input.role === "teacher" ? "Преподаватель" : "Студент";
+
+  return "Участник";
+}
+
+function formatParticipantLabel(p?: Participant | null) {
+  if (!p) return "Преподаватель";
+
+  return formatPersonName({
+    fullName: p.fullName,
+    firstName: (p as { firstName?: string | null }).firstName,
+    lastName: (p as { lastName?: string | null }).lastName,
+    email: p.email,
+    role: p.role,
+    id: p.id,
+  });
+}
+
+function formatPercentMetric(value?: number | null) {
+  return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
+function normalizeIdentity(value?: string | null) {
+  return String(value || "")
+      .trim()
+      .toLocaleLowerCase()
+      .replace(/\s+/g, " ");
+}
+
+function formatMetricsUpdatedAt(value?: string | null) {
+  if (!value) return "время обновления неизвестно";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "время обновления неизвестно";
+
+  return new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
-  }).format(d);
+    second: "2-digit",
+  }).format(date);
 }
 
-function statusTone(s: GroupSession["status"]): Tone {
-  if (s === "live") return "warning";
-  if (s === "ended") return "neutral";
-  return "info";
+function formatFileSize(size?: number | null) {
+  if (typeof size !== "number" || !Number.isFinite(size)) return "Размер не указан";
+  if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} КБ`;
+  return `${(size / 1024 / 1024).toFixed(1)} МБ`;
 }
 
-function typeTone(t: GroupSession["type"]): Tone {
-  return t === "exam" ? "purple" : "info";
+function getFileExtension(fileName?: string | null, mimeType?: string | null) {
+  const fromName = String(fileName || "").split(".").pop()?.trim();
+  if (fromName && fromName.length <= 6 && fromName !== fileName) return fromName.toUpperCase();
+  const fromMime = String(mimeType || "").split("/").pop()?.trim();
+  return fromMime ? fromMime.toUpperCase().slice(0, 6) : "FILE";
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  Start: "Старт",
-  End: "Завершить",
-  Reopen: "Открыть снова",
-};
+function formatUploadTime(value?: string | null) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "загружено";
 
-function nextTeacherAction(
-  status: GroupSession["status"]
-): { nextBackendStatus: "active" | "finished" | "draft"; label: keyof typeof ACTION_LABELS } {
-  if (status === "upcoming") return { nextBackendStatus: "active", label: "Start" };
-  if (status === "live") return { nextBackendStatus: "finished", label: "End" };
-  return { nextBackendStatus: "draft", label: "Reopen" };
+  return `Загружено ${new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date)}`;
 }
 
-function TabButton({
-  active,
-  label,
-  count,
-  onClick,
-  icon,
-}: {
-  active: boolean;
+function CallControlButton({
+                             active = true,
+                             icon,
+                             dangerIcon,
+                             label,
+                             onClick,
+                             disabled,
+                           }: {
+  active?: boolean;
+  icon: React.ReactNode;
+  dangerIcon?: React.ReactNode;
   label: string;
-  count?: number;
-  onClick: () => void;
-  icon?: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition",
-        active
-          ? "bg-primary-muted ring-1 ring-[rgb(var(--primary))]/25 text-[rgb(var(--primary))]"
-          : "ring-1 ring-[color:var(--border)]/30 bg-surface-subtle/60 hover:bg-surface-subtle text-muted hover:text-fg"
-      )}
-    >
-      {icon}
-      <span>{label}</span>
-      {typeof count === "number" && (
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-xs",
-            active
-              ? "bg-[rgb(var(--primary))]/10 text-[rgb(var(--primary))]"
-              : "bg-surface text-muted"
-          )}
+      <div className="flex flex-col items-center gap-2">
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={disabled}
+            className={cn(
+                "w-14 h-14 rounded-full flex items-center justify-center transition-all bg-white border border-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.04)]",
+                !active
+                    ? "bg-slate-100 text-slate-600"
+                    : "text-slate-900 hover:bg-slate-50 hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
+                disabled && "opacity-50 cursor-not-allowed"
+            )}
         >
-          {count}
-        </span>
-      )}
-    </button>
-  );
-}
-
-function EmptyState({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-dashed border-[color:var(--border)]/30 bg-surface-subtle/30 px-5 py-8 text-center">
-      <div className="text-sm font-medium text-fg">{title}</div>
-      <div className="mt-2 text-sm font-semibold text-slate-500">{description}</div>
-    </div>
-  );
-}
-
-function StatTile({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-5 py-5 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:shadow-lg">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
-        {icon}
+          {!active && dangerIcon ? dangerIcon : icon}
+        </button>
+        <span className="text-xs font-semibold text-slate-700">{label}</span>
       </div>
-      <div className="mt-2 text-lg font-semibold text-fg">{value}</div>
-    </div>
   );
 }
 
-function MemberActionsDropdown({
-  onRemove,
-  onBlock,
-}: {
-  onRemove: () => void;
-  onBlock: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative inline-block">
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => setOpen((v) => !v)}
-        className="text-muted"
-      >
-        Действия ▾
-      </Button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden />
-          <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-2xl py-1 shadow-elevated border border-[color:var(--border)] ring-1 ring-black/[0.06] dark:ring-white/[0.08] bg-white/[0.97] dark:bg-[rgba(16,18,26,0.98)] backdrop-blur-xl">
-            <button
-              type="button"
-              className="mx-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-left text-sm text-fg transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-              onClick={() => {
-                setOpen(false);
-                onRemove();
-              }}
-            >
-              <Trash2 size={14} />
-              Удалить из группы
-            </button>
-            <button
-              type="button"
-              className="mx-1 flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-left text-sm text-warning transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
-              onClick={() => {
-                setOpen(false);
-                onBlock();
-              }}
-            >
-              <ShieldAlert size={14} />
-              Заблокировать
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-export default function TeacherGroupDetailPage() {
+export default function TeacherJoinSessionPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id ?? "";
-  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = params?.id ?? "";
+  const autoStart = searchParams.get("autostart") === "1";
+  const { state, setConsent } = useUI();
+  const chatSectionRef = useRef<HTMLDivElement | null>(null);
+  const monitorRef = useRef<HTMLDivElement | null>(null);
+  const materialFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [apiData, setApiData] = useState<{ group: FullGroup; sessions: GroupSession[] } | null>(null);
-  const [groupLoading, setGroupLoading] = useState(apiAvailable);
-  const [tick, setTick] = useState(0);
+  const [joinInfo, setJoinInfo] = useState<SessionJoinInfo | null>(null);
+  const [sessionTeacherName, setSessionTeacherName] = useState<string | null>(null);
+  const [joinInfoLoading, setJoinInfoLoading] = useState(!!(getApiBaseUrl() && hasAuth()));
+  const [joinInfoError, setJoinInfoError] = useState<string | null>(null);
+  const [activeBottomTab, setActiveBottomTab] = useState<"materials" | "notes" | "whiteboard">(
+      "whiteboard"
+  );
+  const [currentUser, setCurrentUser] = useState<ReturnType<typeof getStoredAuth>>(null);
+  const [sessionContent, setSessionContent] = useState<SessionContent | null>(null);
+  const [sessionFiles, setSessionFiles] = useState<SessionContentFile[]>([]);
+  const [contentLoading, setContentLoading] = useState(false);
+  const [materialUploading, setMaterialUploading] = useState(false);
+  const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
+  const [materialUploadError, setMaterialUploadError] = useState<string | null>(null);
+  const [isMonitorFullscreen, setIsMonitorFullscreen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<TabId>("sessions");
-
-  const [editingName, setEditingName] = useState(false);
-  const [editingDesc, setEditingDesc] = useState(false);
-  const [localName, setLocalName] = useState("");
-  const [localDescription, setLocalDescription] = useState("");
-  const [groupImageMessage, setGroupImageMessage] = useState<{ type: "error" | "success"; text: string } | null>(null);
-  const [uploadingGroupImage, setUploadingGroupImage] = useState(false);
-
-  const [groupInvitations, setGroupInvitations] = useState<GroupInvitationRow[]>([]);
-  const [groupMembers, setGroupMembers] = useState<GroupMemberRow[]>([]);
-  const [announcements, setAnnouncements] = useState<GroupMessage[]>([]);
-
-  const [invitationsLoading, setInvitationsLoading] = useState(false);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [annLoading, setAnnLoading] = useState(false);
-
-  const [newAnnouncement, setNewAnnouncement] = useState("");
-
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [inviteEmails, setInviteEmails] = useState("");
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
-
-  const [confirmRemoveMember, setConfirmRemoveMember] = useState<{
-    memberId: string;
-    memberName: string;
-  } | null>(null);
-
-  const [confirmBlockMember, setConfirmBlockMember] = useState<{
-    memberId: string;
-    memberName: string;
-  } | null>(null);
-  const groupImageInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!apiAvailable || !id) {
-      setApiData(null);
-      setGroupLoading(false);
+  const loadJoinInfo = useCallback(async () => {
+    if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
+      setJoinInfoLoading(false);
       return;
     }
 
-    setGroupLoading(true);
-    getGroupByIdApi(id).then((data) => {
-      setApiData(data);
-      setGroupLoading(false);
-    });
-  }, [id, apiAvailable, tick]);
+    setJoinInfoError(null);
+    setJoinInfoLoading(true);
 
-  const group: FullGroup | null = apiData?.group ?? null;
-  const sessions: GroupSession[] = apiData?.sessions ?? [];
+    try {
+      const info = await getSessionJoinInfo(sessionId);
+      setJoinInfo(info ?? null);
 
-  const groupDescriptionValue = useMemo(
-    () => ((group as { description?: string } | null)?.description ?? ""),
-    [group]
+    } catch (e) {
+      setJoinInfo(null);
+      setJoinInfoError(
+          e instanceof Error ? e.message : "Не удалось загрузить данные сессии."
+      );
+    } finally {
+      setJoinInfoLoading(false);
+    }
+  }, [sessionId, state.consent]);
+
+  useEffect(() => {
+    void loadJoinInfo();
+  }, [loadJoinInfo]);
+
+  useEffect(() => {
+    let timer: number | null = null;
+    const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
+
+    if (blockReason === "session_not_started") {
+      timer = window.setInterval(() => {
+        void loadJoinInfo();
+      }, 5000);
+    }
+
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [joinInfo, loadJoinInfo]);
+
+  const title = joinInfo?.title ?? "Сессия";
+  const loadSessionContent = useCallback(async () => {
+    if (!sessionId || !getApiBaseUrl() || !hasAuth()) {
+      setSessionContent(null);
+      setSessionFiles([]);
+      return;
+    }
+
+    setContentLoading(true);
+    try {
+      const [content, materials] = await Promise.all([
+        getSessionContent(sessionId),
+        getSessionMaterials(sessionId),
+      ]);
+
+      setSessionContent(content);
+      setSessionFiles(materials ?? content?.files ?? []);
+    } finally {
+      setContentLoading(false);
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    void loadSessionContent();
+  }, [loadSessionContent]);
+
+  const handleMaterialFileChange = useCallback(
+      async (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0] ?? null;
+        event.target.value = "";
+
+        if (!file || materialUploading) return;
+
+        setMaterialUploading(true);
+        setMaterialUploadError(null);
+
+        try {
+          const uploaded = await uploadMaterialFile(file);
+          const material = await createMaterial({
+            title: file.name.replace(/\.[^/.]+$/, "") || file.name,
+            description: null,
+            fileName: uploaded.fileName || file.name,
+            mimeType: uploaded.mimeType || file.type || null,
+            storageKey: uploaded.storageKey,
+            size: uploaded.size ?? file.size ?? null,
+          });
+
+          await assignMaterial(material.id, { sessionId });
+          await loadSessionContent();
+        } catch (error) {
+          setMaterialUploadError(
+              error instanceof Error ? error.message : "Не удалось добавить материал"
+          );
+        } finally {
+          setMaterialUploading(false);
+        }
+      },
+      [loadSessionContent, materialUploading, sessionId]
   );
 
-  const groupImageUrl = (group as { imageUrl?: string } | null)?.imageUrl;
-  const membersCount = apiAvailable ? groupMembers.length : group?.students.length ?? 0;
-  const pendingCount = groupInvitations.filter((i) => i.status === "pending").length;
 
-  const refetchGroup = () => setTick((x) => x + 1);
+  const handleDeleteMaterial = useCallback(
+      async (materialId: string) => {
+        if (!materialId || deletingMaterialId) return;
 
-  const handleGroupImageUpload = async (file?: File | null) => {
-    if (!file) return;
+        const ok = window.confirm("Удалить этот материал из занятия?");
+        if (!ok) return;
 
-    if (!apiAvailable) {
-      setGroupImageMessage({
-        type: "error",
-        text: "Backend недоступен. Загрузка фото группы станет активной после подключения API.",
-      });
+        setDeletingMaterialId(materialId);
+        setMaterialUploadError(null);
+
+        try {
+          await deleteMaterial(materialId);
+          setSessionFiles((prev) => prev.filter((file) => file.id !== materialId));
+          await loadSessionContent();
+        } catch (error) {
+          setMaterialUploadError(
+              error instanceof Error ? error.message : "Не удалось удалить материал"
+          );
+        } finally {
+          setDeletingMaterialId(null);
+        }
+      },
+      [deletingMaterialId, loadSessionContent]
+  );
+
+  const sessionType: "lecture" | "exam" = joinInfo?.type === "exam" ? "exam" : "lecture";
+
+  const apiAvailable = Boolean(getApiBaseUrl() && hasAuth());
+  const canJoin = !apiAvailable || joinInfo?.allowedToJoin !== false;
+  const blockReason = joinInfo && !joinInfo.allowedToJoin ? joinInfo.reason : null;
+  const preparationStep: 1 | 2 =
+      blockReason === "consent_required" || !state.consent ? 1 : 2;
+
+  const [live, setLive] = useState(autoStart);
+  const [tab, setTab] = useState<"prepare" | "live">(autoStart ? "live" : "prepare");
+  const [preparationView, setPreparationView] = useState<"main" | "consent-details">(
+      "main"
+  );
+  const [consentChecked, setConsentChecked] = useState(state.consent);
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentError, setConsentError] = useState<string | null>(null);
+  const showPreparation =
+      !autoStart &&
+      !joinInfoLoading &&
+      !joinInfoError &&
+      !live &&
+      (canJoin || blockReason === "consent_required");
+
+  const handleLeaveSession = useCallback(() => {
+    setLive(false);
+    setTab("prepare");
+    router.replace("/teacher/sessions");
+  }, [router]);
+
+  useEffect(() => {
+    if (state.consent) setConsentChecked(true);
+  }, [state.consent]);
+
+  useEffect(() => {
+    if (preparationStep === 2) {
+      setPreparationView("main");
+      setConsentError(null);
+    }
+  }, [preparationStep]);
+
+  const confirmSessionConsent = useCallback(async () => {
+    if (!consentChecked || consentSaving) return;
+
+    setConsentSaving(true);
+    setConsentError(null);
+
+    try {
+      setConsent(true);
+
+      try {
+        localStorage.setItem("consent", "true");
+      } catch {
+        // localStorage may be unavailable in privacy mode.
+      }
+
+      if (sessionId && getApiBaseUrl() && hasAuth()) {
+        const updated = await getSessionJoinInfo(sessionId);
+        if (updated) setJoinInfo(updated);
+      }
+    } catch (error) {
+      console.error("session consent save failed", error);
+      setConsentError(
+          error instanceof Error
+              ? error.message
+              : "Не удалось сохранить согласие. Попробуйте ещё раз."
+      );
+    } finally {
+      setConsentSaving(false);
+    }
+  }, [consentChecked, consentSaving, sessionId, setConsent]);
+
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [presence, setPresence] = useState<SessionPresenceRow[]>([]);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [selectedVideoId, setSelectedVideoId] = useState<string>("local");
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+
+  useEffect(() => {
+    if (!apiAvailable || !sessionId || !live) {
+      setPresence([]);
       return;
     }
 
-    setUploadingGroupImage(true);
-    setGroupImageMessage(null);
+    const controller = new AbortController();
+    let closed = false;
 
-    try {
-      const base = getApiBaseUrl();
-      const token = getToken();
-      const formData = new FormData();
-      formData.append("file", file);
+    void joinSessionPresence(sessionId, { signal: controller.signal }).catch(() => {});
 
-      const response = await fetch(`${base}/groups/${id}/image`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const message = response.status === 404 || response.status === 405
-          ? "Backend ещё не поддерживает upload фото группы. Нужен endpoint POST /groups/:id/image."
-          : "Не удалось загрузить фото группы.";
-        throw new Error(message);
+    const load = async () => {
+      try {
+        const list = await getSessionPresence(sessionId, { signal: controller.signal });
+        if (!closed) setPresence(Array.isArray(list) ? list : []);
+      } catch {
+        if (!closed) setPresence([]);
       }
+    };
 
-      setGroupImageMessage({
-        type: "success",
-        text: "Фото группы обновлено. Если backend вернул новый imageUrl, карточка обновится сразу.",
-      });
-      refetchGroup();
-    } catch (error) {
-      setGroupImageMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось загрузить фото группы.",
-      });
-    } finally {
-      setUploadingGroupImage(false);
-      if (groupImageInputRef.current) {
-        groupImageInputRef.current.value = "";
-      }
-    }
-  };
+    void load();
+    const interval = window.setInterval(load, 5000);
 
-  const handleGroupImageDelete = async () => {
-    if (!apiAvailable || !id) return;
+    return () => {
+      closed = true;
+      window.clearInterval(interval);
+      controller.abort();
+      void leaveSessionPresence(sessionId).catch(() => {});
+    };
+  }, [apiAvailable, live, sessionId]);
 
-    setUploadingGroupImage(true);
-    setGroupImageMessage(null);
+  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
+  const [liveMetricsLoading, setLiveMetricsLoading] = useState(false);
+  const [liveMetricsUnavailable, setLiveMetricsUnavailable] = useState(false);
 
-    try {
-      const base = getApiBaseUrl();
-      const token = getToken();
-      const response = await fetch(`${base}/groups/${id}/image`, {
-        method: "DELETE",
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        credentials: "include",
-      });
+  const [connectionState, setConnectionState] = useState<
+      "idle" | "connecting" | "connected" | "error"
+  >("idle");
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [socketDisconnected, setSocketDisconnected] = useState(false);
 
-      if (!response.ok) {
-        throw new Error("Не удалось удалить фото группы.");
-      }
+  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  const [isCameraEnabled, setIsCameraEnabled] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
 
-      setGroupImageMessage({ type: "success", text: "Фото группы удалено." });
-      refetchGroup();
-    } catch (error) {
-      setGroupImageMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : "Не удалось удалить фото группы.",
-      });
-    } finally {
-      setUploadingGroupImage(false);
-    }
-  };
+  const screenStreamRef = useRef<MediaStream | null>(null);
+  const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
-  const openInviteModal = () => {
-    setInviteOpen(true);
-    setInviteError(null);
-    setInviteSuccess(null);
-  };
+  const mlApiAvailable = Boolean(getMlApiBaseUrl());
+  const roomId = sessionId;
 
-  const closeInviteModal = () => {
-    setInviteOpen(false);
-    setInviteError(null);
-    setInviteSuccess(null);
-  };
+  const teacherParticipant = useMemo(
+      () => participants.find((p) => p.role === "teacher") ?? null,
+      [participants]
+  );
+
+  const currentUserName = useMemo(
+      () =>
+          formatPersonName({
+            fullName: currentUser?.fullName,
+            firstName: currentUser?.firstName,
+            lastName: currentUser?.lastName,
+            email: currentUser?.email,
+            role: "teacher",
+          }),
+      [currentUser]
+  );
 
   useEffect(() => {
-    if (!group) return;
-    setLocalName(group.name);
-    setLocalDescription(groupDescriptionValue);
-  }, [group?.id, group?.name, groupDescriptionValue]);
+    setCurrentUser(getStoredAuth());
+  }, []);
 
-  useEffect(() => {
-    if (!apiAvailable || !id || activeTab !== "invitations") return;
+  const videoTiles = useMemo(() => {
+    const localTile = {
+      id: "local",
+      stream: localStream,
+      label: currentUserName,
+      roleLabel: "Вы · Преподаватель",
+      icon: "👩🏻‍🏫",
+      isLocal: true,
+      participant: null as Participant | null,
+    };
 
-    setInvitationsLoading(true);
-    getGroupInvitations(id).then((data) => {
-      setGroupInvitations(data);
-      setInvitationsLoading(false);
+    const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
+      const participant = participants.find((p) => p.id === peerId) ?? null;
+      const isTeacher = participant?.role === "teacher";
+
+      return {
+        id: peerId,
+        stream,
+        label: formatParticipantLabel(participant),
+        roleLabel: isTeacher ? "Преподаватель" : "Студент",
+        icon: isTeacher ? "👩🏻‍🏫" : "🎓",
+        isLocal: false,
+        participant,
+      };
     });
-  }, [apiAvailable, id, activeTab, tick]);
+
+    return [localTile, ...remoteTiles];
+  }, [currentUserName, localStream, participants, remoteStreams]);
+
+  const selectedVideo = useMemo(() => {
+    return (
+        videoTiles.find((tile) => tile.id === selectedVideoId && tile.stream) ??
+        videoTiles.find((tile) => !tile.isLocal && tile.stream) ??
+        videoTiles.find((tile) => tile.stream) ??
+        videoTiles[0] ??
+        null
+    );
+  }, [selectedVideoId, videoTiles]);
+
+  const focusedStudentParticipant = useMemo(() => {
+    if (!selectedVideo || selectedVideo.isLocal) return null;
+
+    const participant =
+        selectedVideo.participant ??
+        participants.find((candidate) => candidate.id === selectedVideo.id) ??
+        null;
+
+    return participant?.role === "student" ? participant : null;
+  }, [participants, selectedVideo]);
+
+  const focusedStudentMetrics = useMemo<LiveMetricsParticipant | null>(() => {
+    if (!focusedStudentParticipant || !liveMetrics?.participants?.length) return null;
+
+    const userId = focusedStudentParticipant.userId?.trim();
+    const email = normalizeIdentity(focusedStudentParticipant.email);
+    const participantName = normalizeIdentity(
+        formatPersonName({
+          fullName: focusedStudentParticipant.fullName,
+          firstName: focusedStudentParticipant.firstName,
+          lastName: focusedStudentParticipant.lastName,
+          email: focusedStudentParticipant.email,
+          role: focusedStudentParticipant.role,
+        })
+    );
+    const selectedLabel = normalizeIdentity(selectedVideo?.label);
+
+    const exactMatch =
+        liveMetrics.participants.find(
+            (metric) => Boolean(userId) && metric.userId === userId
+        ) ??
+        liveMetrics.participants.find(
+            (metric) => Boolean(email) && normalizeIdentity(metric.email) === email
+        ) ??
+        liveMetrics.participants.find((metric) => {
+          const metricName = normalizeIdentity(
+              formatPersonName({
+                fullName: metric.fullName,
+                firstName: metric.firstName,
+                lastName: metric.lastName,
+                email: metric.email,
+                role: "student",
+              })
+          );
+
+          return Boolean(metricName) && (metricName === participantName || metricName === selectedLabel);
+        }) ??
+        null;
+
+    if (exactMatch) return exactMatch;
+
+    const studentTiles = videoTiles.filter(
+        (tile) => !tile.isLocal && tile.participant?.role === "student"
+    );
+
+    return studentTiles.length === 1 && liveMetrics.participants.length === 1
+        ? liveMetrics.participants[0] ?? null
+        : null;
+  }, [focusedStudentParticipant, liveMetrics, selectedVideo?.label, videoTiles]);
+
+  const focusedStudentName = useMemo(
+      () =>
+          focusedStudentMetrics
+              ? formatPersonName({
+                fullName: focusedStudentMetrics.fullName,
+                firstName: focusedStudentMetrics.firstName,
+                lastName: focusedStudentMetrics.lastName,
+                email: focusedStudentMetrics.email,
+                role: "student",
+              })
+              : selectedVideo?.label || "Студент",
+      [focusedStudentMetrics, selectedVideo?.label]
+  );
+
+  const focusedMetricsStale = useMemo(() => {
+    const value = focusedStudentMetrics?.updatedAt;
+    if (!value) return false;
+
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) && Date.now() - timestamp > 15000;
+  }, [focusedStudentMetrics, liveMetrics]);
+
 
   useEffect(() => {
-    if (!apiAvailable || !id || activeTab !== "members") return;
+    const onFullscreenChange = () => {
+      setIsMonitorFullscreen(Boolean(document.fullscreenElement));
+    };
 
-    setMembersLoading(true);
-    getGroupMembers(id, true).then((data) => {
-      setGroupMembers(data.students ?? []);
-      setMembersLoading(false);
-    });
-  }, [apiAvailable, id, activeTab, tick]);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleMonitorFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      await monitorRef.current?.requestFullscreen();
+    } catch (error) {
+      console.error("monitor fullscreen failed", error);
+    }
+  }, []);
+
+  const teacherDisplayName = useMemo(() => {
+    if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
+    if (currentUserName.trim()) return currentUserName;
+    return formatParticipantLabel(teacherParticipant);
+  }, [currentUserName, sessionTeacherName, teacherParticipant]);
+
+  const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
+  const sessionStartTime = useRef<number>(Date.now());
 
   useEffect(() => {
-    if (!apiAvailable || !id || activeTab !== "announcements") return;
+    if (!live || connectionState !== "connected") return;
 
-    setAnnLoading(true);
-    getGroupMessages(id, "announcements")
-      .then((data) => {
-        setAnnouncements(data);
-        setAnnLoading(false);
-      })
-      .catch(() => setAnnLoading(false));
-  }, [apiAvailable, id, activeTab, tick]);
+    sessionStartTime.current = Date.now();
 
-  const handleInviteSubmit = async () => {
-    const emails = inviteEmails
-      .split(/[\n,;]+/)
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
+    const updater = setInterval(() => {
+      const span = Date.now() - sessionStartTime.current;
+      const s = Math.floor(span / 1000);
+      const m = Math.floor(s / 60);
+      const h = Math.floor(m / 60);
+      const fmt = (v: number) => v.toString().padStart(2, "0");
+      setSessionTimerLabel(`${fmt(h)}:${fmt(m % 60)}:${fmt(s % 60)}`);
+    }, 1000);
 
-    if (emails.length === 0) {
-      setInviteError("Введите хотя бы один email.");
+    return () => clearInterval(updater);
+  }, [live, connectionState]);
+
+  useEffect(() => {
+    if (!live || !roomId) {
+      setConnectionState("idle");
+      setConnectionError(null);
       return;
     }
 
-    setInviteError(null);
-    setInviteSuccess(null);
-    setInviteLoading(true);
+    setConnectionState("connecting");
+    setConnectionError(null);
 
-    try {
-      const res = await createInvitations(id, emails);
-      const n = res?.created?.length ?? 0;
-      setInviteSuccess(n > 0 ? `Отправлено приглашений: ${n}` : "Приглашения созданы.");
-      setInviteEmails("");
+    const wsBase = getWsBaseUrl().replace(/^ws/, "http");
+    const signaling = new SignalingClient([`${wsBase}/api/ws`, `${wsBase}/ws`]);
+    const manager = new PeerConnectionManager(signaling, roomId, "teacher", {
+      onRemoteStream: (peerId, stream) => {
+        const hasTracks = stream.getTracks().length > 0;
+        setRemoteStreams((prev) => {
+          const next = { ...prev };
 
-      setTimeout(() => {
-        closeInviteModal();
-        setTick((x) => x + 1);
-      }, 1200);
-    } catch (e: unknown) {
-      setInviteError(e instanceof Error ? e.message : "Ошибка при создании приглашений.");
-    } finally {
-      setInviteLoading(false);
-    }
-  };
+          if (hasTracks) {
+            next[peerId] = stream;
+          } else {
+            delete next[peerId];
+          }
 
-  if (groupLoading && !group) {
-    return (
-      <div className="relative space-y-12 pb-20">
-        <Glow />
-        <Section>
-          <Card variant="elevated">
-            <CardContent className="p-7">
-              <div className="h-24 rounded-2xl bg-surface-subtle animate-pulse" />
-            </CardContent>
-          </Card>
-        </Section>
-      </div>
-    );
-  }
+          return next;
+        });
 
-  if (!group) {
-    return (
-      <div className="relative space-y-12 pb-20">
-        <Glow />
-        <Section>
-          <Card variant="elevated">
-            <CardContent className="p-7">
-              <Link
-                href="/teacher/groups"
-                className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg transition"
-              >
-                ← К списку групп
-              </Link>
-            </CardContent>
-          </Card>
-        </Section>
-      </div>
-    );
-  }
+        if (hasTracks) {
+          setSelectedVideoId((current) => (current === "local" ? peerId : current));
+        }
+      },
+      onPeersChange: (peers) => setParticipants(peers),
+      onDisconnect: () => setSocketDisconnected(true),
+      onPeerLeft: (peerId) => {
+        setRemoteStreams((prev) => {
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+        setSelectedVideoId((current) => (current === peerId ? "local" : current));
+      },
+    });
 
-  return (
-    <div className="relative space-y-8 pb-20">
-      <Glow />
+    peerManagerRef.current = manager;
+    signaling.on("open", () => setSocketDisconnected(false));
+    signaling.on("material.assigned", () => void loadSessionContent());
+    signaling.on("material.unassigned", () => void loadSessionContent());
+    signaling.on("material.deleted", () => void loadSessionContent());
+    signaling.connect();
 
-      <Breadcrumbs
-        items={[
-          { label: "Преподаватель", href: "/teacher/dashboard" },
-          { label: "Группы", href: "/teacher/groups" },
-          { label: group.name },
-        ]}
-      />
+    void (async () => {
+      try {
+        const stream = await manager.initLocalStream({ video: true, audio: true });
+        setLocalStream(stream);
 
-      <Section spacing="none">
-        <Link
-          href="/teacher/groups"
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-fg transition-colors"
-        >
-          ← К списку групп
-        </Link>
-      </Section>
+        await signaling.waitForOpen(12000);
 
-      <Section spacing="none">
-        <Card variant="elevated" className="overflow-hidden">
-          <div
-            className="relative h-44 w-full bg-gradient-to-br from-[#7448FF] via-[#8B5CF6] to-[#B38CFF] md:h-56"
-            style={
-              groupImageUrl
+        const auth = getStoredAuth();
+        manager.join(
+            auth
                 ? {
-                    backgroundImage: `url(${groupImageUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
+                  email: auth.email,
+                  fullName: auth.fullName || undefined,
+                  firstName: auth.firstName || undefined,
+                  lastName: auth.lastName || undefined,
+                }
                 : undefined
-            }
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_34%),linear-gradient(to_top,rgba(15,23,42,0.28),transparent)]" />
-          </div>
+        );
 
-          <CardContent className="relative -mt-16 px-6 pb-7 md:-mt-20 md:px-8 md:pb-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-              <div className="flex min-w-0 items-end gap-4">
-                <input
-                  ref={groupImageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => void handleGroupImageUpload(event.target.files?.[0] ?? null)}
-                  disabled={uploadingGroupImage}
-                />
-                {groupImageUrl ? (
-                  <div className="relative group/avatar">
-                    <div
-                      className="h-24 w-24 shrink-0 rounded-[28px] bg-surface-subtle bg-cover bg-center shadow-2xl ring-4 ring-white md:h-28 md:w-28"
-                      style={{ backgroundImage: `url(${groupImageUrl})` }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => groupImageInputRef.current?.click()}
-                      className="absolute inset-0 flex items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
-                      title="Сменить фото (скоро)"
-                    >
-                      <ImagePlus size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative group/avatar">
-                    <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[28px] bg-white text-3xl font-black text-[#7448FF] shadow-2xl ring-4 ring-white/80 md:h-28 md:w-28 md:text-4xl">
-                      {group.name.slice(0, 2).toUpperCase()}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => groupImageInputRef.current?.click()}
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-3xl bg-surface-subtle/80 text-xs text-white opacity-0 transition-opacity group-hover/avatar:opacity-100"
-                      title="Добавить фото группы (скоро)"
-                    >
-                      <ImagePlus size={18} />
-                      <span>Фото</span>
-                    </button>
-                  </div>
-                )}
+        setConnectionState("connected");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Ошибка подключения";
+        const friendly =
+            msg.toLowerCase().includes("timeout") || msg.toLowerCase().includes("socket")
+                ? "Не удалось подключиться к серверу эфира. Проверьте интернет и настройки Socket.IO."
+                : msg.includes("Permission") || msg.includes("NotAllowed") || msg.includes("NotFound")
+                    ? "Камера или микрофон недоступны. Проверьте разрешения в браузере и попробуйте снова."
+                    : msg;
 
-                <div className="min-w-0 pb-1">
-                  {editingName ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        value={localName}
-                        onChange={(e) => setLocalName(e.target.value)}
-                        className="max-w-xs rounded-xl text-lg font-semibold"
-                        autoFocus
-                      />
-                      <Button size="sm" onClick={() => setEditingName(false)}>
-                        Сохранить
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setLocalName(group.name);
-                          setEditingName(false);
-                        }}
-                      >
-                        Отмена
-                      </Button>
-                    </div>
+        setConnectionError(friendly);
+        setConnectionState("error");
+        setLive(false);
+        setTab("prepare");
+        manager.leave();
+        setRemoteStreams({});
+        setSelectedVideoId("local");
+        setLocalStream(null);
+        setParticipants([]);
+      }
+    })();
+
+    return () => {
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      peerManagerRef.current = null;
+      manager.leave();
+      setRemoteStreams({});
+      setSelectedVideoId("local");
+      setLocalStream(null);
+      setParticipants([]);
+      setConnectionState("idle");
+      setConnectionError(null);
+      setSocketDisconnected(false);
+      setIsScreenSharing(false);
+    };
+  }, [live, roomId, loadSessionContent]);
+
+  useEffect(() => {
+    if (!live || !sessionId || !apiAvailable) return;
+
+    let cancelled = false;
+
+    void getStudentSessionDetails(sessionId).then((details) => {
+      if (cancelled || !details) return;
+      setSessionTeacherName(details.teacherFullName || details.teacher || null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiAvailable, live, sessionId]);
+
+  const toggleMic = () => {
+    const next = !isMicEnabled;
+    peerManagerRef.current?.setAudioEnabled(next);
+    setIsMicEnabled(next);
+  };
+
+  const toggleCamera = () => {
+    if (isScreenSharing) return;
+    const next = !isCameraEnabled;
+    peerManagerRef.current?.setVideoEnabled(next);
+    setIsCameraEnabled(next);
+  };
+
+  const toggleScreenShare = async () => {
+    const manager = peerManagerRef.current;
+    if (!manager || !localStream) return;
+
+    if (isScreenSharing) {
+      const cameraTrack = localStream.getVideoTracks()[0] ?? null;
+      if (cameraTrack) cameraTrack.enabled = isCameraEnabled;
+      await manager.replaceOutgoingVideoTrack(isCameraEnabled ? cameraTrack : null);
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current = null;
+      setIsScreenSharing(false);
+      return;
+    }
+
+    try {
+      const displayStream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+      const displayTrack = displayStream.getVideoTracks()[0];
+      if (!displayTrack) return;
+
+      screenStreamRef.current = displayStream;
+      await manager.replaceOutgoingVideoTrack(displayTrack);
+      setIsScreenSharing(true);
+
+      displayTrack.onended = () => {
+        void toggleScreenShare();
+      };
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (!live || !sessionId || !apiAvailable) return;
+
+    let cancelled = false;
+
+    const loadLiveMetrics = async (initial = false) => {
+      if (initial) setLiveMetricsLoading(true);
+
+      const metrics = await getSessionLiveMetrics(sessionId);
+      if (cancelled) return;
+
+      setLiveMetrics(metrics);
+      setLiveMetricsUnavailable(metrics === null);
+      if (initial) setLiveMetricsLoading(false);
+    };
+
+    void loadLiveMetrics(true);
+    const timer = window.setInterval(() => {
+      void loadLiveMetrics(false);
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [apiAvailable, live, sessionId]);
+
+  const findStudentParticipantForPresence = useCallback(
+      (row: SessionPresenceRow) => {
+        const rowEmail = normalizeIdentity(row.email);
+        const rowName = normalizeIdentity(row.fullName);
+
+        return (
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(participant.userId) &&
+                    participant.userId === row.userId
+            ) ??
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(rowEmail) &&
+                    normalizeIdentity(participant.email) === rowEmail
+            ) ??
+            participants.find(
+                (participant) =>
+                    participant.role === "student" &&
+                    Boolean(rowName) &&
+                    normalizeIdentity(formatParticipantLabel(participant)) === rowName
+            ) ??
+            null
+        );
+      },
+      [participants]
+  );
+
+  const focusStudentFromPresence = useCallback(
+      (row: SessionPresenceRow) => {
+        const participant = findStudentParticipantForPresence(row);
+        if (!participant || !remoteStreams[participant.id]) return;
+        setSelectedVideoId(participant.id);
+      },
+      [findStudentParticipantForPresence, remoteStreams]
+  );
+
+  if (tab === "live") {
+    return (
+        <div className="min-h-[calc(100dvh-64px)] bg-[#FAFAFB]">
+          <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[1550px] flex-col px-4 py-8 md:px-8 animate-in fade-in zoom-in-[0.98] duration-300">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 shrink-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold text-slate-900 truncate">{title}</h1>
+                  <Badge className="bg-purple-50 text-[#7448FF] border-none font-semibold px-2.5 py-0.5 shrink-0">
+                    Онлайн-сессия
+                  </Badge>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-6 mt-2 text-[13px] text-slate-500 font-medium">
+                <span>
+                  Преподаватель:{" "}
+                  <span className="text-slate-900">{teacherDisplayName}</span>
+                </span>
+
+                  {connectionState === "connected" ? (
+                      <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Сессия активна
+                  </span>
                   ) : (
-                    <div className="flex min-w-0 items-center gap-2">
-                      <h1 className="truncate text-3xl font-black tracking-tight text-slate-950 md:text-4xl">
-                        {localName || group.name}
-                      </h1>
-                      <button
-                        type="button"
-                        onClick={() => setEditingName(true)}
-                        className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
-                        aria-label="Редактировать название"
-                      >
-                        <Edit3 size={16} />
-                      </button>
-                    </div>
+                      <span className="flex items-center gap-2 text-amber-600">
+                    <AlertCircle size={14} />{" "}
+                        {connectionState === "connecting" ? "Подключение..." : "Сбой соединения"}
+                  </span>
                   )}
 
-                  <p className="mt-1 text-sm text-muted">
-                    {group.program} · {membersCount} студентов
-                    {apiAvailable && pendingCount > 0 && ` · ${pendingCount} приглашений`}
-                  </p>
-                  {groupImageMessage && (
-                    <p
-                      className={cn(
-                        "mt-2 text-xs font-medium",
-                        groupImageMessage.type === "error" ? "text-rose-500" : "text-emerald-600"
-                      )}
-                    >
-                      {groupImageMessage.text}
-                    </p>
+                  {socketDisconnected && (
+                      <span className="flex items-center gap-2 text-rose-600">
+                    <AlertTriangle size={14} />
+                    Соединение потеряно
+                  </span>
+                  )}
+
+                  {connectionState === "connected" && (
+                      <span className="tabular-nums opacity-60 font-semibold">{sessionTimerLabel}</span>
                   )}
                 </div>
               </div>
 
-              <div className="sm:ml-auto flex flex-wrap items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-2 rounded-xl"
-                  onClick={() => groupImageInputRef.current?.click()}
-                  disabled={uploadingGroupImage}
-                >
-                  <ImagePlus size={16} />
-                  {uploadingGroupImage ? "Загрузка..." : "Фото группы"}
-                </Button>
-                {groupImageUrl && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-2 rounded-xl"
-                    onClick={() => void handleGroupImageDelete()}
-                    disabled={uploadingGroupImage}
-                  >
-                    Удалить фото
-                  </Button>
-                )}
-                {apiAvailable && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="gap-2 rounded-xl"
-                    onClick={openInviteModal}
-                  >
-                    <UserPlus size={16} />
-                    Пригласить
-                  </Button>
-                )}
-                <ToneBadge tone={group.status === "active" ? "success" : "neutral"}>
-                  {group.status === "active" ? "Активна" : "В архиве"}
-                </ToneBadge>
-                <Badge className="bg-surface-subtle text-muted">{group.id}</Badge>
-              </div>
+              <button
+                  onClick={handleLeaveSession}
+                  className="px-5 py-2.5 rounded-xl text-[13px] bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm font-semibold transition-colors shrink-0"
+              >
+                Завершить сессию
+              </button>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-4">
-              <StatTile
-                label="Преподаватель"
-                value={group.teacher.fullName}
-                icon={<Users size={15} className="text-muted" />}
-              />
-              <StatTile
-                label="Студентов"
-                value={`${membersCount}`}
-                icon={<GraduationCap size={15} className="text-muted" />}
-              />
-              <StatTile
-                label="Сессий"
-                value={`${sessions.length}`}
-                icon={<CalendarDays size={15} className="text-muted" />}
-              />
-              <StatTile
-                label="Программа"
-                value={group.program}
-                icon={<BookOpen size={15} className="text-muted" />}
-              />
-            </div>
-
-            <div className="mt-6 rounded-3xl border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur">
-              {editingDesc ? (
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted">Описание группы</label>
-                  <Input
-                    value={localDescription}
-                    onChange={(e) => setLocalDescription(e.target.value)}
-                    placeholder="Краткое описание курса или группы…"
-                    className="rounded-xl"
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => setEditingDesc(false)}>
-                      Сохранить
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setLocalDescription(groupDescriptionValue);
-                        setEditingDesc(false);
-                      }}
-                    >
-                      Отмена
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-3">
-                  <div className="flex-1">
-                    <div className="text-xs uppercase tracking-wide text-muted">Описание</div>
-                    <p className="mt-2 text-sm leading-relaxed text-muted">
-                      {localDescription ||
-                        groupDescriptionValue ||
-                        "Добавьте короткое описание группы, чтобы преподавателю и студентам было проще ориентироваться."}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingDesc(true)}
-                    className="shrink-0 rounded-lg p-1.5 text-muted transition-colors hover:bg-surface-subtle hover:text-fg"
-                    aria-label="Редактировать описание"
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(400px,460px)] xl:grid-cols-[minmax(0,1fr)_460px] 2xl:grid-cols-[minmax(0,1fr)_480px]">
+              <div className="flex min-w-0 flex-col">
+                <div className="shrink-0 space-y-6">
+                  <div
+                      ref={monitorRef}
+                      className="relative w-full rounded-[28px] overflow-hidden bg-slate-100 shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/50 h-[340px] sm:h-[420px] lg:h-[500px] xl:h-[560px] shrink-0"
                   >
-                    <Edit3 size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </Section>
-
-      {id && (
-        <Section>
-          <GroupAnalyticsSection groupId={id} />
-        </Section>
-      )}
-
-      <Section>
-        <div className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-slate-200/70 bg-white/75 p-2 shadow-sm backdrop-blur">
-          <TabButton
-            active={activeTab === "sessions"}
-            label="Сессии"
-            count={sessions.length}
-            onClick={() => setActiveTab("sessions")}
-            icon={<CalendarDays size={15} />}
-          />
-          <TabButton
-            active={activeTab === "announcements"}
-            label="Объявления"
-            count={announcements.length || undefined}
-            onClick={() => setActiveTab("announcements")}
-            icon={<Megaphone size={15} />}
-          />
-          <TabButton
-            active={activeTab === "members"}
-            label="Участники"
-            count={membersCount}
-            onClick={() => setActiveTab("members")}
-            icon={<Users size={15} />}
-          />
-          <TabButton
-            active={activeTab === "invitations"}
-            label="Приглашения"
-            count={pendingCount || undefined}
-            onClick={() => setActiveTab("invitations")}
-            icon={<Mail size={15} />}
-          />
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Reveal className="lg:col-span-2">
-            <Card variant="elevated">
-              <CardContent className="p-6 md:p-8">
-                {activeTab === "sessions" && (
-                  <>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h2 className="text-xl font-semibold text-fg">Сессии группы</h2>
-                        <p className="mt-1 text-sm text-muted">
-                          Управляйте жизненным циклом занятий и экзаменов.
-                        </p>
-                      </div>
+                    <div className="sr-only" aria-hidden="true">
+                      {Object.entries(remoteStreams).map(([peerId, stream]) => (
+                          <StreamAudio key={peerId} stream={stream} />
+                      ))}
                     </div>
 
-                    <div className="mt-6 space-y-4">
-                      {sessions.length === 0 ? (
-                        <EmptyState
-                          title="Сессий пока нет"
-                          description="Создайте первую сессию в разделе «Сессии» и привяжите её к этой группе."
-                        />
-                      ) : (
-                        sessions.map((s) => {
-                          const action = nextTeacherAction(s.status);
-
-                          return (
-                            <div
-                              key={s.id}
-                              className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-5 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-lg"
-                            >
-                              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-base font-semibold text-fg">{s.title}</h3>
-                                    <ToneBadge tone={typeTone(s.type)}>
-                                      {s.type === "exam" ? "Экзамен" : "Лекция"}
-                                    </ToneBadge>
-                                    <ToneBadge tone={statusTone(s.status)}>
-                                      {s.status === "live"
-                                        ? "В эфире"
-                                        : s.status === "ended"
-                                          ? "Завершена"
-                                          : "Ожидает"}
-                                    </ToneBadge>
-                                  </div>
-
-                                  <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted">
-                                    <span className="inline-flex items-center gap-1.5">
-                                      <Clock3 size={14} />
-                                      {fmtDateTime(s.startsAt)}
-                                    </span>
-                                    <span className="text-xs text-muted">{s.id}</span>
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Button
-                                    type="button"
-                                    className={cn(
-                                      action.nextBackendStatus === "active"
-                                        ? "ring-1 ring-amber-400/25 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 text-amber-100"
-                                        : action.nextBackendStatus === "finished"
-                                          ? "ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg"
-                                          : "ring-1 ring-fuchsia-400/25 bg-fuchsia-500/15 hover:bg-fuchsia-500/20 text-fuchsia-100"
-                                    )}
-                                    onClick={() => {
-                                      if (apiAvailable) {
-                                        updateSessionStatus(s.id, action.nextBackendStatus).then(refetchGroup);
-                                      }
-                                    }}
-                                  >
-                                    {ACTION_LABELS[action.label] ?? action.label}
-                                  </Button>
-
-                                  <Link
-                                    href={`/teacher/session/${s.id}`}
-                                    className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm ring-1 ring-[color:var(--border)]/30 bg-surface-subtle hover:bg-surface-subtle/80 text-fg transition"
-                                  >
-                                    Монитор
-                                  </Link>
-
-                                  <Link
-                                    href={`/teacher/session/${s.id}/analytics`}
-                                    className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm ring-1 ring-[rgb(var(--primary))]/25 bg-primary-muted hover:bg-primary-muted/80 text-[rgb(var(--primary))] transition"
-                                  >
-                                    Аналитика
-                                  </Link>
-
-                                  {s.type === "exam" && (
-                                    <Link
-                                      href={`/teacher/session/${s.id}/exam-analytics`}
-                                      className="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm ring-1 ring-fuchsia-400/25 bg-fuchsia-500/15 hover:bg-fuchsia-500/20 text-fuchsia-200 transition"
-                                    >
-                                      Экзамен
-                                    </Link>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </>
-                )}
-
-                {activeTab === "announcements" && (
-                  <>
-                    <h2 className="text-xl font-semibold text-fg">Объявления группы</h2>
-                    <p className="mt-1 text-sm text-muted">
-                      Публикуйте важные сообщения для всех студентов группы.
-                    </p>
-
-                    {apiAvailable ? (
-                      <>
-                        <div className="mt-6 rounded-3xl border border-slate-200/70 bg-white/75 p-5 shadow-sm backdrop-blur">
-                          <textarea
-                            className="w-full rounded-2xl border border-[color:var(--border)]/20 bg-surface px-4 py-3 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]/30"
-                            rows={4}
-                            placeholder="Напишите объявление для группы…"
-                            value={newAnnouncement}
-                            onChange={(e) => setNewAnnouncement(e.target.value)}
+                    {selectedVideo?.stream ? (
+                        <button
+                            type="button"
+                            onClick={() => void toggleMonitorFullscreen()}
+                            className="absolute inset-0 block h-full w-full cursor-pointer bg-black text-left"
+                            title="Открыть видео на весь экран"
+                        >
+                          <StreamVideo
+                              key={`${selectedVideo.id}-${selectedVideo.stream.id}`}
+                              stream={selectedVideo.stream}
+                              className="h-full w-full object-cover"
+                              autoPlay
+                              playsInline
+                              muted
                           />
-                          <div className="mt-3 flex items-center justify-between gap-3">
-                            <p className="text-xs text-muted">
-                              Объявление увидят все студенты этой группы.
-                            </p>
-                            <Button
-                              size="sm"
-                              disabled={!newAnnouncement.trim()}
-                              className="gap-2"
-                              onClick={async () => {
-                                try {
-                                  const msg = await postGroupMessage(id, {
-                                    type: "announcement",
-                                    text: newAnnouncement.trim(),
-                                  });
-                                  setAnnouncements((prev) => [...prev, msg]);
-                                  setNewAnnouncement("");
-                                } catch (e) {
-                                  console.error("postGroupMessage", e);
-                                }
-                              }}
-                            >
-                              <Send size={14} />
-                              Отправить
-                            </Button>
+                        </button>
+                    ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#F4F5F7]">
+                          <div className="w-16 h-16 rounded-full bg-white shadow-sm flex items-center justify-center mb-4">
+                            <span className="text-2xl">👥</span>
+                          </div>
+                          <div className="text-slate-500 font-medium text-sm">
+                            Ожидание подключения участников...
                           </div>
                         </div>
-
-                        <div className="mt-6 space-y-4">
-                          {annLoading && (
-                            <div className="h-24 rounded-2xl bg-surface-subtle animate-pulse" />
-                          )}
-
-                          {!annLoading && announcements.length === 0 && (
-                            <EmptyState
-                              title="Пока нет объявлений"
-                              description="Создайте первое объявление, чтобы студенты видели важные новости по курсу."
-                            />
-                          )}
-
-                          {!annLoading &&
-                            announcements.map((m) => (
-                              <div
-                                key={m.id}
-                                className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4 transition hover:bg-white hover:shadow-md"
-                              >
-                                <div className="flex items-center justify-between gap-2">
-                                  <ToneBadge tone="purple">Объявление</ToneBadge>
-                                  <span className="text-xs text-muted">
-                                    {fmtDateTime(
-                                      typeof m.createdAt === "string"
-                                        ? m.createdAt
-                                        : String(m.createdAt)
-                                    )}
-                                  </span>
-                                </div>
-                                <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-fg">
-                                  {m.text}
-                                </p>
-                              </div>
-                            ))}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-5">
-                        <EmptyState
-                          title="Бэкенд не подключён"
-                          description="Объявления группы будут доступны при подключённом API."
-                        />
-                      </div>
                     )}
-                  </>
-                )}
 
-                {activeTab === "members" && (
-                  <>
-                    <h2 className="text-xl font-semibold text-fg">Участники группы</h2>
-                    <p className="mt-1 text-sm text-muted">
-                      Просматривайте студентов и управляйте доступом.
-                    </p>
+                    <button
+                        type="button"
+                        onClick={() => void toggleMonitorFullscreen()}
+                        className="absolute top-4 right-4 bg-slate-900/40 hover:bg-slate-900/60 transition-colors backdrop-blur-md text-white p-2.5 rounded-2xl cursor-pointer"
+                        aria-label={isMonitorFullscreen ? "Exit fullscreen" : "Open fullscreen"}
+                    >
+                      <Maximize2 size={16} strokeWidth={2.5} />
+                    </button>
 
-                    {membersLoading && apiAvailable ? (
-                      <div className="mt-6 h-32 rounded-2xl bg-surface-subtle animate-pulse" />
-                    ) : (
-                      <div className="mt-6 space-y-3">
-                        {!apiAvailable &&
-                          group?.students?.map((s: { id: string; fullName: string; email?: string | null }) => (
-                            <div
-                              key={s.id}
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
-                            >
-                              <div>
-                                <div className="font-medium text-fg">{s.fullName}</div>
-                                {s.email && <div className="text-sm text-muted">{s.email}</div>}
-                              </div>
-                              <ToneBadge tone="success">В группе</ToneBadge>
-                            </div>
+                    {selectedVideo?.stream && (
+                        <div className="absolute bottom-4 left-4 bg-slate-900/60 backdrop-blur-xl px-3 py-2 text-white rounded-2xl flex items-center gap-2 text-[13px] font-medium shadow-sm max-w-[65%]">
+                          <div className="w-5 h-5 rounded-full bg-[#7448FF] flex items-center justify-center shrink-0">
+                            {selectedVideo.icon}
+                          </div>
+                          <span className="truncate">{selectedVideo.label}</span>
+                          {focusedStudentParticipant && (
+                              <span className="rounded-full bg-[#7448FF] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                                Фокус
+                              </span>
+                          )}
+                        </div>
+                    )}
+
+                    <div className="absolute bottom-4 right-4 flex max-w-[calc(100%-2rem)] items-end gap-3 overflow-x-auto pb-1">
+                      {videoTiles
+                          .filter((tile) => tile.id !== selectedVideo?.id)
+                          .map((tile) => (
+                              <button
+                                  key={tile.id}
+                                  type="button"
+                                  onClick={() => setSelectedVideoId(tile.id)}
+                                  className={cn(
+                                      "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
+                                      selectedVideo?.id === tile.id
+                                          ? "border-[#7448FF] ring-4 ring-[#7448FF]/25"
+                                          : "border-white/20 hover:border-white/60"
+                                  )}
+                                  title={`Открыть ${tile.label} в большом окне`}
+                              >
+                                {tile.stream ? (
+                                    <StreamVideo
+                                        stream={tile.stream}
+                                        className="h-full w-full object-cover"
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center bg-slate-900 text-2xl text-white">
+                                      {tile.icon}
+                                    </div>
+                                )}
+
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 to-transparent px-2 pb-2 pt-7 text-white">
+                                  <div className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold">
+                                    <span className="truncate">{tile.label}</span>
+                                    {tile.isLocal && (
+                                        <Mic size={12} className={isMicEnabled ? "shrink-0 text-white" : "shrink-0 text-red-400"} />
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-medium text-white/70">{tile.roleLabel}</div>
+                                </div>
+                              </button>
                           ))}
+                    </div>
+                  </div>
 
-                        {apiAvailable && groupMembers.length === 0 && (
-                          <EmptyState
-                            title="Список участников пуст"
-                            description="Когда студенты вступят в группу, они появятся здесь."
-                          />
-                        )}
+                  <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                    <CallControlButton
+                        active={isMicEnabled}
+                        icon={<Mic size={22} />}
+                        label="Микрофон"
+                        dangerIcon={<MicOff size={22} />}
+                        onClick={toggleMic}
+                    />
+                    <CallControlButton
+                        active={isCameraEnabled}
+                        icon={<Video size={22} />}
+                        label="Камера"
+                        dangerIcon={<VideoOff size={22} />}
+                        onClick={toggleCamera}
+                        disabled={isScreenSharing}
+                    />
+                    <CallControlButton
+                        active={isScreenSharing}
+                        icon={<Share2 size={22} />}
+                        label="Экран"
+                        onClick={toggleScreenShare}
+                    />
+                    <CallControlButton
+                        active
+                        icon={<MessageSquare size={22} />}
+                        label="Чат"
+                        onClick={() => {
+                          chatSectionRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "start",
+                          });
+                        }}
+                    />
 
-                        {apiAvailable &&
-                          groupMembers.map((m) => (
-                            <div
-                              key={m.id}
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
+                    <div className="flex flex-col items-center gap-2 mx-1">
+                      <button
+                          onClick={handleLeaveSession}
+                          className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
+                      >
+                        <PhoneOff size={22} />
+                      </button>
+                      <span className="text-xs font-semibold text-slate-700">Выйти</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-6 pt-2">
+                  <div>
+                    <div className="flex items-center gap-2 border-b border-slate-100 mb-6">
+                      {["Материалы", "Заметки", "Доска"].map((t) => {
+                        const id =
+                            t === "Материалы"
+                                ? "materials"
+                                : t === "Заметки"
+                                    ? "notes"
+                                    : "whiteboard";
+                        const isActive = activeBottomTab === id;
+
+                        return (
+                            <button
+                                key={id}
+                                onClick={() =>
+                                    setActiveBottomTab(id as "materials" | "notes" | "whiteboard")
+                                }
+                                className={cn(
+                                    "px-5 py-3 text-sm font-semibold transition-colors relative",
+                                    isActive ? "text-[#7448FF]" : "text-slate-500 hover:text-slate-700"
+                                )}
                             >
-                              <div>
-                                <div className="font-medium text-fg">{m.fullName ?? m.email}</div>
-                                <div className="text-sm text-muted">{m.email}</div>
+                              {t}
+                              {isActive && (
+                                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-[#7448FF] rounded-t-full" />
+                              )}
+                            </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="bg-white border text-sm border-slate-100 rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] min-h-[300px] flex items-center justify-center p-8">
+                      {activeBottomTab === "whiteboard" && <SessionWhiteboard sessionId={sessionId} className="w-full" />}
+
+                      {activeBottomTab === "whiteboard" && false && (
+                          <div className="text-center w-full">
+                            <Reveal>
+                              <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                                <PenTool size={32} className="text-slate-200" strokeWidth={1} />
+                                <div className="font-semibold text-slate-700">
+                                  Интерактивная доска недоступна
+                                </div>
+                                <div className="text-sm max-w-sm">
+                                  Модуль совместной работы (Whiteboard) пока находится в разработке.
+                                </div>
+                              </div>
+                            </Reveal>
+                          </div>
+                      )}
+
+                      {activeBottomTab === "notes" && <SessionNotesPanel sessionId={sessionId} role="teacher" />}
+
+                      {activeBottomTab === "notes" && false && (
+                          <div className="flex h-full w-full flex-col text-left">
+                        <textarea
+                            value=""
+                            onChange={() => {}}
+                            className="min-h-[220px] w-full flex-1 resize-none rounded-[24px] border border-slate-100 bg-slate-50/50 p-6 text-sm font-medium text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#7448FF]/10 transition-all"
+                            placeholder="Личные заметки по сессии. Сохраняются только в этом браузере."
+                        />
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 px-2">
+                              <div className="flex items-center gap-2 rounded-lg border border-orange-100 bg-orange-50 px-3 py-1.5">
+                                <AlertTriangle size={14} className="text-orange-500" />
+                                <span className="text-[11px] font-bold text-orange-600">
+                              Личные заметки не синхронизируются с сервером
+                            </span>
+                              </div>
+                              <button
+                                  type="button"
+                                  onClick={() => {}}
+                                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
+                              >
+                                Очистить заметки
+                              </button>
+                            </div>
+                          </div>
+                      )}
+
+                      {activeBottomTab === "materials" && (
+                          <div className="w-full text-left">
+                            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <h3 className="text-[15px] font-extrabold text-slate-900">
+                                  Материалы занятия
+                                </h3>
+                                <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-[#7448FF]">
+                                  {sessionFiles.length}
+                                </span>
                               </div>
 
                               <div className="flex items-center gap-2">
-                                <ToneBadge
-                                  tone={
-                                    (m.status ?? "active") === "active"
-                                      ? "success"
-                                      : (m.status ?? "active") === "blocked"
-                                        ? "warning"
-                                        : "neutral"
-                                  }
+                                <input
+                                    ref={materialFileInputRef}
+                                    type="file"
+                                    className="hidden"
+                                    onChange={(event) => void handleMaterialFileChange(event)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => materialFileInputRef.current?.click()}
+                                    disabled={materialUploading || contentLoading}
+                                    className={cn(
+                                        "inline-flex items-center gap-2 rounded-2xl bg-[#7448FF] px-4 py-2.5 text-[12px] font-bold text-white shadow-[0_12px_24px_rgba(116,72,255,0.22)] transition hover:bg-[#6538f5]",
+                                        (materialUploading || contentLoading) && "cursor-not-allowed opacity-60"
+                                    )}
                                 >
-                                  {(m.status ?? "active") === "active"
-                                    ? "В группе"
-                                    : (m.status ?? "active") === "blocked"
-                                      ? "Заблокирован"
-                                      : "Удалён"}
-                                </ToneBadge>
-
-                                {(m.status ?? "active") === "active" && (
-                                  <MemberActionsDropdown
-                                    onRemove={() =>
-                                      setConfirmRemoveMember({
-                                        memberId: m.id,
-                                        memberName: m.fullName ?? m.email ?? "Участник",
-                                      })
-                                    }
-                                    onBlock={() =>
-                                      setConfirmBlockMember({
-                                        memberId: m.id,
-                                        memberName: m.fullName ?? m.email ?? "Участник",
-                                      })
-                                    }
-                                  />
-                                )}
+                                  {materialUploading ? (
+                                      <Loader2 size={15} className="animate-spin" />
+                                  ) : (
+                                      <UploadCloud size={15} />
+                                  )}
+                                  {materialUploading ? "Загрузка..." : "Добавить материал"}
+                                </button>
                               </div>
                             </div>
-                          ))}
-                      </div>
-                    )}
-                  </>
-                )}
 
-                {activeTab === "invitations" && (
-                  <>
-                    <div className="flex items-start justify-between gap-3">
+                            {materialUploadError && (
+                                <div className="mb-4 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-[12px] font-semibold text-rose-600">
+                                  {materialUploadError}
+                                </div>
+                            )}
+
+                            {contentLoading ? (
+                                <div className="grid min-h-[180px] place-items-center rounded-[24px] border border-slate-100 bg-slate-50/60 text-sm font-semibold text-slate-400">
+                                  Загружаем материалы сессии...
+                                </div>
+                            ) : sessionFiles.length > 0 ? (
+                                <div className="grid gap-3">
+                                  {sessionFiles.map((file) => (
+                                      <div
+                                          key={file.id}
+                                          className="group rounded-[22px] border border-slate-100 bg-white px-4 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.035)] transition hover:border-purple-100 hover:shadow-[0_18px_45px_rgba(116,72,255,0.09)]"
+                                      >
+                                        <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+                                          <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-[18px] bg-purple-50 text-[#7448FF] ring-1 ring-purple-100">
+                                            <FileText size={30} strokeWidth={1.7} />
+                                            <span className="absolute bottom-2 rounded-md bg-[#7448FF] px-1.5 py-0.5 text-[8px] font-black text-white">
+                                          {getFileExtension(file.fileName || file.title, file.mimeType)}
+                                        </span>
+                                          </div>
+
+                                          <div className="min-w-0 flex-1">
+                                            <div className="truncate text-[14px] font-extrabold text-slate-900">
+                                              {file.title}
+                                            </div>
+                                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-400">
+                                          <span className="max-w-[220px] truncate">
+                                            {file.fileName || "Файл занятия"}
+                                          </span>
+                                              <span>•</span>
+                                              <span>{formatFileSize(file.size)}</span>
+                                              <span>•</span>
+                                              <span>{formatUploadTime((file as { createdAt?: string | null }).createdAt)}</span>
+                                            </div>
+                                          </div>
+
+                                          <div className="ml-auto flex shrink-0 items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  const direct = file.url?.trim();
+                                                  if (direct) {
+                                                    window.open(direct, "_blank", "noreferrer");
+                                                    return;
+                                                  }
+
+                                                  const info = await getMaterialDownload(file.id);
+                                                  const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                                  if (url) {
+                                                    window.open(url, "_blank", "noreferrer");
+                                                  }
+                                                }}
+                                                className="inline-flex items-center gap-2 rounded-[18px] border border-purple-100 bg-white px-4 py-2.5 text-[12px] font-bold text-[#7448FF] transition hover:border-[#7448FF]/30 hover:bg-purple-50"
+                                            >
+                                              Открыть
+                                              <Share2 size={13} />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                  const info = await getMaterialDownload(file.id);
+                                                  const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : file.url || "";
+                                                  if (url) window.open(url, "_blank", "noreferrer");
+                                                }}
+                                                className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-100 bg-white text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-purple-100 hover:text-[#7448FF]"
+                                                aria-label="Скачать материал"
+                                            >
+                                              <Download size={16} />
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleDeleteMaterial(file.id)}
+                                                disabled={deletingMaterialId === file.id}
+                                                className={cn(
+                                                    "grid h-11 w-11 place-items-center rounded-2xl border border-rose-100 bg-white text-rose-500 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-rose-200 hover:bg-rose-50",
+                                                    deletingMaterialId === file.id && "cursor-not-allowed opacity-60"
+                                                )}
+                                                aria-label="Удалить материал"
+                                                title="Удалить материал"
+                                            >
+                                              {deletingMaterialId === file.id ? (
+                                                  <Loader2 size={16} className="animate-spin" />
+                                              ) : (
+                                                  <Trash2 size={16} />
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                  ))}
+                                </div>
+                            ) : (
+                                <div className="text-center w-full">
+                                  <Reveal>
+                                    <div className="flex min-h-[190px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 text-slate-400 gap-3">
+                                      <CheckSquare size={32} className="text-slate-200" strokeWidth={1} />
+                                      <div className="font-semibold text-slate-700">Нет материалов</div>
+                                      <div className="text-sm max-w-sm">
+                                        Нажмите «Добавить материал», чтобы прикрепить файл к этой сессии.
+                                      </div>
+                                    </div>
+                                  </Reveal>
+                                </div>
+                            )}
+                          </div>
+                      )}                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <div
+                  ref={chatSectionRef}
+                  className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:self-start"
+              >
+                <LessonPlanPanel sessionId={sessionId} role="teacher" />
+                <div className="flex h-[520px] min-h-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)] lg:h-[560px]">
+                  <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
+                    <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
+                    <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
+                      <Users2 size={12} /> {participants.length || 1}
+                    </Badge>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-hidden">
+                    <SessionChatPanel sessionId={roomId} role="teacher" type={sessionType} />
+                  </div>
+                </div>
+
+                <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 space-y-6 shrink-0">
+                  <h3 className="font-bold text-slate-900 text-[16px]">Информация о сессии</h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-0.5 font-medium">Тема</div>
+                      <div className="font-semibold text-slate-900 text-sm">{title}</div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-0.5 font-medium">Режим</div>
+                      <div className="font-semibold text-slate-900 text-sm flex items-center gap-1.5">
+                        <Clock size={14} className="text-slate-400" />
+                        Live-трансляция ({sessionType})
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
+                      <div className="flex flex-col gap-3">
+                        {presence.length > 0 ? (
+                            <div className="space-y-2">
+                              {presence.map((row) => {
+                                const participant = findStudentParticipantForPresence(row);
+                                const canFocus = Boolean(
+                                    participant && remoteStreams[participant.id]
+                                );
+                                const isFocused =
+                                    Boolean(participant) &&
+                                    focusedStudentParticipant?.id === participant?.id;
+                                const isCurrentTeacher =
+                                    (Boolean(currentUser?.id) && currentUser?.id === row.userId) ||
+                                    (Boolean(currentUser?.email) &&
+                                        normalizeIdentity(currentUser?.email) ===
+                                        normalizeIdentity(row.email));
+
+                                return (
+                                    <button
+                                        key={row.userId}
+                                        type="button"
+                                        onClick={() => focusStudentFromPresence(row)}
+                                        disabled={!canFocus}
+                                        className={cn(
+                                            "flex w-full items-center justify-between gap-3 rounded-2xl border p-3 text-left transition",
+                                            isFocused
+                                                ? "border-[#7448FF] bg-purple-50 ring-2 ring-[#7448FF]/15"
+                                                : "border-slate-100 bg-white",
+                                            canFocus
+                                                ? "cursor-pointer hover:border-purple-200 hover:bg-purple-50/40"
+                                                : "cursor-default"
+                                        )}
+                                        title={
+                                          canFocus
+                                              ? `Показать ${row.fullName || row.email || "студента"} и его ML-метрики`
+                                              : isCurrentTeacher
+                                                  ? "Это вы — метрики преподавателя не показываются"
+                                                  : "Видео участника пока не подключено"
+                                        }
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="truncate text-[13px] font-semibold text-slate-900">
+                                          {row.fullName || row.email || row.userId}
+                                        </div>
+                                        <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                          {row.email || ""}
+                                        </div>
+                                        <div className="mt-1 text-[10px] font-semibold text-[#7448FF]">
+                                          {isCurrentTeacher
+                                              ? "Преподаватель · вы"
+                                              : isFocused
+                                                  ? "Студент в фокусе"
+                                                  : canFocus
+                                                      ? "Нажмите для фокуса"
+                                                      : "Ожидание видео"}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                        <span
+                                            className={cn(
+                                                "h-2 w-2 rounded-full",
+                                                row.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                                            )}
+                                        />
+                                        <span className={row.status === "online" ? "text-emerald-600" : "text-slate-500"}>
+                                          {row.status}
+                                        </span>
+                                      </div>
+                                    </button>
+                                );
+                              })}
+                            </div>
+                        ) : (
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[12px] text-slate-500">
+                              Список участников загружается...
+                            </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <h2 className="text-xl font-semibold text-fg">Приглашения</h2>
-                        <p className="mt-1 text-sm text-muted">
-                          Отправленные инвайты и текущие статусы.
-                        </p>
+                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400">
+                          ML-метрики выбранного студента
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900">
+                          {focusedStudentParticipant ? focusedStudentName : "Студент не выбран"}
+                        </div>
                       </div>
-
-                      {apiAvailable && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="gap-2"
-                          onClick={openInviteModal}
-                        >
-                          <UserPlus size={14} />
-                          Пригласить
-                        </Button>
+                      {focusedStudentParticipant && (
+                          <span className="rounded-full border border-purple-100 bg-purple-50 px-3 py-1 text-[11px] font-bold text-[#7448FF]">
+                            Фокус активен
+                          </span>
                       )}
                     </div>
 
-                    {invitationsLoading ? (
-                      <div className="mt-6 h-32 rounded-2xl bg-surface-subtle animate-pulse" />
-                    ) : (
-                      <div className="mt-6 space-y-3">
-                        {groupInvitations.length === 0 ? (
-                          <EmptyState
-                            title="Приглашений пока нет"
-                            description="Отправьте первое приглашение студентам по email."
-                          />
-                        ) : (
-                          groupInvitations.map((inv) => (
-                            <div
-                              key={inv.id}
-                              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[color:var(--border)]/20 bg-surface-subtle/30 p-4"
+                    {!focusedStudentParticipant ? (
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-[13px] font-medium text-purple-700">
+                          Нажмите на мини-видео студента или на его имя в списке участников. Большое видео по нажатию по-прежнему открывается на весь экран.
+                        </div>
+                    ) : liveMetricsLoading ? (
+                        <div className="rounded-2xl border border-slate-100 bg-white p-4 text-[13px] font-medium text-slate-500">
+                          Загружаем метрики студента...
+                        </div>
+                    ) : focusedStudentMetrics ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Эмоция
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {focusedStudentMetrics.dominant_emotion ||
+                                    focusedStudentMetrics.emotion ||
+                                    "—"}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Уверенность
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.confidence)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Вовлечённость
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.engagement)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Стресс
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.stress)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Усталость
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.fatigue)}
+                              </div>
+                            </div>
+                            <div className="rounded-2xl border border-slate-100 bg-white p-3">
+                              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                Риск
+                              </div>
+                              <div className="mt-1.5 font-semibold text-slate-900">
+                                {formatPercentMetric(focusedStudentMetrics.risk)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
+                            <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-slate-600">
+                              Состояние: {focusedStudentMetrics.state || "—"}
+                            </span>
+                            <span
+                                className={cn(
+                                    "rounded-full border px-3 py-1",
+                                    focusedMetricsStale
+                                        ? "border-amber-100 bg-amber-50 text-amber-700"
+                                        : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                                )}
                             >
-                              <div>
-                                <div className="font-medium text-fg">{inv.inviteeEmail}</div>
-                                <div className="text-sm text-muted">
-                                  Отправлено: {fmtDateTime(inv.createdAt)}
+                              {focusedMetricsStale ? "Данные устарели" : "Данные обновляются"} ·{" "}
+                              {formatMetricsUpdatedAt(focusedStudentMetrics.updatedAt)}
+                            </span>
+                          </div>
+                        </>
+                    ) : liveMetricsUnavailable ? (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] font-medium text-amber-700">
+                          Сервер live-метрик временно недоступен. Камера преподавателя на этот блок не влияет.
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] font-medium text-amber-700">
+                          Для выбранного студента пока нет метрик. Проверьте, что студент дал согласие, его камера включена и на его странице работает ML-анализ.
+                        </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 flex flex-col min-h-[160px]">
+                  <h3 className="font-bold text-slate-900 text-[16px] mb-4">Файлы</h3>
+                  <div className="flex-1 flex flex-col items-center justify-center text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
+                    <FileText size={20} className="text-slate-300 mb-2" strokeWidth={1.5} />
+                    <div className="text-[13px] font-semibold text-slate-500">
+                      Нет прикрепленных файлов
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <style jsx global>{`
+            .custom-scrollbar::-webkit-scrollbar {
+              width: 4px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+              background: #e2e8f0;
+              border-radius: 10px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: #cbd5e1;
+            }
+          `}</style>
+        </div>
+    );
+  }
+
+  return (
+      <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
+        <Breadcrumbs
+            items={[
+              { label: "Преподаватель", href: "/teacher/dashboard" },
+              { label: "Сессии", href: "/teacher/sessions" },
+              { label: title },
+            ]}
+        />
+
+
+        {!live && (
+            <PageHero
+                overline="Преподаватель · Сессия"
+                title={title}
+                subtitle={
+                  joinInfo?.groupName
+                      ? `${joinInfo.groupName}. Сначала согласие и проверка камеры, затем подключение.`
+                      : "Сначала согласие и проверка камеры, затем подключение к эфиру."
+                }
+                right={
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge>{joinInfo?.type === "exam" ? "Экзамен" : "Лекция"}</Badge>
+                    <Badge variant={state.consent ? "success" : "warning"}>
+                      {state.consent ? "Согласие: да" : "Согласие: нет"}
+                    </Badge>
+                    <Link href="/teacher/sessions">
+                      <Button variant="outline">Назад</Button>
+                    </Link>
+                  </div>
+                }
+            />
+        )}
+
+        {joinInfoLoading && (
+            <Section spacing="none" className="mt-6">
+              <Card>
+                <CardContent className="p-6 md:p-7">
+                  <div className="h-24 animate-pulse rounded-[20px] bg-slate-50" />
+                </CardContent>
+              </Card>
+            </Section>
+        )}
+
+        {joinInfoError && (
+            <Section spacing="none" className="mt-6">
+              <Card className="border-amber-200 bg-amber-50">
+                <CardContent className="flex flex-wrap items-center justify-between gap-4 p-6">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle size={20} className="shrink-0 text-amber-600" />
+                    <div>
+                      <div className="font-semibold text-slate-900">Ошибка загрузки</div>
+                      <div className="mt-0.5 text-sm text-amber-800">{joinInfoError}</div>
+                    </div>
+                  </div>
+                  <Button variant="outline" onClick={() => void loadJoinInfo()} className="bg-white">
+                    Повторить
+                  </Button>
+                </CardContent>
+              </Card>
+            </Section>
+        )}
+
+        {!joinInfoLoading &&
+            !joinInfoError &&
+            !canJoin &&
+            blockReason &&
+            blockReason !== "consent_required" && (
+                <Section spacing="none" className="mt-6">
+                  <Reveal>
+                    <Card className="mx-auto max-w-3xl border-slate-100">
+                      <CardContent className="space-y-3 p-6 md:p-7">
+                        {(blockReason === "session_not_started" || blockReason === "session_ended") && (
+                            <>
+                              <div className="text-sm text-slate-500">Статус сессии</div>
+                              <div className="text-lg font-semibold text-slate-900">
+                                {blockReason === "session_ended"
+                                    ? "Сессия завершена."
+                                    : "Сессия ещё не началась."}
+                              </div>
+                              <div className="text-sm text-slate-500">
+                                {blockReason === "session_ended"
+                                    ? "Преподаватель завершил эфир. Подключение недоступно."
+                                    : "Дождитесь, когда преподаватель запустит сессию."}
+                              </div>
+
+                            </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </Reveal>
+                </Section>
+            )}
+
+        {showPreparation && tab === "prepare" && (
+            <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
+              <div className="flex min-h-full items-center justify-center">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className={cn(
+                        "relative w-full overflow-hidden border border-white/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.30)]",
+                        preparationStep === 1
+                            ? "max-w-[720px] rounded-[28px]"
+                            : "max-w-[980px] rounded-[30px]"
+                    )}
+                >
+                  <div className="pointer-events-none absolute -left-24 -top-28 h-64 w-64 rounded-full bg-purple-100/70 blur-3xl" />
+                  <div className="pointer-events-none absolute -right-24 top-1/3 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl" />
+
+                  <div className="relative border-b border-slate-100 px-5 pb-5 pt-5 sm:px-7 sm:pb-6 sm:pt-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-[16px] font-extrabold tracking-[-0.01em] text-slate-900">
+                        Подготовка (согласие и камера)
+                      </div>
+                      <Link
+                          href="/teacher/sessions"
+                          aria-label="Назад"
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                      >
+                        <X size={18} />
+                      </Link>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4 sm:grid-cols-[110px_minmax(0,1fr)_110px]">
+                      <div className="text-xs font-semibold text-slate-500">
+                        Шаг {preparationStep}
+                      </div>
+                      <PreparationStepper step={preparationStep} />
+                      <div className="hidden sm:block" />
+                    </div>
+                  </div>
+
+                  <div className="relative px-5 py-6 sm:px-7 sm:py-7">
+                    {connectionError && (
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <AlertTriangle size={18} className="shrink-0 text-amber-600" />
+                            <div>
+                              <div className="text-sm font-semibold text-slate-900">
+                                Ошибка подключения
+                              </div>
+                              <div className="mt-0.5 text-xs text-amber-800">{connectionError}</div>
+                            </div>
+                          </div>
+                          <Button
+                              variant="outline"
+                              className="rounded-xl bg-white"
+                              onClick={() => {
+                                setConnectionError(null);
+                                setConnectionState("idle");
+                              }}
+                          >
+                            Попробовать снова
+                          </Button>
+                        </div>
+                    )}
+
+                    {preparationStep === 1 ? (
+                        preparationView === "consent-details" ? (
+                            <div className="mx-auto max-w-[650px]">
+                              <button
+                                  type="button"
+                                  onClick={() => setPreparationView("main")}
+                                  className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                              >
+                                <ArrowLeft size={17} />
+                                Назад
+                              </button>
+
+                              <div className="mt-3 rounded-[24px] border border-purple-100 bg-gradient-to-br from-purple-50/80 via-white to-indigo-50/70 p-5 sm:p-6">
+                                <div className="flex items-start gap-4">
+                                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.25)]">
+                                    <LockKeyhole size={21} />
+                                  </div>
+                                  <div>
+                                    <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                      Подробная информация
+                                    </div>
+                                    <h2 className="mt-1.5 text-xl font-extrabold tracking-[-0.02em] text-slate-900 sm:text-2xl">
+                                      Согласие на анализ эмоций
+                                    </h2>
+                                    <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
+                                      Мы обрабатываем 1–2 кадра в секунду, без записи видео. Сохраняются только метаданные.
+                                    </p>
+                                  </div>
                                 </div>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <ToneBadge
-                                  tone={
-                                    inv.status === "pending"
-                                      ? "warning"
-                                      : inv.status === "accepted"
-                                        ? "success"
-                                        : "neutral"
-                                  }
-                                >
-                                  {inv.status === "pending"
-                                    ? "Ожидает"
-                                    : inv.status === "accepted"
-                                      ? "Принято"
-                                      : inv.status === "revoked"
-                                        ? "Отменено"
-                                        : inv.status}
-                                </ToneBadge>
+                              <div className="mt-4 max-h-[42vh] space-y-3 overflow-y-auto pr-1">
+                                {[
+                                  {
+                                    title: "Мы обрабатываем",
+                                    description: "Изображения с веб-камеры без записи видео",
+                                  },
+                                  {
+                                    title: "Мы сохраняем",
+                                    description: "Только метаданные эмоций, без исходного видео",
+                                  },
+                                  {
+                                    title: "Используется для",
+                                    description:
+                                        "Анализа вовлечённости и стресса, чтобы улучшать преподавание",
+                                  },
+                                  {
+                                    title: "Не используется для",
+                                    description: "Оценок, санкций или дисциплинарных решений",
+                                  },
+                                ].map((item) => (
+                                    <div
+                                        key={item.title}
+                                        className="rounded-[18px] border border-slate-100 bg-slate-50/80 px-4 py-3.5"
+                                    >
+                                      <div className="text-xs font-bold text-slate-500">
+                                        {item.title}
+                                      </div>
+                                      <div className="mt-1 text-sm font-semibold leading-relaxed text-slate-900">
+                                        {item.description}
+                                      </div>
+                                    </div>
+                                ))}
 
-                                {inv.status === "pending" && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-warning hover:text-warning"
-                                    onClick={() =>
-                                      revokeInvitation(inv.id).then(() => {
-                                        setTick((x) => x + 1);
-                                        setGroupInvitations((prev) =>
-                                          prev.map((i) =>
-                                            i.id === inv.id ? { ...i, status: "revoked" } : i
-                                          )
-                                        );
-                                      })
-                                    }
-                                  >
-                                    Отменить
-                                  </Button>
+                                <div className="flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3.5">
+                                  <ShieldCheck
+                                      size={18}
+                                      className="mt-0.5 shrink-0 text-emerald-600"
+                                  />
+                                  <div className="text-xs font-medium leading-relaxed text-emerald-900/75">
+                                    Согласие можно отозвать в любой момент. После отзыва анализ новых кадров прекращается.
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="mt-5 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:justify-end">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setPreparationView("main")}
+                                    className="rounded-xl px-6"
+                                >
+                                  Назад
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => setPreparationView("main")}
+                                    className="rounded-xl bg-[#7448FF] px-7 text-white shadow-[0_10px_24px_rgba(116,72,255,0.24)] hover:bg-[#6538f5]"
+                                >
+                                  Понятно
+                                </Button>
+                              </div>
+                            </div>
+                        ) : (
+                            <div className="grid items-center gap-7 md:grid-cols-[0.82fr_1.18fr] md:gap-10">
+                              <div className="relative mx-auto grid min-h-[250px] w-full max-w-[280px] place-items-center overflow-hidden rounded-[30px] bg-[radial-gradient(circle_at_50%_40%,rgba(237,233,254,0.95),rgba(248,250,252,0.75)_58%,rgba(255,255,255,0)_72%)]">
+                                <div className="absolute left-5 top-12 h-3 w-3 rounded-full bg-[#7448FF]/20" />
+                                <div className="absolute right-8 top-8 h-2.5 w-2.5 rounded-full bg-sky-400/25" />
+                                <div className="absolute bottom-12 right-5 h-4 w-4 rounded-full bg-violet-300/25" />
+
+                                <div className="relative">
+                                  <div className="absolute -left-16 bottom-1 grid h-24 w-20 -rotate-6 place-items-center rounded-[22px] border border-white bg-white/90 text-[#7448FF] shadow-[0_18px_45px_rgba(116,72,255,0.12)]">
+                                    <CheckSquare size={38} strokeWidth={1.7} />
+                                  </div>
+                                  <div className="grid h-36 w-32 place-items-center rounded-[34px] border border-purple-100 bg-gradient-to-b from-[#8B6BFF] to-[#7448FF] text-white shadow-[0_24px_55px_rgba(116,72,255,0.30)]">
+                                    <ShieldCheck size={58} strokeWidth={1.7} />
+                                  </div>
+                                  <div className="absolute -right-12 bottom-3 grid h-16 w-14 rotate-6 place-items-center rounded-[18px] border border-white bg-white/90 text-violet-500 shadow-[0_16px_38px_rgba(116,72,255,0.12)]">
+                                    <Sparkles size={25} />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                  Шаг 1
+                                </div>
+                                <div className="mt-2 text-xl font-extrabold tracking-[-0.02em] text-slate-900 sm:text-2xl">
+                                  Consent и правила приватности
+                                </div>
+                                <div className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
+                                  Видео не сохраняется. Анализ идёт 1–2 кадра в секунду, в систему попадают только агрегированные метрики.
+                                </div>
+
+                                {blockReason === "consent_required" && (
+                                    <div className="mt-4 rounded-[18px] border border-purple-100 bg-purple-50/70 px-4 py-3.5">
+                                      <div className="text-xs font-bold text-[#7448FF]">Требуется согласие</div>
+                                      <div className="mt-1 text-sm font-semibold text-slate-800">
+                                        Для подключения к сессии нужно дать согласие на анализ эмоций
+                                      </div>
+                                      <div className="mt-1 text-xs leading-relaxed text-slate-500">
+                                        Согласие обязательно по этике платформы. Его можно отозвать в любой момент.
+                                      </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                  <StatusPill
+                                      label="Согласие пользователя"
+                                      value={state.consent ? "Принято ✅" : "Ожидает"}
+                                  />
+                                  <StatusPill
+                                      label="ML сервис (нейросеть)"
+                                      value={
+                                        mlApiAvailable
+                                            ? "Подключен и Готов ✅"
+                                            : "Временно недоступен"
+                                      }
+                                  />
+                                </div>
+
+                                {!state.consent && (
+                                    <div className="mt-5">
+                                      <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-slate-200 bg-slate-50/80 px-4 py-3.5 transition hover:border-purple-200 hover:bg-purple-50/40">
+                                        <input
+                                            type="checkbox"
+                                            checked={consentChecked}
+                                            onChange={(event) => {
+                                              setConsentChecked(event.target.checked);
+                                              setConsentError(null);
+                                            }}
+                                            className="mt-0.5 h-4 w-4 shrink-0 accent-[#7448FF]"
+                                        />
+                                        <span className="text-xs font-medium leading-relaxed text-slate-600">
+                                Я согласен на анализ обезличенных показателей.
+                                          {" "}
+                                          <button
+                                              type="button"
+                                              onClick={(event) => {
+                                                event.preventDefault();
+                                                setPreparationView("consent-details");
+                                              }}
+                                              className="font-bold text-[#7448FF] underline decoration-[#7448FF]/30 underline-offset-2 hover:text-[#6538f5]"
+                                          >
+                                  Подробнее
+                                </button>
+                              </span>
+                                      </label>
+
+                                      {consentError && (
+                                          <div className="mt-3 rounded-[14px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-medium text-red-700">
+                                            {consentError}
+                                          </div>
+                                      )}
+
+                                      <Button
+                                          type="button"
+                                          onClick={() => void confirmSessionConsent()}
+                                          disabled={!consentChecked || consentSaving}
+                                          className="mt-4 h-11 w-full gap-2 rounded-xl border-none bg-[#7448FF] text-white shadow-[0_12px_28px_rgba(116,72,255,0.28)] hover:bg-[#6538f5]"
+                                      >
+                                        <ShieldCheck size={18} />
+                                        {consentSaving
+                                            ? "Сохраняем..."
+                                            : blockReason === "consent_required"
+                                                ? "Подтвердить и продолжить"
+                                                : "Подтвердить согласие"}
+                                      </Button>
+                                    </div>
                                 )}
                               </div>
                             </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </Reveal>
+                        )
+                    ) : (
+                        <div>
+                          <div className="mb-5 flex items-start gap-3">
+                            <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-500 shadow-sm">
+                              <MonitorUp size={18} />
+                            </div>
+                            <div>
+                              <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-[#7448FF]">
+                                Шаг 2
+                              </div>
+                              <div className="mt-1 text-xl font-extrabold tracking-[-0.02em] text-slate-900">
+                                Проверка камеры
+                              </div>
+                              <div className="mt-1.5 text-sm font-medium text-slate-500">
+                                Настройте свет и положение лица, затем нажмите «Начать».
+                              </div>
+                            </div>
+                          </div>
 
-          <Reveal>
-            <div className="space-y-6">
-              <Card variant="elevated">
-                <CardContent className="p-6 md:p-8">
-                  <h2 className="text-xl font-semibold text-fg">Информация о группе</h2>
-                  <p className="mt-1 text-sm text-muted">Краткий контекст для работы.</p>
-
-                  <div className="mt-6 space-y-3 rounded-2xl bg-surface-subtle/60 ring-1 ring-[color:var(--border)]/20 p-5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted">Преподаватель</span>
-                      <span className="font-medium text-fg">{group.teacher.fullName}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted">Студентов</span>
-                      <span className="font-medium text-fg">{membersCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted">Программа</span>
-                      <span className="font-medium text-fg">{group.program}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted">Статус</span>
-                      <ToneBadge tone={group.status === "active" ? "success" : "neutral"}>
-                        {group.status === "active" ? "Активна" : "В архиве"}
-                      </ToneBadge>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 rounded-2xl bg-surface-subtle/40 ring-1 ring-[color:var(--border)]/20 p-4 text-xs leading-relaxed text-muted">
-                    Подключение к live-сессии доступно студентам после согласия на обработку
-                    агрегированных аналитических сигналов.
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card variant="elevated">
-                <CardContent className="p-6 md:p-8">
-                  <h3 className="text-lg font-semibold text-fg">Быстрые действия</h3>
-                  <div className="mt-4 flex flex-col gap-2">
-                    <Link
-                      href="/teacher/sessions/new"
-                      className="inline-flex items-center justify-center rounded-xl px-4 py-2.5 text-sm ring-1 ring-[rgb(var(--primary))]/25 bg-primary-muted hover:bg-primary-muted/80 text-[rgb(var(--primary))] transition"
-                    >
-                      Создать новую сессию
-                    </Link>
-
-                    {apiAvailable && (
-                      <Button
-                        variant="outline"
-                        className="justify-center"
-                        onClick={openInviteModal}
-                      >
-                        Пригласить студентов
-                      </Button>
+                          <CameraCheck
+                              variant="modal"
+                              onStart={() => {
+                                setConnectionError(null);
+                                setLive(true);
+                                setTab("live");
+                              }}
+                          />
+                        </div>
                     )}
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div className="relative flex items-start justify-center gap-2.5 border-t border-slate-100 bg-slate-50/70 px-5 py-4 text-center sm:px-7">
+                    <Activity className="mt-0.5 shrink-0 text-slate-400" size={15} />
+                    <div className="max-w-3xl text-[11px] font-medium leading-relaxed text-slate-500">
+                      Соединение защищено по стандарту WebRTC P2P. Видео-поток не записывается. Бэкенд получает только обезличенные числовые метрики эмоций.
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </Reveal>
-        </div>
-      </Section>
-
-      <Modal
-        open={!!confirmRemoveMember}
-        onClose={() => setConfirmRemoveMember(null)}
-        title="Исключить из группы?"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmRemoveMember(null)}>
-              Отмена
-            </Button>
-            <Button
-              className="bg-red-500 hover:bg-red-600"
-              onClick={() => {
-                if (confirmRemoveMember && id) {
-                  removeMemberFromGroup(id, confirmRemoveMember.memberId)
-                    .then(refetchGroup)
-                    .then(() => setTick((x) => x + 1))
-                    .finally(() => setConfirmRemoveMember(null));
-                }
-              }}
-            >
-              Исключить
-            </Button>
-          </div>
-        }
-      >
-        {confirmRemoveMember && (
-          <p className="text-sm text-muted">
-            Участник «{confirmRemoveMember.memberName}» будет исключён из группы. Он потеряет доступ к сессиям группы. Вы сможете пригласить его снова позже.
-          </p>
         )}
-      </Modal>
-
-      <Modal
-        open={!!confirmBlockMember}
-        onClose={() => setConfirmBlockMember(null)}
-        title="Заблокировать участника?"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmBlockMember(null)}>
-              Отмена
-            </Button>
-            <Button
-              className="bg-amber-500 hover:bg-amber-600"
-              onClick={() => {
-                if (confirmBlockMember && id) {
-                  blockMemberInGroup(id, confirmBlockMember.memberId)
-                    .then(refetchGroup)
-                    .then(() => setTick((x) => x + 1))
-                    .finally(() => setConfirmBlockMember(null));
-                }
-              }}
-            >
-              Заблокировать
-            </Button>
-          </div>
-        }
-      >
-        {confirmBlockMember && (
-          <p className="text-sm text-muted">
-            Участник «{confirmBlockMember.memberName}» будет заблокирован в группе. Он не сможет подключаться к сессиям до снятия блокировки.
-          </p>
-        )}
-      </Modal>
-
-      <Modal
-        open={inviteOpen}
-        onClose={closeInviteModal}
-        title="Пригласить студентов в группу"
-        description="Укажите email через запятую или с новой строки. Если пользователь зарегистрирован, он увидит приглашение в личном кабинете."
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={closeInviteModal}>
-              Отмена
-            </Button>
-            <Button disabled={inviteLoading} onClick={handleInviteSubmit}>
-              {inviteLoading ? "Отправка…" : "Отправить приглашения"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <textarea
-            className="w-full min-h-32 rounded-2xl border border-[color:var(--border)]/20 bg-surface px-4 py-3 text-sm text-fg placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]/30"
-            placeholder="student@example.com, another@university.edu"
-            value={inviteEmails}
-            onChange={(e) => setInviteEmails(e.target.value)}
-          />
-          {inviteError && <p className="text-sm text-red-400">{inviteError}</p>}
-          {inviteSuccess && <p className="text-sm text-emerald-400">{inviteSuccess}</p>}
-        </div>
-      </Modal>
-    </div>
+      </div>
   );
 }
