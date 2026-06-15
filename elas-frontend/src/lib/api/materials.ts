@@ -176,11 +176,11 @@ export async function getStudentMaterials(params?: { signal?: AbortSignal }): Pr
 export async function getMaterialDownload(
     materialId: string,
     params?: { signal?: AbortSignal; mode?: "inline" | "download" }
-): Promise<{ downloadUrl: string; fileName: string; kind?: MaterialKind; mimeType?: string | null } | null> {
+): Promise<{ downloadUrl: string; url?: string; fileName: string; kind?: MaterialKind; mimeType?: string | null } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
   const mode = params?.mode === "inline" ? "inline" : "download";
 
-  return api.get<{ downloadUrl: string; fileName: string; kind?: MaterialKind; mimeType?: string | null }>(
+  return api.get<{ downloadUrl: string; url?: string; fileName: string; kind?: MaterialKind; mimeType?: string | null }>(
       `/materials/${materialId}/download?mode=${mode}`,
       { signal: params?.signal }
   );
@@ -189,7 +189,7 @@ export async function getMaterialDownload(
 export async function getMaterialDownloadByStorageKey(
     input: { storageKey: string; fileName?: string | null },
     params?: { signal?: AbortSignal; mode?: "inline" | "download" }
-): Promise<{ downloadUrl: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; url?: string; fileName: string } | null> {
   const storageKey = String(input.storageKey || "").trim();
   if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
 
@@ -204,7 +204,7 @@ export async function getMaterialDownloadByStorageKey(
     query.set("mode", params.mode);
   }
 
-  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
+  return api.get<{ downloadUrl: string; url?: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
     signal: params?.signal,
   });
 }
