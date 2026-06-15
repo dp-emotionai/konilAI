@@ -147,6 +147,7 @@ export default function TeacherSessionPreparationModal({
     useEffect(() => {
         if (!open || !sessionId) return;
 
+        const safeSessionId = sessionId;
         const controller = new AbortController();
         let active = true;
 
@@ -164,7 +165,7 @@ export default function TeacherSessionPreparationModal({
 
                 if (consentStatus.hasConsent) {
                     try {
-                        await recordSessionConsent(sessionId);
+                        await recordSessionConsent(safeSessionId);
                     } catch (sessionConsentError) {
                         console.warn("TEACHER SESSION CONSENT AUDIT SYNC FAILED", sessionConsentError);
                     }
