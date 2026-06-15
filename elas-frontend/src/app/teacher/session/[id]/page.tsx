@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -203,9 +203,11 @@ function CallControlButton({
   );
 }
 
-export default function TeacherJoinSessionPage() {
+export default function StudentJoinSessionPage() {
   const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
   const sessionId = params?.id ?? "";
+  const autoStart = searchParams.get("autostart") === "1";
   const { state, setConsent } = useUI();
   const chatSectionRef = useRef<HTMLDivElement | null>(null);
   const monitorRef = useRef<HTMLDivElement | null>(null);
@@ -299,8 +301,8 @@ export default function TeacherJoinSessionPage() {
   const preparationStep: 1 | 2 =
       blockReason === "consent_required" || !state.consent ? 1 : 2;
 
-  const [live, setLive] = useState(false);
-  const [tab, setTab] = useState<"prepare" | "live">("prepare");
+  const [live, setLive] = useState(autoStart);
+  const [tab, setTab] = useState<"prepare" | "live">(autoStart ? "live" : "prepare");
   const [preparationView, setPreparationView] = useState<"main" | "consent-details">(
       "main"
   );
@@ -308,6 +310,7 @@ export default function TeacherJoinSessionPage() {
   const [consentSaving, setConsentSaving] = useState(false);
   const [consentError, setConsentError] = useState<string | null>(null);
   const showPreparation =
+      !autoStart &&
       !joinInfoLoading &&
       !joinInfoError &&
       !live &&
@@ -339,18 +342,16 @@ export default function TeacherJoinSessionPage() {
         // localStorage may be unavailable in privacy mode.
       }
 
-      setPreparationView("main");
-
       if (sessionId && getApiBaseUrl() && hasAuth()) {
         const updated = await getSessionJoinInfo(sessionId);
         if (updated) setJoinInfo(updated);
       }
     } catch (error) {
-      console.error("teacher consent save failed", error);
+      console.error("session consent save failed", error);
       setConsentError(
           error instanceof Error
               ? error.message
-              : "Не удалось подтвердить согласие. Попробуйте ещё раз."
+              : "Не удалось сохранить согласие. Попробуйте ещё раз."
       );
     } finally {
       setConsentSaving(false);
@@ -1468,14 +1469,14 @@ export default function TeacherJoinSessionPage() {
       <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
         <Breadcrumbs
             items={[
-              { label: "Преподаватель", href: "/teacher/dashboard" },
-              { label: "Сессии", href: "/teacher/sessions" },
+              { label: "Студент", href: "/student/dashboard" },
+              { label: "Сессии", href: "/student/sessions" },
               { label: title },
             ]}
         />
 
         <Link
-            href="/teacher/sessions"
+            href="/student/sessions"
             className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
         >
           ← К списку сессий
@@ -1483,7 +1484,7 @@ export default function TeacherJoinSessionPage() {
 
         {!live && (
             <PageHero
-                overline="Преподаватель · Сессия"
+                overline="Студент · Сессия"
                 title={title}
                 subtitle={
                   joinInfo?.groupName
@@ -1496,7 +1497,7 @@ export default function TeacherJoinSessionPage() {
                     <Badge variant={state.consent ? "success" : "warning"}>
                       {state.consent ? "Согласие: да" : "Согласие: нет"}
                     </Badge>
-                    <Link href="/teacher/sessions">
+                    <Link href="/student/sessions">
                       <Button variant="outline">Назад</Button>
                     </Link>
                   </div>
@@ -1556,7 +1557,7 @@ export default function TeacherJoinSessionPage() {
                                     : "Дождитесь, когда преподаватель запустит сессию."}
                               </div>
 
-                              <Link href="/teacher/sessions" className="mt-2 inline-block">
+                              <Link href="/student/sessions" className="mt-2 inline-block">
                                 <Button variant="outline">К списку</Button>
                               </Link>
                             </>
@@ -1589,7 +1590,7 @@ export default function TeacherJoinSessionPage() {
                         Подготовка (согласие и камера)
                       </div>
                       <Link
-                          href="/teacher/sessions"
+                          href="/student/sessions"
                           aria-label="Назад"
                           className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                       >
