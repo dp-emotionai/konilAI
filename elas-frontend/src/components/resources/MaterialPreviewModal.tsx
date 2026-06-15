@@ -219,11 +219,11 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
   const fileType = getFileExtension(fileName, material.mimeType);
 
   return (
-      <div className="fixed inset-0 z-[100] overflow-y-auto">
+      <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/35 backdrop-blur-lg">
         <button
             type="button"
             aria-label="Закрыть предпросмотр"
-            className="absolute inset-0 cursor-default bg-slate-950/20 backdrop-blur-md"
+            className="absolute inset-0 cursor-default"
             onClick={onClose}
         />
 
