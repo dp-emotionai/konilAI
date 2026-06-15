@@ -21,7 +21,7 @@ type EventHandlers = {
   close: () => void;
 };
 
-type PartialHandlers = Partial<EventHandlers>;
+type CustomEventHandler = (...args: unknown[]) => void;
 
 function normalizeSocketIoUrl(rawUrl: string) {
   const withHttpProtocol = rawUrl
@@ -47,7 +47,8 @@ export class SignalingClient {
   private openedInCurrentConnection = false;
   private failedCandidatesInCycle = 0;
   private queue: ClientMessage[] = [];
-  private handlers: PartialHandlers = {};
+  private handlers: Partial<EventHandlers> = {};
+  private customHandlers: Record<string, CustomEventHandler | undefined> = {};
   private resolveOpen: (() => void) | undefined;
   private rejectOpen: ((reason?: unknown) => void) | undefined;
   private openTimer: number | null = null;
@@ -189,8 +190,41 @@ export class SignalingClient {
     });
   }
 
-  on<K extends keyof EventHandlers>(type: K, handler: EventHandlers[K]) {
-    (this.handlers as Record<string, unknown>)[type] = handler;
+  on<K extends keyof EventHandlers>(type: K, handler: EventHandlers[K]): void;
+  on(type: string, handler: CustomEventHandler): void;
+  on(type: string, handler: CustomEventHandler | EventHandlers[keyof EventHandlers]) {
+    switch (type) {
+      case "open":
+        this.handlers.open = handler as EventHandlers["open"];
+        break;
+      case "joined":
+        this.handlers.joined = handler as EventHandlers["joined"];
+        break;
+      case "user-joined":
+        this.handlers["user-joined"] = handler as EventHandlers["user-joined"];
+        break;
+      case "user-left":
+        this.handlers["user-left"] = handler as EventHandlers["user-left"];
+        break;
+      case "webrtc-offer":
+        this.handlers["webrtc-offer"] = handler as EventHandlers["webrtc-offer"];
+        break;
+      case "webrtc-answer":
+        this.handlers["webrtc-answer"] = handler as EventHandlers["webrtc-answer"];
+        break;
+      case "webrtc-ice":
+        this.handlers["webrtc-ice"] = handler as EventHandlers["webrtc-ice"];
+        break;
+      case "error":
+        this.handlers.error = handler as EventHandlers["error"];
+        break;
+      case "close":
+        this.handlers.close = handler as EventHandlers["close"];
+        break;
+      default:
+        this.customHandlers[type] = handler as CustomEventHandler;
+        break;
+    }
   }
 
   join(
@@ -302,6 +336,7 @@ export class SignalingClient {
         this.handlers.error?.(msg.message);
         break;
       default:
+        this.customHandlers[msg.type]?.(msg);
         break;
     }
   }

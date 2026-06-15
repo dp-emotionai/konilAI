@@ -650,6 +650,9 @@ export default function StudentJoinSessionPage() {
 
         peerManagerRef.current = manager;
         signaling.on("open", () => setSocketDisconnected(false));
+        signaling.on("material.assigned", () => void loadSessionContent());
+        signaling.on("material.unassigned", () => void loadSessionContent());
+        signaling.on("material.deleted", () => void loadSessionContent());
         signaling.connect();
 
         void (async () => {
@@ -709,7 +712,7 @@ export default function StudentJoinSessionPage() {
                 setIsScreenSharing(false);
             });
         };
-    }, [live, roomId]);
+    }, [live, roomId, loadSessionContent]);
 
     useEffect(() => {
         if (!live || !sessionId || !apiAvailable) return;
