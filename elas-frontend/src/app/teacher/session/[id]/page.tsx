@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
@@ -205,6 +205,7 @@ function CallControlButton({
 
 export default function TeacherJoinSessionPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = params?.id ?? "";
   const autoStart = searchParams.get("autostart") === "1";
@@ -315,6 +316,12 @@ export default function TeacherJoinSessionPage() {
       !joinInfoError &&
       !live &&
       (canJoin || blockReason === "consent_required");
+
+  const handleLeaveSession = useCallback(() => {
+    setLive(false);
+    setTab("prepare");
+    router.replace("/teacher/sessions");
+  }, [router]);
 
   useEffect(() => {
     if (state.consent) setConsentChecked(true);
@@ -819,10 +826,7 @@ export default function TeacherJoinSessionPage() {
               </div>
 
               <button
-                  onClick={() => {
-                    setLive(false);
-                    setTab("prepare");
-                  }}
+                  onClick={handleLeaveSession}
                   className="px-5 py-2.5 rounded-xl text-[13px] bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200 shadow-sm font-semibold transition-colors shrink-0"
               >
                 Завершить сессию
@@ -973,10 +977,7 @@ export default function TeacherJoinSessionPage() {
 
                     <div className="flex flex-col items-center gap-2 mx-1">
                       <button
-                          onClick={() => {
-                            setLive(false);
-                            setTab("prepare");
-                          }}
+                          onClick={handleLeaveSession}
                           className="w-14 h-14 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition shadow-[0_8px_20px_rgba(239,68,68,0.3)] shrink-0"
                       >
                         <PhoneOff size={22} />
@@ -1475,12 +1476,6 @@ export default function TeacherJoinSessionPage() {
             ]}
         />
 
-        <Link
-            href="/teacher/sessions"
-            className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
-        >
-          ← К списку сессий
-        </Link>
 
         {!live && (
             <PageHero
@@ -1857,6 +1852,7 @@ export default function TeacherJoinSessionPage() {
                           <CameraCheck
                               variant="modal"
                               onStart={() => {
+                                setConnectionError(null);
                                 setLive(true);
                                 setTab("live");
                               }}
