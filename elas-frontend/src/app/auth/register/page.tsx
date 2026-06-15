@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
@@ -70,7 +69,8 @@ export default function RegisterWizardPage() {
   const hasUppercase = /[A-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const passwordsMatch = password === confirmPassword && password.length > 0;
-  const isPasswordValid = hasMinLength && hasUppercase && hasNumber && passwordsMatch;
+  const isPasswordValid =
+    hasMinLength && hasUppercase && hasNumber && passwordsMatch;
 
   const nextStep = () => {
     setError("");
@@ -151,7 +151,9 @@ export default function RegisterWizardPage() {
         role: role || "student",
       });
 
-      router.push(`/auth/verify-email?email=${encodeURIComponent(normalizedEmail)}&mode=register`);
+      router.push(
+        `/auth/verify-email?email=${encodeURIComponent(normalizedEmail)}&mode=register`,
+      );
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       setError(raw || "Ошибка регистрации.");
@@ -165,7 +167,7 @@ export default function RegisterWizardPage() {
     title,
     text,
   }: {
-    icon: React.ReactNode;
+    icon: ReactNode;
     title: string;
     text: string;
   }) => (
@@ -174,8 +176,10 @@ export default function RegisterWizardPage() {
         {icon}
       </div>
       <div>
-        <h3 className="text-sm font-extrabold text-slate-900">{title}</h3>
-        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">{text}</p>
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+          {text}
+        </p>
       </div>
     </div>
   );
@@ -187,7 +191,7 @@ export default function RegisterWizardPage() {
       <div className="absolute bottom-0 right-0 h-full w-full bg-[radial-gradient(circle_at_80%_20%,rgba(116,72,255,0.12),transparent_28%),radial-gradient(circle_at_25%_70%,rgba(167,139,250,0.14),transparent_30%)]" />
 
       <div className="relative z-10 flex h-full flex-col justify-center">
-        <div className="mb-8 inline-flex w-fit items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-[#7448FF] shadow-sm">
+        <div className="mb-8 inline-flex w-fit items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#7448FF] shadow-sm">
           <GraduationCap size={16} />
           Платформа современного обучения
         </div>
@@ -195,13 +199,20 @@ export default function RegisterWizardPage() {
         <div className="relative mb-10 flex justify-center">
           <div className="relative h-64 w-full max-w-md">
             <div className="absolute left-10 top-20 h-24 w-24 rotate-[-8deg] rounded-[26px] bg-white p-4 shadow-[0_18px_50px_rgba(116,72,255,0.18)]">
-              <BookOpen className="h-full w-full text-[#7448FF]" strokeWidth={1.5} />
+              <BookOpen
+                className="h-full w-full text-[#7448FF]"
+                strokeWidth={1.5}
+              />
             </div>
 
             <div className="absolute left-28 top-6 h-44 w-64 rounded-[28px] border border-white/80 bg-white/85 p-5 shadow-[0_24px_70px_rgba(116,72,255,0.18)] backdrop-blur">
               <div className="mb-4 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-500">Прогресс</span>
-                <span className="rounded-full bg-purple-50 px-2 py-1 text-xs font-bold text-[#7448FF]">84%</span>
+                <span className="text-xs font-medium text-slate-500">
+                  Прогресс
+                </span>
+                <span className="rounded-full bg-purple-50 px-2 py-1 text-xs font-medium text-[#7448FF]">
+                  84%
+                </span>
               </div>
               <div className="mb-4 h-16 rounded-2xl bg-gradient-to-br from-purple-50 to-white p-3">
                 <div className="flex h-full items-end gap-2">
@@ -231,14 +242,14 @@ export default function RegisterWizardPage() {
           </div>
         </div>
 
-        <h2 className="max-w-xl text-center text-4xl font-black leading-tight tracking-tight text-slate-950">
+        <h2 className="max-w-xl text-center text-[30px] font-semibold leading-tight tracking-tight text-slate-900">
           Учитесь, взаимодействуйте
-          <br />
-          и отслеживайте прогресс
+          <br />и отслеживайте прогресс
         </h2>
 
         <p className="mx-auto mt-5 max-w-xl text-center text-[15px] font-medium leading-7 text-slate-600">
-          Инструменты для интерактивных занятий, материалов, аналитики и эффективного взаимодействия между преподавателями и студентами.
+          Инструменты для интерактивных занятий, материалов, аналитики и
+          эффективного взаимодействия между преподавателями и студентами.
         </p>
 
         <div className="mt-10 grid grid-cols-3 gap-5">
@@ -263,24 +274,28 @@ export default function RegisterWizardPage() {
   );
 
   const renderWelcome = () => (
-    <div className="grid min-h-[720px] overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 lg:grid-cols-[0.86fr_1.14fr]">
+    <div className="grid min-h-[680px] overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/70 lg:grid-cols-[0.9fr_1.1fr]">
       <div className="flex flex-col justify-center px-8 py-10 md:px-14 lg:px-16">
-        <div className="mb-7 inline-flex w-fit items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-xs font-extrabold uppercase tracking-wide text-[#7448FF]">
+        <div className="mb-7 inline-flex w-fit items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#7448FF]">
           <ShieldCheck size={16} />
           Безопасная регистрация
         </div>
 
-        <h1 className="text-4xl font-black leading-tight tracking-tight text-slate-950 md:text-5xl">
+        <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 md:text-4xl">
           Добро пожаловать
           <br />в KoniAI
         </h1>
 
         <p className="mt-5 max-w-md text-[15px] font-medium leading-7 text-slate-500">
-          Создайте аккаунт для доступа к платформе, учебным сессиям и аналитике обучения.
+          Создайте аккаунт для доступа к платформе, учебным сессиям и аналитике
+          обучения.
         </p>
 
         <div className="mt-10 space-y-4">
-          <Button onClick={nextStep} className="h-14 w-full rounded-2xl text-[15px] font-extrabold shadow-[0_14px_30px_rgba(116,72,255,0.28)]">
+          <Button
+            onClick={nextStep}
+            className="h-14 w-full rounded-2xl text-[15px] font-semibold shadow-[0_14px_30px_rgba(116,72,255,0.28)]"
+          >
             Зарегистрироваться
             <ArrowRight size={18} />
           </Button>
@@ -288,14 +303,19 @@ export default function RegisterWizardPage() {
           <Button
             variant="outline"
             onClick={() => router.push("/auth/login")}
-            className="h-14 w-full rounded-2xl border-slate-200 bg-white text-[15px] font-extrabold"
+            className="h-14 w-full rounded-2xl border-slate-200 bg-white text-[15px] font-semibold"
           >
             Уже есть аккаунт? Войти
           </Button>
         </div>
 
         <div className="mt-8 rounded-[24px] border border-slate-100 bg-slate-50/70 p-5">
-          <SocialAuthButtons mode="register" role={role} onSuccess={finishSocialRegister} onError={setError} />
+          <SocialAuthButtons
+            mode="register"
+            role={role}
+            onSuccess={finishSocialRegister}
+            onError={setError}
+          />
         </div>
 
         {error && (
@@ -305,22 +325,15 @@ export default function RegisterWizardPage() {
         )}
 
         <div className="mt-10 grid grid-cols-2 gap-3">
-          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500">
             <Lock size={16} className="text-[#7448FF]" />
             Защищённый вход
           </div>
-          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-bold text-slate-500">
+          <div className="flex items-center justify-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500">
             <ShieldCheck size={16} className="text-[#7448FF]" />
             Контроль согласия
           </div>
         </div>
-
-        <p className="mt-8 text-center text-sm font-medium text-slate-500">
-          Уже есть аккаунт?{" "}
-          <Link href="/auth/login" className="font-extrabold text-[#7448FF] hover:underline">
-            Войти
-          </Link>
-        </p>
       </div>
 
       <MarketingPanel />
@@ -329,11 +342,18 @@ export default function RegisterWizardPage() {
 
   const renderRoleSelection = () => (
     <div className="mx-auto max-w-xl animate-in fade-in slide-in-from-right-4 py-8 duration-500">
-      <button onClick={prevStep} className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600">
+      <button
+        onClick={prevStep}
+        className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600"
+      >
         <ChevronLeft size={16} /> Назад
       </button>
 
-      <StepHeading step={2} title="Выбор роли" subtitle="Выберите свою роль в системе" />
+      <StepHeading
+        step={2}
+        title="Выбор роли"
+        subtitle="Выберите свою роль в системе"
+      />
 
       <div className="mt-10 space-y-4">
         {[
@@ -360,30 +380,34 @@ export default function RegisterWizardPage() {
                 "group relative flex cursor-pointer items-center gap-5 rounded-[28px] border-2 p-5 transition-all",
                 active
                   ? "border-[#7448FF] bg-purple-50/40 shadow-[0_18px_45px_rgba(116,72,255,0.12)]"
-                  : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
+                  : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm",
               )}
             >
               <div
                 className={cn(
                   "flex h-14 w-14 items-center justify-center rounded-2xl transition-colors",
-                  active ? "bg-[#7448FF] text-white" : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+                  active
+                    ? "bg-[#7448FF] text-white"
+                    : "bg-slate-100 text-slate-400 group-hover:bg-slate-200",
                 )}
               >
                 {item.icon}
               </div>
 
               <div className="flex-1">
-                <h3 className="font-bold text-slate-900">{item.title}</h3>
+                <h3 className="font-medium text-slate-900">{item.title}</h3>
                 <p className="text-sm text-slate-500">{item.description}</p>
               </div>
 
               <div
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-full border-2 transition-all",
-                  active ? "border-[#7448FF]" : "border-slate-200"
+                  active ? "border-[#7448FF]" : "border-slate-200",
                 )}
               >
-                {active && <div className="h-3 w-3 rounded-full bg-[#7448FF]" />}
+                {active && (
+                  <div className="h-3 w-3 rounded-full bg-[#7448FF]" />
+                )}
               </div>
             </div>
           );
@@ -391,7 +415,12 @@ export default function RegisterWizardPage() {
       </div>
 
       <div className="mt-10 rounded-[28px] border border-slate-100 bg-white p-5 shadow-sm">
-        <SocialAuthButtons mode="register" role={role} onSuccess={finishSocialRegister} onError={setError} />
+        <SocialAuthButtons
+          mode="register"
+          role={role}
+          onSuccess={finishSocialRegister}
+          onError={setError}
+        />
       </div>
 
       {error && (
@@ -400,7 +429,11 @@ export default function RegisterWizardPage() {
         </div>
       )}
 
-      <Button onClick={nextStep} disabled={!role} className="mt-12 h-14 w-full rounded-2xl text-[15px] font-bold">
+      <Button
+        onClick={nextStep}
+        disabled={!role}
+        className="mt-12 h-14 w-full rounded-2xl text-[15px] font-medium"
+      >
         Продолжить
       </Button>
     </div>
@@ -408,37 +441,63 @@ export default function RegisterWizardPage() {
 
   const renderBasicInfo = () => (
     <div className="mx-auto max-w-xl animate-in fade-in slide-in-from-right-4 py-8 duration-500">
-      <button onClick={prevStep} className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600">
+      <button
+        onClick={prevStep}
+        className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600"
+      >
         <ChevronLeft size={16} /> Назад
       </button>
 
-      <StepHeading step={3} title="Расскажите о себе" subtitle="Заполните основную информацию для аккаунта" />
+      <StepHeading
+        step={3}
+        title="Расскажите о себе"
+        subtitle="Заполните основную информацию для аккаунта"
+      />
 
       <div className="mt-10 space-y-6">
         <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Имя</label>
-          <Input placeholder="Введите имя" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-12 bg-white" />
-        </div>
-
-        <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Фамилия</label>
-          <Input placeholder="Введите фамилию" value={lastName} onChange={(e) => setLastName(e.target.value)} className="h-12 bg-white" />
-        </div>
-
-        <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Email</label>
+          <label className="ml-1 mb-2.5 block text-[13px] font-medium text-slate-500">
+            Имя
+          </label>
           <Input
+            placeholder="Введите имя"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="h-12 bg-white"
+          />
+        </div>
+
+        <div>
+          <label className="ml-1 mb-2.5 block text-[13px] font-medium text-slate-500">
+            Фамилия
+          </label>
+          <Input
+            placeholder="Введите фамилию"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="h-12 bg-white"
+          />
+        </div>
+
+        <div>
+          <label className="ml-1 mb-2.5 block text-[13px] font-medium text-slate-500">
+            Email
+          </label>
+          <AuthInput
             placeholder="example@mail.ru"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="h-12 bg-white"
-            prefix={<Mail size={18} />}
+            icon={<Mail size={18} />}
           />
         </div>
       </div>
 
-      <Button onClick={nextStep} disabled={!firstName || !lastName || !email} className="mt-12 h-14 w-full rounded-2xl text-[15px] font-bold">
+      <Button
+        onClick={nextStep}
+        disabled={!firstName || !lastName || !email}
+        className="mt-12 h-14 w-full rounded-2xl text-[15px] font-medium"
+      >
         Продолжить
       </Button>
     </div>
@@ -446,25 +505,37 @@ export default function RegisterWizardPage() {
 
   const renderPasswordSetup = () => (
     <div className="mx-auto max-w-xl animate-in fade-in slide-in-from-right-4 py-8 duration-500">
-      <button onClick={prevStep} className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600">
+      <button
+        onClick={prevStep}
+        className="mb-8 flex items-center gap-1.5 text-sm font-medium text-slate-400 transition-colors hover:text-slate-600"
+      >
         <ChevronLeft size={16} /> Назад
       </button>
 
-      <StepHeading step={4} title="Создайте пароль" subtitle="Придумайте надежный пароль для защиты аккаунта" />
+      <StepHeading
+        step={4}
+        title="Создайте пароль"
+        subtitle="Придумайте надежный пароль для защиты аккаунта"
+      />
 
       <div className="mt-10 space-y-6">
         <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Пароль</label>
-          <Input
-            placeholder="••••••••••"
+          <label className="ml-1 mb-2.5 block text-[13px] font-medium text-slate-500">
+            Пароль
+          </label>
+          <AuthInput
+            placeholder="Введите пароль"
             type={showPassword ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            className="h-12 bg-white"
-            prefix={<Lock size={18} />}
+            icon={<Lock size={18} />}
             suffix={
-              <button type="button" onClick={() => setShowPassword((value) => !value)} className="transition-colors hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             }
@@ -477,22 +548,37 @@ export default function RegisterWizardPage() {
             { ok: hasUppercase, text: "Хотя бы одна заглавная буква" },
             { ok: hasNumber, text: "Хотя бы одна цифра" },
           ].map((item) => (
-            <div key={item.text} className="flex items-center gap-2.5 transition-colors">
-              {item.ok ? <CheckCircle2 size={16} className="text-emerald-500" /> : <div className="h-4 w-4 rounded-full border border-slate-200" />}
-              <span className={cn("text-[13px] font-medium", item.ok ? "text-emerald-600" : "text-slate-400")}>{item.text}</span>
+            <div
+              key={item.text}
+              className="flex items-center gap-2.5 transition-colors"
+            >
+              {item.ok ? (
+                <CheckCircle2 size={16} className="text-emerald-500" />
+              ) : (
+                <div className="h-4 w-4 rounded-full border border-slate-200" />
+              )}
+              <span
+                className={cn(
+                  "text-[13px] font-medium",
+                  item.ok ? "text-emerald-600" : "text-slate-400",
+                )}
+              >
+                {item.text}
+              </span>
             </div>
           ))}
         </div>
 
         <div>
-          <label className="ml-1 mb-2.5 block text-[13px] font-bold text-slate-500">Подтвердите пароль</label>
-          <Input
-            placeholder="••••••••••"
+          <label className="ml-1 mb-2.5 block text-[13px] font-medium text-slate-500">
+            Подтвердите пароль
+          </label>
+          <AuthInput
+            placeholder="Повторите пароль"
             type={showPassword ? "text" : "password"}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="h-12 bg-white"
-            prefix={<Lock size={18} />}
+            icon={<Lock size={18} />}
           />
 
           {confirmPassword && !passwordsMatch && (
@@ -512,7 +598,7 @@ export default function RegisterWizardPage() {
       <Button
         onClick={handleRegister}
         disabled={!isPasswordValid || loading}
-        className="mt-12 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-bold"
+        className="mt-12 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-medium"
       >
         {loading ? "Обработка..." : "Завершить регистрацию"}
         {!loading && <ChevronRight size={18} />}
@@ -536,5 +622,35 @@ export default function RegisterWizardPage() {
         )}
       </div>
     </main>
+  );
+}
+
+function AuthInput({
+  icon,
+  suffix,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & {
+  icon: ReactNode;
+  suffix?: ReactNode;
+}) {
+  return (
+    <div className="relative">
+      <div className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-400">
+        {icon}
+      </div>
+      <input
+        {...props}
+        className={cn(
+          "h-[52px] w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-12 text-[15px] font-normal text-slate-900 shadow-[0_6px_20px_rgba(15,23,42,0.04)] outline-none transition placeholder:text-slate-400 focus:border-[#7448FF] focus:ring-4 focus:ring-purple-100 disabled:cursor-not-allowed disabled:bg-slate-50",
+          className,
+        )}
+      />
+      {suffix && (
+        <div className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
+          {suffix}
+        </div>
+      )}
+    </div>
   );
 }
