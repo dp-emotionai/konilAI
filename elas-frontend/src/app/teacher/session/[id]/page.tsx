@@ -1480,14 +1480,14 @@ export default function StudentJoinSessionPage() {
       <div className="space-y-6 pb-12 mx-auto max-w-[1440px] px-4 py-8">
         <Breadcrumbs
             items={[
-              { label: "Студент", href: "/student/dashboard" },
-              { label: "Сессии", href: "/student/sessions" },
+              { label: "Преподаватель", href: "/teacher/dashboard" },
+              { label: "Сессии", href: "/teacher/sessions" },
               { label: title },
             ]}
         />
 
         <Link
-            href="/student/sessions"
+            href="/teacher/sessions"
             className="inline-flex text-sm text-slate-500 transition-colors hover:text-slate-800"
         >
           ← К списку сессий
@@ -1495,7 +1495,7 @@ export default function StudentJoinSessionPage() {
 
         {!live && (
             <PageHero
-                overline="Студент · Сессия"
+                overline="Преподаватель · Сессия"
                 title={title}
                 subtitle={
                   joinInfo?.groupName
@@ -1508,7 +1508,7 @@ export default function StudentJoinSessionPage() {
                     <Badge variant={state.consent ? "success" : "warning"}>
                       {state.consent ? "Согласие: да" : "Согласие: нет"}
                     </Badge>
-                    <Link href="/student/sessions">
+                    <Link href="/teacher/sessions">
                       <Button variant="outline">Назад</Button>
                     </Link>
                   </div>
@@ -1568,7 +1568,7 @@ export default function StudentJoinSessionPage() {
                                     : "Дождитесь, когда преподаватель запустит сессию."}
                               </div>
 
-                              <Link href="/student/sessions" className="mt-2 inline-block">
+                              <Link href="/teacher/sessions" className="mt-2 inline-block">
                                 <Button variant="outline">К списку</Button>
                               </Link>
                             </>
@@ -1601,7 +1601,7 @@ export default function StudentJoinSessionPage() {
                         Подготовка (согласие и камера)
                       </div>
                       <Link
-                          href="/student/sessions"
+                          href="/teacher/sessions"
                           aria-label="Назад"
                           className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                       >
