@@ -405,8 +405,8 @@ export default function StudentJoinSessionPage() {
         }
     };
 
-    const [live, setLive] = useState(false);
-    const [tab, setTab] = useState<"prepare" | "live">("prepare");
+    const [live, setLive] = useState(autoStart);
+    const [tab, setTab] = useState<"prepare" | "live">(autoStart ? "live" : "prepare");
 
     const handleLeaveSession = useCallback(() => {
         document.body.style.overflow = "";
@@ -1550,7 +1550,7 @@ export default function StudentJoinSessionPage() {
     }
 
     return (
-        <div>
+        <>
             {showPreparation && tab === "prepare" && !consentModalOpen && (
                 <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
                     <div className="flex min-h-full items-center justify-center">
@@ -1773,6 +1773,6 @@ export default function StudentJoinSessionPage() {
                     setConsentModalOpen(false);
                 }}
             />
-        </div>
+        </>
     );
 }
