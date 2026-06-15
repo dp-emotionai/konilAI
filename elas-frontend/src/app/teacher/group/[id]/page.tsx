@@ -399,9 +399,7 @@ export default function TeacherGroupDetailPage() {
     };
   }, []);
 
-  const membersCount = apiAvailable
-      ? groupMembers.length
-      : (group?.students.length ?? 0);
+  const membersCount = groupMembers.length || group?.students?.length || 0;
   const pendingCount = groupInvitations.filter(
       (i) => i.status === "pending",
   ).length;
@@ -605,14 +603,17 @@ export default function TeacherGroupDetailPage() {
   };
 
   useEffect(() => {
-    if (!apiAvailable || !id || activeTab !== "members") return;
+    if (!apiAvailable || !id) return;
 
     setMembersLoading(true);
-    getGroupMembers(id, true).then((data) => {
-      setGroupMembers(data.students ?? []);
-      setMembersLoading(false);
-    });
-  }, [apiAvailable, id, activeTab, tick]);
+    getGroupMembers(id, true)
+        .then((data) => {
+          setGroupMembers(data.students ?? []);
+        })
+        .finally(() => {
+          setMembersLoading(false);
+        });
+  }, [apiAvailable, id, tick]);
 
   useEffect(() => {
     if (!apiAvailable || !id || activeTab !== "announcements") return;
@@ -864,7 +865,7 @@ export default function TeacherGroupDetailPage() {
                           disabled={uploadingGroupImage}
                       >
                         <Trash2 size={16} />
-                        Өшіру
+                        Удалить
                       </Button>
                   )}
                   {apiAvailable && (
