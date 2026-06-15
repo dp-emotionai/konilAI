@@ -292,29 +292,29 @@ export default function TeacherResourcesPage() {
     const normalizedQuery = query.trim().toLocaleLowerCase("ru-RU");
 
     return materials
-      .filter((material) => kind === "all" || getMaterialKind(material) === kind)
-      .filter((material) => {
-        if (!normalizedQuery) return true;
-        const haystack = [
-          material.title,
-          material.description,
-          material.fileName,
-          material.mimeType,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLocaleLowerCase("ru-RU");
-        return haystack.includes(normalizedQuery);
-      })
-      .sort((left, right) => {
-        if (sort === "name") {
-          return left.title.localeCompare(right.title, "ru");
-        }
+        .filter((material) => kind === "all" || getMaterialKind(material) === kind)
+        .filter((material) => {
+          if (!normalizedQuery) return true;
+          const haystack = [
+            material.title,
+            material.description,
+            material.fileName,
+            material.mimeType,
+          ]
+              .filter(Boolean)
+              .join(" ")
+              .toLocaleLowerCase("ru-RU");
+          return haystack.includes(normalizedQuery);
+        })
+        .sort((left, right) => {
+          if (sort === "name") {
+            return left.title.localeCompare(right.title, "ru");
+          }
 
-        const leftTime = new Date(left.createdAt).getTime() || 0;
-        const rightTime = new Date(right.createdAt).getTime() || 0;
-        return sort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
-      });
+          const leftTime = new Date(left.createdAt).getTime() || 0;
+          const rightTime = new Date(right.createdAt).getTime() || 0;
+          return sort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+        });
   }, [kind, materials, query, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filteredMaterials.length / pageSize));
@@ -390,50 +390,50 @@ export default function TeacherResourcesPage() {
     setAssignForm(DEFAULT_ASSIGN_FORM);
     setAssignOpen(true);
     getMaterialAssignments(material.id)
-      .then(setActiveAssignments)
-      .catch(() => setActiveAssignments([]));
+        .then(setActiveAssignments)
+        .catch(() => setActiveAssignments([]));
   }, []);
 
   const handleDownload = useCallback(
-    async (material: MaterialRow) => {
-      try {
-        const info = await getMaterialDownload(material.id);
-        if (!info?.downloadUrl) throw new Error("Ссылка для скачивания не получена.");
-        const url = resolveDownloadUrl(info.downloadUrl);
-        if (!url) throw new Error("Некорректная ссылка для скачивания.");
-        window.open(url, "_blank", "noopener,noreferrer");
-      } catch (error: unknown) {
-        push({
-          type: "error",
-          title: "Не удалось скачать файл",
-          text: getErrorMessage(error),
-        });
-      }
-    },
-    [push]
+      async (material: MaterialRow) => {
+        try {
+          const info = await getMaterialDownload(material.id);
+          if (!info?.downloadUrl) throw new Error("Ссылка для скачивания не получена.");
+          const url = resolveDownloadUrl(info.downloadUrl);
+          if (!url) throw new Error("Некорректная ссылка для скачивания.");
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch (error: unknown) {
+          push({
+            type: "error",
+            title: "Не удалось скачать файл",
+            text: getErrorMessage(error),
+          });
+        }
+      },
+      [push]
   );
 
   const handleDelete = useCallback(
-    async (material: MaterialRow) => {
-      setActionMenuId(null);
-      if (!window.confirm(`Удалить материал «${material.title}»?`)) return;
+      async (material: MaterialRow) => {
+        setActionMenuId(null);
+        if (!window.confirm(`Удалить материал «${material.title}»?`)) return;
 
-      setWorking(true);
-      try {
-        await deleteMaterial(material.id);
-        await loadMaterials();
-        push({ type: "success", title: "Материал удалён" });
-      } catch (error: unknown) {
-        push({
-          type: "error",
-          title: "Не удалось удалить материал",
-          text: getErrorMessage(error),
-        });
-      } finally {
-        setWorking(false);
-      }
-    },
-    [loadMaterials, push]
+        setWorking(true);
+        try {
+          await deleteMaterial(material.id);
+          await loadMaterials();
+          push({ type: "success", title: "Материал удалён" });
+        } catch (error: unknown) {
+          push({
+            type: "error",
+            title: "Не удалось удалить материал",
+            text: getErrorMessage(error),
+          });
+        } finally {
+          setWorking(false);
+        }
+      },
+      [loadMaterials, push]
   );
 
   const handleCreate = async () => {
@@ -444,19 +444,20 @@ export default function TeacherResourcesPage() {
 
     setWorking(true);
     try {
-      const uploaded = await uploadMaterialFile(selectedFile);
+      const uploaded = await uploadMaterialFile(selectedFile, createKind === "audio" ? "audio" : createKind);
       const descriptionParts = [form.description.trim()];
 
       if ((createKind === "audio" || createKind === "video") && mediaDetails.trim()) {
         const detailsLabel = createKind === "audio"
-          ? "Ссылка или длительность аудио"
-          : "Ссылка или длительность видео";
+            ? "Ссылка или длительность аудио"
+            : "Ссылка или длительность видео";
         descriptionParts.push(`${detailsLabel}: ${mediaDetails.trim()}`);
       }
 
       const material = await createMaterial({
         title: form.title.trim(),
         description: descriptionParts.filter(Boolean).join("\n") || null,
+        kind: uploaded.kind || (createKind === "audio" ? "audio" : createKind),
         fileName: uploaded.fileName,
         mimeType: uploaded.mimeType || form.mimeType.trim() || null,
         storageKey: uploaded.storageKey,
@@ -479,10 +480,10 @@ export default function TeacherResourcesPage() {
         type: assignmentFailed ? "info" : "success",
         title: assignmentFailed ? "Материал создан без назначения" : "Материал создан",
         text: assignmentFailed
-          ? "Файл загружен, но назначить его группе не удалось. Назначьте материал через кнопку в таблице."
-          : createGroupId
-            ? "Материал сразу назначен выбранной группе."
-            : undefined,
+            ? "Файл загружен, но назначить его группе не удалось. Назначьте материал через кнопку в таблице."
+            : createGroupId
+                ? "Материал сразу назначен выбранной группе."
+                : undefined,
       });
     } catch (error: unknown) {
       push({
@@ -504,11 +505,11 @@ export default function TeacherResourcesPage() {
         groupId: assignForm.groupId || undefined,
         sessionId: assignForm.sessionId || undefined,
         visibleFrom: assignForm.visibleFrom
-          ? new Date(assignForm.visibleFrom).toISOString()
-          : null,
+            ? new Date(assignForm.visibleFrom).toISOString()
+            : null,
         visibleTo: assignForm.visibleTo
-          ? new Date(assignForm.visibleTo).toISOString()
-          : null,
+            ? new Date(assignForm.visibleTo).toISOString()
+            : null,
       });
 
       const assignments = await getMaterialAssignments(activeMaterial.id).catch(() => []);
@@ -529,603 +530,603 @@ export default function TeacherResourcesPage() {
   const createConfig = CREATE_CONFIG[createKind];
 
   return (
-    <div className="min-h-screen bg-[#FAFAFB]">
-      <div className="mx-auto max-w-[1440px] px-4 py-8 md:px-8">
-        <header className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-950">Материалы</h1>
-            <p className="mt-1.5 max-w-3xl text-[15px] text-slate-500">
-              Загружайте, организуйте, назначайте и скачивайте материалы для ваших учеников.
-            </p>
-          </div>
+      <div className="min-h-screen bg-[#FAFAFB]">
+        <div className="mx-auto max-w-[1440px] px-4 py-8 md:px-8">
+          <header className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-slate-950">Материалы</h1>
+              <p className="mt-1.5 max-w-3xl text-[15px] text-slate-500">
+                Загружайте, организуйте, назначайте и скачивайте материалы для ваших учеников.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="relative min-w-[240px] flex-1 xl:w-[280px] xl:flex-none">
-              <Search
-                size={17}
-                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Поиск материалов..."
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              />
-              {query && (
-                <button
-                  type="button"
-                  aria-label="Очистить поиск"
-                  onClick={() => {
-                    setQuery("");
-                    setPage(1);
-                  }}
-                  className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="relative min-w-[240px] flex-1 xl:w-[280px] xl:flex-none">
+                <Search
+                    size={17}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Поиск материалов..."
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-9 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                />
+                {query && (
+                    <button
+                        type="button"
+                        aria-label="Очистить поиск"
+                        onClick={() => {
+                          setQuery("");
+                          setPage(1);
+                        }}
+                        className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <X size={15} />
+                    </button>
+                )}
+              </label>
+
+              <div className="relative">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFiltersOpen((value) => !value)}
+                    aria-expanded={filtersOpen}
                 >
-                  <X size={15} />
-                </button>
-              )}
-            </label>
+                  <Filter size={16} />
+                  Фильтры
+                </Button>
 
-            <div className="relative">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setFiltersOpen((value) => !value)}
-                aria-expanded={filtersOpen}
-              >
-                <Filter size={16} />
-                Фильтры
+                {filtersOpen && (
+                    <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
+                      <div className="flex items-center justify-between">
+                        <div className="font-semibold text-slate-900">Фильтры</div>
+                        <button
+                            type="button"
+                            aria-label="Закрыть фильтры"
+                            onClick={() => setFiltersOpen(false)}
+                            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      <label className="mt-4 block text-xs font-semibold text-slate-500">
+                        Тип материала
+                        <select
+                            value={kind}
+                            onChange={(event) => selectKind(event.target.value as MaterialKind)}
+                            className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                        >
+                          <option value="all">Все типы</option>
+                          <option value="document">Документы</option>
+                          <option value="image">Изображения</option>
+                          <option value="video">Видеоуроки</option>
+                          <option value="audio">Аудиозаписи</option>
+                          <option value="other">Другие файлы</option>
+                        </select>
+                      </label>
+
+                      <button
+                          type="button"
+                          onClick={() => {
+                            setKind("all");
+                            setSort("newest");
+                            setPage(1);
+                            setFiltersOpen(false);
+                          }}
+                          className="mt-4 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                      >
+                        Сбросить фильтры
+                      </button>
+                    </div>
+                )}
+              </div>
+
+              <label className="relative">
+                <select
+                    aria-label="Сортировка материалов"
+                    value={sort}
+                    onChange={(event) => {
+                      setSort(event.target.value as SortMode);
+                      setPage(1);
+                    }}
+                    className="h-10 appearance-none rounded-xl border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-medium text-slate-700 shadow-sm outline-none hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                >
+                  <option value="newest">По дате: новые</option>
+                  <option value="oldest">По дате: старые</option>
+                  <option value="name">По названию</option>
+                </select>
+                <ChevronDown
+                    size={15}
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+              </label>
+
+              <Button type="button" variant="outline" onClick={() => void loadMaterials()} disabled={loading}>
+                <RefreshCw size={16} className={cn(loading && "animate-spin")} />
+                Обновить
               </Button>
 
-              {filtersOpen && (
-                <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_45px_rgba(15,23,42,0.14)]">
-                  <div className="flex items-center justify-between">
-                    <div className="font-semibold text-slate-900">Фильтры</div>
-                    <button
-                      type="button"
-                      aria-label="Закрыть фильтры"
-                      onClick={() => setFiltersOpen(false)}
-                      className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-
-                  <label className="mt-4 block text-xs font-semibold text-slate-500">
-                    Тип материала
-                    <select
-                      value={kind}
-                      onChange={(event) => selectKind(event.target.value as MaterialKind)}
-                      className="mt-1.5 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-                    >
-                      <option value="all">Все типы</option>
-                      <option value="document">Документы</option>
-                      <option value="image">Изображения</option>
-                      <option value="video">Видеоуроки</option>
-                      <option value="audio">Аудиозаписи</option>
-                      <option value="other">Другие файлы</option>
-                    </select>
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setKind("all");
-                      setSort("newest");
-                      setPage(1);
-                      setFiltersOpen(false);
-                    }}
-                    className="mt-4 w-full rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                  >
-                    Сбросить фильтры
-                  </button>
-                </div>
-              )}
+              <Button type="button" onClick={() => setCreateOpen(true)}>
+                <Plus size={17} />
+                Создать материал
+              </Button>
             </div>
+          </header>
 
-            <label className="relative">
-              <select
-                aria-label="Сортировка материалов"
-                value={sort}
-                onChange={(event) => {
-                  setSort(event.target.value as SortMode);
-                  setPage(1);
-                }}
-                className="h-10 appearance-none rounded-xl border border-slate-200 bg-white py-0 pl-4 pr-10 text-sm font-medium text-slate-700 shadow-sm outline-none hover:border-slate-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              >
-                <option value="newest">По дате: новые</option>
-                <option value="oldest">По дате: старые</option>
-                <option value="name">По названию</option>
-              </select>
-              <ChevronDown
-                size={15}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-            </label>
+          <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard
+                icon={FileText}
+                iconClass="bg-violet-50 text-violet-600"
+                label="Всего материалов"
+                value={counts.all}
+                helper={addedThisWeek > 0 ? `+${addedThisWeek} за неделю` : "Без новых за неделю"}
+                helperClass={addedThisWeek > 0 ? "text-violet-600" : "text-slate-400"}
+            />
+            <StatCard
+                icon={FileText}
+                iconClass="bg-blue-50 text-blue-600"
+                label="Документы"
+                value={counts.document}
+                helper={formatShare(counts.document, counts.all)}
+            />
+            <StatCard
+                icon={ImageIcon}
+                iconClass="bg-emerald-50 text-emerald-600"
+                label="Изображения"
+                value={counts.image}
+                helper={formatShare(counts.image, counts.all)}
+            />
+            <StatCard
+                icon={Video}
+                iconClass="bg-rose-50 text-rose-500"
+                label="Видеоуроки"
+                value={counts.video}
+                helper={formatShare(counts.video, counts.all)}
+            />
+            <StatCard
+                icon={Music2}
+                iconClass="bg-violet-50 text-violet-600"
+                label="Аудиозаписи"
+                value={counts.audio}
+                helper={formatShare(counts.audio, counts.all)}
+            />
+          </section>
 
-            <Button type="button" variant="outline" onClick={() => void loadMaterials()} disabled={loading}>
-              <RefreshCw size={16} className={cn(loading && "animate-spin")} />
-              Обновить
-            </Button>
-
-            <Button type="button" onClick={() => setCreateOpen(true)}>
-              <Plus size={17} />
-              Создать материал
-            </Button>
-          </div>
-        </header>
-
-        <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          <StatCard
-            icon={FileText}
-            iconClass="bg-violet-50 text-violet-600"
-            label="Всего материалов"
-            value={counts.all}
-            helper={addedThisWeek > 0 ? `+${addedThisWeek} за неделю` : "Без новых за неделю"}
-            helperClass={addedThisWeek > 0 ? "text-violet-600" : "text-slate-400"}
-          />
-          <StatCard
-            icon={FileText}
-            iconClass="bg-blue-50 text-blue-600"
-            label="Документы"
-            value={counts.document}
-            helper={formatShare(counts.document, counts.all)}
-          />
-          <StatCard
-            icon={ImageIcon}
-            iconClass="bg-emerald-50 text-emerald-600"
-            label="Изображения"
-            value={counts.image}
-            helper={formatShare(counts.image, counts.all)}
-          />
-          <StatCard
-            icon={Video}
-            iconClass="bg-rose-50 text-rose-500"
-            label="Видеоуроки"
-            value={counts.video}
-            helper={formatShare(counts.video, counts.all)}
-          />
-          <StatCard
-            icon={Music2}
-            iconClass="bg-violet-50 text-violet-600"
-            label="Аудиозаписи"
-            value={counts.audio}
-            helper={formatShare(counts.audio, counts.all)}
-          />
-        </section>
-
-        <section className="mt-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => selectKind(tab.id)}
-                  className={cn(
-                    "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition",
-                    kind === tab.id
-                      ? "border-violet-300 bg-violet-50 text-violet-700 shadow-sm"
-                      : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800"
-                  )}
-                >
-                  {tab.label}
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[11px]",
-                      kind === tab.id ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"
-                    )}
-                  >
+          <section className="mt-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+                {TABS.map((tab) => (
+                    <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => selectKind(tab.id)}
+                        className={cn(
+                            "inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition",
+                            kind === tab.id
+                                ? "border-violet-300 bg-violet-50 text-violet-700 shadow-sm"
+                                : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-800"
+                        )}
+                    >
+                      {tab.label}
+                      <span
+                          className={cn(
+                              "rounded-full px-2 py-0.5 text-[11px]",
+                              kind === tab.id ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"
+                          )}
+                      >
                     {counts[tab.id]}
                   </span>
-                </button>
-              ))}
-            </div>
-
-            <div className="text-sm text-slate-500">
-              Найдено: <span className="font-semibold text-slate-800">{filteredMaterials.length}</span>
-            </div>
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
-            {loading ? (
-              <LoadingRows />
-            ) : pageMaterials.length === 0 ? (
-              <EmptyState hasFilters={Boolean(query || kind !== "all")} onReset={() => {
-                setQuery("");
-                setKind("all");
-                setPage(1);
-              }} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1040px] border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50/70 text-left text-xs font-semibold text-slate-500">
-                      <th className="px-5 py-4">Название</th>
-                      <th className="px-4 py-4">Тип</th>
-                      <th className="px-4 py-4">Файл</th>
-                      <th className="px-4 py-4">Размер</th>
-                      <th className="px-4 py-4">Дата</th>
-                      <th className="px-4 py-4 text-right">Действия</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pageMaterials.map((material) => (
-                      <MaterialTableRow
-                        key={material.id}
-                        material={material}
-                        menuOpen={actionMenuId === material.id}
-                        disabled={working}
-                        onToggleMenu={() =>
-                          setActionMenuId((current) => current === material.id ? null : material.id)
-                        }
-                        onDownload={() => void handleDownload(material)}
-                        onAssign={() => openAssign(material)}
-                        onDelete={() => void handleDelete(material)}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              Показано {shownFrom}–{shownTo} из {filteredMaterials.length} материалов
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-1">
-                <PaginationButton
-                  label="Предыдущая страница"
-                  disabled={safePage <= 1}
-                  onClick={() => setPage(Math.max(1, safePage - 1))}
-                >
-                  <ChevronLeft size={16} />
-                </PaginationButton>
-
-                {getPageNumbers(safePage, totalPages).map((pageNumber) => (
-                  <button
-                    key={pageNumber}
-                    type="button"
-                    onClick={() => setPage(pageNumber)}
-                    className={cn(
-                      "h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition",
-                      pageNumber === safePage
-                        ? "border-violet-300 bg-violet-50 text-violet-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                    )}
-                  >
-                    {pageNumber}
-                  </button>
+                    </button>
                 ))}
-
-                <PaginationButton
-                  label="Следующая страница"
-                  disabled={safePage >= totalPages}
-                  onClick={() => setPage(Math.min(totalPages, safePage + 1))}
-                >
-                  <ChevronRight size={16} />
-                </PaginationButton>
               </div>
 
-              <label className="flex items-center gap-2">
-                <span>Показывать по</span>
-                <select
-                  value={pageSize}
-                  onChange={(event) => {
-                    setPageSize(Number(event.target.value));
+              <div className="text-sm text-slate-500">
+                Найдено: <span className="font-semibold text-slate-800">{filteredMaterials.length}</span>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-hidden rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
+              {loading ? (
+                  <LoadingRows />
+              ) : pageMaterials.length === 0 ? (
+                  <EmptyState hasFilters={Boolean(query || kind !== "all")} onReset={() => {
+                    setQuery("");
+                    setKind("all");
                     setPage(1);
-                  }}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-400"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                </select>
-              </label>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <Modal
-        open={createOpen}
-        onClose={closeCreateModal}
-        title="Создание материала"
-        size="lg"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={closeCreateModal} disabled={working}>
-              Отмена
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleCreate()}
-              disabled={working || !form.title.trim() || !selectedFile}
-            >
-              {working ? "Создание..." : "Создать материал"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-5">
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Название материала</span>
-            <input
-              value={form.title}
-              maxLength={160}
-              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-              placeholder="Введите название материала"
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-            />
-          </label>
-
-          <div>
-            <div className="mb-2 text-sm font-semibold text-slate-700">Тип</div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {CREATE_TYPES.map((item) => {
-                const Icon = item.icon;
-                const active = createKind === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setCreateKind(item.id);
-                      setSelectedFile(null);
-                      setMediaDetails("");
-                      setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
-                    }}
-                    className={cn(
-                      "flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
-                      active
-                        ? "border-violet-400 bg-violet-50 text-violet-700 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50/50"
-                    )}
-                  >
-                    <Icon size={16} />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-2 text-sm font-semibold text-slate-700">
-              {createConfig.uploadLabel}
-            </div>
-            <label
-              className={cn(
-                "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition",
-                dragActive
-                  ? "border-violet-500 bg-violet-100/70"
-                  : "border-violet-300 bg-violet-50/45 hover:bg-violet-50"
+                  }} />
+              ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[1040px] border-collapse">
+                      <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/70 text-left text-xs font-semibold text-slate-500">
+                        <th className="px-5 py-4">Название</th>
+                        <th className="px-4 py-4">Тип</th>
+                        <th className="px-4 py-4">Файл</th>
+                        <th className="px-4 py-4">Размер</th>
+                        <th className="px-4 py-4">Дата</th>
+                        <th className="px-4 py-4 text-right">Действия</th>
+                      </tr>
+                      </thead>
+                      <tbody>
+                      {pageMaterials.map((material) => (
+                          <MaterialTableRow
+                              key={material.id}
+                              material={material}
+                              menuOpen={actionMenuId === material.id}
+                              disabled={working}
+                              onToggleMenu={() =>
+                                  setActionMenuId((current) => current === material.id ? null : material.id)
+                              }
+                              onDownload={() => void handleDownload(material)}
+                              onAssign={() => openAssign(material)}
+                              onDelete={() => void handleDelete(material)}
+                          />
+                      ))}
+                      </tbody>
+                    </table>
+                  </div>
               )}
-              onDragEnter={(event) => {
-                event.preventDefault();
-                setDragActive(true);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={(event) => {
-                event.preventDefault();
-                setDragActive(false);
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragActive(false);
-                applySelectedFile(event.dataTransfer.files?.[0] ?? null);
-              }}
-            >
-              <CreateUploadIcon kind={createKind} />
-              <span className="mt-3 text-sm font-semibold text-slate-800">
-                {selectedFile ? selectedFile.name : createConfig.dropLabel}
-              </span>
-              <span className="mt-1 text-xs text-slate-500">{createConfig.hint}</span>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                Показано {shownFrom}–{shownTo} из {filteredMaterials.length} материалов
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <PaginationButton
+                      label="Предыдущая страница"
+                      disabled={safePage <= 1}
+                      onClick={() => setPage(Math.max(1, safePage - 1))}
+                  >
+                    <ChevronLeft size={16} />
+                  </PaginationButton>
+
+                  {getPageNumbers(safePage, totalPages).map((pageNumber) => (
+                      <button
+                          key={pageNumber}
+                          type="button"
+                          onClick={() => setPage(pageNumber)}
+                          className={cn(
+                              "h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold transition",
+                              pageNumber === safePage
+                                  ? "border-violet-300 bg-violet-50 text-violet-700"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                          )}
+                      >
+                        {pageNumber}
+                      </button>
+                  ))}
+
+                  <PaginationButton
+                      label="Следующая страница"
+                      disabled={safePage >= totalPages}
+                      onClick={() => setPage(Math.min(totalPages, safePage + 1))}
+                  >
+                    <ChevronRight size={16} />
+                  </PaginationButton>
+                </div>
+
+                <label className="flex items-center gap-2">
+                  <span>Показывать по</span>
+                  <select
+                      value={pageSize}
+                      onChange={(event) => {
+                        setPageSize(Number(event.target.value));
+                        setPage(1);
+                      }}
+                      className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-violet-400"
+                  >
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <Modal
+            open={createOpen}
+            onClose={closeCreateModal}
+            title="Создание материала"
+            size="lg"
+            footer={
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={closeCreateModal} disabled={working}>
+                  Отмена
+                </Button>
+                <Button
+                    type="button"
+                    onClick={() => void handleCreate()}
+                    disabled={working || !form.title.trim() || !selectedFile}
+                >
+                  {working ? "Создание..." : "Создать материал"}
+                </Button>
+              </div>
+            }
+        >
+          <div className="space-y-5">
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Название материала</span>
               <input
-                type="file"
-                accept={CREATE_ACCEPT[createKind]}
-                className="sr-only"
-                onChange={(event) => applySelectedFile(event.target.files?.[0] ?? null)}
+                  value={form.title}
+                  maxLength={160}
+                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                  placeholder="Введите название материала"
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               />
             </label>
-          </div>
 
-          {(createKind === "audio" || createKind === "video") && (
-            <label className="block">
+            <div>
+              <div className="mb-2 text-sm font-semibold text-slate-700">Тип</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {CREATE_TYPES.map((item) => {
+                  const Icon = item.icon;
+                  const active = createKind === item.id;
+                  return (
+                      <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setCreateKind(item.id);
+                            setSelectedFile(null);
+                            setMediaDetails("");
+                            setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
+                          }}
+                          className={cn(
+                              "flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
+                              active
+                                  ? "border-violet-400 bg-violet-50 text-violet-700 shadow-sm"
+                                  : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50/50"
+                          )}
+                      >
+                        <Icon size={16} />
+                        {item.label}
+                      </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 text-sm font-semibold text-slate-700">
+                {createConfig.uploadLabel}
+              </div>
+              <label
+                  className={cn(
+                      "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition",
+                      dragActive
+                          ? "border-violet-500 bg-violet-100/70"
+                          : "border-violet-300 bg-violet-50/45 hover:bg-violet-50"
+                  )}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setDragActive(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragActive(false);
+                    applySelectedFile(event.dataTransfer.files?.[0] ?? null);
+                  }}
+              >
+                <CreateUploadIcon kind={createKind} />
+                <span className="mt-3 text-sm font-semibold text-slate-800">
+                {selectedFile ? selectedFile.name : createConfig.dropLabel}
+              </span>
+                <span className="mt-1 text-xs text-slate-500">{createConfig.hint}</span>
+                <input
+                    type="file"
+                    accept={CREATE_ACCEPT[createKind]}
+                    className="sr-only"
+                    onChange={(event) => applySelectedFile(event.target.files?.[0] ?? null)}
+                />
+              </label>
+            </div>
+
+            {(createKind === "audio" || createKind === "video") && (
+                <label className="block">
               <span className="mb-2 block text-sm font-semibold text-slate-700">
                 {createConfig.detailsLabel}
               </span>
-              <input
-                value={mediaDetails}
-                maxLength={255}
-                onChange={(event) => setMediaDetails(event.target.value)}
-                placeholder={createConfig.detailsPlaceholder}
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  <input
+                      value={mediaDetails}
+                      maxLength={255}
+                      onChange={(event) => setMediaDetails(event.target.value)}
+                      placeholder={createConfig.detailsPlaceholder}
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  />
+                  <div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-400">
+                    <span>{createConfig.detailsHelp} Для скачивания нужен загруженный файл.</span>
+                    <span className="shrink-0">{mediaDetails.length}/255</span>
+                  </div>
+                </label>
+            )}
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">Описание (необязательно)</span>
+              <textarea
+                  value={form.description}
+                  maxLength={500}
+                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                  placeholder="Введите описание материала"
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               />
-              <div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-400">
-                <span>{createConfig.detailsHelp} Для скачивания нужен загруженный файл.</span>
-                <span className="shrink-0">{mediaDetails.length}/255</span>
-              </div>
+              <span className="mt-1 block text-right text-[11px] text-slate-400">{form.description.length}/500</span>
             </label>
-          )}
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-semibold text-slate-700">Описание (необязательно)</span>
-            <textarea
-              value={form.description}
-              maxLength={500}
-              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-              placeholder="Введите описание материала"
-              rows={3}
-              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-            />
-            <span className="mt-1 block text-right text-[11px] text-slate-400">{form.description.length}/500</span>
-          </label>
-
-          <label className="block">
+            <label className="block">
             <span className="mb-2 block text-sm font-semibold text-slate-700">
               Назначить группе (необязательно)
             </span>
-            <select
-              value={createGroupId}
-              onChange={(event) => setCreateGroupId(event.target.value)}
-              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-            >
-              <option value="">Выберите группу</option>
-              {groupOptions.map((group) => (
-                <option key={group.id} value={group.id}>{group.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </Modal>
-
-      <Modal
-        open={assignOpen}
-        onClose={() => {
-          if (working) return;
-          setAssignOpen(false);
-        }}
-        title="Назначить материал"
-        description={activeMaterial ? `Материал: ${activeMaterial.title}` : undefined}
-        size="lg"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setAssignOpen(false)} disabled={working}>
-              Отмена
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleAssign()}
-              disabled={working || !activeMaterial || (!assignForm.groupId && !assignForm.sessionId)}
-            >
-              {working ? "Назначение..." : "Назначить"}
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-500">Группа</span>
               <select
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-                value={assignForm.groupId}
-                onChange={(event) =>
-                  setAssignForm((current) => ({ ...current, groupId: event.target.value }))
-                }
+                  value={createGroupId}
+                  onChange={(event) => setCreateGroupId(event.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               >
-                <option value="">Не выбрана</option>
+                <option value="">Выберите группу</option>
                 {groupOptions.map((group) => (
-                  <option key={group.id} value={group.id}>{group.name}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-500">Сессия</span>
-              <select
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-                value={assignForm.sessionId}
-                onChange={(event) =>
-                  setAssignForm((current) => ({ ...current, sessionId: event.target.value }))
-                }
-              >
-                <option value="">Не выбрана</option>
-                {sessionOptions.map((session) => (
-                  <option key={session.id} value={session.id}>{session.title}</option>
+                    <option key={group.id} value={group.id}>{group.name}</option>
                 ))}
               </select>
             </label>
           </div>
+        </Modal>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-500">Показывать с</span>
-              <Input
-                type="datetime-local"
-                value={assignForm.visibleFrom}
-                onChange={(event) =>
-                  setAssignForm((current) => ({ ...current, visibleFrom: event.target.value }))
-                }
-              />
-            </label>
-            <label className="space-y-1.5">
-              <span className="text-xs font-semibold text-slate-500">Показывать до</span>
-              <Input
-                type="datetime-local"
-                value={assignForm.visibleTo}
-                onChange={(event) =>
-                  setAssignForm((current) => ({ ...current, visibleTo: event.target.value }))
-                }
-              />
-            </label>
-          </div>
+        <Modal
+            open={assignOpen}
+            onClose={() => {
+              if (working) return;
+              setAssignOpen(false);
+            }}
+            title="Назначить материал"
+            description={activeMaterial ? `Материал: ${activeMaterial.title}` : undefined}
+            size="lg"
+            footer={
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setAssignOpen(false)} disabled={working}>
+                  Отмена
+                </Button>
+                <Button
+                    type="button"
+                    onClick={() => void handleAssign()}
+                    disabled={working || !activeMaterial || (!assignForm.groupId && !assignForm.sessionId)}
+                >
+                  {working ? "Назначение..." : "Назначить"}
+                </Button>
+              </div>
+            }
+        >
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-500">Группа</span>
+                <select
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    value={assignForm.groupId}
+                    onChange={(event) =>
+                        setAssignForm((current) => ({ ...current, groupId: event.target.value }))
+                    }
+                >
+                  <option value="">Не выбрана</option>
+                  {groupOptions.map((group) => (
+                      <option key={group.id} value={group.id}>{group.name}</option>
+                  ))}
+                </select>
+              </label>
 
-          {activeAssignments.length > 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                Текущие назначения
-              </div>
-              <div className="space-y-2">
-                {activeAssignments.map((assignment) => (
-                  <div
-                    key={assignment.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate font-semibold text-slate-700">
-                        {getAssignmentLabel(assignment, groupOptions, sessionOptions)}
-                      </div>
-                      <div className="mt-0.5 text-slate-400">{formatDateTime(assignment.createdAt)}</div>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        if (!activeMaterial) return;
-                        try {
-                          await unassignMaterial(activeMaterial.id, assignment.id);
-                          const assignments = await getMaterialAssignments(activeMaterial.id).catch(() => []);
-                          setActiveAssignments(assignments);
-                          push({ type: "success", title: "Назначение удалено" });
-                        } catch (error: unknown) {
-                          push({
-                            type: "error",
-                            title: "Не удалось убрать назначение",
-                            text: getErrorMessage(error),
-                          });
-                        }
-                      }}
-                    >
-                      Убрать
-                    </Button>
-                  </div>
-                ))}
-              </div>
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-500">Сессия</span>
+                <select
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 shadow-sm outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    value={assignForm.sessionId}
+                    onChange={(event) =>
+                        setAssignForm((current) => ({ ...current, sessionId: event.target.value }))
+                    }
+                >
+                  <option value="">Не выбрана</option>
+                  {sessionOptions.map((session) => (
+                      <option key={session.id} value={session.id}>{session.title}</option>
+                  ))}
+                </select>
+              </label>
             </div>
-          )}
-        </div>
-      </Modal>
-    </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-500">Показывать с</span>
+                <Input
+                    type="datetime-local"
+                    value={assignForm.visibleFrom}
+                    onChange={(event) =>
+                        setAssignForm((current) => ({ ...current, visibleFrom: event.target.value }))
+                    }
+                />
+              </label>
+              <label className="space-y-1.5">
+                <span className="text-xs font-semibold text-slate-500">Показывать до</span>
+                <Input
+                    type="datetime-local"
+                    value={assignForm.visibleTo}
+                    onChange={(event) =>
+                        setAssignForm((current) => ({ ...current, visibleTo: event.target.value }))
+                    }
+                />
+              </label>
+            </div>
+
+            {activeAssignments.length > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Текущие назначения
+                  </div>
+                  <div className="space-y-2">
+                    {activeAssignments.map((assignment) => (
+                        <div
+                            key={assignment.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 text-xs"
+                        >
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-slate-700">
+                              {getAssignmentLabel(assignment, groupOptions, sessionOptions)}
+                            </div>
+                            <div className="mt-0.5 text-slate-400">{formatDateTime(assignment.createdAt)}</div>
+                          </div>
+                          <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={async () => {
+                                if (!activeMaterial) return;
+                                try {
+                                  await unassignMaterial(activeMaterial.id, assignment.id);
+                                  const assignments = await getMaterialAssignments(activeMaterial.id).catch(() => []);
+                                  setActiveAssignments(assignments);
+                                  push({ type: "success", title: "Назначение удалено" });
+                                } catch (error: unknown) {
+                                  push({
+                                    type: "error",
+                                    title: "Не удалось убрать назначение",
+                                    text: getErrorMessage(error),
+                                  });
+                                }
+                              }}
+                          >
+                            Убрать
+                          </Button>
+                        </div>
+                    ))}
+                  </div>
+                </div>
+            )}
+          </div>
+        </Modal>
+      </div>
   );
 }
 
 function CreateUploadIcon({ kind }: { kind: CreateKind }) {
   if (kind === "image") {
     return (
-      <span className="relative flex h-16 w-20 items-center justify-center">
+        <span className="relative flex h-16 w-20 items-center justify-center">
         <span className="absolute left-1 top-2 h-11 w-14 rotate-[-7deg] rounded-xl border border-violet-200 bg-white/80 shadow-sm" />
         <span className="relative flex h-12 w-16 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-600 shadow-sm">
           <ImageIcon size={30} />
@@ -1139,7 +1140,7 @@ function CreateUploadIcon({ kind }: { kind: CreateKind }) {
 
   if (kind === "video") {
     return (
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
         <Video size={30} />
       </span>
     );
@@ -1147,17 +1148,17 @@ function CreateUploadIcon({ kind }: { kind: CreateKind }) {
 
   if (kind === "audio") {
     return (
-      <span className="flex items-center gap-2 text-violet-600">
+        <span className="flex items-center gap-2 text-violet-600">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
           <Music2 size={28} />
         </span>
         <span aria-hidden="true" className="flex items-center gap-1">
           {[14, 24, 34, 22, 30, 18].map((height, index) => (
-            <span
-              key={`${height}-${index}`}
-              className="w-1 rounded-full bg-violet-500"
-              style={{ height }}
-            />
+              <span
+                  key={`${height}-${index}`}
+                  className="w-1 rounded-full bg-violet-500"
+                  style={{ height }}
+              />
           ))}
         </span>
       </span>
@@ -1165,20 +1166,20 @@ function CreateUploadIcon({ kind }: { kind: CreateKind }) {
   }
 
   return (
-    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
       <CloudUpload size={30} />
     </span>
   );
 }
 
 function StatCard({
-  icon: Icon,
-  iconClass,
-  label,
-  value,
-  helper,
-  helperClass = "text-slate-400",
-}: {
+                    icon: Icon,
+                    iconClass,
+                    label,
+                    value,
+                    helper,
+                    helperClass = "text-slate-400",
+                  }: {
   icon: ComponentType<{ size?: number; className?: string }>;
   iconClass: string;
   label: string;
@@ -1187,30 +1188,30 @@ function StatCard({
   helperClass?: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-slate-200 bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)]">
-      <div className="flex items-start gap-4">
+      <div className="rounded-[18px] border border-slate-200 bg-white p-5 shadow-[0_6px_24px_rgba(15,23,42,0.04)]">
+        <div className="flex items-start gap-4">
         <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", iconClass)}>
           <Icon size={21} />
         </span>
-        <div>
-          <div className="text-xs font-semibold text-slate-500">{label}</div>
-          <div className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</div>
-          <div className={cn("mt-1 text-xs font-semibold", helperClass)}>{helper}</div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">{label}</div>
+            <div className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{value}</div>
+            <div className={cn("mt-1 text-xs font-semibold", helperClass)}>{helper}</div>
+          </div>
         </div>
       </div>
-    </div>
   );
 }
 
 function MaterialTableRow({
-  material,
-  menuOpen,
-  disabled,
-  onToggleMenu,
-  onDownload,
-  onAssign,
-  onDelete,
-}: {
+                            material,
+                            menuOpen,
+                            disabled,
+                            onToggleMenu,
+                            onDownload,
+                            onAssign,
+                            onDelete,
+                          }: {
   material: MaterialRow;
   menuOpen: boolean;
   disabled: boolean;
@@ -1224,142 +1225,142 @@ function MaterialTableRow({
   const Icon = meta.icon;
 
   return (
-    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-      <td className="px-5 py-4">
-        <div className="flex items-center gap-3">
+      <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+        <td className="px-5 py-4">
+          <div className="flex items-center gap-3">
           <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl", meta.iconClass)}>
             <Icon size={20} />
           </span>
-          <div className="min-w-0">
-            <div className="max-w-[260px] truncate text-sm font-semibold text-slate-900">{material.title}</div>
-            <div className="mt-0.5 max-w-[280px] truncate text-xs text-slate-400">
-              {material.description || "Учебный материал"}
+            <div className="min-w-0">
+              <div className="max-w-[260px] truncate text-sm font-semibold text-slate-900">{material.title}</div>
+              <div className="mt-0.5 max-w-[280px] truncate text-xs text-slate-400">
+                {material.description || "Учебный материал"}
+              </div>
             </div>
           </div>
-        </div>
-      </td>
-      <td className="px-4 py-4">
+        </td>
+        <td className="px-4 py-4">
         <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1", meta.badgeClass)}>
           {meta.label}
         </span>
-      </td>
-      <td className="max-w-[240px] px-4 py-4 text-sm text-slate-600">
-        <div className="truncate" title={material.fileName}>{material.fileName || "—"}</div>
-      </td>
-      <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">{formatBytes(material.size)}</td>
-      <td className="whitespace-nowrap px-4 py-4">
-        <div className="text-sm text-slate-700">{formatDate(material.createdAt)}</div>
-        <div className="mt-0.5 text-xs text-slate-400">{formatTime(material.createdAt)}</div>
-      </td>
-      <td className="px-4 py-4">
-        <div className="flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onDownload}
-            disabled={disabled}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <ArrowDownToLine size={15} />
-            Скачать
-          </button>
-          <button
-            type="button"
-            onClick={onAssign}
-            disabled={disabled}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
-          >
-            <UserPlus size={15} />
-            Назначить
-          </button>
-
-          <div className="relative">
+        </td>
+        <td className="max-w-[240px] px-4 py-4 text-sm text-slate-600">
+          <div className="truncate" title={material.fileName}>{material.fileName || "—"}</div>
+        </td>
+        <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">{formatBytes(material.size)}</td>
+        <td className="whitespace-nowrap px-4 py-4">
+          <div className="text-sm text-slate-700">{formatDate(material.createdAt)}</div>
+          <div className="mt-0.5 text-xs text-slate-400">{formatTime(material.createdAt)}</div>
+        </td>
+        <td className="px-4 py-4">
+          <div className="flex items-center justify-end gap-2">
             <button
-              type="button"
-              aria-label="Дополнительные действия"
-              aria-expanded={menuOpen}
-              onClick={onToggleMenu}
-              disabled={disabled}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                type="button"
+                onClick={onDownload}
+                disabled={disabled}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
             >
-              <MoreVertical size={17} />
+              <ArrowDownToLine size={15} />
+              Скачать
             </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_14px_35px_rgba(15,23,42,0.14)]">
-                <button
+            <button
+                type="button"
+                onClick={onAssign}
+                disabled={disabled}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
+            >
+              <UserPlus size={15} />
+              Назначить
+            </button>
+
+            <div className="relative">
+              <button
                   type="button"
-                  onClick={onDelete}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
-                >
-                  <Trash2 size={15} />
-                  Удалить
-                </button>
-              </div>
-            )}
+                  aria-label="Дополнительные действия"
+                  aria-expanded={menuOpen}
+                  onClick={onToggleMenu}
+                  disabled={disabled}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              >
+                <MoreVertical size={17} />
+              </button>
+              {menuOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_14px_35px_rgba(15,23,42,0.14)]">
+                    <button
+                        type="button"
+                        onClick={onDelete}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition hover:bg-red-50"
+                    >
+                      <Trash2 size={15} />
+                      Удалить
+                    </button>
+                  </div>
+              )}
+            </div>
           </div>
-        </div>
-      </td>
-    </tr>
+        </td>
+      </tr>
   );
 }
 
 function LoadingRows() {
   return (
-    <div className="space-y-3 p-5">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-14 animate-pulse rounded-xl bg-slate-100" />
-      ))}
-    </div>
+      <div className="space-y-3 p-5">
+        {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-14 animate-pulse rounded-xl bg-slate-100" />
+        ))}
+      </div>
   );
 }
 
 function EmptyState({ hasFilters, onReset }: { hasFilters: boolean; onReset: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+      <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
         <FileText size={25} />
       </span>
-      <h2 className="mt-4 text-lg font-bold text-slate-900">
-        {hasFilters ? "Материалы не найдены" : "Материалов пока нет"}
-      </h2>
-      <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">
-        {hasFilters
-          ? "Измените запрос или сбросьте фильтры."
-          : "Создайте первый материал, чтобы назначить его группе или учебной сессии."}
-      </p>
-      {hasFilters && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="mt-4 rounded-xl bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
-        >
-          Сбросить поиск и фильтры
-        </button>
-      )}
-    </div>
+        <h2 className="mt-4 text-lg font-bold text-slate-900">
+          {hasFilters ? "Материалы не найдены" : "Материалов пока нет"}
+        </h2>
+        <p className="mt-1 max-w-md text-sm leading-6 text-slate-500">
+          {hasFilters
+              ? "Измените запрос или сбросьте фильтры."
+              : "Создайте первый материал, чтобы назначить его группе или учебной сессии."}
+        </p>
+        {hasFilters && (
+            <button
+                type="button"
+                onClick={onReset}
+                className="mt-4 rounded-xl bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+            >
+              Сбросить поиск и фильтры
+            </button>
+        )}
+      </div>
   );
 }
 
 function PaginationButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
+                            label,
+                            disabled,
+                            onClick,
+                            children,
+                          }: {
   label: string;
   disabled: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"
-    >
-      {children}
-    </button>
+      <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300"
+      >
+        {children}
+      </button>
   );
 }
 
@@ -1382,12 +1383,12 @@ function getMaterialKind(material: MaterialRow): Exclude<MaterialKind, "all"> {
   if (mime.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(name)) return "video";
   if (mime.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(name)) return "audio";
   if (
-    mime.includes("pdf") ||
-    mime.includes("document") ||
-    mime.includes("text") ||
-    mime.includes("sheet") ||
-    mime.includes("presentation") ||
-    /\.(pdf|docx?|xlsx?|pptx?|txt|rtf|csv)$/i.test(name)
+      mime.includes("pdf") ||
+      mime.includes("document") ||
+      mime.includes("text") ||
+      mime.includes("sheet") ||
+      mime.includes("presentation") ||
+      /\.(pdf|docx?|xlsx?|pptx?|txt|rtf|csv)$/i.test(name)
   ) {
     return "document";
   }
@@ -1446,9 +1447,9 @@ function getPageNumbers(current: number, total: number): number[] {
 }
 
 function getAssignmentLabel(
-  assignment: MaterialAssignmentRow,
-  groups: TeacherGroup[],
-  sessions: GroupSession[]
+    assignment: MaterialAssignmentRow,
+    groups: TeacherGroup[],
+    sessions: GroupSession[]
 ): string {
   if (assignment.sessionId) {
     const session = sessions.find((item) => item.id === assignment.sessionId);

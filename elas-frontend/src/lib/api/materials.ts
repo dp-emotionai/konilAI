@@ -1,13 +1,18 @@
 import { api, getApiBaseUrl, getApiOriginUrl, getToken, hasAuth } from "@/lib/api/client";
 
+export type MaterialKind = "video" | "audio" | "image" | "document" | "file";
+
 export type MaterialRow = {
   id: string;
   title: string;
   description: string | null;
+  kind: MaterialKind;
   fileName: string;
   mimeType: string | null;
   storageKey: string;
   size: number | null;
+  thumbnailStorageKey?: string | null;
+  durationSec?: number | null;
   ownerId: string;
   createdAt: string;
   updatedAt: string;
@@ -25,6 +30,7 @@ export type MaterialAssignmentRow = {
 
 export type MaterialUploadResult = {
   storageKey: string;
+  kind: MaterialKind;
   fileName: string;
   mimeType: string | null;
   size: number | null;
@@ -35,9 +41,11 @@ export type AssignedMaterialRow = {
   materialId: string;
   title: string;
   description: string | null;
+  kind: MaterialKind;
   fileName: string | null;
   mimeType: string | null;
   size: number | null;
+  durationSec?: number | null;
   createdAt: string;
   visibleFrom: string | null;
   visibleTo: string | null;
@@ -53,23 +61,30 @@ export async function createMaterial(
     input: {
       title: string;
       description?: string | null;
+      kind?: MaterialKind;
       fileName: string;
       mimeType?: string | null;
       storageKey: string;
       size?: number | null;
+      thumbnailStorageKey?: string | null;
+      durationSec?: number | null;
     },
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.post<MaterialRow>("/materials", input, { signal: params?.signal });
 }
 
-export async function uploadMaterialFile(file: File): Promise<MaterialUploadResult> {
+export async function uploadMaterialFile(file: File, kind?: MaterialKind): Promise<MaterialUploadResult> {
   const base = getApiBaseUrl();
   const token = getToken();
   if (!base || !token) throw new Error("API URL or auth token not configured");
 
   const formData = new FormData();
   formData.append("file", file);
+
+  if (kind) {
+    formData.append("kind", kind);
+  }
 
   const response = await fetch(`${base}/materials/upload`, {
     method: "POST",
@@ -90,7 +105,7 @@ export async function uploadMaterialFile(file: File): Promise<MaterialUploadResu
 
 export async function updateMaterial(
     materialId: string,
-    input: Partial<Pick<MaterialRow, "title" | "description" | "fileName" | "mimeType" | "storageKey" | "size">>,
+    input: Partial<Pick<MaterialRow, "title" | "description" | "kind" | "fileName" | "mimeType" | "storageKey" | "size" | "thumbnailStorageKey" | "durationSec">>,
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.patch<MaterialRow>(`/materials/${materialId}`, input, { signal: params?.signal });
