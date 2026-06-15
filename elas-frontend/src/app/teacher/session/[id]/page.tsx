@@ -8,6 +8,7 @@ import Breadcrumbs from "@/components/layout/Breadcrumbs";
 import PageHero from "@/components/common/PageHero";
 import Reveal from "@/components/common/Reveal";
 import Section from "@/components/common/Section";
+import LessonPlanPanel from "@/components/session/LessonPlanPanel";
 
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -17,16 +18,18 @@ import { useUI } from "@/components/layout/Providers";
 import {
   getSessionJoinInfo,
   getStudentSessionDetails,
-  recordSessionConsent,
+  sendSessionMetrics,
   type SessionJoinInfo,
 } from "@/lib/api/student";
-import {
-  getSessionLiveMetrics,
-  type LiveMetricsParticipant,
-  type SessionLiveMetrics,
-} from "@/lib/api/teacher";
 import { getApiBaseUrl, hasAuth, getStoredAuth } from "@/lib/api/client";
-import { getMlApiBaseUrl } from "@/lib/api/ml";
+import {
+  getMlApiBaseUrl,
+  mlAnalyzeFrame,
+  captureSquareFrameGrayscale,
+  ML_INTERVAL,
+  ML_429_PAUSE_MS,
+  type MlAnalyzeResponse,
+} from "@/lib/api/ml";
 import {
   getSessionContent,
   getSessionMaterials,
@@ -164,39 +167,6 @@ function formatPercentMetric(value?: number | null) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
 }
 
-function normalizeIdentity(value?: string | null) {
-  return value?.trim().toLowerCase() || "";
-}
-
-function isMetricStale(updatedAt?: string | null) {
-  if (!updatedAt) return true;
-  const timestamp = Date.parse(updatedAt);
-  if (!Number.isFinite(timestamp)) return true;
-  return Date.now() - timestamp > 15_000;
-}
-
-type VideoTile = {
-  id: string;
-  stream: MediaStream | null;
-  label: string;
-  roleLabel: string;
-  icon: string;
-  isLocal: boolean;
-  role: "teacher" | "student";
-  userId?: string;
-  email?: string;
-};
-
-type StudentFocusItem = {
-  key: string;
-  userId?: string;
-  email?: string;
-  fullName: string;
-  status: "online" | "offline" | "stale";
-  peerId?: string;
-  hasStream: boolean;
-};
-
 function CallControlButton({
                              active = true,
                              icon,
@@ -266,15 +236,6 @@ export default function TeacherJoinSessionPage() {
       const info = await getSessionJoinInfo(sessionId);
       setJoinInfo(info ?? null);
 
-      if (info?.reason === "consent_required" && state.consent) {
-        try {
-          await recordSessionConsent(sessionId);
-          const updated = await getSessionJoinInfo(sessionId);
-          if (updated) setJoinInfo(updated);
-        } catch {
-          // ignore
-        }
-      }
     } catch (e) {
       setJoinInfo(null);
       setJoinInfoError(
@@ -370,10 +331,6 @@ export default function TeacherJoinSessionPage() {
     setConsentError(null);
 
     try {
-      if (sessionId && getApiBaseUrl() && hasAuth()) {
-        await recordSessionConsent(sessionId);
-      }
-
       setConsent(true);
 
       try {
@@ -382,16 +339,18 @@ export default function TeacherJoinSessionPage() {
         // localStorage may be unavailable in privacy mode.
       }
 
+      setPreparationView("main");
+
       if (sessionId && getApiBaseUrl() && hasAuth()) {
         const updated = await getSessionJoinInfo(sessionId);
         if (updated) setJoinInfo(updated);
       }
     } catch (error) {
-      console.error("session consent save failed", error);
+      console.error("teacher consent save failed", error);
       setConsentError(
           error instanceof Error
               ? error.message
-              : "Не удалось сохранить согласие. Попробуйте ещё раз."
+              : "Не удалось подтвердить согласие. Попробуйте ещё раз."
       );
     } finally {
       setConsentSaving(false);
@@ -435,10 +394,10 @@ export default function TeacherJoinSessionPage() {
     };
   }, [apiAvailable, live, sessionId]);
 
-  const [liveMetrics, setLiveMetrics] = useState<SessionLiveMetrics | null>(null);
-  const [liveMetricsLoading, setLiveMetricsLoading] = useState(false);
-  const [liveMetricsError, setLiveMetricsError] = useState<string | null>(null);
-  const [focusedStudentKey, setFocusedStudentKey] = useState<string | null>(null);
+  const [mlResult, setMlResult] = useState<MlAnalyzeResponse | null>(null);
+  const [mlFaceDetected, setMlFaceDetected] = useState<boolean | null>(null);
+  const [mlActive, setMlActive] = useState(false);
+  const [mlUnavailable, setMlUnavailable] = useState(false);
 
   const [connectionState, setConnectionState] = useState<
       "idle" | "connecting" | "connected" | "error"
@@ -454,16 +413,22 @@ export default function TeacherJoinSessionPage() {
   const peerManagerRef = useRef<PeerConnectionManager | null>(null);
 
   const mlApiAvailable = Boolean(getMlApiBaseUrl());
+  const shouldRunMl = live && state.consent && mlApiAvailable;
   const roomId = sessionId;
 
-  const currentTeacherName = useMemo(
+  const teacherParticipant = useMemo(
+      () => participants.find((p) => p.role === "teacher") ?? participants[0] ?? null,
+      [participants]
+  );
+
+  const currentStudentName = useMemo(
       () =>
           formatPersonName({
             fullName: currentUser?.fullName,
             firstName: currentUser?.firstName,
             lastName: currentUser?.lastName,
             email: currentUser?.email,
-            role: "teacher",
+            role: "student",
           }),
       [currentUser]
   );
@@ -471,38 +436,32 @@ export default function TeacherJoinSessionPage() {
     setCurrentUser(getStoredAuth());
   }, []);
 
-  const videoTiles = useMemo<VideoTile[]>(() => {
-    const localTile: VideoTile = {
+  const videoTiles = useMemo(() => {
+    const localTile = {
       id: "local",
       stream: localStream,
-      label: currentTeacherName,
-      roleLabel: "Вы · преподаватель",
-      icon: "👩🏻‍🏫",
+      label: currentStudentName,
+      roleLabel: "Вы",
+      icon: "👤",
       isLocal: true,
-      role: "teacher",
-      userId: currentUser?.id ?? undefined,
-      email: currentUser?.email ?? undefined,
     };
 
-    const remoteTiles: VideoTile[] = Object.entries(remoteStreams).map(([peerId, stream]) => {
+    const remoteTiles = Object.entries(remoteStreams).map(([peerId, stream]) => {
       const participant = participants.find((p) => p.id === peerId) ?? null;
-      const role = participant?.role === "teacher" ? "teacher" : "student";
+      const isTeacher = participant?.role === "teacher";
 
       return {
         id: peerId,
         stream,
         label: formatParticipantLabel(participant),
-        roleLabel: role === "teacher" ? "Преподаватель" : "Студент",
-        icon: role === "teacher" ? "👩🏻‍🏫" : "🎓",
+        roleLabel: isTeacher ? "Преподаватель" : "Участник",
+        icon: isTeacher ? "👩🏻‍🏫" : "🎓",
         isLocal: false,
-        role,
-        userId: participant?.userId,
-        email: participant?.email,
       };
     });
 
     return [localTile, ...remoteTiles];
-  }, [currentTeacherName, currentUser?.email, currentUser?.id, localStream, participants, remoteStreams]);
+  }, [currentStudentName, localStream, participants, remoteStreams]);
 
   const selectedVideo = useMemo(() => {
     return (
@@ -538,9 +497,10 @@ export default function TeacherJoinSessionPage() {
   }, []);
 
   const teacherDisplayName = useMemo(() => {
+    const liveParticipantName = formatParticipantLabel(teacherParticipant);
     if (sessionTeacherName?.trim()) return sessionTeacherName.trim();
-    return currentTeacherName;
-  }, [currentTeacherName, sessionTeacherName]);
+    return liveParticipantName;
+  }, [sessionTeacherName, teacherParticipant]);
 
   const [sessionTimerLabel, setSessionTimerLabel] = useState<string>("00:00:00");
   const sessionStartTime = useRef<number>(Date.now());
@@ -729,187 +689,89 @@ export default function TeacherJoinSessionPage() {
   };
 
   useEffect(() => {
-    if (!apiAvailable || !sessionId || !live) {
-      setLiveMetrics(null);
-      setLiveMetricsLoading(false);
-      setLiveMetricsError(null);
-      return;
-    }
+    if (!shouldRunMl || !localStream) return;
 
-    let closed = false;
+    setMlActive(true);
+    setMlUnavailable(false);
+
+    let cancelled = false;
     let inflight = false;
+    let consecutiveFailures = 0;
+    let pausedUntil = 0;
+    const failureThreshold = 4;
 
-    const load = async (initial = false) => {
-      if (closed || inflight) return;
-      inflight = true;
+    const hiddenVideo = document.createElement("video");
+    hiddenVideo.muted = true;
+    hiddenVideo.playsInline = true;
+    hiddenVideo.autoplay = true;
+    hiddenVideo.srcObject = localStream;
+    hiddenVideo.play().catch(() => { });
 
-      if (initial) {
-        setLiveMetricsLoading(true);
-      }
+    const timer = setInterval(async () => {
+      if (cancelled || inflight) return;
+      if (Date.now() < pausedUntil) return;
+
+      const frame = captureSquareFrameGrayscale(hiddenVideo, 192);
+      if (!frame) return;
 
       try {
-        const data = await getSessionLiveMetrics(sessionId);
+        inflight = true;
+        const result = await mlAnalyzeFrame(frame);
+        if (cancelled) return;
 
-        if (closed) return;
+        if (!result) {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
+          return;
+        }
 
-        if (data) {
-          setLiveMetrics(data);
-          setLiveMetricsError(null);
+        consecutiveFailures = 0;
+        const hasFace = result.face_detected !== false;
+        setMlFaceDetected(hasFace);
+
+        if (!hasFace) {
+          setMlResult(null);
+          return;
+        }
+
+        setMlResult(result);
+
+        if (sessionId && apiAvailable) {
+          sendSessionMetrics(sessionId, {
+            emotion: result.emotion ?? "Neutral",
+            confidence: result.confidence ?? 0,
+            risk: result.risk ?? 0,
+            state: result.state ?? "NORMAL",
+            dominant_emotion: result.dominant_emotion ?? "Neutral",
+            engagement: result.engagement,
+            stress: result.stress,
+            fatigue: result.fatigue,
+          }).catch(() => { });
+        }
+      } catch (err) {
+        const e = err as Error & { status?: number };
+        if (e?.status === 429 || e?.message === "RATE_LIMIT") {
+          pausedUntil = Date.now() + ML_429_PAUSE_MS;
         } else {
-          setLiveMetricsError("Не удалось получить ML-метрики студентов.");
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= failureThreshold) setMlUnavailable(true);
         }
       } finally {
         inflight = false;
-        if (!closed) {
-          setLiveMetricsLoading(false);
-        }
       }
-    };
-
-    void load(true);
-    const interval = window.setInterval(() => {
-      void load();
-    }, 2000);
+    }, ML_INTERVAL);
 
     return () => {
-      closed = true;
-      window.clearInterval(interval);
+      cancelled = true;
+      clearInterval(timer);
+      hiddenVideo.pause();
+      hiddenVideo.srcObject = null;
+      setMlActive(false);
+      setMlResult(null);
+      setMlFaceDetected(null);
+      setMlUnavailable(false);
     };
-  }, [apiAvailable, live, sessionId]);
-
-  const studentFocusItems = useMemo<StudentFocusItem[]>(() => {
-    const map = new Map<string, StudentFocusItem>();
-    const ownUserId = normalizeIdentity(currentUser?.id);
-    const ownEmail = normalizeIdentity(currentUser?.email);
-
-    const upsert = (item: StudentFocusItem) => {
-      const current = map.get(item.key);
-      map.set(item.key, current ? { ...current, ...item } : item);
-    };
-
-    for (const row of presence) {
-      const userId = normalizeIdentity(row.userId);
-      const email = normalizeIdentity(row.email);
-      if ((ownUserId && userId === ownUserId) || (ownEmail && email === ownEmail)) {
-        continue;
-      }
-
-      const key = userId || email;
-      if (!key) continue;
-
-      upsert({
-        key,
-        userId: row.userId || undefined,
-        email: row.email || undefined,
-        fullName: row.fullName || row.email || "Студент",
-        status: row.status === "online" ? "online" : "offline",
-        hasStream: false,
-      });
-    }
-
-    for (const participant of participants) {
-      if (participant.role !== "student") continue;
-
-      const userId = normalizeIdentity(participant.userId);
-      const email = normalizeIdentity(participant.email);
-      const key = userId || email || participant.id;
-      const hasStream = Boolean(remoteStreams[participant.id]);
-
-      upsert({
-        key,
-        userId: participant.userId,
-        email: participant.email,
-        fullName: formatParticipantLabel(participant),
-        status: "online",
-        peerId: participant.id,
-        hasStream,
-      });
-    }
-
-    for (const metric of liveMetrics?.participants ?? []) {
-      const userId = normalizeIdentity(metric.userId);
-      const email = normalizeIdentity(metric.email);
-      const key = userId || email;
-      if (!key) continue;
-
-      upsert({
-        key,
-        userId: metric.userId,
-        email: metric.email || undefined,
-        fullName: formatPersonName(metric),
-        status: isMetricStale(metric.updatedAt) ? "stale" : "online",
-        hasStream: map.get(key)?.hasStream ?? false,
-        peerId: map.get(key)?.peerId,
-      });
-    }
-
-    return Array.from(map.values()).sort((a, b) => {
-      if (a.status !== b.status) {
-        const order = { online: 0, stale: 1, offline: 2 } as const;
-        return order[a.status] - order[b.status];
-      }
-      return a.fullName.localeCompare(b.fullName, "ru");
-    });
-  }, [currentUser?.email, currentUser?.id, liveMetrics?.participants, participants, presence, remoteStreams]);
-
-  const selectedStudentFromVideo = useMemo(() => {
-    if (!selectedVideo || selectedVideo.role !== "student") return null;
-
-    const userId = normalizeIdentity(selectedVideo.userId);
-    const email = normalizeIdentity(selectedVideo.email);
-    const key = userId || email || selectedVideo.id;
-
-    return studentFocusItems.find((item) => item.key === key) ?? null;
-  }, [selectedVideo, studentFocusItems]);
-
-  const effectiveFocusedStudentKey = focusedStudentKey ?? selectedStudentFromVideo?.key ?? null;
-
-  const focusedStudent = useMemo(
-      () =>
-          studentFocusItems.find((item) => item.key === effectiveFocusedStudentKey) ??
-          selectedStudentFromVideo,
-      [effectiveFocusedStudentKey, selectedStudentFromVideo, studentFocusItems]
-  );
-
-  const focusedMetrics = useMemo<LiveMetricsParticipant | null>(() => {
-    if (!focusedStudent) return null;
-
-    const userId = normalizeIdentity(focusedStudent.userId);
-    const email = normalizeIdentity(focusedStudent.email);
-
-    return (
-        liveMetrics?.participants.find((metric) => {
-          const metricUserId = normalizeIdentity(metric.userId);
-          const metricEmail = normalizeIdentity(metric.email);
-          return Boolean(
-              (userId && metricUserId === userId) ||
-              (email && metricEmail === email)
-          );
-        }) ?? null
-    );
-  }, [focusedStudent, liveMetrics?.participants]);
-
-  const focusStudent = useCallback(
-      (student: StudentFocusItem) => {
-        setFocusedStudentKey(student.key);
-        if (student.peerId && remoteStreams[student.peerId]) {
-          setSelectedVideoId(student.peerId);
-        }
-      },
-      [remoteStreams]
-  );
-
-  const focusVideoTile = useCallback((tile: VideoTile) => {
-    setSelectedVideoId(tile.id);
-
-    if (tile.role !== "student") {
-      setFocusedStudentKey(null);
-      return;
-    }
-
-    const key = normalizeIdentity(tile.userId) || normalizeIdentity(tile.email) || tile.id;
-    setFocusedStudentKey(key);
-  }, []);
+  }, [shouldRunMl, sessionId, apiAvailable, localStream]);
 
   if (tab === "live") {
     return (
@@ -1031,7 +893,7 @@ export default function TeacherJoinSessionPage() {
                               <button
                                   key={tile.id}
                                   type="button"
-                                  onClick={() => focusVideoTile(tile)}
+                                  onClick={() => setSelectedVideoId(tile.id)}
                                   className={cn(
                                       "relative h-[92px] w-[140px] shrink-0 overflow-hidden rounded-[20px] border-[3px] bg-black text-left shadow-xl transition-all sm:h-[116px] sm:w-[190px] xl:h-[132px] xl:w-[220px]",
                                       selectedVideo?.id === tile.id
@@ -1391,11 +1253,12 @@ export default function TeacherJoinSessionPage() {
                   ref={chatSectionRef}
                   className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-20 lg:self-start"
               >
+                <LessonPlanPanel sessionId={sessionId} role="teacher" />
                 <div className="flex h-[520px] min-h-[420px] flex-col overflow-hidden rounded-[28px] border border-slate-100 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.02)] lg:h-[560px]">
                   <div className="px-6 py-5 border-b border-slate-50 flex items-center justify-between bg-white z-10 shrink-0">
                     <h3 className="font-bold text-slate-900 text-[16px]">Чат сессии</h3>
                     <Badge className="bg-purple-50 text-[#7448FF] shadow-none flex items-center gap-1.5 px-2 py-0.5 rounded-lg border-none">
-                      <Users2 size={12} /> {studentFocusItems.length + 1}
+                      <Users2 size={12} /> {participants.length || 1}
                     </Badge>
                   </div>
                   <div className="flex-1 min-h-0 overflow-hidden">
@@ -1422,109 +1285,73 @@ export default function TeacherJoinSessionPage() {
 
                     <div>
                       <div className="text-[12px] text-slate-400 mb-2 font-medium">Участники</div>
-                      <div className="flex flex-col gap-2">
-                        <button
-                            type="button"
-                            onClick={() => focusVideoTile(videoTiles[0])}
-                            className={cn(
-                                "flex items-center gap-3 rounded-2xl border p-2.5 text-left transition",
-                                selectedVideo?.isLocal
-                                    ? "border-[#7448FF]/30 bg-purple-50/70 ring-2 ring-[#7448FF]/10"
-                                    : "border-slate-100 bg-slate-50 hover:border-slate-200"
-                            )}
-                        >
+                      <div className="flex flex-col gap-3">
+                        {presence.length > 0 && (
+                            <div className="space-y-2">
+                              {presence.map((p) => (
+                                  <div
+                                      key={p.userId}
+                                      className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-3"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate text-[13px] font-semibold text-slate-900">
+                                        {p.fullName || p.email || p.userId}
+                                      </div>
+                                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                                        {p.email || ""}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] font-semibold">
+                                <span
+                                    className={cn(
+                                        "h-2 w-2 rounded-full",
+                                        p.status === "online" ? "bg-emerald-500" : "bg-slate-300"
+                                    )}
+                                />
+                                      <span className={p.status === "online" ? "text-emerald-600" : "text-slate-500"}>
+                                  {p.status}
+                                </span>
+                                    </div>
+                                  </div>
+                              ))}
+                            </div>
+                        )}
+                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
                           <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
                             👩🏻‍🏫
                           </div>
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0">
                             <div className="font-semibold text-[13px] text-slate-900 truncate">
                               {teacherDisplayName}
                             </div>
                             <div className="text-[11px] text-slate-500 font-medium">
-                              Вы · преподаватель
+                              Преподаватель
                             </div>
                           </div>
-                        </button>
+                        </div>
 
-                        {studentFocusItems.length > 0 ? (
-                            studentFocusItems.map((student) => {
-                              const isFocused = student.key === effectiveFocusedStudentKey;
-                              const statusLabel =
-                                  student.status === "online"
-                                      ? "online"
-                                      : student.status === "stale"
-                                          ? "данные устарели"
-                                          : "offline";
-
-                              return (
-                                  <button
-                                      key={student.key}
-                                      type="button"
-                                      onClick={() => focusStudent(student)}
-                                      className={cn(
-                                          "flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition",
-                                          isFocused
-                                              ? "border-[#7448FF]/35 bg-purple-50/70 ring-2 ring-[#7448FF]/10"
-                                              : "border-slate-100 bg-white hover:border-purple-200 hover:bg-purple-50/30"
-                                      )}
-                                  >
-                                    <div className="flex min-w-0 items-center gap-3">
-                                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-100 bg-white shadow-sm">
-                                        🎓
-                                      </div>
-                                      <div className="min-w-0">
-                                        <div className="truncate text-[13px] font-semibold text-slate-900">
-                                          {student.fullName}
-                                        </div>
-                                        <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                                          {student.email || (student.hasStream ? "Видео подключено" : "Студент")}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-semibold">
-                                      <span
-                                          className={cn(
-                                              "h-2 w-2 rounded-full",
-                                              student.status === "online"
-                                                  ? "bg-emerald-500"
-                                                  : student.status === "stale"
-                                                      ? "bg-amber-400"
-                                                      : "bg-slate-300"
-                                          )}
-                                      />
-                                      <span
-                                          className={cn(
-                                              student.status === "online"
-                                                  ? "text-emerald-600"
-                                                  : student.status === "stale"
-                                                      ? "text-amber-600"
-                                                      : "text-slate-500"
-                                          )}
-                                      >
-                                        {statusLabel}
-                                      </span>
-                                    </div>
-                                  </button>
-                              );
-                            })
-                        ) : (
-                            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs font-medium text-slate-500">
-                              Студенты ещё не подключились к сессии.
+                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-2.5 rounded-2xl">
+                          <div className="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
+                            👦🏻
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[13px] text-slate-900 truncate">
+                              {currentStudentName}
                             </div>
-                        )}
+                            <div className="text-[11px] text-[#7448FF] font-semibold flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-[#7448FF] rounded-full" />
+                              Студент
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {focusedStudent && focusedMetrics && (
+                  {mlResult && (
                       <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                          <div className="text-[12px] font-black uppercase tracking-widest text-slate-400">
-                            ML-метрики студента
-                          </div>
-                          <div className="max-w-full truncate text-[12px] font-bold text-[#7448FF]">
-                            {focusedStudent.fullName}
-                          </div>
+                        <div className="text-[12px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                          Ваши локальные ML-метрики
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1532,7 +1359,7 @@ export default function TeacherJoinSessionPage() {
                               Эмоция
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {focusedMetrics.dominant_emotion || focusedMetrics.emotion || "—"}
+                              {mlResult.dominant_emotion || mlResult.emotion || "—"}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1540,7 +1367,7 @@ export default function TeacherJoinSessionPage() {
                               Уверенность
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(focusedMetrics.confidence)}
+                              {formatPercentMetric(mlResult.confidence)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1548,7 +1375,7 @@ export default function TeacherJoinSessionPage() {
                               Вовлечённость
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(focusedMetrics.engagement)}
+                              {formatPercentMetric(mlResult.engagement)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1556,7 +1383,7 @@ export default function TeacherJoinSessionPage() {
                               Стресс
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(focusedMetrics.stress)}
+                              {formatPercentMetric(mlResult.stress)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1564,7 +1391,7 @@ export default function TeacherJoinSessionPage() {
                               Усталость
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(focusedMetrics.fatigue)}
+                              {formatPercentMetric(mlResult.fatigue)}
                             </div>
                           </div>
                           <div className="rounded-2xl border border-slate-100 bg-white p-3">
@@ -1572,47 +1399,38 @@ export default function TeacherJoinSessionPage() {
                               Риск
                             </div>
                             <div className="mt-1.5 font-semibold text-slate-900">
-                              {formatPercentMetric(focusedMetrics.risk)}
+                              {formatPercentMetric(mlResult.risk)}
                             </div>
                           </div>
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px] font-medium">
-                          <span className="rounded-full border border-slate-100 bg-white px-3 py-1 text-slate-600">
-                            Состояние: {focusedMetrics.state || "—"}
-                          </span>
-                          <span
-                              className={cn(
-                                  "rounded-full border px-3 py-1",
-                                  isMetricStale(focusedMetrics.updatedAt)
-                                      ? "border-amber-100 bg-amber-50 text-amber-700"
-                                      : "border-emerald-100 bg-emerald-50 text-emerald-700"
-                              )}
-                          >
-                            {isMetricStale(focusedMetrics.updatedAt) ? "Данные временно не обновляются" : "Данные обновляются"}
-                          </span>
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                        Состояние: {mlResult.state || "—"}
+                      </span>
+                          {typeof mlResult.face_detected === "boolean" && (
+                              <span className="rounded-full bg-white px-3 py-1 text-slate-600 border border-slate-100">
+                          Лицо в кадре: {mlResult.face_detected ? "обнаружено" : "не найдено"}
+                        </span>
+                          )}
                         </div>
                       </div>
                   )}
 
-                  {focusedStudent && !focusedMetrics && (
-                      <div
-                          className={cn(
-                              "rounded-2xl border p-4 text-[13px] font-medium",
-                              liveMetricsError
-                                  ? "border-amber-100 bg-amber-50 text-amber-700"
-                                  : "border-purple-100 bg-purple-50 text-purple-700"
-                          )}
-                      >
-                        {liveMetricsLoading
-                            ? `Загружаем ML-метрики студента ${focusedStudent.fullName}…`
-                            : liveMetricsError ||
-                              `Ожидание первых ML-метрик студента ${focusedStudent.fullName}…`}
+                  {mlActive && mlFaceDetected === false && !mlUnavailable && (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
+                        Лицо не найдено в кадре. Аналитика временно приостановлена, пока лицо не вернется.
                       </div>
                   )}
 
-                  {!focusedStudent && (
-                      <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-[13px] font-medium text-slate-600">
-                        Выберите студента в списке или нажмите на его видео, чтобы увидеть ML-метрики.
+                  {mlActive && !mlResult && mlFaceDetected !== false && !mlUnavailable && (
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-[13px] text-emerald-700 font-medium">
+                        ML-анализ активен. Ожидание первых результатов...
+                      </div>
+                  )}
+
+                  {mlUnavailable && (
+                      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-[13px] text-amber-700 font-medium">
+                        ML-анализ временно недоступен.
                       </div>
                   )}
                 </div>

@@ -31,13 +31,13 @@ export function getWsBaseUrl() {
     }
 
     if (protocol === "https:") {
-      return "wss://elas-backend.onrender.com";
+      return "wss://backend-7x7i.onrender.com";
     }
 
-    return "ws://elas-backend.onrender.com";
+    return "wss://backend-7x7i.onrender.com";
   }
 
-  return "wss://elas-backend.onrender.com";
+  return "wss://backend-7x7i.onrender.com";
 }
 
 export const getSocketBaseUrl = getWsBaseUrl;
