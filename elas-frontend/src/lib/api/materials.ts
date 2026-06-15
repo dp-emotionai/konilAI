@@ -189,7 +189,7 @@ export async function getMaterialDownload(
 export async function getMaterialDownloadByStorageKey(
     input: { storageKey: string; fileName?: string | null },
     params?: { signal?: AbortSignal; mode?: "inline" | "download" }
-): Promise<{ downloadUrl: string; url?: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; fileName: string } | null> {
   const storageKey = String(input.storageKey || "").trim();
   if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
 
@@ -204,7 +204,7 @@ export async function getMaterialDownloadByStorageKey(
     query.set("mode", params.mode);
   }
 
-  return api.get<{ downloadUrl: string; url?: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
+  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
     signal: params?.signal,
   });
 }
