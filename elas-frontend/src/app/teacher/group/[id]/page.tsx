@@ -290,6 +290,7 @@ export default function TeacherGroupDetailPage() {
   } | null>(null);
   const [uploadingGroupImage, setUploadingGroupImage] = useState(false);
   const [displayGroupImageUrl, setDisplayGroupImageUrl] = useState<string | null>(null);
+  const optimisticGroupImageRef = useRef<string | null>(null);
 
   const [groupInvitations, setGroupInvitations] = useState<
       GroupInvitationRow[]
@@ -347,11 +348,13 @@ export default function TeacherGroupDetailPage() {
       [group],
   );
 
-  const groupImageUrl = (group as { imageUrl?: string } | null)?.imageUrl;
+  const groupImageUrl = (group as { imageUrl?: string | null } | null)?.imageUrl ?? null;
 
   useEffect(() => {
     if (!groupImageUrl) {
-      setDisplayGroupImageUrl(null);
+      if (!optimisticGroupImageRef.current) {
+        setDisplayGroupImageUrl(null);
+      }
       return;
     }
 
@@ -361,6 +364,7 @@ export default function TeacherGroupDetailPage() {
 
     fetch(groupImageUrl, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      credentials: "include",
       signal: controller.signal,
     })
         .then((response) => {
@@ -369,18 +373,32 @@ export default function TeacherGroupDetailPage() {
         })
         .then((blob) => {
           objectUrl = URL.createObjectURL(blob);
+          if (optimisticGroupImageRef.current) {
+            URL.revokeObjectURL(optimisticGroupImageRef.current);
+            optimisticGroupImageRef.current = null;
+          }
           setDisplayGroupImageUrl(objectUrl);
         })
         .catch((error) => {
           if (error instanceof DOMException && error.name === "AbortError") return;
-          setDisplayGroupImageUrl(null);
+          if (!optimisticGroupImageRef.current) setDisplayGroupImageUrl(null);
         });
 
     return () => {
       controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [groupImageUrl, tick]);
+  }, [groupImageUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (optimisticGroupImageRef.current) {
+        URL.revokeObjectURL(optimisticGroupImageRef.current);
+        optimisticGroupImageRef.current = null;
+      }
+    };
+  }, []);
+
   const membersCount = apiAvailable
       ? groupMembers.length
       : (group?.students.length ?? 0);
@@ -400,6 +418,13 @@ export default function TeacherGroupDetailPage() {
       });
       return;
     }
+
+    if (optimisticGroupImageRef.current) {
+      URL.revokeObjectURL(optimisticGroupImageRef.current);
+    }
+    const optimisticUrl = URL.createObjectURL(file);
+    optimisticGroupImageRef.current = optimisticUrl;
+    setDisplayGroupImageUrl(optimisticUrl);
 
     setUploadingGroupImage(true);
     setGroupImageMessage(null);
@@ -424,9 +449,14 @@ export default function TeacherGroupDetailPage() {
         throw new Error(message);
       }
 
-      setGroupImageMessage(null);
+      setGroupImageMessage({ type: "success", text: "Фото группы обновлено." });
       refetchGroup();
     } catch (error) {
+      if (optimisticGroupImageRef.current) {
+        URL.revokeObjectURL(optimisticGroupImageRef.current);
+        optimisticGroupImageRef.current = null;
+      }
+      setDisplayGroupImageUrl(null);
       setGroupImageMessage({
         type: "error",
         text:
@@ -461,6 +491,11 @@ export default function TeacherGroupDetailPage() {
         throw new Error("Не удалось удалить фото группы.");
       }
 
+      if (optimisticGroupImageRef.current) {
+        URL.revokeObjectURL(optimisticGroupImageRef.current);
+        optimisticGroupImageRef.current = null;
+      }
+      setDisplayGroupImageUrl(null);
       setGroupImageMessage({ type: "success", text: "Фото группы удалено." });
       refetchGroup();
     } catch (error) {
@@ -820,11 +855,11 @@ export default function TeacherGroupDetailPage() {
                     <Camera size={16} />
                     {uploadingGroupImage ? "Загрузка..." : "Фото группы"}
                   </Button>
-                  {groupImageUrl && (
+                  {apiAvailable && displayGroupImageUrl && (
                       <Button
                           size="sm"
                           variant="outline"
-                          className="gap-2 rounded-2xl border-rose-100 bg-white/90 text-rose-600 shadow-[0_10px_24px_rgba(15,23,42,0.08)] hover:bg-rose-50"
+                          className="gap-2 rounded-2xl border-rose-100 bg-rose-50/90 text-rose-600 shadow-[0_10px_24px_rgba(225,29,72,0.08)] hover:bg-rose-100"
                           onClick={() => void handleGroupImageDelete()}
                           disabled={uploadingGroupImage}
                       >
