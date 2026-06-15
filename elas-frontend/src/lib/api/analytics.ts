@@ -72,6 +72,18 @@ export type GroupAnalyticsResponse = {
     | SessionAnalyticsTimelinePoint[]
     | { time_sec?: number; engagement?: number }[];
   engagementTrend?: SessionAnalyticsTimelinePoint[];
+
+  // Optional group metrics returned by the backend.
+  average_attendance?: number;
+  averageAttendance?: number;
+  attendance_rate?: number;
+  attendanceRate?: number;
+
+  task_completion_rate?: number;
+  taskCompletionRate?: number;
+
+  average_score?: number;
+  averageScore?: number;
 };
 
 export type TeacherAnalyticsResponse = {
@@ -122,6 +134,9 @@ export type GroupAnalytics = {
   groupId: string;
   totalSessions: number;
   averageEngagement: number;
+  averageAttendance?: number;
+  taskCompletionRate?: number;
+  averageScore?: number;
   engagementTrend: { timeSec: number; engagement: number }[];
 };
 
@@ -231,6 +246,21 @@ function normGroupAnalytics(
     raw.average_engagement ?? raw.avgEngagement ?? raw.avg_engagement ?? 0;
   const trendRaw = raw.engagement_trend ?? raw.engagementTrend ?? [];
 
+  const averageAttendance = normalizeMaybePercent(
+    raw.average_attendance ??
+      raw.averageAttendance ??
+      raw.attendance_rate ??
+      raw.attendanceRate
+  );
+
+  const taskCompletionRate = normalizeMaybePercent(
+    raw.task_completion_rate ?? raw.taskCompletionRate
+  );
+
+  const averageScore = normalizeMaybePercent(
+    raw.average_score ?? raw.averageScore
+  );
+
   const engagementTrend = trendRaw.map(
     (
       p:
@@ -256,6 +286,9 @@ function normGroupAnalytics(
     groupId: raw.groupId ?? raw.group_id ?? groupId,
     totalSessions: toNumber(total, 0),
     averageEngagement: normalizePercent(avg),
+    averageAttendance,
+    taskCompletionRate,
+    averageScore,
     engagementTrend,
   };
 }
