@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { cn } from "@/lib/cn";
 import { formatSessionDateTime, parseSessionTimestamp } from "@/lib/utils/sessionCalendar";
@@ -113,7 +112,6 @@ function getActionLabel(session: GroupSession): string {
 }
 
 export default function TeacherSessionsPage() {
-  const router = useRouter();
   const [tick, setTick] = useState(0);
   const [sessions, setSessions] = useState<GroupSession[]>([]);
   const [loading, setLoading] = useState(true);
@@ -386,9 +384,8 @@ export default function TeacherSessionsPage() {
             open={Boolean(selectedSession)}
             session={selectedSession}
             onClose={() => setSelectedSession(null)}
-            onStart={(sessionId) => {
+            onStart={() => {
               setSelectedSession(null);
-              router.push(`/teacher/session/${sessionId}?autostart=1`);
             }}
         />
 
