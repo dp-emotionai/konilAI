@@ -849,7 +849,7 @@ export default function TeacherResourcesPage() {
             title="Создание материала"
             size="lg"
             footer={
-              <div className="flex w-full items-center justify-end gap-3 border-t border-slate-100 bg-white/95 px-1 pt-4">
+              <div className="flex w-full flex-col-reverse gap-3 border-t border-slate-100 bg-white/95 pt-4 sm:flex-row sm:justify-end">
                 <Button type="button" variant="outline" onClick={closeCreateModal} disabled={working}>
                   Отмена
                 </Button>
@@ -857,36 +857,31 @@ export default function TeacherResourcesPage() {
                     type="button"
                     onClick={() => void handleCreate()}
                     disabled={working || !form.title.trim() || !selectedFile}
-                    className="rounded-xl bg-violet-600 px-5 shadow-lg shadow-violet-500/25 hover:bg-violet-700"
+                    className="shadow-lg shadow-violet-500/20"
                 >
                   {working ? "Создание..." : "Создать материал"}
                 </Button>
               </div>
             }
         >
-          <div className="space-y-5">
+          <div className="space-y-6">
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">
-                Название материала
-              </span>
+              <span className="mb-2 block text-sm font-bold text-slate-700">Название материала</span>
               <input
                   value={form.title}
                   maxLength={160}
-                  onChange={(event) =>
-                      setForm((current) => ({ ...current, title: event.target.value }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
                   placeholder="Введите название материала"
-                  className="h-12 w-full rounded-xl border border-violet-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  className="h-12 w-full rounded-2xl border border-violet-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 hover:border-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               />
             </label>
 
             <div>
-              <div className="mb-3 text-sm font-semibold text-slate-700">Тип</div>
+              <div className="mb-3 text-sm font-bold text-slate-700">Тип</div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {CREATE_TYPES.map((item) => {
                   const Icon = item.icon;
                   const active = createKind === item.id;
-
                   return (
                       <button
                           key={item.id}
@@ -895,18 +890,13 @@ export default function TeacherResourcesPage() {
                             setCreateKind(item.id);
                             setSelectedFile(null);
                             setMediaDetails("");
-                            setForm((current) => ({
-                              ...current,
-                              fileName: "",
-                              mimeType: "",
-                              size: "",
-                            }));
+                            setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
                           }}
                           className={cn(
-                              "flex h-14 items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                              "flex h-14 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition",
                               active
-                                  ? "border-violet-500 bg-violet-50 text-violet-700 shadow-sm ring-2 ring-violet-100"
-                                  : "border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50/60 hover:text-violet-700"
+                                  ? "border-violet-400 bg-violet-50 text-violet-700 shadow-sm shadow-violet-500/10 ring-4 ring-violet-100/70"
+                                  : "border-slate-200 bg-white text-slate-500 hover:border-violet-200 hover:bg-violet-50/50 hover:text-violet-700"
                           )}
                       >
                         <Icon size={18} />
@@ -918,15 +908,14 @@ export default function TeacherResourcesPage() {
             </div>
 
             <div>
-              <div className="mb-3 text-sm font-semibold text-slate-700">
+              <div className="mb-3 text-sm font-bold text-slate-700">
                 {createConfig.uploadLabel}
               </div>
-
               <label
                   className={cn(
-                      "group relative flex min-h-[188px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl border border-dashed px-6 py-8 text-center transition",
+                      "group relative flex min-h-[180px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed px-6 py-8 text-center transition",
                       dragActive
-                          ? "border-violet-500 bg-violet-100/70"
+                          ? "border-violet-500 bg-violet-100/80 shadow-inner shadow-violet-500/10"
                           : "border-violet-300 bg-gradient-to-br from-violet-50 via-white to-violet-50/70 hover:border-violet-400 hover:bg-violet-50"
                   )}
                   onDragEnter={(event) => {
@@ -947,24 +936,22 @@ export default function TeacherResourcesPage() {
                     applySelectedFile(event.dataTransfer.files?.[0] ?? null);
                   }}
               >
-                <div className="mb-4 flex h-[70px] w-[70px] items-center justify-center rounded-[24px] border border-violet-200 bg-violet-100/70 text-violet-600 shadow-sm">
-                  <CloudUpload size={34} />
+                <div className="absolute inset-0 opacity-0 transition group-hover:opacity-100">
+                  <div className="absolute left-1/2 top-0 h-32 w-32 -translate-x-1/2 rounded-full bg-violet-200/30 blur-3xl" />
                 </div>
 
-                <span className="text-base font-bold text-slate-800">
+                <div className="relative z-10">
+                  <CreateUploadIcon kind={createKind} />
+                </div>
+                <span className="relative z-10 mt-4 text-base font-black text-slate-800">
                   {selectedFile ? selectedFile.name : createConfig.dropLabel}
                 </span>
-
-                <span className="mt-1 text-sm font-medium text-slate-500">
-                  {createConfig.hint}
-                </span>
-
+                <span className="relative z-10 mt-1 text-sm font-medium text-slate-500">{createConfig.hint}</span>
                 {selectedFile && (
-                    <span className="mt-3 rounded-full bg-white px-3 py-1 text-xs font-semibold text-violet-700 shadow-sm ring-1 ring-violet-100">
+                    <span className="relative z-10 mt-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-violet-700 shadow-sm ring-1 ring-violet-100">
                       {formatBytes(selectedFile.size)} · {selectedFile.type || "тип не указан"}
                     </span>
                 )}
-
                 <input
                     type="file"
                     accept={CREATE_ACCEPT[createKind]}
@@ -975,8 +962,8 @@ export default function TeacherResourcesPage() {
             </div>
 
             {(createKind === "audio" || createKind === "video") && (
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="block rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                  <span className="mb-2 block text-sm font-bold text-slate-700">
                     {createConfig.detailsLabel}
                   </span>
                   <input
@@ -984,54 +971,44 @@ export default function TeacherResourcesPage() {
                       maxLength={255}
                       onChange={(event) => setMediaDetails(event.target.value)}
                       placeholder={createConfig.detailsPlaceholder}
-                      className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                   />
-                  <div className="mt-1 text-right text-[11px] font-medium text-slate-400">
-                    {mediaDetails.length}/255
+                  <div className="mt-2 flex items-start justify-between gap-3 text-[11px] font-medium text-slate-400">
+                    <span>{createConfig.detailsHelp} Для скачивания нужен загруженный файл.</span>
+                    <span className="shrink-0">{mediaDetails.length}/255</span>
                   </div>
                 </label>
             )}
 
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">
-                Описание (необязательно)
-              </span>
+              <span className="mb-2 block text-sm font-bold text-slate-700">Описание (необязательно)</span>
               <textarea
                   value={form.description}
                   maxLength={500}
-                  onChange={(event) =>
-                      setForm((current) => ({ ...current, description: event.target.value }))
-                  }
+                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
                   placeholder="Введите описание материала"
                   rows={4}
-                  className="w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
               />
-              <span className="mt-1 block text-right text-[11px] font-medium text-slate-400">
-                {form.description.length}/500
-              </span>
+              <span className="mt-1 block text-right text-[11px] font-medium text-slate-400">{form.description.length}/500</span>
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-semibold text-slate-700">
+              <span className="mb-2 block text-sm font-bold text-slate-700">
                 Назначить группе (необязательно)
               </span>
               <div className="relative">
                 <select
                     value={createGroupId}
                     onChange={(event) => setCreateGroupId(event.target.value)}
-                    className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-white px-4 pr-11 text-sm font-medium text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                    className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-11 text-sm font-semibold text-slate-700 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                 >
                   <option value="">Выберите группу</option>
                   {groupOptions.map((group) => (
-                      <option key={group.id} value={group.id}>
-                        {group.name}
-                      </option>
+                      <option key={group.id} value={group.id}>{group.name}</option>
                   ))}
                 </select>
-                <ChevronDown
-                    size={18}
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-                />
+                <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
             </label>
           </div>
