@@ -1,9 +1,12 @@
 import { api, getApiBaseUrl, getApiOriginUrl, getToken, hasAuth } from "@/lib/api/client";
 
+export type MaterialKind = "video" | "audio" | "image" | "document" | "file";
+
 export type MaterialRow = {
   id: string;
   title: string;
   description: string | null;
+  kind: MaterialKind;
   fileName: string;
   mimeType: string | null;
   storageKey: string;
@@ -26,6 +29,7 @@ export type MaterialAssignmentRow = {
 export type MaterialUploadResult = {
   storageKey: string;
   fileName: string;
+  kind: MaterialKind;
   mimeType: string | null;
   size: number | null;
 };
@@ -35,6 +39,7 @@ export type AssignedMaterialRow = {
   materialId: string;
   title: string;
   description: string | null;
+  kind: MaterialKind;
   fileName: string | null;
   mimeType: string | null;
   size: number | null;
@@ -53,6 +58,7 @@ export async function createMaterial(
     input: {
       title: string;
       description?: string | null;
+      kind?: MaterialKind | null;
       fileName: string;
       mimeType?: string | null;
       storageKey: string;
@@ -90,7 +96,12 @@ export async function uploadMaterialFile(file: File): Promise<MaterialUploadResu
 
 export async function updateMaterial(
     materialId: string,
-    input: Partial<Pick<MaterialRow, "title" | "description" | "fileName" | "mimeType" | "storageKey" | "size">>,
+    input: Partial<
+        Pick<
+            MaterialRow,
+            "title" | "description" | "kind" | "fileName" | "mimeType" | "storageKey" | "size"
+        >
+    >,
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.patch<MaterialRow>(`/materials/${materialId}`, input, { signal: params?.signal });
@@ -132,36 +143,52 @@ export async function getMaterialAssignments(
   return Array.isArray(list) ? list : [];
 }
 
-export async function getGroupMaterials(groupId: string, params?: { signal?: AbortSignal }): Promise<AssignedMaterialRow[]> {
+export async function getGroupMaterials(
+    groupId: string,
+    params?: { signal?: AbortSignal }
+): Promise<AssignedMaterialRow[]> {
   if (!getApiBaseUrl() || !hasAuth() || !groupId) return [];
-  const list = await api.get<AssignedMaterialRow[]>(`/materials/groups/${groupId}/materials`, { signal: params?.signal });
+  const list = await api.get<AssignedMaterialRow[]>(`/materials/groups/${groupId}/materials`, {
+    signal: params?.signal,
+  });
   return Array.isArray(list) ? list : [];
 }
 
-export async function getSessionMaterials(sessionId: string, params?: { signal?: AbortSignal }): Promise<AssignedMaterialRow[]> {
+export async function getSessionMaterials(
+    sessionId: string,
+    params?: { signal?: AbortSignal }
+): Promise<AssignedMaterialRow[]> {
   if (!getApiBaseUrl() || !hasAuth() || !sessionId) return [];
-  const list = await api.get<AssignedMaterialRow[]>(`/materials/sessions/${sessionId}/materials`, { signal: params?.signal });
+  const list = await api.get<AssignedMaterialRow[]>(`/materials/sessions/${sessionId}/materials`, {
+    signal: params?.signal,
+  });
   return Array.isArray(list) ? list : [];
 }
 
 export async function getStudentMaterials(params?: { signal?: AbortSignal }): Promise<AssignedMaterialRow[]> {
   if (!getApiBaseUrl() || !hasAuth()) return [];
-  const list = await api.get<AssignedMaterialRow[]>("/materials/student/materials", { signal: params?.signal });
+  const list = await api.get<AssignedMaterialRow[]>("/materials/student/materials", {
+    signal: params?.signal,
+  });
   return Array.isArray(list) ? list : [];
 }
 
 export async function getMaterialDownload(
     materialId: string,
     params?: { signal?: AbortSignal; mode?: "inline" | "download" }
-): Promise<{ downloadUrl: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; fileName: string; kind?: MaterialKind; mimeType?: string | null } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
   const mode = params?.mode === "inline" ? "inline" : "download";
-  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/${materialId}/download?mode=${mode}`, { signal: params?.signal });
+
+  return api.get<{ downloadUrl: string; fileName: string; kind?: MaterialKind; mimeType?: string | null }>(
+      `/materials/${materialId}/download?mode=${mode}`,
+      { signal: params?.signal }
+  );
 }
 
 export async function getMaterialDownloadByStorageKey(
     input: { storageKey: string; fileName?: string | null },
-    params?: { signal?: AbortSignal }
+    params?: { signal?: AbortSignal; mode?: "inline" | "download" }
 ): Promise<{ downloadUrl: string; fileName: string } | null> {
   const storageKey = String(input.storageKey || "").trim();
   if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
@@ -171,6 +198,10 @@ export async function getMaterialDownloadByStorageKey(
 
   if (fileName) {
     query.set("fileName", fileName);
+  }
+
+  if (params?.mode) {
+    query.set("mode", params.mode);
   }
 
   return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
