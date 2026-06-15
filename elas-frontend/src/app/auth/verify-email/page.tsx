@@ -2,9 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
-import { ChevronLeft, AlertCircle, RefreshCw, ArrowRight } from "lucide-react";
+import { ChevronLeft, AlertCircle, RefreshCw, ArrowRight, MailCheck } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -189,15 +188,17 @@ function VerifyEmailInner() {
               <ChevronLeft size={16} /> Назад
             </button>
 
-            <div className="relative mb-8 flex h-24 w-24 items-center justify-center rounded-[40px] border border-slate-100 bg-slate-50 p-6">
-              <Image
-                src="/auth_verify_illustration_1776719333175.png"
-                alt="Verify Illustration"
-                width={140}
-                height={140}
-                className="absolute -top-10 scale-125"
-              />
-            </div>
+            <div className="relative mb-8 flex h-28 w-28 items-center justify-center rounded-[36px] bg-gradient-to-br from-purple-50 to-indigo-50 shadow-[0_18px_45px_rgba(116,72,255,0.18)]">
+  <div className="absolute inset-0 rounded-[36px] border border-white/70" />
+
+  <div className="relative flex h-20 w-20 items-center justify-center rounded-[28px] bg-gradient-to-br from-[#8B5CFF] to-[#6D36F5] shadow-[0_12px_30px_rgba(116,72,255,0.35)]">
+    <MailCheck size={42} className="text-white" strokeWidth={2.2} />
+  </div>
+
+  <div className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow-md">
+    <span className="text-lg">✨</span>
+  </div>
+</div>
 
             <h2 className="mb-3 text-center text-3xl font-extrabold tracking-tight text-slate-900">Проверьте вашу почту</h2>
             <p className="mb-10 max-w-sm text-center text-[15px] font-medium text-slate-500">
