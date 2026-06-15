@@ -85,9 +85,9 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
           data
               ? [
                 { name: "Вовлечённость", value: data.averageEngagement },
-                { name: "Қатысу", value: data.averageAttendance },
-                { name: "Тапсырма", value: data.taskCompletionRate },
-                { name: "Орташа балл", value: data.averageScore },
+                { name: "Посещаемость", value: data.averageAttendance },
+                { name: "Выполнение заданий", value: data.taskCompletionRate },
+                { name: "Средний балл", value: data.averageScore },
               ]
               : [],
       [data]
@@ -150,8 +150,9 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                 </div>
                 <div>
                   <h2 className="text-xl font-semibold text-fg">Аналитика группы</h2>
+
                   <p className="mt-1 text-sm text-muted">
-                    Нақты деректер: қатысу, сабақ, материал, тапсырма және студент прогресі.
+                    Реальная статистика: посещаемость, занятия, материалы, задания и прогресс студентов.
                   </p>
                 </div>
               </div>
@@ -165,7 +166,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                       aria-label="Экспорт отчёта группы в PDF"
                   >
                     <FileDown size={14} />
-                    {exporting ? "PDF дайындалуда…" : "PDF экспорт"}
+                    {exporting ? "Подготовка PDF..." : "Экспорт PDF"}
                   </Button>
               )}
             </div>
@@ -183,25 +184,25 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
               {data && (
                   <div className="space-y-7">
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                      <KpiCard label="Студенттер" value={data.studentCount} hint="active members" icon={<Users size={22} />} />
-                      <KpiCard label="Сессиялар" value={data.totalSessions} hint="group sessions" icon={<Video size={22} />} />
-                      <KpiCard label="Материалдар" value={data.materialCount} hint="assigned files" icon={<BookOpen size={22} />} />
-                      <KpiCard label="Тапсырмалар" value={data.taskCount + data.testCount} hint="tasks + tests" icon={<Layers3 size={22} />} />
+                      <KpiCard label="Студенты" value={data.studentCount} hint="active members" icon={<Users size={22} />} />
+                      <KpiCard label="Сессии" value={data.totalSessions} hint="group sessions" icon={<Video size={22} />} />
+                      <KpiCard label="Материалы" value={data.materialCount} hint="assigned files" icon={<BookOpen size={22} />} />
+                      <KpiCard label="Задания" value={data.taskCount + data.testCount} hint="tasks + tests" icon={<Layers3 size={22} />} />
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       <KpiCard label="Вовлечённость" value={`${data.averageEngagement}%`} hint="avg session engagement" icon={<BarChart3 size={22} />} />
-                      <KpiCard label="Қатысу" value={`${data.averageAttendance}%`} hint="attendance rate" icon={<CheckCircle2 size={22} />} />
-                      <KpiCard label="Орындалуы" value={`${data.taskCompletionRate}%`} hint="submitted tasks" icon={<FileDown size={22} />} />
-                      <KpiCard label="Орташа балл" value={`${data.averageScore}%`} hint="tests/tasks score" icon={<Award size={22} />} />
+                      <KpiCard label="Посещаемость" value={`${data.averageAttendance}%`} hint="attendance rate" icon={<CheckCircle2 size={22} />} />
+                      <KpiCard label="Выполнение" value={`${data.taskCompletionRate}%`} hint="submitted tasks" icon={<FileDown size={22} />} />
+                      <KpiCard label="Средний  балл" value={`${data.averageScore}%`} hint="tests/tasks score" icon={<Award size={22} />} />
                     </div>
 
                     {chartReady ? (
                         <div className="grid gap-5 xl:grid-cols-2">
                           <div className="rounded-3xl border border-[color:var(--border)]/25 bg-surface-subtle/20 p-5">
                             <div className="mb-4">
-                              <h3 className="font-semibold text-fg">Жалпы көрсеткіштер</h3>
-                              <p className="text-xs text-muted">Негізгі метрикалар пайызбен.</p>
+                              <h3 className="font-semibold text-fg">Общие показатели</h3>
+                              <p className="text-xs text-muted">Основные метрики в процентах.</p>
                             </div>
                             <div className="h-72">
                               <ResponsiveContainer width="100%" height="100%">
@@ -210,7 +211,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                                   <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                   <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
                                   <Tooltip
-                                      formatter={(value) => [`${value}%`, "Көрсеткіш"]}
+                                      formatter={(value) => [`${value}%`, "Показатель"]}
                                       contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px" }}
                                   />
                                   <Bar dataKey="value" radius={[12, 12, 4, 4]}>
@@ -225,8 +226,8 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
 
                           <div className="rounded-3xl border border-[color:var(--border)]/25 bg-surface-subtle/20 p-5">
                             <div className="mb-4">
-                              <h3 className="font-semibold text-fg">Қатысу динамикасы</h3>
-                              <p className="text-xs text-muted">Соңғы сессиялардағы қатысу пайызы.</p>
+                              <h3 className="font-semibold text-fg">Динамика посещаемости</h3>
+                              <p className="text-xs text-muted">Процент посещаемости последних занятий.</p>
                             </div>
                             <div className="h-72">
                               {attendanceData.length > 0 ? (
@@ -244,7 +245,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                                   </ResponsiveContainer>
                               ) : (
                                   <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)]/30 text-sm text-muted">
-                                    Қатысу бойынша дерек әлі жоқ.
+                                    Нет данных по посещаемости.
                                   </div>
                               )}
                             </div>
@@ -253,7 +254,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                           <div className="rounded-3xl border border-[color:var(--border)]/25 bg-surface-subtle/20 p-5">
                             <div className="mb-4">
                               <h3 className="font-semibold text-fg">Вовлечённость</h3>
-                              <p className="text-xs text-muted">Сессия summary негізінде.</p>
+                              <p className="text-xs text-muted">На основе аналитики проведённых занятий.</p>
                             </div>
                             <div className="h-72">
                               {engagementData.length > 0 ? (
@@ -271,7 +272,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                                   </ResponsiveContainer>
                               ) : (
                                   <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)]/30 text-sm text-muted">
-                                    Emotion summary жоқ болса, график шықпайды.
+                                    Если отсутствуют данные аналитики, график не отображается.
                                   </div>
                               )}
                             </div>
@@ -279,8 +280,8 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
 
                           <div className="rounded-3xl border border-[color:var(--border)]/25 bg-surface-subtle/20 p-5">
                             <div className="mb-4">
-                              <h3 className="font-semibold text-fg">Материалдар түрі</h3>
-                              <p className="text-xs text-muted">Топқа бекітілген файлдар.</p>
+                              <h3 className="font-semibold text-fg">Типы материалы</h3>
+                              <p className="text-xs text-muted">Материалы, закреплённые за группой.</p>
                             </div>
                             <div className="h-72">
                               {data.materialBreakdown.length > 0 ? (
@@ -296,7 +297,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                                   </ResponsiveContainer>
                               ) : (
                                   <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[color:var(--border)]/30 text-sm text-muted">
-                                    Материал бекітілмеген.
+                                    Материалы ещё не добавлены.
                                   </div>
                               )}
                             </div>
@@ -307,8 +308,9 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                     <div className="rounded-3xl border border-[color:var(--border)]/25 bg-surface-subtle/20 p-5">
                       <div className="mb-4 flex items-center justify-between gap-3">
                         <div>
-                          <h3 className="font-semibold text-fg">Үздік студенттер</h3>
-                          <p className="text-xs text-muted">Балл + қатысу + тапсырма орындау бойынша.</p>
+                          <h3 className="font-semibold text-fg">Лучшие студенты</h3>
+                          <p className="text-xs text-muted">Рейтинг на основе среднего балла,
+                            посещаемости и выполнения заданий.</p>
                         </div>
                       </div>
                       {topStudentsData.length > 0 ? (
@@ -319,7 +321,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
                                 <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} />
                                 <Tooltip
-                                    formatter={(value) => [`${value}%`, "Индекс"]}
+                                    formatter={(value) => [`${value}%`, "Рейтинг"]}
                                     contentStyle={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "14px" }}
                                 />
                                 <Bar dataKey="score" fill="rgb(var(--primary))" radius={[0, 12, 12, 0]} />
@@ -328,7 +330,7 @@ export function GroupAnalyticsSection({ groupId }: { groupId: string }) {
                           </div>
                       ) : (
                           <div className="rounded-2xl border border-dashed border-[color:var(--border)]/30 py-8 text-center text-sm text-muted">
-                            Студенттер бойынша есеп шығару үшін топта active students болуы керек.
+                            Для формирования рейтинга в группе должны быть активные студенты.
                           </div>
                       )}
                     </div>
