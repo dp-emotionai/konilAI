@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import Reveal from "@/components/common/Reveal";
 import LessonPlanPanel from "@/components/session/LessonPlanPanel";
@@ -249,8 +249,9 @@ function deferStateUpdate(callback: () => void) {
 export default function StudentJoinSessionPage() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const sessionId = params?.id ?? "";
-    const autoStart = true;
+    const autoStart = searchParams.get("autostart") === "1";
     const { state, setConsent } = useUI();
     const chatSectionRef = useRef<HTMLDivElement | null>(null);
     const monitorRef = useRef<HTMLDivElement | null>(null);
@@ -1548,9 +1549,23 @@ export default function StudentJoinSessionPage() {
         );
     }
 
+    const shouldShowPreparationModal = showPreparation && tab === "prepare" && !consentModalOpen;
+
+    if (!shouldShowPreparationModal) {
+        return (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#FAFAFB]">
+                <div className="rounded-3xl border border-slate-100 bg-white px-6 py-5 text-center shadow-[0_18px_55px_rgba(15,23,42,0.10)]">
+                    <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[#7448FF]" />
+                    <div className="text-sm font-semibold text-slate-900">Подключаем видеозвонок...</div>
+                    <div className="mt-1 text-xs text-slate-500">Пожалуйста, подождите несколько секунд.</div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <>
-            {showPreparation && tab === "prepare" && !consentModalOpen && (
+            {shouldShowPreparationModal && (
                 <div className="fixed inset-0 z-[80] overflow-y-auto bg-slate-950/55 px-3 py-4 backdrop-blur-[3px] sm:px-5 sm:py-7">
                     <div className="flex min-h-full items-center justify-center">
                         <div
