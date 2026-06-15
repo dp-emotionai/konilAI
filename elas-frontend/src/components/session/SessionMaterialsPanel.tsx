@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import Button from "@/components/ui/Button";
+import MaterialPreviewModal from "@/components/resources/MaterialPreviewModal";
 import { useUI } from "@/components/layout/Providers";
 import {
   getMaterialDownload,
@@ -199,6 +200,7 @@ function PreviewContent({ material, preview }: { material: AssignedMaterialRow; 
 export function SessionMaterialsPanel({ sessionId, className }: Props) {
   const [materials, setMaterials] = useState<AssignedMaterialRow[]>([]);
   const [selected, setSelected] = useState<AssignedMaterialRow | null>(null);
+  const [previewMaterial, setPreviewMaterial] = useState<AssignedMaterialRow | null>(null);
   const [preview, setPreview] = useState<PreviewState>({ url: "", loading: false, error: null });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -363,195 +365,212 @@ export function SessionMaterialsPanel({ sessionId, className }: Props) {
   }, [editDescription, editSaving, editTitle, selected?.materialId]);
 
   return (
-      <div className={cn("flex h-full min-h-[520px] flex-col rounded-[24px] border border-slate-100 bg-white", className)}>
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          <div>
-            <div className="text-sm font-bold text-slate-900">Материалы</div>
-            <div className="text-xs font-medium text-slate-400">
-              {loading ? "Загружаем..." : `${materials.length} файлов`}
+      <>
+        <div className={cn("flex h-full min-h-[520px] flex-col rounded-[24px] border border-slate-100 bg-white", className)}>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <div>
+              <div className="text-sm font-bold text-slate-900">Материалы</div>
+              <div className="text-xs font-medium text-slate-400">
+                {loading ? "Загружаем..." : `${materials.length} файлов`}
+              </div>
             </div>
+            <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
+              {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              Обновить
+            </Button>
           </div>
-          <Button size="sm" variant="outline" onClick={() => void load()} disabled={loading}>
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Обновить
-          </Button>
-        </div>
 
-        <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3 text-xs font-bold">
-          <span className="rounded-full bg-violet-50 px-3 py-1.5 text-[#7448FF]">Все {counts.all || 0}</span>
-          <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-500">Документы {counts.document || 0}</span>
-          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-500">Изображения {counts.image || 0}</span>
-          <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-500">Видео {counts.video || 0}</span>
-          <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-500">Аудио {counts.audio || 0}</span>
-        </div>
+          <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3 text-xs font-bold">
+            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-[#7448FF]">Все {counts.all || 0}</span>
+            <span className="rounded-full bg-blue-50 px-3 py-1.5 text-blue-500">Документы {counts.document || 0}</span>
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-500">Изображения {counts.image || 0}</span>
+            <span className="rounded-full bg-rose-50 px-3 py-1.5 text-rose-500">Видео {counts.video || 0}</span>
+            <span className="rounded-full bg-violet-50 px-3 py-1.5 text-violet-500">Аудио {counts.audio || 0}</span>
+          </div>
 
-        <div className="grid flex-1 min-h-0 gap-0 lg:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.3fr)]">
-          <div className="min-h-0 overflow-y-auto border-r border-slate-100 p-4">
-            {loading ? (
-                <div className="grid h-full min-h-[260px] place-items-center text-sm font-semibold text-slate-400">
-                  Загружаем материалы...
-                </div>
-            ) : error ? (
-                <div className="grid h-full min-h-[260px] place-items-center text-center text-sm font-semibold text-rose-500">
-                  {error}
-                </div>
-            ) : materials.length === 0 ? (
-                <div className="grid h-full min-h-[260px] place-items-center text-center">
-                  <div>
-                    <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
-                      <FileText size={24} />
-                    </div>
-                    <div className="text-sm font-bold text-slate-700">Материалов пока нет</div>
-                    <div className="mt-1 text-xs font-medium text-slate-400">
-                      Когда преподаватель назначит файлы, они появятся здесь.
+          <div className="grid flex-1 min-h-0 gap-0 lg:grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.3fr)]">
+            <div className="min-h-0 overflow-y-auto border-r border-slate-100 p-4">
+              {loading ? (
+                  <div className="grid h-full min-h-[260px] place-items-center text-sm font-semibold text-slate-400">
+                    Загружаем материалы...
+                  </div>
+              ) : error ? (
+                  <div className="grid h-full min-h-[260px] place-items-center text-center text-sm font-semibold text-rose-500">
+                    {error}
+                  </div>
+              ) : materials.length === 0 ? (
+                  <div className="grid h-full min-h-[260px] place-items-center text-center">
+                    <div>
+                      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-300">
+                        <FileText size={24} />
+                      </div>
+                      <div className="text-sm font-bold text-slate-700">Материалов пока нет</div>
+                      <div className="mt-1 text-xs font-medium text-slate-400">
+                        Когда преподаватель назначит файлы, они появятся здесь.
+                      </div>
                     </div>
                   </div>
-                </div>
-            ) : (
-                <div className="grid gap-3">
-                  {materials.map((material) => {
-                    const active = selected?.assignmentId === material.assignmentId;
-                    return (
-                        <button
-                            key={material.assignmentId}
-                            type="button"
-                            onClick={() => setSelected(material)}
-                            className={cn(
-                                "group rounded-2xl border px-4 py-4 text-left transition hover:border-[#7448FF]/20 hover:bg-white hover:shadow-sm",
-                                active ? "border-[#7448FF]/25 bg-violet-50/80 shadow-sm" : "border-slate-100 bg-slate-50/70"
-                            )}
-                        >
-                          <div className="flex items-start gap-3">
-                            <MaterialIcon material={material} />
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-bold text-slate-900">{material.title}</div>
-                              <div className="mt-1 truncate text-xs font-medium text-slate-500">
-                                {material.fileName || "Файл"} · {formatSize(material.size)}
-                              </div>
-                              {material.description && (
-                                  <div className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
-                                    {material.description}
-                                  </div>
+              ) : (
+                  <div className="grid gap-3">
+                    {materials.map((material) => {
+                      const active = selected?.assignmentId === material.assignmentId;
+                      return (
+                          <button
+                              key={material.assignmentId}
+                              type="button"
+                              onClick={() => {
+                                setSelected(material);
+                                setPreviewMaterial(material);
+                              }}
+                              className={cn(
+                                  "group rounded-2xl border px-4 py-4 text-left transition hover:border-[#7448FF]/20 hover:bg-white hover:shadow-sm",
+                                  active ? "border-[#7448FF]/25 bg-violet-50/80 shadow-sm" : "border-slate-100 bg-slate-50/70"
                               )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <MaterialIcon material={material} />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-bold text-slate-900">{material.title}</div>
+                                <div className="mt-1 truncate text-xs font-medium text-slate-500">
+                                  {material.fileName || "Файл"} · {formatSize(material.size)}
+                                </div>
+                                {material.description && (
+                                    <div className="mt-2 line-clamp-2 text-xs font-medium leading-5 text-slate-500">
+                                      {material.description}
+                                    </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </button>
-                    );
-                  })}
-                </div>
-            )}
-          </div>
+                          </button>
+                      );
+                    })}
+                  </div>
+              )}
+            </div>
 
-          <div className="min-h-0 overflow-y-auto p-5">
-            {selected ? (
-                <div className="space-y-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <MaterialIcon material={selected} />
-                      <div className="min-w-0">
-                        {editing ? (
-                            <input
-                                value={editTitle}
-                                onChange={(event) => setEditTitle(event.target.value)}
-                                className="h-10 w-full min-w-[220px] rounded-2xl border border-slate-200 bg-white px-3 text-sm font-extrabold text-slate-900 outline-none transition focus:border-[#7448FF]/40 focus:ring-4 focus:ring-[#7448FF]/10"
-                                placeholder="Название материала"
-                            />
-                        ) : (
-                            <div className="truncate text-base font-extrabold text-slate-900">{selected.title}</div>
-                        )}
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
-                          <span>{kindLabel(selected)}</span>
-                          <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[#7448FF]">{getFileExt(selected)}</span>
+            <div className="min-h-0 overflow-y-auto p-5">
+              {selected ? (
+                  <div className="space-y-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <MaterialIcon material={selected} />
+                        <div className="min-w-0">
+                          {editing ? (
+                              <input
+                                  value={editTitle}
+                                  onChange={(event) => setEditTitle(event.target.value)}
+                                  className="h-10 w-full min-w-[220px] rounded-2xl border border-slate-200 bg-white px-3 text-sm font-extrabold text-slate-900 outline-none transition focus:border-[#7448FF]/40 focus:ring-4 focus:ring-[#7448FF]/10"
+                                  placeholder="Название материала"
+                              />
+                          ) : (
+                              <div className="truncate text-base font-extrabold text-slate-900">{selected.title}</div>
+                          )}
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-400">
+                            <span>{kindLabel(selected)}</span>
+                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[#7448FF]">{getFileExt(selected)}</span>
+                          </div>
                         </div>
                       </div>
+                      <button
+                          type="button"
+                          onClick={() => setSelected(null)}
+                          className="rounded-full p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 lg:hidden"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setSelected(null)}
-                        className="rounded-full p-2 text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 lg:hidden"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
 
-                  {canEditMaterial && (
-                      <div className="flex flex-wrap gap-2">
-                        {editing ? (
-                            <>
-                              <Button size="sm" onClick={() => void saveEdit()} disabled={editSaving}>
-                                {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                                Сохранить
+                    {canEditMaterial && (
+                        <div className="flex flex-wrap gap-2">
+                          {editing ? (
+                              <>
+                                <Button size="sm" onClick={() => void saveEdit()} disabled={editSaving}>
+                                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                                  Сохранить
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={cancelEdit} disabled={editSaving}>
+                                  Отмена
+                                </Button>
+                              </>
+                          ) : (
+                              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                                <Edit3 size={14} />
+                                Редактировать
                               </Button>
-                              <Button size="sm" variant="outline" onClick={cancelEdit} disabled={editSaving}>
-                                Отмена
-                              </Button>
-                            </>
-                        ) : (
-                            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                              <Edit3 size={14} />
-                              Редактировать
-                            </Button>
-                        )}
-                      </div>
-                  )}
+                          )}
+                        </div>
+                    )}
 
-                  {editing ? (
+                    {editing ? (
+                        <div>
+                          <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
+                          <textarea
+                              value={editDescription}
+                              onChange={(event) => setEditDescription(event.target.value)}
+                              rows={4}
+                              className="w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#7448FF]/40 focus:ring-4 focus:ring-[#7448FF]/10"
+                              placeholder="Описание материала"
+                          />
+                          {editError && <div className="mt-2 text-xs font-bold text-rose-500">{editError}</div>}
+                        </div>
+                    ) : selected.description ? (
+                        <div>
+                          <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
+                          <div className="text-sm font-medium leading-6 text-slate-500">{selected.description}</div>
+                        </div>
+                    ) : null}
+
+                    <div>
+                      <div className="mb-3 text-sm font-extrabold text-slate-900">Предпросмотр</div>
+                      <PreviewContent material={selected} preview={preview} />
+                    </div>
+
+                    <div className="grid gap-3 rounded-3xl border border-slate-100 bg-slate-50/70 p-4 text-sm sm:grid-cols-3">
                       <div>
-                        <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
-                        <textarea
-                            value={editDescription}
-                            onChange={(event) => setEditDescription(event.target.value)}
-                            rows={4}
-                            className="w-full resize-none rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#7448FF]/40 focus:ring-4 focus:ring-[#7448FF]/10"
-                            placeholder="Описание материала"
-                        />
-                        {editError && <div className="mt-2 text-xs font-bold text-rose-500">{editError}</div>}
+                        <div className="text-xs font-bold text-slate-400">Размер</div>
+                        <div className="mt-1 font-extrabold text-slate-700">{formatSize(selected.size)}</div>
                       </div>
-                  ) : selected.description ? (
                       <div>
-                        <div className="mb-2 text-sm font-extrabold text-slate-900">Описание</div>
-                        <div className="text-sm font-medium leading-6 text-slate-500">{selected.description}</div>
+                        <div className="text-xs font-bold text-slate-400">Тип</div>
+                        <div className="mt-1 font-extrabold text-slate-700">{kindLabel(selected)}</div>
                       </div>
-                  ) : null}
-
-                  <div>
-                    <div className="mb-3 text-sm font-extrabold text-slate-900">Предпросмотр</div>
-                    <PreviewContent material={selected} preview={preview} />
-                  </div>
-
-                  <div className="grid gap-3 rounded-3xl border border-slate-100 bg-slate-50/70 p-4 text-sm sm:grid-cols-3">
-                    <div>
-                      <div className="text-xs font-bold text-slate-400">Размер</div>
-                      <div className="mt-1 font-extrabold text-slate-700">{formatSize(selected.size)}</div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-400">Дата добавления</div>
+                        <div className="mt-1 font-extrabold text-slate-700">{formatDate(selected.createdAt)}</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-400">Тип</div>
-                      <div className="mt-1 font-extrabold text-slate-700">{kindLabel(selected)}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-400">Дата добавления</div>
-                      <div className="mt-1 font-extrabold text-slate-700">{formatDate(selected.createdAt)}</div>
+
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button onClick={() => setPreviewMaterial(selected)} className="w-full sm:w-auto">
+                        <PlayCircle size={16} />
+                        Открыть материал
+                      </Button>
+                      <Button variant="outline" onClick={() => void download(selected.materialId)} className="w-full sm:w-auto">
+                        <Download size={16} />
+                        Скачать файл
+                      </Button>
                     </div>
                   </div>
-
-                  <Button onClick={() => void download(selected.materialId)} className="w-full sm:w-auto">
-                    <Download size={16} />
-                    Скачать файл
-                  </Button>
-                </div>
-            ) : (
-                <div className="grid h-full min-h-[320px] place-items-center text-center">
-                  <div>
-                    <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-3xl bg-slate-50 text-slate-300">
-                      <FileText size={26} />
+              ) : (
+                  <div className="grid h-full min-h-[320px] place-items-center text-center">
+                    <div>
+                      <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-3xl bg-slate-50 text-slate-300">
+                        <FileText size={26} />
+                      </div>
+                      <div className="text-sm font-bold text-slate-700">Выберите материал</div>
+                      <div className="mt-1 text-xs font-medium text-slate-400">Файл откроется справа без скачивания.</div>
                     </div>
-                    <div className="text-sm font-bold text-slate-700">Выберите материал</div>
-                    <div className="mt-1 text-xs font-medium text-slate-400">Файл откроется справа без скачивания.</div>
                   </div>
-                </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-      </div>
+
+        <MaterialPreviewModal
+            open={Boolean(previewMaterial)}
+            material={previewMaterial}
+            onClose={() => setPreviewMaterial(null)}
+        />
+      </>
   );
 }
