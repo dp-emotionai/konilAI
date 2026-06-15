@@ -79,6 +79,7 @@ import {
     CheckSquare,
     CheckCircle2,
     X,
+    Download,
 } from "lucide-react";
 import { getWsBaseUrl } from "@/lib/env";
 import { cn } from "@/lib/cn";
@@ -204,6 +205,29 @@ function formatParticipantLabel(p?: Participant | null) {
 
 function formatPercentMetric(value?: number | null) {
     return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
+function formatFileSize(size?: number | null) {
+    if (typeof size !== "number" || !Number.isFinite(size)) return "Размер не указан";
+    if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} КБ`;
+    return `${(size / 1024 / 1024).toFixed(1)} МБ`;
+}
+
+function getFileExtension(fileName?: string | null, mimeType?: string | null) {
+    const fromName = String(fileName || "").split(".").pop()?.trim();
+    if (fromName && fromName.length <= 6 && fromName !== fileName) return fromName.toUpperCase();
+    const fromMime = String(mimeType || "").split("/").pop()?.trim();
+    return fromMime ? fromMime.toUpperCase().slice(0, 6) : "FILE";
+}
+
+function formatUploadTime(value?: string | null) {
+    const date = value ? new Date(value) : new Date();
+    if (Number.isNaN(date.getTime())) return "Загружено";
+
+    return `Загружено ${new Intl.DateTimeFormat("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+    }).format(date)}`;
 }
 
 function CallControlButton({
@@ -1146,54 +1170,92 @@ export default function StudentJoinSessionPage() {
                                         )}
 
                                         {activeBottomTab === "materials" && (contentLoading || sessionFiles.length > 0) && (
-                                            <div className="w-full">
+                                            <div className="w-full text-left">
+                                                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="text-[15px] font-extrabold text-slate-900">
+                                                            Материалы занятия
+                                                        </h3>
+                                                        <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-[#7448FF]">
+                                                            {sessionFiles.length}
+                                                        </span>
+                                                    </div>
+                                                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600">
+                                                        Обновляется в real-time
+                                                    </span>
+                                                </div>
+
                                                 {contentLoading ? (
-                                                    <div className="text-center text-sm text-slate-400">
+                                                    <div className="grid min-h-[180px] place-items-center rounded-[24px] border border-slate-100 bg-slate-50/60 text-sm font-semibold text-slate-400">
                                                         Загружаем материалы сессии...
                                                     </div>
                                                 ) : (
                                                     <div className="grid gap-3">
                                                         {sessionFiles.map((file) => (
-                                                            <button
+                                                            <div
                                                                 key={file.id}
-                                                                type="button"
-                                                                onClick={async () => {
-                                                                    const direct = file.url?.trim();
-                                                                    if (direct) {
-                                                                        window.open(direct, "_blank", "noreferrer");
-                                                                        return;
-                                                                    }
-
-                                                                    const info = await getMaterialDownload(file.id);
-                                                                    const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
-                                                                    if (url) {
-                                                                        window.open(url, "_blank", "noreferrer");
-                                                                    }
-                                                                }}
-                                                                className={cn(
-                                                                    "rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-4 text-left transition",
-                                                                    "hover:bg-slate-50"
-                                                                )}
+                                                                className="group rounded-[22px] border border-slate-100 bg-white px-4 py-4 shadow-[0_12px_35px_rgba(15,23,42,0.035)] transition hover:border-purple-100 hover:shadow-[0_18px_45px_rgba(116,72,255,0.09)]"
                                                             >
-                                                                <div className="flex items-start gap-3">
-                                                                    <div className="mt-0.5 rounded-2xl border border-slate-100 bg-white p-2 text-slate-500">
-                                                                        <FileText size={16} />
+                                                                <div className="flex flex-wrap items-center gap-4 sm:flex-nowrap">
+                                                                    <div className="relative grid h-16 w-16 shrink-0 place-items-center rounded-[18px] bg-purple-50 text-[#7448FF] ring-1 ring-purple-100">
+                                                                        <FileText size={30} strokeWidth={1.7} />
+                                                                        <span className="absolute bottom-2 rounded-md bg-[#7448FF] px-1.5 py-0.5 text-[8px] font-black text-white">
+                                                                            {getFileExtension(file.fileName || file.title, file.mimeType)}
+                                                                        </span>
                                                                     </div>
-                                                                    <div className="min-w-0">
-                                                                        <div className="truncate font-semibold text-slate-900">
+
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="truncate text-[14px] font-extrabold text-slate-900">
                                                                             {file.title}
                                                                         </div>
-                                                                        <div className="mt-1 text-xs text-slate-500">
-                                                                            {file.fileName || "Файл сессии"}
+                                                                        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-400">
+                                                                            <span className="max-w-[220px] truncate">
+                                                                                {file.fileName || "Файл занятия"}
+                                                                            </span>
+                                                                            <span>•</span>
+                                                                            <span>{formatFileSize(file.size)}</span>
+                                                                            <span>•</span>
+                                                                            <span>{formatUploadTime((file as { createdAt?: string | null }).createdAt)}</span>
                                                                         </div>
-                                                                        {false && (
-                                                                            <div className="mt-2 text-xs text-amber-600">
-                                                                                Backend ещё не вернул ссылку на скачивание.
-                                                                            </div>
-                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="ml-auto flex shrink-0 items-center gap-2">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={async () => {
+                                                                                const direct = file.url?.trim();
+                                                                                if (direct) {
+                                                                                    window.open(direct, "_blank", "noreferrer");
+                                                                                    return;
+                                                                                }
+
+                                                                                const info = await getMaterialDownload(file.id);
+                                                                                const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : "";
+                                                                                if (url) {
+                                                                                    window.open(url, "_blank", "noreferrer");
+                                                                                }
+                                                                            }}
+                                                                            className="inline-flex items-center gap-2 rounded-[18px] border border-purple-100 bg-white px-4 py-2.5 text-[12px] font-bold text-[#7448FF] transition hover:border-[#7448FF]/30 hover:bg-purple-50"
+                                                                        >
+                                                                            Открыть
+                                                                            <Share2 size={13} />
+                                                                        </button>
+
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={async () => {
+                                                                                const info = await getMaterialDownload(file.id);
+                                                                                const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : file.url || "";
+                                                                                if (url) window.open(url, "_blank", "noreferrer");
+                                                                            }}
+                                                                            className="grid h-11 w-11 place-items-center rounded-2xl border border-slate-100 bg-white text-slate-600 shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition hover:border-purple-100 hover:text-[#7448FF]"
+                                                                            aria-label="Скачать материал"
+                                                                        >
+                                                                            <Download size={16} />
+                                                                        </button>
                                                                     </div>
                                                                 </div>
-                                                            </button>
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 )}
@@ -1201,13 +1263,21 @@ export default function StudentJoinSessionPage() {
                                         )}
 
                                         {activeBottomTab === "materials" && !contentLoading && sessionFiles.length === 0 && (
-                                            <div className="text-center w-full">
+                                            <div className="w-full text-left">
+                                                <div className="mb-5 flex items-center gap-2">
+                                                    <h3 className="text-[15px] font-extrabold text-slate-900">
+                                                        Материалы занятия
+                                                    </h3>
+                                                    <span className="rounded-full bg-purple-50 px-2.5 py-1 text-[11px] font-bold text-[#7448FF]">
+                                                        0
+                                                    </span>
+                                                </div>
                                                 <Reveal>
-                                                    <div className="flex flex-col items-center justify-center text-slate-400 gap-3">
+                                                    <div className="flex min-h-[190px] flex-col items-center justify-center rounded-[24px] border border-dashed border-slate-200 bg-slate-50/70 text-slate-400 gap-3">
                                                         <CheckSquare size={32} className="text-slate-200" strokeWidth={1} />
                                                         <div className="font-semibold text-slate-700">Нет материалов</div>
-                                                        <div className="text-sm max-w-sm">
-                                                            Учебный план для данной сессии не загружен сервером.
+                                                        <div className="text-sm max-w-sm text-center">
+                                                            Когда преподаватель добавит материал, он появится здесь автоматически.
                                                         </div>
                                                     </div>
                                                 </Reveal>
