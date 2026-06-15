@@ -1491,16 +1491,6 @@ export default function StudentJoinSessionPage() {
                                     </div>
                                 )}
                             </div>
-
-                            <div className="bg-white border-slate-100 border rounded-[28px] shadow-[0_4px_24px_rgba(0,0,0,0.02)] p-6 flex flex-col min-h-[160px]">
-                                <h3 className="font-bold text-slate-900 text-[16px] mb-4">Файлы</h3>
-                                <div className="flex-1 flex flex-col items-center justify-center text-center py-4 bg-slate-50 rounded-2xl border border-slate-100 border-dashed">
-                                    <FileText size={20} className="text-slate-300 mb-2" strokeWidth={1.5} />
-                                    <div className="text-[13px] font-semibold text-slate-500">
-                                        Нет прикрепленных файлов
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>

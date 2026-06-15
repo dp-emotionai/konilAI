@@ -1,13 +1,11 @@
 import { api, getApiBaseUrl, getApiOriginUrl, getToken, hasAuth } from "@/lib/api/client";
 
-export type MaterialKind = "video" | "audio" | "image" | "document" | "file";
-
 export type MaterialRow = {
   id: string;
   title: string;
   description: string | null;
-  kind?: MaterialKind | string | null;
   fileName: string;
+  kind?: string | null;
   mimeType: string | null;
   storageKey: string;
   size: number | null;
@@ -28,9 +26,9 @@ export type MaterialAssignmentRow = {
 
 export type MaterialUploadResult = {
   storageKey: string;
-  kind?: MaterialKind | string | null;
   fileName: string;
   mimeType: string | null;
+  kind: string | null;
   size: number | null;
 };
 
@@ -39,9 +37,9 @@ export type AssignedMaterialRow = {
   materialId: string;
   title: string;
   description: string | null;
-  kind?: MaterialKind | string | null;
   fileName: string | null;
   mimeType: string | null;
+  kind: string | null;
   size: number | null;
   createdAt: string;
   visibleFrom: string | null;
@@ -59,44 +57,14 @@ export async function createMaterial(
       title: string;
       description?: string | null;
       fileName: string;
-      kind?: MaterialKind | string | null;
       mimeType?: string | null;
       storageKey: string;
+      kind?: string | null;
       size?: number | null;
     },
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.post<MaterialRow>("/materials", input, { signal: params?.signal });
-}
-
-function detectUploadKind(file: File): MaterialKind {
-  const mimeType = String(file.type || "").toLowerCase();
-  const fileName = String(file.name || "").toLowerCase();
-
-  if (mimeType.startsWith("video/")) return "video";
-  if (mimeType.startsWith("audio/")) return "audio";
-  if (mimeType.startsWith("image/")) return "image";
-
-  if (
-      mimeType.includes("pdf") ||
-      mimeType.includes("word") ||
-      mimeType.includes("document") ||
-      mimeType.includes("presentation") ||
-      mimeType.includes("spreadsheet") ||
-      mimeType.startsWith("text/") ||
-      fileName.endsWith(".pdf") ||
-      fileName.endsWith(".doc") ||
-      fileName.endsWith(".docx") ||
-      fileName.endsWith(".ppt") ||
-      fileName.endsWith(".pptx") ||
-      fileName.endsWith(".xls") ||
-      fileName.endsWith(".xlsx") ||
-      fileName.endsWith(".txt")
-  ) {
-    return "document";
-  }
-
-  return "file";
 }
 
 export async function uploadMaterialFile(file: File): Promise<MaterialUploadResult> {
@@ -106,7 +74,20 @@ export async function uploadMaterialFile(file: File): Promise<MaterialUploadResu
 
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("kind", detectUploadKind(file));
+
+  const mime = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  const kind = mime.startsWith("video/")
+      ? "video"
+      : mime.startsWith("audio/")
+          ? "audio"
+          : mime.startsWith("image/")
+              ? "image"
+              : mime.includes("pdf") || /\.(pdf|doc|docx|ppt|pptx|xls|xlsx|txt)$/i.test(name)
+                  ? "document"
+                  : "file";
+
+  formData.append("kind", kind);
 
   const response = await fetch(`${base}/materials/upload`, {
     method: "POST",
@@ -189,16 +170,22 @@ export async function getStudentMaterials(params?: { signal?: AbortSignal }): Pr
 
 export async function getMaterialDownload(
     materialId: string,
-    params?: { signal?: AbortSignal }
-): Promise<{ downloadUrl: string; fileName: string; kind?: string | null; mimeType?: string | null } | null> {
+    params?: { signal?: AbortSignal; mode?: "inline" | "download" }
+): Promise<{ downloadUrl: string; url?: string; fileName: string; kind?: string | null; mimeType?: string | null } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
-  return api.get<{ downloadUrl: string; fileName: string; kind?: string | null; mimeType?: string | null }>(`/materials/${materialId}/download`, { signal: params?.signal });
+
+  const query = params?.mode ? `?mode=${encodeURIComponent(params.mode)}` : "";
+
+  return api.get<{ downloadUrl: string; url?: string; fileName: string; kind?: string | null; mimeType?: string | null }>(
+      `/materials/${materialId}/download${query}`,
+      { signal: params?.signal }
+  );
 }
 
 export async function getMaterialDownloadByStorageKey(
-    input: { storageKey: string; fileName?: string | null },
+    input: { storageKey: string; fileName?: string | null; mode?: "inline" | "download" },
     params?: { signal?: AbortSignal }
-): Promise<{ downloadUrl: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; url?: string; fileName: string } | null> {
   const storageKey = String(input.storageKey || "").trim();
   if (!getApiBaseUrl() || !hasAuth() || !storageKey) return null;
 
@@ -209,7 +196,11 @@ export async function getMaterialDownloadByStorageKey(
     query.set("fileName", fileName);
   }
 
-  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
+  if (input.mode) {
+    query.set("mode", input.mode);
+  }
+
+  return api.get<{ downloadUrl: string; url?: string; fileName: string }>(`/materials/download-by-key?${query.toString()}`, {
     signal: params?.signal,
   });
 }
