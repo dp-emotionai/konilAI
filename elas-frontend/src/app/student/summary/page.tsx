@@ -1,26 +1,50 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import Breadcrumbs from "@/components/layout/Breadcrumbs";
-import PageHero from "@/components/common/PageHero";
-import Section from "@/components/common/Section";
 import Reveal from "@/components/common/Reveal";
-
-import { Card, CardContent } from "@/components/ui/Card";
-import Button from "@/components/ui/Button";
-import Badge from "@/components/ui/Badge";
-
 import SparkArea from "@/components/common/SparkArea";
 import DonutMini from "@/components/common/DonutMini";
+import Button from "@/components/ui/Button";
 
 import { getStudentEmotionsSummary, type StudentEmotionsSummary } from "@/lib/api/student";
 import { getApiBaseUrl, hasAuth } from "@/lib/api/client";
 import { readConsent } from "@/lib/consent";
 import { useUI } from "@/components/layout/Providers";
 
-import { Download, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  Activity,
+  AlertCircle,
+  ArrowDownRight,
+  ArrowRight,
+  ArrowUpRight,
+  BarChart3,
+  BrainCircuit,
+  Clock3,
+  Download,
+  Eye,
+  HeartPulse,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  TimerReset,
+  TrendingUp,
+} from "lucide-react";
+
+type Accent = "violet" | "emerald" | "rose" | "amber" | "blue";
+
+const EMOTION_LABELS: Record<string, string> = {
+  Neutral: "Нейтрально",
+  Happy: "Радость",
+  Angry: "Злость",
+  Surprise: "Удивление",
+  Sad: "Грусть",
+  Fear: "Страх",
+  Disgust: "Отвращение",
+};
 
 export default function StudentSummaryPage() {
   const { state } = useUI();
@@ -35,18 +59,21 @@ export default function StudentSummaryPage() {
 
   const load = useCallback(async () => {
     setError(null);
+
     if (!apiAvailable) {
       setLoading(false);
       return;
     }
+
     setLoading(true);
+
     try {
       const data = await getStudentEmotionsSummary();
       setSummary(data ?? null);
       setUpdatedAt(new Date());
-    } catch (e) {
+    } catch (reason: unknown) {
       setSummary(null);
-      setError(e instanceof Error ? e.message : "Не удалось загрузить сводку.");
+      setError(reason instanceof Error ? reason.message : "Не удалось загрузить сводку.");
     } finally {
       setLoading(false);
     }
@@ -57,284 +84,728 @@ export default function StudentSummaryPage() {
   }, [load]);
 
   const analyzedCount = summary?.analyzedSessions ?? 0;
-  const avgEng = summary ? Math.round((summary.avgEngagement ?? 0) * 100) : 0;
+  const avgEngagement = toPercent(summary?.avgEngagement);
   const stressPeaks = summary?.stressPeaks ?? 0;
-  const bestTime = summary?.bestTimeWindow ?? "—";
+  const bestTime = summary?.bestTimeWindow || "—";
   const engagementSeries = summary?.engagementSeries?.length ? summary.engagementSeries : null;
   const dropsSeries = summary?.dropsSeries?.length ? summary.dropsSeries : null;
-  const weekCompare = summary?.weekCompare ?? { thisWeek: 0, prevWeek: 0, delta: 0 };
-  const emotionLabels = summary ? Object.keys(summary.emotionsDistribution ?? {}) : [];
-  const emotionValues = summary
-    ? emotionLabels.map((k) => Math.round((summary.emotionsDistribution[k] ?? 0) * 100))
-    : [];
+
+  const weekCompare = useMemo(() => {
+    const raw = summary?.weekCompare ?? { thisWeek: 0, prevWeek: 0, delta: 0 };
+
+    return {
+      thisWeek: toPercent(raw.thisWeek),
+      prevWeek: toPercent(raw.prevWeek),
+      delta: toPercentDelta(raw.delta),
+    };
+  }, [summary]);
+
+  const emotionLabels = useMemo(
+    () => (summary ? Object.keys(summary.emotionsDistribution ?? {}) : []),
+    [summary]
+  );
+
+  const emotionValues = useMemo(
+    () =>
+      summary
+        ? emotionLabels.map((key) => toPercent(summary.emotionsDistribution[key] ?? 0))
+        : [],
+    [emotionLabels, summary]
+  );
+
+  const localizedEmotionLabels = useMemo(
+    () => emotionLabels.map((label) => EMOTION_LABELS[label] ?? label),
+    [emotionLabels]
+  );
 
   const hasData = analyzedCount > 0 && !loading && !error;
 
-  return (
-    <div className="pb-12">
-      <Breadcrumbs items={[{ label: "Студент", href: "/student/dashboard" }, { label: "Итоги" }]} />
+  const exportCsv = useCallback(() => {
+    if (!summary) return;
 
-      <PageHero
-        overline="Студент"
-        title="Моя сводка"
-        subtitle="Личная вовлечённость (опционально). Показываем агрегаты и подсказки для саморефлексии."
-        right={
-          <div className="flex flex-wrap items-center gap-2">
-            {updatedAt && (
-              <span className="text-xs text-muted">
-                Updated: {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-              </span>
-            )}
-            <Button variant="outline" disabled className="gap-2">
-              <Download size={16} /> Export CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-1.5">
-              <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-              Обновить
-            </Button>
-            <Link href="/student/dashboard">
-              <Button variant="outline">На дашборд</Button>
-            </Link>
-          </div>
-        }
+    const rows: Array<[string, string | number]> = [
+      ["Показатель", "Значение"],
+      ["Сессий в расчёте", analyzedCount],
+      ["Средняя вовлечённость", `${avgEngagement}%`],
+      ["Пики стресса", stressPeaks],
+      ["Лучшее время", bestTime],
+      ["Эта неделя", `${weekCompare.thisWeek}%`],
+      ["Прошлая неделя", `${weekCompare.prevWeek}%`],
+      ["Изменение", `${weekCompare.delta >= 0 ? "+" : ""}${weekCompare.delta}%`],
+      ...emotionLabels.map(
+        (label, index) =>
+          [`Эмоция: ${EMOTION_LABELS[label] ?? label}`, `${emotionValues[index] ?? 0}%`] as [
+            string,
+            string
+          ]
+      ),
+    ];
+
+    const csv = rows
+      .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
+      .join("\n");
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+
+    anchor.href = url;
+    anchor.download = `konilai-summary-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, [
+    analyzedCount,
+    avgEngagement,
+    bestTime,
+    emotionLabels,
+    emotionValues,
+    stressPeaks,
+    summary,
+    weekCompare,
+  ]);
+
+  return (
+    <div className="relative overflow-hidden pb-14">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-24 top-4 h-80 w-80 rounded-full bg-violet-200/30 blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-32 top-[540px] h-80 w-80 rounded-full bg-blue-100/60 blur-3xl"
       />
 
-      <Section spacing="none" className="mt-8 space-y-6">
-        {/* error */}
-        {error && (
-          <Reveal>
-            <Card className="border-amber-400/25 bg-amber-500/10">
-              <CardContent className="p-6 flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <AlertCircle size={20} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                  <div>
-                    <div className="font-semibold text-fg">Ошибка загрузки</div>
-                    <div className="text-sm text-muted mt-0.5">{error}</div>
-                  </div>
-                </div>
-                <Button variant="outline" onClick={() => void load()} className="gap-2">
-                  <RefreshCw size={14} /> Повторить
+      <div className="relative z-10">
+        <Breadcrumbs
+          items={[
+            { label: "Студент", href: "/student/dashboard" },
+            { label: "Моя сводка" },
+          ]}
+        />
+
+        <section className="mt-5 overflow-hidden rounded-[30px] border border-violet-100/80 bg-[radial-gradient(circle_at_82%_18%,rgba(139,92,246,0.18),transparent_25%),linear-gradient(135deg,#ffffff_0%,#fbfaff_55%,#f4f0ff_100%)] px-5 py-7 shadow-[0_22px_70px_rgba(88,57,180,0.10)] sm:px-7 md:px-9 md:py-9">
+          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-white/80 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.15em] text-violet-600 shadow-sm">
+                <Sparkles size={14} />
+                Личная аналитика
+              </div>
+
+              <h1 className="mt-4 text-4xl font-bold tracking-[-0.045em] text-slate-950 sm:text-5xl">
+                Моя сводка
+              </h1>
+
+              <p className="mt-3 max-w-2xl text-[15px] leading-7 text-slate-600 sm:text-base">
+                Агрегированная картина вовлечённости, концентрации и эмоциональных сигналов.
+                Данные предназначены только для саморефлексии.
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
+                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-slate-600 shadow-sm">
+                  <Clock3 size={15} className="text-violet-500" />
+                  {updatedAt
+                    ? `Обновлено в ${updatedAt.toLocaleTimeString("ru-RU", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`
+                    : "Данные ещё не обновлялись"}
+                </span>
+
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-700">
+                  <ShieldCheck size={15} />
+                  Без хранения raw-видео
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button
+                variant="outline"
+                onClick={exportCsv}
+                disabled={!summary || loading}
+                className="gap-2 bg-white/90"
+              >
+                <Download size={16} />
+                Скачать CSV
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => void load()}
+                disabled={loading}
+                className="gap-2 bg-white/90"
+              >
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                Обновить
+              </Button>
+
+              <Link href="/student/dashboard">
+                <Button className="gap-2">
+                  На дашборд
+                  <ArrowRight size={16} />
                 </Button>
-              </CardContent>
-            </Card>
-          </Reveal>
-        )}
+              </Link>
+            </div>
+          </div>
+        </section>
 
-        {/* no API */}
-        {!apiAvailable && !loading && !error && (
-          <Reveal>
-            <Card>
-              <CardContent className="p-6 md:p-7 text-center">
-                <div className="text-sm text-muted">Чтобы видеть сводку по сессиям, войдите в аккаунт и убедитесь, что указан адрес сервера.</div>
-                <Link href="/auth/login" className="inline-block mt-4">
-                  <Button variant="outline">Войти</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </Reveal>
-        )}
-
-        {/* consent hint */}
-        {!consent && apiAvailable && !error && (
-          <Reveal>
-            <Card>
-              <CardContent className="p-6 md:p-7 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm text-muted">Доступ</div>
-                  <div className="mt-2 text-lg font-semibold text-fg">Согласие не дано</div>
-                  <div className="mt-2 text-sm text-muted">
-                    Вы можете включить аналитику в центре согласия. Сводка останется агрегированной и без raw-видео.
-                  </div>
-                </div>
-                <Link href="/consent">
-                  <Button className="gap-2">
-                    <ShieldCheck size={18} /> Управление согласием
+        <div className="mt-6 space-y-5">
+          {error && (
+            <Reveal>
+              <StatusBanner
+                accent="amber"
+                icon={<AlertCircle size={22} />}
+                title="Не удалось загрузить сводку"
+                text={error}
+                action={
+                  <Button variant="outline" onClick={() => void load()} className="bg-white">
+                    Повторить
                   </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </Reveal>
-        )}
+                }
+              />
+            </Reveal>
+          )}
 
-        {/* no data hint when API ok but no sessions analyzed yet */}
-        {apiAvailable && !loading && !error && !hasData && (
-          <Reveal>
-            <Card className="border-primary/20 bg-primary/5">
-              <CardContent className="p-5">
-                <div className="text-sm text-muted">
-                  Данных пока нет. Подключитесь к сессиям с включённым согласием — сводка заполнится после анализа (ML).
+          {!apiAvailable && !loading && !error && (
+            <Reveal>
+              <StatusBanner
+                accent="blue"
+                icon={<AlertCircle size={22} />}
+                title="Сервис пока недоступен"
+                text="Войдите в аккаунт и убедитесь, что адрес API настроен корректно."
+                action={
+                  <Link href="/auth/login">
+                    <Button variant="outline" className="bg-white">
+                      Войти
+                    </Button>
+                  </Link>
+                }
+              />
+            </Reveal>
+          )}
+
+          {!consent && apiAvailable && !error && (
+            <Reveal>
+              <StatusBanner
+                accent="violet"
+                icon={<ShieldCheck size={22} />}
+                title="Согласие на аналитику не дано"
+                text="Вы можете включить аналитику в центре согласия. Сводка останется агрегированной и без raw-видео."
+                action={
+                  <Link href="/consent">
+                    <Button className="gap-2">
+                      <ShieldCheck size={17} />
+                      Управление согласием
+                    </Button>
+                  </Link>
+                }
+              />
+            </Reveal>
+          )}
+
+          {apiAvailable && !loading && !error && !hasData && (
+            <Reveal>
+              <StatusBanner
+                accent="blue"
+                icon={<BrainCircuit size={22} />}
+                title="Данных пока недостаточно"
+                text="Подключитесь к сессиям с включённым согласием — сводка заполнится после анализа."
+                action={
+                  <Link href="/student/sessions">
+                    <Button variant="outline" className="bg-white">
+                      К сессиям
+                    </Button>
+                  </Link>
+                }
+              />
+            </Reveal>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Reveal>
+              <KpiCard
+                icon={<BarChart3 size={22} />}
+                title="Сессий в расчёте"
+                value={loading ? "…" : String(analyzedCount)}
+                hint="Проанализированные занятия"
+                accent="violet"
+              />
+            </Reveal>
+
+            <Reveal>
+              <KpiCard
+                icon={<TrendingUp size={22} />}
+                title="Средняя вовлечённость"
+                value={hasData ? `${avgEngagement}%` : "—"}
+                hint="Среднее значение по сессиям"
+                accent="emerald"
+              />
+            </Reveal>
+
+            <Reveal>
+              <KpiCard
+                icon={<HeartPulse size={22} />}
+                title="Пики стресса"
+                value={hasData ? String(stressPeaks) : "—"}
+                hint="Сессии со стрессом от 60%"
+                accent="rose"
+              />
+            </Reveal>
+
+            <Reveal>
+              <KpiCard
+                icon={<Clock3 size={22} />}
+                title="Лучшее время"
+                value={hasData ? bestTime : "—"}
+                hint="Окно наибольшей концентрации"
+                accent="amber"
+              />
+            </Reveal>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Reveal>
+              <AnalyticsCard
+                title="Динамика вовлечённости"
+                description="Как менялось внимание во время последних занятий"
+                icon={<Activity size={20} />}
+                tag="Тренд"
+              >
+                {loading ? (
+                  <ChartSkeleton />
+                ) : engagementSeries ? (
+                  <div className="rounded-2xl bg-[linear-gradient(180deg,#fbf9ff,#ffffff)] p-3">
+                    <SparkArea values={engagementSeries} height={235} />
+                  </div>
+                ) : (
+                  <EmptyChart />
+                )}
+
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-violet-100 bg-violet-50/60 px-4 py-3 text-sm leading-6 text-violet-800">
+                  <Eye size={18} className="mt-0.5 shrink-0" />
+                  Сглаженная линия помогает увидеть устойчивые периоды внимания и моменты снижения.
                 </div>
-                <Link href="/student/sessions" className="inline-block mt-3">
-                  <Button variant="outline" size="sm">К списку сессий</Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </Reveal>
-        )}
+              </AnalyticsCard>
+            </Reveal>
 
-        {/* KPI */}
-        <div className="grid lg:grid-cols-4 gap-5">
-          <Reveal><Kpi title="Сессий в расчёте" value={loading ? "…" : String(analyzedCount)} hint="На основе ваших сессий" /></Reveal>
-          <Reveal><Kpi title="Средняя вовлечённость" value={hasData ? `${avgEng}%` : "—"} hint="Среднее по сессиям" /></Reveal>
-          <Reveal><Kpi title="Пики стресса" value={hasData ? `${stressPeaks}` : "—"} hint="Сессий со стрессом ≥ 60%" /></Reveal>
-          <Reveal><Kpi title="Лучшее время" value={hasData ? bestTime : "—"} hint="Окно концентрации" /></Reveal>
-        </div>
-
-        {/* Charts */}
-        <div className="grid lg:grid-cols-2 gap-5">
-          <Reveal>
-            <ChartCard title="Вовлечённость по времени" tag="Trend">
-              {loading ? (
-                <div className="h-[210px] rounded-elas-lg bg-surface-subtle animate-pulse" />
-              ) : engagementSeries ? (
-                <SparkArea values={engagementSeries} height={210} />
-              ) : (
-                <EmptyChart />
-              )}
-              <p className="mt-3 text-sm text-muted">
-                Сглаженная линия по последним сессиям. Показывает динамику внимания в течение занятия.
-              </p>
-            </ChartCard>
-          </Reveal>
-
-          <Reveal>
-            <ChartCard title="Распределение эмоций" tag="Summary">
-              {loading ? (
-                <div className="h-[210px] rounded-elas-lg bg-surface-subtle animate-pulse" />
-              ) : hasData && emotionLabels.length > 0 ? (
-                <DonutMini labels={emotionLabels} values={emotionValues} />
-              ) : (
-                <EmptyChart />
-              )}
-              <p className="mt-3 text-sm text-muted">
-                Агрегированная оценка (без хранения raw-видео). Используется для саморефлексии.
-              </p>
-            </ChartCard>
-          </Reveal>
-
-          <Reveal>
-            <ChartCard title="Снижения концентрации" tag="Alerts">
-              {loading ? (
-                <div className="h-[210px] rounded-elas-lg bg-surface-subtle animate-pulse" />
-              ) : dropsSeries ? (
-                <SparkArea values={dropsSeries} height={210} />
-              ) : (
-                <EmptyChart />
-              )}
-              <p className="mt-3 text-sm text-muted">
-                Пики — возможные “провалы”. Помогают паузы/смена активности.
-              </p>
-            </ChartCard>
-          </Reveal>
-
-          <Reveal>
-            <ChartCard title="Неделя к предыдущей" tag="Compare">
-              {loading ? (
-                <div className="h-[210px] rounded-elas-lg bg-surface-subtle animate-pulse" />
-              ) : hasData ? (
-                <>
-                  <div className="grid grid-cols-3 gap-3">
-                    <MiniCompare label="Эта неделя" value={`${weekCompare.thisWeek}%`} />
-                    <MiniCompare label="Прошлая" value={`${weekCompare.prevWeek}%`} />
-                    <MiniCompare
-                      label="Δ"
-                      value={`${weekCompare.delta >= 0 ? "+" : ""}${weekCompare.delta}%`}
-                      accent
-                    />
+            <Reveal>
+              <AnalyticsCard
+                title="Распределение эмоций"
+                description="Агрегированная структура эмоциональных сигналов"
+                icon={<BrainCircuit size={20} />}
+                tag="Эмоции"
+              >
+                {loading ? (
+                  <ChartSkeleton />
+                ) : hasData && emotionLabels.length > 0 ? (
+                  <div className="rounded-2xl bg-[linear-gradient(180deg,#fbf9ff,#ffffff)] p-4">
+                    <DonutMini labels={localizedEmotionLabels} values={emotionValues} />
                   </div>
-                  <div className="mt-4 rounded-elas-lg bg-surface-subtle p-4 text-sm text-muted">
-                    Если Δ отрицательная — попробуйте больше интерактива и меньше монотонного темпа.
-                  </div>
-                </>
-              ) : (
-                <EmptyChart />
-              )}
-            </ChartCard>
-          </Reveal>
-        </div>
+                ) : (
+                  <EmptyChart />
+                )}
 
-        {/* explanation */}
-        <Reveal>
-          <Card>
-            <CardContent className="p-6 md:p-7">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-800">
+                  <ShieldCheck size={18} className="mt-0.5 shrink-0" />
+                  Значения обезличены и используются только для понимания собственного состояния.
+                </div>
+              </AnalyticsCard>
+            </Reveal>
+
+            <Reveal>
+              <AnalyticsCard
+                title="Снижения концентрации"
+                description="Потенциальные моменты потери внимания"
+                icon={<TimerReset size={20} />}
+                tag="Сигналы"
+              >
+                {loading ? (
+                  <ChartSkeleton />
+                ) : dropsSeries ? (
+                  <div className="rounded-2xl bg-[linear-gradient(180deg,#fffaf8,#ffffff)] p-3">
+                    <SparkArea values={dropsSeries} height={235} />
+                  </div>
+                ) : (
+                  <EmptyChart />
+                )}
+
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-amber-100 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-800">
+                  <Target size={18} className="mt-0.5 shrink-0" />
+                  Короткая пауза или смена активности помогают вернуть концентрацию.
+                </div>
+              </AnalyticsCard>
+            </Reveal>
+
+            <Reveal>
+              <AnalyticsCard
+                title="Неделя к предыдущей"
+                description="Сравнение средней вовлечённости"
+                icon={<TrendingUp size={20} />}
+                tag="Сравнение"
+              >
+                {loading ? (
+                  <ChartSkeleton />
+                ) : hasData ? (
+                  <WeekComparison
+                    thisWeek={weekCompare.thisWeek}
+                    prevWeek={weekCompare.prevWeek}
+                    delta={weekCompare.delta}
+                  />
+                ) : (
+                  <EmptyChart />
+                )}
+              </AnalyticsCard>
+            </Reveal>
+          </div>
+
+          <Reveal>
+            <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.07)]">
+              <div className="grid gap-6 border-b border-slate-100 bg-[linear-gradient(135deg,#fbfaff,#ffffff)] px-5 py-6 md:grid-cols-[minmax(0,1fr)_auto] md:px-7">
                 <div>
-                  <div className="text-sm text-muted">Пояснение</div>
-                  <div className="mt-2 text-lg font-semibold text-fg">Что это значит</div>
-                  <div className="mt-2 text-sm text-muted leading-relaxed max-w-3xl">
-                    Страница опциональна и может быть отключена политикой. Данные агрегируются и предназначены для саморефлексии,
-                    а не для оценки личности.
+                  <div className="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">
+                    Как читать показатели
                   </div>
+                  <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
+                    Что это значит
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    Аналитика помогает замечать собственные паттерны, но не является медицинской,
+                    психологической или академической оценкой.
+                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Link href="/consent"><Button variant="outline">Управление согласием</Button></Link>
-                  <Link href="/privacy"><Button variant="ghost">Конфиденциальность</Button></Link>
+
+                <div className="flex flex-wrap items-start gap-2">
+                  <Link href="/consent">
+                    <Button variant="outline" className="bg-white">
+                      Управление согласием
+                    </Button>
+                  </Link>
+                  <Link href="/privacy">
+                    <Button variant="ghost">Конфиденциальность</Button>
+                  </Link>
                 </div>
               </div>
 
-              <div className="mt-6 grid md:grid-cols-3 gap-4">
-                <Insight title="Снижения концентрации" text="Перерывы каждые 25 минут и смена активности помогают удерживать внимание." />
-                <Insight title="Пики стресса" text="Во время экзамена стресс выше — полезны паузы и дыхательные практики." />
-                <Insight title="Приватность" text="Согласие можно отозвать. Метрики — агрегированные, без хранения raw-видео." />
+              <div className="grid gap-4 p-5 md:grid-cols-3 md:p-7">
+                <InsightCard
+                  icon={<Target size={20} />}
+                  title="Концентрация"
+                  text="Перерывы каждые 25–30 минут и смена активности помогают дольше удерживать внимание."
+                  accent="violet"
+                />
+                <InsightCard
+                  icon={<HeartPulse size={20} />}
+                  title="Стресс"
+                  text="Во время сложных заданий напряжение может расти. Полезны короткие паузы и дыхательные практики."
+                  accent="rose"
+                />
+                <InsightCard
+                  icon={<ShieldCheck size={20} />}
+                  title="Приватность"
+                  text="Согласие можно отозвать в любой момент. Метрики агрегируются без хранения raw-видео."
+                  accent="emerald"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </Reveal>
-      </Section>
-    </div>
-  );
-}
-
-function EmptyChart() {
-  return (
-    <div className="h-[210px] rounded-elas-lg bg-surface-subtle flex items-center justify-center text-sm text-muted">
-      Недостаточно данных
-    </div>
-  );
-}
-
-function Kpi({ title, value, hint }: { title: string; value: string; hint: string }) {
-  return (
-    <Card>
-      <CardContent className="p-6 md:p-7">
-        <div className="text-sm text-muted">{title}</div>
-        <div className="mt-2 text-3xl font-semibold text-fg">{value}</div>
-        <div className="mt-2 text-sm text-muted">{hint}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChartCard({ title, tag, children }: { title: string; tag: string; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="p-6 md:p-7">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-medium text-fg">{title}</div>
-          <Badge className="bg-primary/10">{tag}</Badge>
+            </section>
+          </Reveal>
         </div>
-        <div className="mt-5">{children}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MiniCompare({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="rounded-elas-lg bg-surface-subtle p-4">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={`mt-1 text-xl font-semibold ${accent ? "text-[rgb(var(--primary))]" : "text-fg"}`}>
-        {value}
       </div>
     </div>
   );
 }
 
-function Insight({ title, text }: { title: string; text: string }) {
+function StatusBanner({
+  icon,
+  title,
+  text,
+  action,
+  accent,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  action?: ReactNode;
+  accent: Accent;
+}) {
+  const tones: Record<Accent, string> = {
+    violet: "border-violet-200 bg-[linear-gradient(135deg,#f5f0ff,#ffffff)] text-violet-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    rose: "border-rose-200 bg-rose-50 text-rose-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-700",
+  };
+
   return (
-    <div className="rounded-elas-lg bg-surface-subtle p-4">
-      <div className="font-semibold text-fg">{title}</div>
-      <div className="mt-2 text-sm text-muted leading-relaxed">{text}</div>
+    <section
+      className={`flex flex-col gap-4 rounded-[24px] border p-5 shadow-[0_12px_35px_rgba(15,23,42,0.05)] sm:flex-row sm:items-center sm:justify-between ${tones[accent]}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm">
+          {icon}
+        </div>
+        <div>
+          <h2 className="font-bold text-slate-950">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{text}</p>
+        </div>
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </section>
+  );
+}
+
+function KpiCard({
+  icon,
+  title,
+  value,
+  hint,
+  accent,
+}: {
+  icon: ReactNode;
+  title: string;
+  value: string;
+  hint: string;
+  accent: Accent;
+}) {
+  const tones: Record<Accent, { icon: string; glow: string }> = {
+    violet: {
+      icon: "bg-violet-50 text-violet-600 border-violet-100",
+      glow: "from-violet-500/15",
+    },
+    emerald: {
+      icon: "bg-emerald-50 text-emerald-600 border-emerald-100",
+      glow: "from-emerald-500/15",
+    },
+    rose: {
+      icon: "bg-rose-50 text-rose-600 border-rose-100",
+      glow: "from-rose-500/15",
+    },
+    amber: {
+      icon: "bg-amber-50 text-amber-600 border-amber-100",
+      glow: "from-amber-500/15",
+    },
+    blue: {
+      icon: "bg-blue-50 text-blue-600 border-blue-100",
+      glow: "from-blue-500/15",
+    },
+  };
+
+  return (
+    <article className="group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(15,23,42,0.10)]">
+      <div
+        aria-hidden="true"
+        className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${tones[accent].glow} to-transparent opacity-70`}
+      />
+      <div className="relative">
+        <div className="flex items-start justify-between gap-3">
+          <div
+            className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${tones[accent].icon}`}
+          >
+            {icon}
+          </div>
+          <span className="rounded-full bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-400">
+            За всё время
+          </span>
+        </div>
+
+        <div className="mt-5 text-sm font-semibold text-slate-500">{title}</div>
+        <div className="mt-1 text-3xl font-bold tracking-tight text-slate-950">{value}</div>
+        <div className="mt-2 text-xs leading-5 text-slate-500">{hint}</div>
+      </div>
+    </article>
+  );
+}
+
+function AnalyticsCard({
+  title,
+  description,
+  icon,
+  tag,
+  children,
+}: {
+  title: string;
+  description: string;
+  icon: ReactNode;
+  tag: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="h-full overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.07)]">
+      <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-[linear-gradient(135deg,#fbfaff,#ffffff)] px-5 py-5 md:px-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-100 bg-violet-50 text-violet-600">
+            {icon}
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-950">{title}</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+          </div>
+        </div>
+        <span className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-violet-600">
+          {tag}
+        </span>
+      </div>
+
+      <div className="p-5 md:p-6">{children}</div>
+    </section>
+  );
+}
+
+function WeekComparison({
+  thisWeek,
+  prevWeek,
+  delta,
+}: {
+  thisWeek: number;
+  prevWeek: number;
+  delta: number;
+}) {
+  const positive = delta >= 0;
+  const DeltaIcon = positive ? ArrowUpRight : ArrowDownRight;
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <MiniCompare label="Эта неделя" value={`${thisWeek}%`} accent="violet" />
+        <MiniCompare label="Прошлая неделя" value={`${prevWeek}%`} accent="blue" />
+        <div
+          className={`rounded-2xl border p-4 ${
+            positive
+              ? "border-emerald-100 bg-emerald-50"
+              : "border-rose-100 bg-rose-50"
+          }`}
+        >
+          <div className="text-xs font-semibold text-slate-500">Изменение</div>
+          <div
+            className={`mt-2 flex items-center gap-1 text-2xl font-bold ${
+              positive ? "text-emerald-600" : "text-rose-600"
+            }`}
+          >
+            <DeltaIcon size={20} />
+            {positive ? "+" : ""}
+            {delta}%
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+        <ComparisonBar label="Эта неделя" value={thisWeek} accent />
+        <ComparisonBar label="Прошлая неделя" value={prevWeek} />
+      </div>
+
+      <p className="text-sm leading-6 text-slate-600">
+        {positive
+          ? "Вовлечённость выросла. Сохраните формат занятий, который дал положительную динамику."
+          : "Вовлечённость снизилась. Попробуйте добавить больше интерактива и коротких смен активности."}
+      </p>
     </div>
   );
+}
+
+function MiniCompare({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: "violet" | "blue";
+}) {
+  const styles =
+    accent === "violet"
+      ? "border-violet-100 bg-violet-50 text-violet-700"
+      : "border-blue-100 bg-blue-50 text-blue-700";
+
+  return (
+    <div className={`rounded-2xl border p-4 ${styles}`}>
+      <div className="text-xs font-semibold opacity-70">{label}</div>
+      <div className="mt-2 text-2xl font-bold">{value}</div>
+    </div>
+  );
+}
+
+function ComparisonBar({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
+        <span>{label}</span>
+        <span>{value}%</span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={`h-full rounded-full ${
+            accent
+              ? "bg-[linear-gradient(90deg,#8b5cf6,#6d28d9)]"
+              : "bg-[linear-gradient(90deg,#93c5fd,#60a5fa)]"
+          }`}
+          style={{ width: `${Math.max(2, Math.min(100, value))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function InsightCard({
+  icon,
+  title,
+  text,
+  accent,
+}: {
+  icon: ReactNode;
+  title: string;
+  text: string;
+  accent: "violet" | "rose" | "emerald";
+}) {
+  const tones = {
+    violet: "border-violet-100 bg-violet-50/60 text-violet-600",
+    rose: "border-rose-100 bg-rose-50/60 text-rose-600",
+    emerald: "border-emerald-100 bg-emerald-50/60 text-emerald-600",
+  };
+
+  return (
+    <article className={`rounded-2xl border p-5 ${tones[accent]}`}>
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm">
+        {icon}
+      </div>
+      <h3 className="mt-4 font-bold text-slate-950">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+    </article>
+  );
+}
+
+function ChartSkeleton() {
+  return <div className="h-[235px] animate-pulse rounded-2xl bg-slate-100" />;
+}
+
+function EmptyChart() {
+  return (
+    <div className="flex h-[235px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-center">
+      <BrainCircuit size={30} className="text-slate-300" />
+      <div className="mt-3 font-semibold text-slate-600">Недостаточно данных</div>
+      <div className="mt-1 text-xs text-slate-400">
+        Данные появятся после нескольких проанализированных сессий
+      </div>
+    </div>
+  );
+}
+
+function toPercent(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  const normalized = Math.abs(value) <= 1 ? value * 100 : value;
+  return Math.round(normalized * 10) / 10;
+}
+
+function toPercentDelta(value: number | null | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 0;
+  const normalized = Math.abs(value) <= 1 ? value * 100 : value;
+  return Math.round(normalized * 10) / 10;
 }
