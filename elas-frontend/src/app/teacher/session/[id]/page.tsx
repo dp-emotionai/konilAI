@@ -360,6 +360,7 @@ export default function TeacherJoinSessionPage() {
             title: file.name.replace(/\.[^/.]+$/, "") || file.name,
             description: null,
             fileName: uploaded.fileName || file.name,
+            kind: uploaded.kind || null,
             mimeType: uploaded.mimeType || file.type || null,
             storageKey: uploaded.storageKey,
             size: uploaded.size ?? file.size ?? null,

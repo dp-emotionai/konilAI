@@ -444,7 +444,7 @@ export default function TeacherResourcesPage() {
 
     setWorking(true);
     try {
-      const uploaded = await uploadMaterialFile(selectedFile, createKind === "audio" ? "audio" : createKind);
+      const uploaded = await uploadMaterialFile(selectedFile);
       const descriptionParts = [form.description.trim()];
 
       if ((createKind === "audio" || createKind === "video") && mediaDetails.trim()) {
@@ -457,8 +457,8 @@ export default function TeacherResourcesPage() {
       const material = await createMaterial({
         title: form.title.trim(),
         description: descriptionParts.filter(Boolean).join("\n") || null,
-        kind: uploaded.kind || (createKind === "audio" ? "audio" : createKind),
         fileName: uploaded.fileName,
+        kind: uploaded.kind || createKind,
         mimeType: uploaded.mimeType || form.mimeType.trim() || null,
         storageKey: uploaded.storageKey,
         size: uploaded.size,

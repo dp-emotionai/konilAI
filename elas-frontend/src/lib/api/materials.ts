@@ -6,13 +6,11 @@ export type MaterialRow = {
   id: string;
   title: string;
   description: string | null;
-  kind: MaterialKind;
+  kind?: MaterialKind | string | null;
   fileName: string;
   mimeType: string | null;
   storageKey: string;
   size: number | null;
-  thumbnailStorageKey?: string | null;
-  durationSec?: number | null;
   ownerId: string;
   createdAt: string;
   updatedAt: string;
@@ -30,7 +28,7 @@ export type MaterialAssignmentRow = {
 
 export type MaterialUploadResult = {
   storageKey: string;
-  kind: MaterialKind;
+  kind?: MaterialKind | string | null;
   fileName: string;
   mimeType: string | null;
   size: number | null;
@@ -41,11 +39,10 @@ export type AssignedMaterialRow = {
   materialId: string;
   title: string;
   description: string | null;
-  kind: MaterialKind;
+  kind?: MaterialKind | string | null;
   fileName: string | null;
   mimeType: string | null;
   size: number | null;
-  durationSec?: number | null;
   createdAt: string;
   visibleFrom: string | null;
   visibleTo: string | null;
@@ -61,30 +58,55 @@ export async function createMaterial(
     input: {
       title: string;
       description?: string | null;
-      kind?: MaterialKind;
       fileName: string;
+      kind?: MaterialKind | string | null;
       mimeType?: string | null;
       storageKey: string;
       size?: number | null;
-      thumbnailStorageKey?: string | null;
-      durationSec?: number | null;
     },
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.post<MaterialRow>("/materials", input, { signal: params?.signal });
 }
 
-export async function uploadMaterialFile(file: File, kind?: MaterialKind): Promise<MaterialUploadResult> {
+function detectUploadKind(file: File): MaterialKind {
+  const mimeType = String(file.type || "").toLowerCase();
+  const fileName = String(file.name || "").toLowerCase();
+
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  if (mimeType.startsWith("image/")) return "image";
+
+  if (
+      mimeType.includes("pdf") ||
+      mimeType.includes("word") ||
+      mimeType.includes("document") ||
+      mimeType.includes("presentation") ||
+      mimeType.includes("spreadsheet") ||
+      mimeType.startsWith("text/") ||
+      fileName.endsWith(".pdf") ||
+      fileName.endsWith(".doc") ||
+      fileName.endsWith(".docx") ||
+      fileName.endsWith(".ppt") ||
+      fileName.endsWith(".pptx") ||
+      fileName.endsWith(".xls") ||
+      fileName.endsWith(".xlsx") ||
+      fileName.endsWith(".txt")
+  ) {
+    return "document";
+  }
+
+  return "file";
+}
+
+export async function uploadMaterialFile(file: File): Promise<MaterialUploadResult> {
   const base = getApiBaseUrl();
   const token = getToken();
   if (!base || !token) throw new Error("API URL or auth token not configured");
 
   const formData = new FormData();
   formData.append("file", file);
-
-  if (kind) {
-    formData.append("kind", kind);
-  }
+  formData.append("kind", detectUploadKind(file));
 
   const response = await fetch(`${base}/materials/upload`, {
     method: "POST",
@@ -105,7 +127,7 @@ export async function uploadMaterialFile(file: File, kind?: MaterialKind): Promi
 
 export async function updateMaterial(
     materialId: string,
-    input: Partial<Pick<MaterialRow, "title" | "description" | "kind" | "fileName" | "mimeType" | "storageKey" | "size" | "thumbnailStorageKey" | "durationSec">>,
+    input: Partial<Pick<MaterialRow, "title" | "description" | "fileName" | "mimeType" | "storageKey" | "size">>,
     params?: { signal?: AbortSignal }
 ): Promise<MaterialRow> {
   return api.patch<MaterialRow>(`/materials/${materialId}`, input, { signal: params?.signal });
@@ -168,9 +190,9 @@ export async function getStudentMaterials(params?: { signal?: AbortSignal }): Pr
 export async function getMaterialDownload(
     materialId: string,
     params?: { signal?: AbortSignal }
-): Promise<{ downloadUrl: string; fileName: string } | null> {
+): Promise<{ downloadUrl: string; fileName: string; kind?: string | null; mimeType?: string | null } | null> {
   if (!getApiBaseUrl() || !hasAuth() || !materialId) return null;
-  return api.get<{ downloadUrl: string; fileName: string }>(`/materials/${materialId}/download`, { signal: params?.signal });
+  return api.get<{ downloadUrl: string; fileName: string; kind?: string | null; mimeType?: string | null }>(`/materials/${materialId}/download`, { signal: params?.signal });
 }
 
 export async function getMaterialDownloadByStorageKey(
