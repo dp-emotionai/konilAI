@@ -2,6 +2,13 @@ import { api, getApiBaseUrl, getApiOriginUrl, getToken, hasAuth } from "@/lib/ap
 
 export type MaterialKind = "video" | "audio" | "image" | "document" | "file";
 
+export type MaterialGroupInfo = {
+  id: string;
+  name: string;
+  imageUrl?: string | null;
+  teacherId?: string | null;
+};
+
 export type MaterialRow = {
   id: string;
   title: string;
@@ -21,6 +28,11 @@ export type MaterialAssignmentRow = {
   materialId: string;
   groupId: string;
   sessionId: string | null;
+  groupId?: string | null;
+  groupName?: string | null;
+  group?: MaterialGroupInfo | null;
+  sessionId?: string | null;
+  assignedAt?: string | null;
   visibleFrom: string | null;
   visibleTo: string | null;
   createdAt: string;
@@ -44,6 +56,11 @@ export type AssignedMaterialRow = {
   mimeType: string | null;
   size: number | null;
   createdAt: string;
+  groupId?: string | null;
+  groupName?: string | null;
+  group?: MaterialGroupInfo | null;
+  sessionId?: string | null;
+  assignedAt?: string | null;
   visibleFrom: string | null;
   visibleTo: string | null;
 };

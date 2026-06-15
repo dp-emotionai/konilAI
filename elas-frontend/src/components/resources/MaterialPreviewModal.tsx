@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Music2,
+  UsersRound,
   Video,
   X,
 } from "lucide-react";
@@ -94,6 +95,12 @@ function getBadgeClass(kind: PreviewKind): string {
   if (kind === "audio") return "bg-violet-50 text-violet-700 ring-violet-100";
   if (kind === "document") return "bg-[#7448FF]/10 text-[#7448FF] ring-[#7448FF]/15";
   return "bg-slate-100 text-slate-700 ring-slate-200";
+}
+
+function getMaterialGroupName(material: PreviewMaterial): string {
+  if (!("assignmentId" in material)) return "—";
+
+  return String(material.group?.name || material.groupName || material.groupId || "Без группы").trim();
 }
 
 function getFileExtension(fileName: string | null | undefined, mimeType?: string | null): string {
@@ -259,7 +266,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                     <span className={cn("rounded-full px-3 py-1 text-xs font-black ring-1", getBadgeClass(kind))}>{getLabel(kind)}</span>
                   </div>
 
-                  <div className="mt-5 grid gap-4 sm:grid-cols-4">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-5">
                     <div className="min-w-0 sm:col-span-2">
                       <div className="text-xs font-black text-slate-400">Имя файла</div>
                       <div className="mt-1 truncate text-sm font-bold text-slate-700" title={fileName}>{fileName}</div>
@@ -271,6 +278,12 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                     <div>
                       <div className="text-xs font-black text-slate-400">Размер</div>
                       <div className="mt-1 text-sm font-bold text-slate-700">{formatBytes(material.size)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs font-black text-slate-400">Группа</div>
+                      <div className="mt-1 truncate text-sm font-bold text-slate-700" title={getMaterialGroupName(material)}>
+                        {getMaterialGroupName(material)}
+                      </div>
                     </div>
                     <div>
                       <div className="text-xs font-black text-slate-400">Дата добавления</div>
@@ -340,7 +353,7 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                 </div>
               </div>
 
-              <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 text-sm sm:grid-cols-4">
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-400"><FileText size={15} /> Размер</div>
                   <div className="mt-2 font-black text-slate-700">{formatBytes(material.size)}</div>
@@ -348,6 +361,10 @@ export default function MaterialPreviewModal({ material, open, onClose }: Props)
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-400"><Icon size={15} /> Тип</div>
                   <div className="mt-2 font-black text-slate-700">{getLabel(kind)} ({fileType})</div>
+                </div>
+                <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2 text-xs font-black text-slate-400"><UsersRound size={15} /> Группа</div>
+                  <div className="mt-2 truncate font-black text-slate-700" title={getMaterialGroupName(material)}>{getMaterialGroupName(material)}</div>
                 </div>
                 <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                   <div className="flex items-center gap-2 text-xs font-black text-slate-400"><CalendarDays size={15} /> Дата добавления</div>
