@@ -25,6 +25,7 @@ import {
   Search,
   Trash2,
   Upload,
+  CloudUpload,
   UserPlus,
   Video,
   X,
@@ -57,7 +58,19 @@ import {
 import { ChatClient } from "@/lib/ws/chatClient";
 
 type MaterialKind = "all" | "document" | "image" | "video" | "audio" | "other";
+type CreateKind = "document" | "image" | "video" | "audio";
 type SortMode = "newest" | "oldest" | "name";
+
+type CreateTypeConfig = {
+  uploadLabel: string;
+  dropLabel: string;
+  hint: string;
+  maxBytes: number;
+  maxSizeLabel: string;
+  detailsLabel?: string;
+  detailsPlaceholder?: string;
+  detailsHelp?: string;
+};
 
 type MaterialKindMeta = {
   label: string;
@@ -90,6 +103,58 @@ const TABS: Array<{ id: MaterialKind; label: string }> = [
   { id: "video", label: "Видеоуроки" },
   { id: "audio", label: "Аудиозаписи" },
 ];
+
+
+const CREATE_TYPES: Array<{ id: CreateKind; label: string; icon: ComponentType<{ size?: number; className?: string }> }> = [
+  { id: "document", label: "Документ", icon: FileText },
+  { id: "image", label: "Изображение", icon: ImageIcon },
+  { id: "video", label: "Видеоурок", icon: Video },
+  { id: "audio", label: "Аудиозапись", icon: Music2 },
+];
+
+const CREATE_ACCEPT: Record<CreateKind, string> = {
+  document: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.csv,application/pdf,text/*",
+  image: "image/*,.png,.jpg,.jpeg,.webp,.gif,.svg",
+  video: "video/*,.mp4,.mov,.avi,.mkv,.webm,.m4v",
+  audio: "audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac,.wma,.opus",
+};
+
+const CREATE_CONFIG: Record<CreateKind, CreateTypeConfig> = {
+  document: {
+    uploadLabel: "Загрузить файл",
+    dropLabel: "Перетащите файл сюда или нажмите для выбора",
+    hint: "Поддерживаются PDF, DOCX, PPTX, XLSX (до 100 МБ)",
+    maxBytes: 100 * 1024 * 1024,
+    maxSizeLabel: "100 МБ",
+  },
+  image: {
+    uploadLabel: "Загрузить изображение",
+    dropLabel: "Перетащите изображение сюда или нажмите для выбора",
+    hint: "Поддерживаются JPG, PNG, WEBP, SVG (до 20 МБ)",
+    maxBytes: 20 * 1024 * 1024,
+    maxSizeLabel: "20 МБ",
+  },
+  video: {
+    uploadLabel: "Загрузить видео",
+    dropLabel: "Перетащите видеофайл сюда или нажмите для выбора",
+    hint: "Поддерживаются MP4, MOV, AVI, WebM (до 500 МБ)",
+    maxBytes: 500 * 1024 * 1024,
+    maxSizeLabel: "500 МБ",
+    detailsLabel: "Ссылка на видео или длительность (необязательно)",
+    detailsPlaceholder: "https://example.com/video или 00:00:00",
+    detailsHelp: "Укажите ссылку на видео или приблизительную длительность (чч:мм:сс).",
+  },
+  audio: {
+    uploadLabel: "Загрузить аудио",
+    dropLabel: "Перетащите аудиофайл сюда или нажмите для выбора",
+    hint: "Поддерживаются MP3, WAV, M4A, OGG (до 100 МБ)",
+    maxBytes: 100 * 1024 * 1024,
+    maxSizeLabel: "100 МБ",
+    detailsLabel: "Ссылка на аудио или длительность (необязательно)",
+    detailsPlaceholder: "https://example.com/audio.mp3 или 12:45",
+    detailsHelp: "Укажите ссылку на аудио или приблизительную длительность.",
+  },
+};
 
 const KIND_META: Record<Exclude<MaterialKind, "all">, MaterialKindMeta> = {
   document: {
@@ -147,6 +212,10 @@ export default function TeacherResourcesPage() {
   const [actionMenuId, setActionMenuId] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<CreateKind>("document");
+  const [createGroupId, setCreateGroupId] = useState("");
+  const [mediaDetails, setMediaDetails] = useState("");
+  const [dragActive, setDragActive] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [activeMaterial, setActiveMaterial] = useState<MaterialRow | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -263,6 +332,57 @@ export default function TeacherResourcesPage() {
     setPage(1);
   };
 
+  const resetCreateForm = useCallback(() => {
+    setForm(DEFAULT_CREATE_FORM);
+    setSelectedFile(null);
+    setCreateKind("document");
+    setCreateGroupId("");
+    setMediaDetails("");
+    setDragActive(false);
+  }, []);
+
+  const closeCreateModal = useCallback(() => {
+    if (working) return;
+    setCreateOpen(false);
+    resetCreateForm();
+  }, [resetCreateForm, working]);
+
+  const applySelectedFile = useCallback((file: File | null) => {
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    const detectedKind = getCreateKindFromFile(file);
+    if (!detectedKind) {
+      push({
+        type: "error",
+        title: "Неподдерживаемый формат файла",
+        text: "Выберите документ, изображение, видео или аудиофайл поддерживаемого формата.",
+      });
+      return;
+    }
+
+    const config = CREATE_CONFIG[detectedKind];
+    if (file.size > config.maxBytes) {
+      push({
+        type: "error",
+        title: "Файл слишком большой",
+        text: `Максимальный размер для этого типа — ${config.maxSizeLabel}.`,
+      });
+      return;
+    }
+
+    setCreateKind(detectedKind);
+    setSelectedFile(file);
+    setForm((current) => ({
+      ...current,
+      fileName: file.name,
+      mimeType: file.type || current.mimeType,
+      size: String(file.size),
+    }));
+  }, [push]);
+
   const openAssign = useCallback((material: MaterialRow) => {
     setActionMenuId(null);
     setActiveMaterial(material);
@@ -317,25 +437,53 @@ export default function TeacherResourcesPage() {
   );
 
   const handleCreate = async () => {
+    if (!selectedFile) {
+      push({ type: "error", title: "Выберите файл для загрузки" });
+      return;
+    }
+
     setWorking(true);
     try {
-      const uploaded = selectedFile ? await uploadMaterialFile(selectedFile) : null;
-      const size = uploaded ? uploaded.size : form.size.trim() ? Number(form.size) : null;
+      const uploaded = await uploadMaterialFile(selectedFile);
+      const descriptionParts = [form.description.trim()];
 
-      await createMaterial({
+      if ((createKind === "audio" || createKind === "video") && mediaDetails.trim()) {
+        const detailsLabel = createKind === "audio"
+          ? "Ссылка или длительность аудио"
+          : "Ссылка или длительность видео";
+        descriptionParts.push(`${detailsLabel}: ${mediaDetails.trim()}`);
+      }
+
+      const material = await createMaterial({
         title: form.title.trim(),
-        description: form.description.trim() || null,
-        fileName: uploaded?.fileName || form.fileName.trim(),
-        mimeType: uploaded?.mimeType || form.mimeType.trim() || null,
-        storageKey: uploaded?.storageKey || form.storageKey.trim(),
-        size: typeof size === "number" && Number.isFinite(size) ? size : null,
+        description: descriptionParts.filter(Boolean).join("\n") || null,
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType || form.mimeType.trim() || null,
+        storageKey: uploaded.storageKey,
+        size: uploaded.size,
       });
 
+      let assignmentFailed = false;
+      if (createGroupId) {
+        try {
+          await assignMaterial(material.id, { groupId: createGroupId });
+        } catch {
+          assignmentFailed = true;
+        }
+      }
+
       setCreateOpen(false);
-      setForm(DEFAULT_CREATE_FORM);
-      setSelectedFile(null);
+      resetCreateForm();
       await loadMaterials();
-      push({ type: "success", title: "Материал создан" });
+      push({
+        type: assignmentFailed ? "info" : "success",
+        title: assignmentFailed ? "Материал создан без назначения" : "Материал создан",
+        text: assignmentFailed
+          ? "Файл загружен, но назначить его группе не удалось. Назначьте материал через кнопку в таблице."
+          : createGroupId
+            ? "Материал сразу назначен выбранной группе."
+            : undefined,
+      });
     } catch (error: unknown) {
       push({
         type: "error",
@@ -377,6 +525,8 @@ export default function TeacherResourcesPage() {
       setWorking(false);
     }
   };
+
+  const createConfig = CREATE_CONFIG[createKind];
 
   return (
     <div className="min-h-screen bg-[#FAFAFB]">
@@ -686,101 +836,157 @@ export default function TeacherResourcesPage() {
 
       <Modal
         open={createOpen}
-        onClose={() => {
-          if (working) return;
-          setCreateOpen(false);
-        }}
-        title="Создать материал"
-        description="Загрузите файл и заполните данные материала."
+        onClose={closeCreateModal}
+        title="Создание материала"
         size="lg"
         footer={
           <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={working}>
+            <Button type="button" variant="outline" onClick={closeCreateModal} disabled={working}>
               Отмена
             </Button>
             <Button
               type="button"
               onClick={() => void handleCreate()}
-              disabled={
-                working ||
-                !form.title.trim() ||
-                (!selectedFile && (!form.fileName.trim() || !form.storageKey.trim()))
-              }
+              disabled={working || !form.title.trim() || !selectedFile}
             >
-              {working ? "Создание..." : "Создать"}
+              {working ? "Создание..." : "Создать материал"}
             </Button>
           </div>
         }
       >
-        <div className="space-y-4">
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-violet-300 bg-violet-50/50 px-5 py-7 text-center transition hover:bg-violet-50">
-            <Upload size={26} className="text-violet-600" />
-            <span className="mt-2 text-sm font-semibold text-slate-800">
-              {selectedFile ? selectedFile.name : "Выберите файл для загрузки"}
-            </span>
-            <span className="mt-1 text-xs text-slate-500">
-              Документы, изображения, видео и аудио
-            </span>
+        <div className="space-y-5">
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-slate-700">Название материала</span>
             <input
-              type="file"
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0] ?? null;
-                setSelectedFile(file);
-                if (file) {
-                  setForm((current) => ({
-                    ...current,
-                    fileName: file.name,
-                    mimeType: file.type || current.mimeType,
-                    size: String(file.size),
-                  }));
-                }
-              }}
+              value={form.title}
+              maxLength={160}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="Введите название материала"
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
             />
           </label>
 
-          <Input
-            placeholder="Название"
-            value={form.title}
-            onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-          />
-          <Input
-            placeholder="Описание (необязательно)"
-            value={form.description}
-            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-          />
-
-          {!selectedFile && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                Ручные данные файла
-              </div>
-              <div className="space-y-3">
-                <Input
-                  placeholder="Имя файла, например lesson.pdf"
-                  value={form.fileName}
-                  onChange={(event) => setForm((current) => ({ ...current, fileName: event.target.value }))}
-                />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    placeholder="MIME-тип"
-                    value={form.mimeType}
-                    onChange={(event) => setForm((current) => ({ ...current, mimeType: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Размер в байтах"
-                    value={form.size}
-                    onChange={(event) => setForm((current) => ({ ...current, size: event.target.value }))}
-                  />
-                </div>
-                <Input
-                  placeholder="Ключ хранилища"
-                  value={form.storageKey}
-                  onChange={(event) => setForm((current) => ({ ...current, storageKey: event.target.value }))}
-                />
-              </div>
+          <div>
+            <div className="mb-2 text-sm font-semibold text-slate-700">Тип</div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {CREATE_TYPES.map((item) => {
+                const Icon = item.icon;
+                const active = createKind === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setCreateKind(item.id);
+                      setSelectedFile(null);
+                      setMediaDetails("");
+                      setForm((current) => ({ ...current, fileName: "", mimeType: "", size: "" }));
+                    }}
+                    className={cn(
+                      "flex h-11 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold transition",
+                      active
+                        ? "border-violet-400 bg-violet-50 text-violet-700 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:bg-violet-50/50"
+                    )}
+                  >
+                    <Icon size={16} />
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+
+          <div>
+            <div className="mb-2 text-sm font-semibold text-slate-700">
+              {createConfig.uploadLabel}
+            </div>
+            <label
+              className={cn(
+                "flex min-h-[148px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center transition",
+                dragActive
+                  ? "border-violet-500 bg-violet-100/70"
+                  : "border-violet-300 bg-violet-50/45 hover:bg-violet-50"
+              )}
+              onDragEnter={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setDragActive(false);
+                applySelectedFile(event.dataTransfer.files?.[0] ?? null);
+              }}
+            >
+              <CreateUploadIcon kind={createKind} />
+              <span className="mt-3 text-sm font-semibold text-slate-800">
+                {selectedFile ? selectedFile.name : createConfig.dropLabel}
+              </span>
+              <span className="mt-1 text-xs text-slate-500">{createConfig.hint}</span>
+              <input
+                type="file"
+                accept={CREATE_ACCEPT[createKind]}
+                className="sr-only"
+                onChange={(event) => applySelectedFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+          </div>
+
+          {(createKind === "audio" || createKind === "video") && (
+            <label className="block">
+              <span className="mb-2 block text-sm font-semibold text-slate-700">
+                {createConfig.detailsLabel}
+              </span>
+              <input
+                value={mediaDetails}
+                maxLength={255}
+                onChange={(event) => setMediaDetails(event.target.value)}
+                placeholder={createConfig.detailsPlaceholder}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+              />
+              <div className="mt-1 flex items-start justify-between gap-3 text-[11px] text-slate-400">
+                <span>{createConfig.detailsHelp} Для скачивания нужен загруженный файл.</span>
+                <span className="shrink-0">{mediaDetails.length}/255</span>
+              </div>
+            </label>
           )}
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-slate-700">Описание (необязательно)</span>
+            <textarea
+              value={form.description}
+              maxLength={500}
+              onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+              placeholder="Введите описание материала"
+              rows={3}
+              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+            />
+            <span className="mt-1 block text-right text-[11px] text-slate-400">{form.description.length}/500</span>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-semibold text-slate-700">
+              Назначить группе (необязательно)
+            </span>
+            <select
+              value={createGroupId}
+              onChange={(event) => setCreateGroupId(event.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+            >
+              <option value="">Выберите группу</option>
+              {groupOptions.map((group) => (
+                <option key={group.id} value={group.id}>{group.name}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </Modal>
 
@@ -913,6 +1119,55 @@ export default function TeacherResourcesPage() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+function CreateUploadIcon({ kind }: { kind: CreateKind }) {
+  if (kind === "image") {
+    return (
+      <span className="relative flex h-16 w-20 items-center justify-center">
+        <span className="absolute left-1 top-2 h-11 w-14 rotate-[-7deg] rounded-xl border border-violet-200 bg-white/80 shadow-sm" />
+        <span className="relative flex h-12 w-16 items-center justify-center rounded-xl border border-violet-200 bg-white text-violet-600 shadow-sm">
+          <ImageIcon size={30} />
+        </span>
+        <span className="absolute -right-1 bottom-0 flex h-8 w-8 items-center justify-center rounded-full bg-violet-600 text-white shadow-md">
+          <Upload size={16} />
+        </span>
+      </span>
+    );
+  }
+
+  if (kind === "video") {
+    return (
+      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+        <Video size={30} />
+      </span>
+    );
+  }
+
+  if (kind === "audio") {
+    return (
+      <span className="flex items-center gap-2 text-violet-600">
+        <span className="flex h-14 w-14 items-center justify-center rounded-full bg-violet-100">
+          <Music2 size={28} />
+        </span>
+        <span aria-hidden="true" className="flex items-center gap-1">
+          {[14, 24, 34, 22, 30, 18].map((height, index) => (
+            <span
+              key={`${height}-${index}`}
+              className="w-1 rounded-full bg-violet-500"
+              style={{ height }}
+            />
+          ))}
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-violet-600">
+      <CloudUpload size={30} />
+    </span>
   );
 }
 
@@ -1106,6 +1361,17 @@ function PaginationButton({
       {children}
     </button>
   );
+}
+
+function getCreateKindFromFile(file: File): CreateKind | null {
+  const mime = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)) return "image";
+  if (mime.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm|m4v)$/i.test(name)) return "video";
+  if (mime.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|flac|wma|opus)$/i.test(name)) return "audio";
+  if (/\.(pdf|docx?|xlsx?|pptx?|txt|rtf|csv)$/i.test(name) || mime.includes("pdf") || mime.includes("document") || mime.startsWith("text/")) return "document";
+  return null;
 }
 
 function getMaterialKind(material: MaterialRow): Exclude<MaterialKind, "all"> {
