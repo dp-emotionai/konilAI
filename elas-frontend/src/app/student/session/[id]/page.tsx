@@ -221,6 +221,21 @@ function getFileExtension(fileName?: string | null, mimeType?: string | null) {
     return fromMime ? fromMime.toUpperCase().slice(0, 6) : "FILE";
 }
 
+
+function getPreviewMaterialId(file: SessionContentFile | null): string {
+    if (!file) return "";
+    return String(file.materialId || file.id || "").trim();
+}
+
+function normalizePreviewMaterial(file: SessionContentFile): SessionContentFile {
+    const materialId = getPreviewMaterialId(file);
+    return {
+        ...file,
+        id: materialId || file.id,
+        materialId: materialId || file.id,
+    };
+}
+
 function formatUploadTime(value?: string | null) {
     const date = value ? new Date(value) : new Date();
     if (Number.isNaN(date.getTime())) return "Загружено";
@@ -1221,7 +1236,7 @@ export default function StudentJoinSessionPage() {
                                                                     <div className="ml-auto flex shrink-0 items-center gap-2">
                                                                         <button
                                                                             type="button"
-                                                                            onClick={() => setSelectedMaterialPreview(file)}
+                                                                            onClick={() => setSelectedMaterialPreview(normalizePreviewMaterial(file))}
                                                                             className="inline-flex items-center gap-2 rounded-[18px] border border-purple-100 bg-white px-4 py-2.5 text-[12px] font-bold text-[#7448FF] transition hover:border-[#7448FF]/30 hover:bg-purple-50"
                                                                         >
                                                                             Открыть
@@ -1231,7 +1246,8 @@ export default function StudentJoinSessionPage() {
                                                                         <button
                                                                             type="button"
                                                                             onClick={async () => {
-                                                                                const info = await getMaterialDownload(file.id, { mode: "download" });
+                                                                                const materialId = getPreviewMaterialId(file);
+                                                                                const info = await getMaterialDownload(materialId, { mode: "download" });
                                                                                 const url = info?.downloadUrl ? resolveDownloadUrl(info.downloadUrl) : file.url || "";
                                                                                 if (url) window.open(url, "_blank", "noreferrer");
                                                                             }}
