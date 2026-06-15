@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 function playElement(element: HTMLMediaElement) {
   const playPromise = element.play();
@@ -19,6 +19,16 @@ export function StreamVideo({
                             }: { stream: MediaStream | null } & React.VideoHTMLAttributes<HTMLVideoElement>) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const streamTrackKey = useMemo(() => {
+    if (!stream) return "no-stream";
+
+    return stream
+        .getTracks()
+        .map((track) => `${track.kind}:${track.id}:${track.readyState}:${track.enabled ? "1" : "0"}`)
+        .sort()
+        .join("|");
+  }, [stream]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -34,8 +44,8 @@ export function StreamVideo({
     }
 
     // Force re-attach. Some browsers keep the old rendering pipeline when the
-    // same MediaStream is moved from a thumbnail video to the main video. That
-    // can leave the main element black while audio continues.
+    // same MediaStream is moved from a thumbnail video to the main video, or
+    // when a remote video track appears after an audio track in a group call.
     video.pause();
     video.srcObject = null;
     video.load();
@@ -56,7 +66,7 @@ export function StreamVideo({
       window.removeEventListener("click", retryOnUserGesture);
       window.removeEventListener("touchstart", retryOnUserGesture);
     };
-  }, [stream, muted, autoPlay, playsInline]);
+  }, [stream, streamTrackKey, muted, autoPlay, playsInline]);
 
   return (
       <video

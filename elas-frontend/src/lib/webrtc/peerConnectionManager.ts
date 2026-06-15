@@ -172,6 +172,15 @@ export class PeerConnectionManager {
       new Map<ClientId, RTCIceCandidateInit[]>();
 
   /**
+   * Для каждого peer держим один общий remote MediaStream.
+   * В групповых звонках браузер часто присылает audio/video track отдельными
+   * ontrack-событиями. Если каждый раз отдавать старый event.streams[0],
+   * React может не перерисовать главное видео, и оно остаётся чёрным.
+   */
+  private remoteStreams =
+      new Map<ClientId, MediaStream>();
+
+  /**
    * Защищает от одновременной отправки нескольких offer
    * одному и тому же участнику.
    */
@@ -425,6 +434,7 @@ export class PeerConnectionManager {
 
     this.peers.clear();
     this.pendingIceCandidates.clear();
+    this.remoteStreams.clear();
     this.offerInProgress.clear();
 
     this.participants = [];
@@ -710,29 +720,48 @@ export class PeerConnectionManager {
     pc.ontrack = (
         event
     ) => {
-      const [firstStream] =
-          event.streams;
+      const remoteStream =
+          this.getOrCreateRemoteStream(
+              peerId
+          );
 
-      if (firstStream) {
-        this.callbacks.onRemoteStream?.(
-            peerId,
-            firstStream
-        );
+      const incomingTracks =
+          event.streams.length > 0
+              ? event.streams.flatMap((stream) => stream.getTracks())
+              : [event.track];
 
-        return;
+      for (const track of incomingTracks) {
+        if (!remoteStream.getTrackById(track.id)) {
+          remoteStream.addTrack(track);
+        }
+
+        track.onended = () => {
+          const stream =
+              this.remoteStreams.get(peerId);
+
+          if (!stream) return;
+
+          const existing =
+              stream.getTrackById(track.id);
+
+          if (existing) {
+            stream.removeTrack(existing);
+          }
+
+          this.emitRemoteStream(
+              peerId
+          );
+        };
+
+        track.onunmute = () => {
+          this.emitRemoteStream(
+              peerId
+          );
+        };
       }
 
-      /**
-       * Safari иногда может прислать track без event.streams.
-       */
-      const fallbackStream =
-          new MediaStream([
-            event.track,
-          ]);
-
-      this.callbacks.onRemoteStream?.(
-          peerId,
-          fallbackStream
+      this.emitRemoteStream(
+          peerId
       );
     };
 
@@ -1064,6 +1093,7 @@ export class PeerConnectionManager {
 
     this.peers.delete(peerId);
     this.pendingIceCandidates.delete(peerId);
+    this.remoteStreams.delete(peerId);
     this.offerInProgress.delete(peerId);
 
     this.participants =
@@ -1081,6 +1111,51 @@ export class PeerConnectionManager {
           peerId
       );
     }
+  }
+
+
+  private getOrCreateRemoteStream(
+      peerId: ClientId
+  ): MediaStream {
+    const existing =
+        this.remoteStreams.get(peerId);
+
+    if (existing) {
+      return existing;
+    }
+
+    const stream =
+        new MediaStream();
+
+    this.remoteStreams.set(
+        peerId,
+        stream
+    );
+
+    return stream;
+  }
+
+  private emitRemoteStream(
+      peerId: ClientId
+  ) {
+    const stream =
+        this.remoteStreams.get(peerId);
+
+    if (!stream) {
+      return;
+    }
+
+    /**
+     * Берём clone MediaStream object with the same tracks so React receives
+     * a new reference when the second/third participant adds a video track.
+     */
+    const tracks =
+        stream.getTracks().filter((track) => track.readyState !== "ended");
+
+    this.callbacks.onRemoteStream?.(
+        peerId,
+        new MediaStream(tracks)
+    );
   }
 
   private closePeerConnection(
