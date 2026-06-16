@@ -70,8 +70,24 @@ export type GroupAnalyticsResponse = {
   avg_engagement?: number;
   engagement_trend?:
     | SessionAnalyticsTimelinePoint[]
-    | { time_sec?: number; engagement?: number }[];
-  engagementTrend?: SessionAnalyticsTimelinePoint[];
+    | {
+        time_sec?: number;
+        timeSec?: number;
+        date?: string;
+        session_date?: string;
+        sessionDate?: string;
+        engagement?: number;
+      }[];
+  engagementTrend?:
+    | SessionAnalyticsTimelinePoint[]
+    | {
+        time_sec?: number;
+        timeSec?: number;
+        date?: string;
+        session_date?: string;
+        sessionDate?: string;
+        engagement?: number;
+      }[];
 
   // Optional group metrics returned by the backend.
   average_attendance?: number;
@@ -137,7 +153,11 @@ export type GroupAnalytics = {
   averageAttendance?: number;
   taskCompletionRate?: number;
   averageScore?: number;
-  engagementTrend: { timeSec: number; engagement: number }[];
+  engagementTrend: {
+    timeSec: number;
+    date?: string;
+    engagement: number;
+  }[];
 };
 
 export type TeacherAnalytics = {
@@ -265,13 +285,26 @@ function normGroupAnalytics(
     (
       p:
         | SessionAnalyticsTimelinePoint
-        | { time_sec?: number; engagement?: number }
+        | {
+            time_sec?: number;
+            timeSec?: number;
+            date?: string;
+            session_date?: string;
+            sessionDate?: string;
+            engagement?: number;
+          }
     ) => ({
       timeSec:
         (p as SessionAnalyticsTimelinePoint).time_sec ??
         (p as SessionAnalyticsTimelinePoint).timeSec ??
-        (p as { time_sec?: number }).time_sec ??
+        (p as { time_sec?: number; timeSec?: number }).time_sec ??
+        (p as { time_sec?: number; timeSec?: number }).timeSec ??
         0,
+      date:
+        (p as { date?: string }).date ??
+        (p as { session_date?: string }).session_date ??
+        (p as { sessionDate?: string }).sessionDate ??
+        undefined,
       engagement: normalizePercent(
         (p as SessionAnalyticsTimelinePoint).engagement ??
           (p as SessionAnalyticsTimelinePoint).avg_engagement ??
