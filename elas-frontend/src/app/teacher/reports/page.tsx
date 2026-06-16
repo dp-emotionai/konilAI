@@ -631,7 +631,7 @@ export default function TeacherReportsPage() {
                             </div>
                           ) : (
                             <div className="text-sm leading-6 text-slate-500">
-                              Backend пока не вернул временные buckets для этой сессии.
+                              Сервер пока не вернул временные buckets для этой сессии.
                             </div>
                           )}
                         </div>

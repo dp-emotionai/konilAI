@@ -457,7 +457,7 @@ export default function TeacherCalendarPage() {
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Без назначенного времени</h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Сессии, для которых backend пока не отдал точный timestamp.
+                    Сессии, для которых сервер пока не отдал точный timestamp.
                   </p>
                 </div>
                 <span className="rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
