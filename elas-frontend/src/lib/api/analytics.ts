@@ -170,16 +170,20 @@ function toNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && !Number.isNaN(value) ? value : fallback;
 }
 
+function clampPercent(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function normalizePercent(value: unknown): number {
   const n = toNumber(value, 0);
-  if (n >= 0 && n <= 1) return Math.round(n * 100);
-  return Math.round(n);
+  if (n >= 0 && n <= 1) return clampPercent(n * 100);
+  return clampPercent(n);
 }
 
 function normalizeMaybePercent(value: unknown): number | undefined {
   if (typeof value !== "number" || Number.isNaN(value)) return undefined;
-  if (value >= 0 && value <= 1) return Math.round(value * 100);
-  return Math.round(value);
+  if (value >= 0 && value <= 1) return clampPercent(value * 100);
+  return clampPercent(value);
 }
 
 function normSessionAnalytics(
