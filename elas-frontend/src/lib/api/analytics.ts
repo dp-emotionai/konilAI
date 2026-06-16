@@ -233,14 +233,13 @@ function normSessionAnalytics(
   const drops = raw.attention_drops ?? raw.attentionDrops ?? 0;
   const timelineRaw = Array.isArray(raw.timeline) ? raw.timeline : [];
 
-  const timeline = timelineRaw.map((p) => {
+  const mappedTimeline = timelineRaw.map((p) => {
     const fromSec = toNumber(p.from_sec ?? p.fromSec ?? p.time_sec ?? p.timeSec ?? 0, 0);
     const toSec = toNumber(p.to_sec ?? p.toSec ?? fromSec, fromSec);
 
     return {
-      timeSec: fromSec,
-      fromSec,
-      toSec,
+      rawFromSec: fromSec,
+      rawToSec: toSec,
       engagement: normalizePercent(
           p.engagement ?? p.avg_engagement ?? p.avgEngagement ?? 0
       ),
@@ -252,6 +251,23 @@ function normSessionAnalytics(
       sampleCount: toNumber(p.sample_count ?? p.sampleCount ?? 0, 0),
     };
   });
+
+  const firstSec = mappedTimeline.length
+      ? Math.min(...mappedTimeline.map((p) => p.rawFromSec))
+      : 0;
+
+  const timeline = mappedTimeline.map((p) => ({
+    timeSec: Math.max(0, p.rawFromSec - firstSec),
+    fromSec: Math.max(0, p.rawFromSec - firstSec),
+    toSec: Math.max(0, p.rawToSec - firstSec),
+    engagement: p.engagement,
+    stress: p.stress,
+    fatigue: p.fatigue,
+    risk: p.risk,
+    confidence: p.confidence,
+    dominantEmotion: p.dominantEmotion,
+    sampleCount: p.sampleCount,
+  }));
 
   const participants = Array.isArray(raw.participants)
       ? raw.participants.map((p, index) => ({
