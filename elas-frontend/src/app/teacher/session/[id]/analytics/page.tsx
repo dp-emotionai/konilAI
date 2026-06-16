@@ -13,7 +13,6 @@ import {
   YAxis,
 } from "recharts";
 import {
-  ArrowRight,
   CheckCircle2,
   Eye,
   FileJson,
@@ -99,25 +98,20 @@ function MetricCard({
 }
 
 function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
-  const [ready, setReady] = useState(false);
 
-  useEffect(() => {
-    setReady(true);
-  }, []);
+    const chartData = useMemo(() => {
+        if (analytics.timeline?.length) {
+            return analytics.timeline.map((point) => ({
+                timeSec: point.timeSec,
+                fromSec: point.fromSec ?? point.timeSec,
+                toSec: point.toSec ?? point.timeSec,
+                engagement: point.engagement ?? 0,
+                stress: point.stress ?? 0,
+            }));
+        }
 
-  const chartData = useMemo(() => {
-    if (analytics.timeline?.length) {
-      return analytics.timeline.map((point) => ({
-        name: formatTimelineTime(point.timeSec),
-        fromSec: point.fromSec ?? point.timeSec,
-        toSec: point.toSec ?? point.timeSec,
-        engagement: point.engagement ?? 0,
-        stress: point.stress ?? 0,
-      }));
-    }
-
-    return [];
-  }, [analytics.timeline]);
+        return [];
+    }, [analytics.timeline]);
 
   return (
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_18px_55px_rgba(15,23,42,0.05)] lg:col-span-2">
@@ -134,8 +128,7 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
         </div>
 
         <div className="h-[260px]">
-          {ready ? (
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                     data={chartData}
                     margin={{ top: 10, right: 14, left: -8, bottom: 0 }}
@@ -157,12 +150,13 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
                       stroke="#E9E5F5"
                       vertical={false}
                   />
-                  <XAxis
-                      dataKey="name"
-                      tick={{ fill: "#64748B", fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                  />
+                    <XAxis
+                        dataKey="timeSec"
+                        tickFormatter={formatTimelineTime}
+                        tick={{ fill: "#64748B", fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                    />
                   <YAxis
                       domain={[0, 100]}
                       tickFormatter={(value) => `${value}%`}
@@ -170,18 +164,18 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
                       axisLine={false}
                       tickLine={false}
                   />
-                  <Tooltip
-                      contentStyle={{
-                        borderRadius: 16,
-                        border: "1px solid #E2E8F0",
-                        boxShadow: "0 18px 45px rgba(15,23,42,.08)",
-                      }}
-                      labelFormatter={(label) => `Время: ${label}`}
-                      formatter={(value: unknown, name) => [
-                        `${Number(value).toFixed(0)}%`,
-                        name === "engagement" ? "Вовлечённость" : "Стресс",
-                      ]}
-                  />
+                    <Tooltip
+                        contentStyle={{
+                            borderRadius: 16,
+                            border: "1px solid #E2E8F0",
+                            boxShadow: "0 18px 45px rgba(15,23,42,.08)",
+                        }}
+                        labelFormatter={(label) => `Время: ${formatTimelineTime(Number(label))}`}
+                        formatter={(value: unknown, name) => [
+                            `${Number(value).toFixed(0)}%`,
+                            name === "engagement" ? "Вовлечённость" : "Стресс",
+                        ]}
+                    />
                   <Area
                       type="monotone"
                       dataKey="engagement"
@@ -192,11 +186,6 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-          ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                Готовим график…
-              </div>
-          )}
         </div>
 
         <div className="mt-2 flex gap-6 text-xs font-medium text-slate-500">
