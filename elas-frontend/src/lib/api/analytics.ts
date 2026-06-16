@@ -29,12 +29,20 @@ export type SessionAnalyticsTimelinePoint = {
   time_sec?: number;
   timeSec?: number;
   from_sec?: number;
+  fromSec?: number;
   to_sec?: number;
+  toSec?: number;
   engagement?: number;
   avg_engagement?: number;
   avgEngagement?: number;
   stress?: number;
+  fatigue?: number;
   risk?: number;
+  confidence?: number;
+  dominantEmotion?: string | null;
+  dominant_emotion?: string | null;
+  sampleCount?: number;
+  sample_count?: number;
 };
 
 export type SessionAnalyticsParticipantResponse = {
@@ -225,14 +233,25 @@ function normSessionAnalytics(
   const drops = raw.attention_drops ?? raw.attentionDrops ?? 0;
   const timelineRaw = Array.isArray(raw.timeline) ? raw.timeline : [];
 
-  const timeline = timelineRaw.map((p) => ({
-    timeSec: toNumber(p.time_sec ?? p.timeSec ?? p.from_sec ?? 0, 0),
-    engagement: normalizePercent(
-        p.engagement ?? p.avg_engagement ?? p.avgEngagement ?? 0
-    ),
-    stress: normalizeMaybePercent(p.stress),
-    risk: normalizeMaybePercent(p.risk),
-  }));
+  const timeline = timelineRaw.map((p) => {
+    const fromSec = toNumber(p.from_sec ?? p.fromSec ?? p.time_sec ?? p.timeSec ?? 0, 0);
+    const toSec = toNumber(p.to_sec ?? p.toSec ?? fromSec, fromSec);
+
+    return {
+      timeSec: fromSec,
+      fromSec,
+      toSec,
+      engagement: normalizePercent(
+          p.engagement ?? p.avg_engagement ?? p.avgEngagement ?? 0
+      ),
+      stress: normalizeMaybePercent(p.stress),
+      fatigue: normalizeMaybePercent(p.fatigue),
+      risk: normalizeMaybePercent(p.risk),
+      confidence: normalizeMaybePercent(p.confidence),
+      dominantEmotion: p.dominant_emotion ?? p.dominantEmotion ?? null,
+      sampleCount: toNumber(p.sample_count ?? p.sampleCount ?? 0, 0),
+    };
+  });
 
   const participants = Array.isArray(raw.participants)
       ? raw.participants.map((p, index) => ({
