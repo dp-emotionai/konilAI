@@ -150,7 +150,18 @@ export type SessionAnalytics = {
   averageEngagement: number;
   stressEvents: number;
   attentionDrops: number;
-  timeline: { timeSec: number; engagement: number; stress?: number; risk?: number }[];
+  timeline: Array<{
+    timeSec: number;
+    fromSec?: number;
+    toSec?: number;
+    engagement: number;
+    stress?: number;
+    fatigue?: number;
+    risk?: number;
+    confidence?: number;
+    dominantEmotion?: string | null;
+    sampleCount?: number;
+  }>;
   quality?: string;
   durationMinutes?: number;
   aiSummary?: string | null;
