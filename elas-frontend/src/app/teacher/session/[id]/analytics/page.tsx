@@ -41,12 +41,11 @@ const PURPLE = "#7C3AED";
 
 type LocalTab = "overview" | "timeline" | "participants" | "insights";
 
-function formatTimelineTime(value?: number | string) {
-    const raw = typeof value === "string" ? Number(value) : value;
-    const totalSeconds = Math.max(0, Math.floor(Number.isFinite(raw) ? Number(raw) : 0));
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+function formatTimelineTime(value?: number) {
+    const total = Math.max(0, Math.floor(Number(value) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
 
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
@@ -95,19 +94,25 @@ function MetricCard({
 }
 
 function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
-
     const chartData = useMemo(() => {
-        if (analytics.timeline?.length) {
-            return analytics.timeline.map((point) => ({
-                timeSec: point.fromSec ?? point.timeSec,
-                fromSec: point.fromSec ?? point.timeSec,
-                toSec: point.toSec ?? point.timeSec,
-                engagement: point.engagement ?? 0,
-                stress: point.stress ?? 0,
-            }));
-        }
+        const points = analytics.timeline ?? [];
+        if (!points.length) return [];
 
-        return [];
+        const rawPoints = points.map((point) => ({
+            rawSec: Math.max(0, Math.floor(Number(point.fromSec ?? point.timeSec) || 0)),
+            toSec: Math.max(0, Math.floor(Number(point.toSec ?? point.timeSec) || 0)),
+            engagement: point.engagement ?? 0,
+            stress: point.stress ?? 0,
+        }));
+
+        const firstSec = Math.min(...rawPoints.map((point) => point.rawSec));
+
+        return rawPoints.map((point) => ({
+            timeSec: Math.max(0, point.rawSec - firstSec),
+            toSec: Math.max(0, point.toSec - firstSec),
+            engagement: point.engagement,
+            stress: point.stress,
+        }));
     }, [analytics.timeline]);
 
     return (
@@ -151,7 +156,7 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
                             dataKey="timeSec"
                             type="number"
                             domain={["dataMin", "dataMax"]}
-                            tickFormatter={(value) => formatTimelineTime(value)}
+                            tickFormatter={formatTimelineTime}
                             tick={{ fill: "#64748B", fontSize: 12 }}
                             axisLine={false}
                             tickLine={false}
@@ -169,7 +174,7 @@ function ChartCard({ analytics }: { analytics: SessionAnalytics }) {
                                 border: "1px solid #E2E8F0",
                                 boxShadow: "0 18px 45px rgba(15,23,42,.08)",
                             }}
-                            labelFormatter={(label) => `Время: ${formatTimelineTime(label)}`}
+                            labelFormatter={(label) => `Время: ${formatTimelineTime(Number(label))}`}
                             formatter={(value: unknown, name) => [
                                 `${Number(value).toFixed(0)}%`,
                                 name === "engagement" ? "Вовлечённость" : "Стресс",
