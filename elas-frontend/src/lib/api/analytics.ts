@@ -256,10 +256,10 @@ function normSessionAnalytics(
       ? Math.min(...mappedTimeline.map((p) => p.rawFromSec))
       : 0;
 
-  const timeline = mappedTimeline.map((p) => ({
-    timeSec: Math.max(0, p.rawFromSec - firstSec),
-    fromSec: Math.max(0, p.rawFromSec - firstSec),
-    toSec: Math.max(0, p.rawToSec - firstSec),
+  const timeline = mappedTimeline.map((p, index) => ({
+    timeSec: index * 10,
+    fromSec: index * 10,
+    toSec: (index + 1) * 10,
     engagement: p.engagement,
     stress: p.stress,
     fatigue: p.fatigue,
