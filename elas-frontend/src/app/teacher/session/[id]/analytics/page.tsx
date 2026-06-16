@@ -43,16 +43,16 @@ const PURPLE = "#7C3AED";
 type LocalTab = "overview" | "timeline" | "participants" | "insights";
 
 function formatTimelineTime(value?: number) {
-  const total = Math.max(0, Math.floor(Number(value) || 0));
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const seconds = total % 60;
+    const total = Math.max(0, Math.floor(Number(value) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
 
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
+    if (hours > 0) {
+        return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
 
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function MetricCard({
